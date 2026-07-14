@@ -6,6 +6,22 @@ Asankary is an independent white-label clone of the Haryad Autoparts app (React 
 
 ---
 
+## Session 2 — features & polish (autonomous)
+
+New work built on top of the white-label clone (all commits local, tsc-clean, emulator-verified where noted):
+
+- **Category detail screen** (`src/screens/CategoryProductsScreen.tsx`): tapping a category tile on Categories opens a dedicated screen listing that category's products (header + count + price sort + 2-col card grid). Route `CategoryProducts` accepts `{ category }` or `{ brand }` — reused for brand-filtered lists too.
+- **Admin Brand Manager** (`src/screens/admin/AdminBrandManagerScreen.tsx` + `src/services/brandService.ts`): admin CRUD for brands with **name + logo**. Home "Our Brands" reads it (admin logos instead of auto letter-icons); tapping a brand → its products. Reached from Admin Settings → Brands.
+- **Admin Category Manager** (`src/screens/admin/AdminCategoryManagerScreen.tsx` + `src/services/categoryStore.ts`): admin CRUD for categories with **name + logo**; Categories tiles read it. Admin Settings → Categories now opens this.
+- **Logo uploads** work offline in demo (mock mode uses the picked local image URI; real mode uploads to Supabase Storage via `ImageService`). Brand/category stores are AsyncStorage-backed so admin edits persist across reloads.
+- **Auth redesign** — `SignInScreen` + `RegisterScreen` restyled premium (amber gradient hero + brand coin, Phone|Email segmented pill, +964 Iraq input, gradient CTA, social sign-in, guest). All auth logic/handlers/navigation preserved.
+- **Polish**: dark-mode/theme fixes (Cart total was invisible on dark; Orders button/count; Notifications filter → brand amber), Profile currency i18n, and the Volvo `hero-truck.jpg` cover replaced with a branded amber banner (Profile + 2 admin screens).
+
+**Notes for you:**
+- Brand/category default logos are clean amber letter tiles (external logo CDNs like Clearbit are blocked in this build env) — upload real logos via the admin managers.
+- The mock stores (`brandService`, `categoryStore`, `mockData`) auto-disable once a real `EXPO_PUBLIC_SUPABASE_URL` is set. For the live backend, port brand storage to a Supabase `brands` table (category storage already maps to the existing `categories` table via `tenantAdminService`).
+- Remaining un-debranded bundled images may exist (`assets/logo.jpg`, `banner-*.jpg`, `splash-icon.jpg`) — swap when the real logo/artwork arrives.
+
 ## What changed, per phase
 
 **Phase 0 — clean-room purge** (`cb6d747`)
