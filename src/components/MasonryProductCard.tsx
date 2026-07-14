@@ -247,7 +247,6 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
               fontSize={11}
               style={styles.statusText}
               numberOfLines={1}
-              numberOfLines={1}
               adjustsFontSizeToFit
               minimumFontScale={0.5}
             >
@@ -262,7 +261,6 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
             <AppText
               fontSize={11}
               style={styles.statusText}
-              numberOfLines={1}
               numberOfLines={1}
               adjustsFontSizeToFit
               minimumFontScale={0.5}
@@ -280,7 +278,6 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
                 fontSize={11}
                 style={styles.statusText}
               numberOfLines={1}
-                numberOfLines={1}
                 adjustsFontSizeToFit
                 minimumFontScale={0.5}
               >

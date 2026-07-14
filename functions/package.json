@@ -1,7 +1,7 @@
 {
-  "name": "haryad-auto-part-functions",
+  "name": "asankary-functions",
   "version": "1.0.0",
-  "description": "Firebase Cloud Functions for Haryad Auto Part app",
+  "description": "Firebase Cloud Functions for Asankary app",
   "main": "lib/index.js",
   "engines": {
     "node": "22"

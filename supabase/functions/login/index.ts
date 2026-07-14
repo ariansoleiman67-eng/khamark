@@ -11,8 +11,8 @@
 //   supabase.auth.signInWithPassword(). After the first login, the user is fully
 //   on Supabase; Firebase can be retired once logins have drained over.
 //
-// Phone users have synthetic emails ("<digits>@haryadapp.internal" from
-// phoneToEmail, or "<firebase_uid>@haryadapp.internal"). We try all candidates.
+// Phone users have synthetic emails ("<digits>@asankaryapp.internal" from
+// phoneToEmail, or "<firebase_uid>@asankaryapp.internal"). We try all candidates.
 //
 // SETUP:
 //   supabase secrets set FIREBASE_WEB_API_KEY="AIza..."   # Firebase console → Project settings → Web API Key
@@ -85,8 +85,8 @@ Deno.serve(async (req: Request) => {
     if (userRow.email) candidates.add(userRow.email);
     if (authUser?.email) candidates.add(authUser.email);
     const phoneDigits = digitsOnly(userRow.phone || (isEmail ? '' : identifier));
-    if (phoneDigits) candidates.add(`${phoneDigits}@haryadapp.internal`);
-    if (firebaseUid) candidates.add(`${firebaseUid}@haryadapp.internal`);
+    if (phoneDigits) candidates.add(`${phoneDigits}@asankaryapp.internal`);
+    if (firebaseUid) candidates.add(`${firebaseUid}@asankaryapp.internal`);
 
     let verified = false;
     for (const email of candidates) {

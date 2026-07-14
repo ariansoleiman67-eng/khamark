@@ -6,7 +6,7 @@ import { User } from '../types';
 export class AuthService {
   static async signIn(email: string, password: string): Promise<User> {
     try {
-      await AsyncStorage.multiRemove(['user_data', '@haryad_user_profile']);
+      await AsyncStorage.multiRemove(['user_data', '@asankary_user_profile']);
 
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
@@ -135,13 +135,13 @@ export class AuthService {
       throw new Error(result?.error || 'Incorrect password');
     }
 
-    // Prefer email sign-in (synthetic "<digits>@haryadapp.internal" for phone users).
+    // Prefer email sign-in (synthetic "<digits>@asankaryapp.internal" for phone users).
     if (result.email) {
       return this.signIn(result.email, password);
     }
 
     // Phone-only fallback.
-    await AsyncStorage.multiRemove(['user_data', '@haryad_user_profile']);
+    await AsyncStorage.multiRemove(['user_data', '@asankary_user_profile']);
     const { error } = await supabase.auth.signInWithPassword({ phone: result.phone, password });
     if (error) throw new Error(error.message || 'Incorrect password');
     const user = await this.getCurrentUserFresh();
@@ -172,7 +172,7 @@ export class AuthService {
         'user_data',
         'cart',
         'recent_searches',
-        '@haryad_user_profile',
+        '@asankary_user_profile',
         '@user_theme',
         '@user_language',
       ]);
@@ -211,7 +211,7 @@ export class AuthService {
         'user_data',
         'cart',
         'recent_searches',
-        '@haryad_user_profile',
+        '@asankary_user_profile',
         '@user_theme',
         '@user_language',
       ]);

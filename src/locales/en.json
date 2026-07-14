@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Haryad Auto Parts"
+    "name": "Asankary"
   },
   "nav": {
     "home": "Home",
@@ -95,7 +95,7 @@
     "later": "Later",
     "available": "Update Available",
     "softTitle": "Update Available",
-    "softMessage": "A new version of Haryad Auto Part is available with improvements and fixes."
+    "softMessage": "A new version of Asankary is available with improvements and fixes."
   },
   "common": {
     "video": "Video",
@@ -105,7 +105,7 @@
     "directions": "Directions",
     "location": "Location",
     "openInMaps": "Open in Maps",
-    "appName": "Haryad Auto Part",
+    "appName": "Asankary",
     "loading": "Loading...",
     "error": "Error",
     "success": "Success",
@@ -243,7 +243,7 @@
     "forgotPasswordLabel": "Forgot Password?",
     "resetPasswordLabel": "Reset Password",
     "welcomeBack": "Please sign in to your existing account",
-    "joinUs": "Join Haryad Auto Part and get access to quality Volvo truck parts.",
+    "joinUs": "Join Asankary and shop quality products at great prices.",
     "email": "Email Address",
     "password": "Password",
     "confirmPassword": "Confirm Password",
@@ -448,8 +448,8 @@
     }
   },
   "home": {
-    "welcome": "Welcome to Haryad Auto Part",
-    "subtitle": "Find quality Volvo truck spare parts",
+    "welcome": "Welcome to Asankary",
+    "subtitle": "Find quality products at great prices",
     "location": "Erbil, Iraq",
     "categories": "Categories",
     "featuredProducts": "Featured Products",
@@ -465,10 +465,10 @@
     "today": "Today",
     "tomorrow": "Tomorrow",
     "banners": {
-      "newParts": "New Volvo FH Series Parts",
-      "newPartsSubtitle": "Get 20% off on all engine components",
-      "brakeSystems": "Quality Brake Systems",
-      "brakeSystemsSubtitle": "Safety first with premium brake parts",
+      "newParts": "New Arrivals Just In",
+      "newPartsSubtitle": "Get 20% off on selected items",
+      "brakeSystems": "Top Electronics Deals",
+      "brakeSystemsSubtitle": "Shop premium gadgets and accessories",
       "fastDelivery": "Fast Delivery",
       "fastDeliverySubtitle": "Same day delivery in Erbil region"
     },
@@ -871,7 +871,7 @@
     "noTrackingMessage": "Tracking information is not available yet.",
     "cannotCancel": "Cannot Cancel",
     "cannotCancelMessage": "This order cannot be cancelled at this stage.",
-    "shareText": "Check out my order from Haryad Auto Part:",
+    "shareText": "Check out my order from Asankary:",
     "dateRange": "Date Range",
     "cancelledOn": "Cancelled on {{date}}",
     "messageSeller": "Message Seller",
@@ -1106,7 +1106,7 @@
       }
     },
     "termsAndConditions": "Terms & Conditions",
-    "termsSubtitle": "Haryad Auto Parts Co. - Genuine Volvo Parts",
+    "termsSubtitle": "Asankary - Terms & Conditions",
     "termsEffectiveDate": "Effective Date: January 1, 2025",
     "fullName": "Full Name",
     "enterFullName": "Enter your full name",
@@ -1141,9 +1141,9 @@
       "female": "Female",
       "preferNotToSay": "Prefer not to say"
     },
-    "vehicleInfoDescription": "Adding your vehicle information helps us recommend the right parts for your truck.",
-    "vehicleMakePlaceholder": "e.g., Volvo, Scania, MAN",
-    "vehicleModelPlaceholder": "e.g., FH16, FH12, FM",
+    "vehicleInfoDescription": "Adding your vehicle information helps us recommend the right products for your vehicle.",
+    "vehicleMakePlaceholder": "e.g., your vehicle make",
+    "vehicleModelPlaceholder": "e.g., your vehicle model",
     "vehicleYearPlaceholder": "e.g., 2018",
     "vehicleVinPlaceholder": "17-character VIN (optional)",
     "vehicleVinDescription": "VIN helps us ensure part compatibility with your specific vehicle",
@@ -1587,11 +1587,11 @@
       },
       "phone": {
         "title": "Call Support",
-        "subtitle": "+964 750 692 9085"
+        "subtitle": "TODO_CONTACT_PHONE_2"
       },
       "email": {
         "title": "Email Support",
-        "subtitle": "haryadautoparts@gmail.com"
+        "subtitle": "TODO_CONTACT_EMAIL"
       },
       "facebook": {
         "title": "Facebook",
@@ -1601,7 +1601,7 @@
         "title": "Visit Our Store",
         "subtitle": "Erbil, Kurdistan Region, Iraq",
         "alertTitle": "Store Location",
-        "alertMessage": "Haryad Auto Parts\nIraq-Erbil-North Industry\nKurdistan Region, Iraq\n\nOpen: Saturday - Thursday\n8:00 AM - 6:00 PM\n\nFriday: 8:00 AM - 12:00 PM",
+        "alertMessage": "Asankary\nTODO_CONTACT_ADDRESS\n\nOpen: Saturday - Thursday\n8:00 AM - 6:00 PM\n\nFriday: 8:00 AM - 12:00 PM",
         "callStore": "Call Store",
         "getDirections": "Get Directions",
         "close": "Close"
@@ -1621,11 +1621,11 @@
       "questions": {
         "trackOrder": {
           "question": "How do I track my order?",
-          "answer": "You can track your order by:\n\n1. Going to \"My Orders\" in your profile\n2. Selecting the order you want to track\n3. Viewing the real-time status updates\n4. Calling our support line at +964750692908\n\nWe provide SMS updates for all order status changes."
+          "answer": "You can track your order by:\n\n1. Going to \"My Orders\" in your profile\n2. Selecting the order you want to track\n3. Viewing the real-time status updates\n4. Calling our support line at TODO_CONTACT_PHONE_2\n\nWe provide SMS updates for all order status changes."
         },
         "cancelOrder": {
           "question": "Can I cancel or modify my order?",
-          "answer": "Yes, you can cancel or modify your order:\n\n• Within 2 hours of placing the order\n• Before it enters \"Processing\" status\n• By contacting us immediately\n\nTo cancel: Go to \"My Orders\" and tap \"Cancel Order\" or call us at +964750692908."
+          "answer": "Yes, you can cancel or modify your order:\n\n• Within 2 hours of placing the order\n• Before it enters \"Processing\" status\n• By contacting us immediately\n\nTo cancel: Go to \"My Orders\" and tap \"Cancel Order\" or call us at TODO_CONTACT_PHONE_2."
         },
         "deliveryAreas": {
           "question": "What areas do you deliver to?",
@@ -1640,24 +1640,24 @@
           "answer": "We accept multiple payment methods:\n\n• Cash on Delivery (COD)\n• QI Card payments\n• FIB Bank cards\n• Bank transfers\n• Mobile wallet payments\n\nAll electronic payments are secure and encrypted. COD is available for all orders."
         },
         "genuineParts": {
-          "question": "Are your parts genuine Volvo parts?",
-          "answer": "Yes, we guarantee:\n\n• 100% genuine Volvo OEM parts\n• Official Volvo distributor certification\n• Full warranty coverage\n• Quality assurance certificates\n• Authenticity verification\n\nAll parts come with official Volvo packaging and documentation."
+          "question": "Are your products genuine and authentic?",
+          "answer": "Yes, we guarantee:\n\n• 100% genuine, authentic products\n• Sourced from trusted suppliers\n• Full warranty coverage\n• Quality assurance certificates\n• Authenticity verification\n\nAll products come with official packaging and documentation."
         },
         "warranty": {
-          "question": "Do you offer warranties on parts?",
-          "answer": "Yes, comprehensive warranty coverage:\n\n• Genuine parts: 12-24 months warranty\n• Engine parts: Up to 24 months\n• Electrical parts: 12 months\n• Body parts: 12 months\n• Labor warranty: 6 months\n\nWarranty covers manufacturing defects and normal wear."
+          "question": "Do you offer warranties on products?",
+          "answer": "Yes, comprehensive warranty coverage:\n\n• Genuine products: 12-24 months warranty\n• Electronics: Up to 24 months\n• Accessories: 12 months\n• Manufacturing defects: Fully covered\n• Service warranty: 6 months\n\nWarranty covers manufacturing defects and normal use."
         },
         "resetPassword": {
           "question": "How do I reset my password?",
           "answer": "To reset your password:\n\n1. Tap \"Forgot Password\" on login screen\n2. Enter your registered email\n3. Check your email for reset link\n4. Follow the instructions in the email\n5. Create a new strong password\n\nIf you don't receive the email, check spam folder or contact us."
         },
         "installation": {
-          "question": "Do you install the parts?",
-          "answer": "Yes, we offer professional installation:\n\n• Certified Volvo technicians\n• Installation at our service center\n• Mobile installation service available\n• Competitive installation rates\n• Installation warranty included\n\nContact us to schedule installation: +964750692908"
+          "question": "Do you offer product setup or installation?",
+          "answer": "Yes, we offer professional setup and installation:\n\n• Certified technicians\n• Installation at our service center\n• Mobile installation service available\n• Competitive rates\n• Installation warranty included\n\nContact us to schedule: TODO_CONTACT_PHONE_2"
         },
         "returns": {
-          "question": "Can I return or exchange parts?",
-          "answer": "Return and exchange policy:\n\n• 7-day return policy\n• Parts must be unused and in original packaging\n• Manufacturing defects: Full refund\n• Wrong part ordered: Exchange available\n• Installation errors: Consultation provided\n\nContact us within 7 days for returns or exchanges."
+          "question": "Can I return or exchange products?",
+          "answer": "Return and exchange policy:\n\n• 7-day return policy\n• Products must be unused and in original packaging\n• Manufacturing defects: Full refund\n• Wrong item ordered: Exchange available\n• Other issues: Consultation provided\n\nContact us within 7 days for returns or exchanges."
         }
       }
     },
@@ -1715,7 +1715,7 @@
   "chatbot": {
     "title": "AI Assistant",
     "subtitle": "Online - Ready to help",
-    "welcomeMessage": "Hello! 👋 I'm your Haryad Auto Parts assistant. I can help you with questions about our Volvo truck parts, orders, delivery, and more. How can I help you today?",
+    "welcomeMessage": "Hello! 👋 I'm your Asankary shopping assistant. I can help you with questions about our products, orders, delivery, and more. How can I help you today?",
     "inputPlaceholder": "Type your message...",
     "typing": "Typing",
     "errorMessage": "Sorry, I couldn't process your message. Please try again.",
@@ -1723,7 +1723,7 @@
     "clearChat": "Clear Chat",
     "clearChatConfirm": "Are you sure you want to clear this conversation?",
     "quickActions": {
-      "findParts": "🔧 Find Parts",
+      "findParts": "🛍️ Find Products",
       "trackOrder": "📦 Track Order",
       "deliveryInfo": "🚚 Delivery Info",
       "contactStore": "📞 Contact",
@@ -1733,7 +1733,7 @@
       "myOrders": "Orders"
     },
     "questions": {
-      "findParts": "What Volvo truck parts do you have available?",
+      "findParts": "What products do you have available?",
       "trackOrder": "What's the status of my orders?",
       "deliveryInfo": "What are your delivery options and costs?",
       "contactStore": "How can I contact the store directly?",
@@ -2088,7 +2088,7 @@
       "administrator": "Administrator",
       "setupYourStore": "Setup Your Store",
       "setupYourStoreSubtitle": "Enter your store name to complete setup:",
-      "storeNamePlaceholder": "e.g., Haryad Auto Part",
+      "storeNamePlaceholder": "e.g., Asankary",
       "setupStore": "Setup Store",
       "customers": "Customer Management",
       "customersSubtitle": "View users, set VIP roles, and manage access",
@@ -2912,8 +2912,8 @@
   },
   "onboarding": {
     "welcomeTitle": "Welcome to",
-    "welcomeSubtitle": "Your premium destination for heavy-duty truck parts across Kurdistan and Iraq",
-    "feat1": "Smart Part Search",
+    "welcomeSubtitle": "Your one-stop shop for electronics and accessories across Kurdistan and Iraq",
+    "feat1": "Smart Product Search",
     "feat2": "Verified Quality",
     "feat3": "Fast Delivery",
     "getStarted": "Get Started",
@@ -2921,10 +2921,10 @@
     "continue": "Continue",
     "skip": "Skip",
     "finish": "Let's Go!",
-    "searchTitle": "Find Exact Parts Fast",
-    "searchSub": "Search by part number, brand, or system to get Volvo, Scania, and DAF matches instantly.",
-    "searchB1": "Advanced filters for engines, brakes & suspension",
-    "searchB2": "Compatibility notes for FH/FM, R/S, and XF series",
+    "searchTitle": "Find What You Need Fast",
+    "searchSub": "Search by name, brand, or category to find products instantly.",
+    "searchB1": "Advanced filters by category, brand & price",
+    "searchB2": "Detailed specs and compatibility notes",
     "searchB3": "Visual highlights for best sellers & new arrivals",
     "orderTitle": "Order with Confidence",
     "orderSub": "See live stock, pick cash on delivery or card, and get delivery ETAs.",

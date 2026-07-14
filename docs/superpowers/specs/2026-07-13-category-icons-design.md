@@ -23,7 +23,7 @@ name or choosing from a fixed list. The customer-facing Categories screen shows
 - **CRUD already exists** in `tenantAdminService`: `getCategories`, `addCategory`,
   `updateCategory`, `deleteCategory` (all tenant-scoped).
 - **Nothing uses the table yet.** Add Product (`AdminProductsScreen`) picks the
-  category from a hardcoded `VOLVO_CATEGORIES` list or free-typed text, and stores
+  category from a hardcoded `STORE_CATEGORIES` list or free-typed text, and stores
   it as a plain string on the product (`category` / `categoryAr` / `categoryKu`).
 - The **customer `CategoriesScreen`** builds its category list from the distinct
   `product.category` strings and assigns an icon via a hardcoded guess-map
@@ -51,7 +51,7 @@ change, no new RLS.** Icon lives in the existing `image_url` column.
   duplicates.
 
 ### 3. Add Product — pick from managed categories
-- Replace the `VOLVO_CATEGORIES` picker + free-text with a picker listing the
+- Replace the `STORE_CATEGORIES` picker + free-text with a picker listing the
   tenant's managed categories (icon + localized name), loaded via `getCategories`.
 - Selecting a category writes its `name` / `name_ar` / `name_ku` onto the
   product's existing string fields — **backward compatible, no product migration.**

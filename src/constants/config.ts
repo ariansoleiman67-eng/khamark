@@ -1,3 +1,16 @@
+// Central brand block — single source of truth for store identity/contact.
+// Contact + domain values are placeholders until finalized.
+export const BRAND = {
+  name: 'Asankary',
+  domain: 'ASANKARY_DOMAIN_TBD',
+  contactEmail: 'TODO_CONTACT_EMAIL',
+  contactPhone: 'TODO_CONTACT_PHONE',
+  contactPhone2: 'TODO_CONTACT_PHONE_2',
+  contactPhone3: 'TODO_CONTACT_PHONE_3',
+  address: 'TODO_CONTACT_ADDRESS',
+  storeCoords: { latitude: 36.1911, longitude: 44.0094 }, // Erbil default
+} as const;
+
 // Firebase Configuration
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -35,7 +48,7 @@ export const API_CONFIG = {
 
 // App Configuration
 export const APP_CONFIG = {
-  NAME: process.env.EXPO_PUBLIC_APP_NAME || 'Haryad Auto Part',
+  NAME: process.env.EXPO_PUBLIC_APP_NAME || BRAND.name,
   VERSION: process.env.EXPO_PUBLIC_APP_VERSION || '1.0.0',
   SUPPORTED_LANGUAGES: ['en', 'ar', 'ku'] as const,
   DEFAULT_LANGUAGE: 'en' as const,
@@ -50,8 +63,8 @@ export const APP_CONFIG = {
 // The store owner is a normal admin in the DB (role='admin'); there is no DB-level
 // "owner" flag, so the owner-only Partner Management tools are gated on these UIDs.
 // Both accounts the owner uses are recognized:
-//   a25f166b… — "HAryad Store", the main phone-login admin that owns the store/products
-//   b99b3b5c… — haryadautoparts@gmail.com, the owner's personal account
+//   a25f166b… — "Asankary Store", the main phone-login admin that owns the store/products
+//   b99b3b5c… — TODO_CONTACT_EMAIL, the owner's personal account
 export const OWNER_UIDS: string[] = [
   'a25f166b-c5b4-4cca-ae27-a593a1329f66',
   'b99b3b5c-6df1-4714-a5f9-16da05526805',

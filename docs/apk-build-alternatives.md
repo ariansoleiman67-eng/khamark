@@ -68,8 +68,8 @@ npm audit fix
 ```json
 {
   "expo": {
-    "name": "HaryadAutoPart",
-    "slug": "HaryadAutoPart", 
+    "name": "Asankary",
+    "slug": "Asankary", 
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -82,14 +82,14 @@ npm audit fix
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.arian142312.haryadautopart"
+      "bundleIdentifier": "com.asankary.app"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.arian142312.haryadautopart",
+      "package": "com.asankary.app",
       "edgeToEdgeEnabled": true
     },
     "web": {

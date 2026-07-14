@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../components/ThemeProvider';
 import { getDirection } from '../../locales';
 import { SPACING } from '../../constants/theme';
+import { BRAND } from '../../constants/config';
 
 const TermsAndConditionsScreen: React.FC = () => {
   const { theme } = useTheme();
@@ -23,27 +24,27 @@ const TermsAndConditionsScreen: React.FC = () => {
   const termsContent = [
     {
       title: "1. ACCEPTANCE OF TERMS",
-      content: `By accessing and using the Haryad Auto Parts mobile application and services, you accept and agree to be bound by these Terms and Conditions. If you do not agree to these terms, please do not use our services.
+      content: `By accessing and using the ${BRAND.name} mobile application and services, you accept and agree to be bound by these Terms and Conditions. If you do not agree to these terms, please do not use our services.
 
 These terms apply to all users, including customers, visitors, and others who access or use our service in the Kurdistan Region of Iraq and beyond.`
     },
     {
       title: "2. COMPANY INFORMATION",
-      content: `Haryad Auto Parts Co.
+      content: `${BRAND.name}
 Business License: [License Number]
-Address: Iraq-Erbil-North Industry
-Phone: +964 750 492 9085
-Alternate Phone: +964 770 127 9797
-Email: haryadautoparts@gmail.com
+Address: ${BRAND.address}
+Phone: ${BRAND.contactPhone2}
+Alternate Phone: ${BRAND.contactPhone}
+Email: ${BRAND.contactEmail}
 
-We are a registered automotive parts distributor specializing in genuine Volvo truck and heavy vehicle parts.`
+We are a registered online retailer offering a wide range of consumer electronics, accessories, and everyday products.`
     },
     {
       title: "3. PRODUCTS AND SERVICES",
       content: `3.1 PRODUCT AUTHENTICITY
-• We guarantee all parts are genuine OEM Volvo parts
-• All products come with manufacturer warranties
-• Counterfeit or replica parts are explicitly prohibited
+• We guarantee all products are genuine and sourced from authorized suppliers
+• All products come with applicable manufacturer warranties
+• Counterfeit or replica products are explicitly prohibited
 • Product specifications are accurate to the best of our knowledge
 
 3.2 INVENTORY AND AVAILABILITY
@@ -98,15 +99,15 @@ We deliver throughout the Kurdistan Region of Iraq:
       title: "6. RETURNS AND EXCHANGES",
       content: `6.1 RETURN POLICY
 • 7-day return period from delivery date
-• Parts must be unused and in original packaging
+• Items must be unused and in original packaging
 • Return shipping costs borne by customer (unless defective)
-• Electrical parts require original seals intact
+• Sealed items require original seals intact
 
 6.2 EXCHANGE CONDITIONS
 • Manufacturing defects: Full refund or exchange
-• Wrong part ordered: Exchange for correct part
+• Wrong item ordered: Exchange for correct item
 • Customer error: Exchange subject to 10% restocking fee
-• Installation damage: Not eligible for return
+• Damage after delivery: Not eligible for return
 
 6.3 REFUND PROCESS
 • Refunds processed within 5-7 business days
@@ -117,17 +118,16 @@ We deliver throughout the Kurdistan Region of Iraq:
     {
       title: "7. WARRANTIES",
       content: `7.1 PRODUCT WARRANTIES
-• Genuine Volvo parts: 12-24 months manufacturer warranty
-• Engine components: Up to 24 months
-• Electrical parts: 12 months
-• Body parts: 12 months
-• Wear items (filters, belts): 6 months
+• Products with manufacturer warranty: 12-24 months
+• Electronics and appliances: Up to 24 months
+• Accessories: 12 months
+• Consumable items: 6 months
 
 7.2 WARRANTY EXCLUSIONS
 • Normal wear and tear
-• Misuse or improper installation
+• Misuse or improper handling
 • Damage from accidents or negligence
-• Use in non-compatible vehicles
+• Use inconsistent with product instructions
 • Modifications or unauthorized repairs
 
 7.3 WARRANTY CLAIMS
@@ -141,27 +141,27 @@ We deliver throughout the Kurdistan Region of Iraq:
       content: `8.1 LIMITATION OF LIABILITY
 • Our liability is limited to the purchase price of products
 • We are not liable for consequential or indirect damages
-• Professional installation is recommended for safety
-• Customer assumes risk for self-installation
+• Products should be used according to manufacturer instructions
+• Customer assumes risk for improper use
 
-8.2 VEHICLE COMPATIBILITY
-• Customer responsible for verifying part compatibility
-• VIN number and model year required for accuracy
-• We provide compatibility guidance but not guarantees
-• Incorrect parts due to wrong information: Customer responsibility
+8.2 PRODUCT SUITABILITY
+• Customer responsible for verifying product suitability
+• Product specifications are provided to help you choose
+• We provide product guidance but not guarantees
+• Incorrect orders due to wrong information: Customer responsibility
 
-8.3 INSTALLATION SERVICES
-• Installation services available through certified technicians
-• Installation warranty: 6 months on labor
-• Customer may choose independent installation
-• Warranty void if improperly installed`
+8.3 SETUP AND SUPPORT
+• Setup guidance available for supported products
+• Support provided for product-related questions
+• Customer may seek independent assistance
+• Warranty void if product is misused or tampered with`
     },
     {
       title: "9. INTELLECTUAL PROPERTY",
       content: `9.1 TRADEMARKS
-• Volvo is a registered trademark of Volvo Group
-• We are an authorized distributor, not manufacturer
-• All product names and trademarks belong to respective owners
+• All product names and trademarks belong to their respective owners
+• We are a retailer, not a manufacturer
+• Brand names are used for identification purposes only
 • Our branding and app design are our intellectual property
 
 9.2 APP CONTENT
@@ -216,13 +216,13 @@ We deliver throughout the Kurdistan Region of Iraq:
       title: "13. CONTACT INFORMATION",
       content: `For questions about these Terms and Conditions:
 
-Haryad Auto Parts Co.
-Address: Iraq-Erbil-North Industry
-Phone: +964 750 492 9085
-Alternate Phone: +964 750 692 9085
-WhatsApp: +964 770 127 9797
-Email: haryadautoparts@gmail.com
-Support: haryadautoparts@gmail.com
+${BRAND.name}
+Address: ${BRAND.address}
+Phone: ${BRAND.contactPhone2}
+Alternate Phone: ${BRAND.contactPhone2}
+WhatsApp: ${BRAND.contactPhone}
+Email: ${BRAND.contactEmail}
+Support: ${BRAND.contactEmail}
 
 Business Hours:
 Saturday - Thursday: 8:00 AM - 6:00 PM
@@ -358,7 +358,7 @@ Last Updated: January 2025`
                 color: theme.colors.textSecondary,
                 textAlign: 'center',
               }}>
-                Questions? Contact us at volvoha2025@gmail.com
+                {`Questions? Contact us at ${BRAND.contactEmail}`}
               </Text>
             </View>
           </View>

@@ -27,7 +27,7 @@ import { Platform } from 'react-native';
 let cachedUser: any = null;
 
 const isInternalEmail = (email?: string | null): boolean =>
-  !!email && (isSyntheticEmail(email) || email.includes('@haryadapp.'));
+  !!email && (isSyntheticEmail(email) || email.includes('@asankaryapp.'));
 
 /** Map a Supabase provider name to the legacy Firebase-style id the UI expects. */
 const toLegacyProviderId = (provider: string): string => {

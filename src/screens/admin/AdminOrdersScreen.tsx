@@ -33,6 +33,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { Order, OrderStatus, normalizeOrderStatus } from '../../types';
 import { InvoiceSettings } from '../../services/tenantAdminService';
+import { BRAND } from '../../constants/config';
 import OrderStatusBadge, { getStatusConfig } from '../../components/OrderStatusBadge';
 import { formatPrice, convertUSDToIQD } from '../../utils/currency';
 import { getThumbnailUrl } from '../../utils/imageUtils';
@@ -837,7 +838,7 @@ const AdminOrdersScreen: React.FC = () => {
     const labels = {
       en: {
         invoice: 'INVOICE',
-        companyName: invoiceSettings?.companyName || 'HARYAD AUTO PARTS',
+        companyName: invoiceSettings?.companyName || BRAND.name,
         orderNumber: 'Order #:',
         date: 'Date:',
         status: 'Status:',
@@ -1185,7 +1186,7 @@ const AdminOrdersScreen: React.FC = () => {
         <div class="footer">
           <p><strong>${L.companyName}</strong></p>
           ${invoiceSettings?.phone ? `<p style="margin-top: 4px;">📞 ${invoiceSettings.phone}</p>` : ''}
-          <p style="margin-top: 4px;">📧 ${invoiceSettings?.email || 'haryadautoparts@gmail.com'}</p>
+          <p style="margin-top: 4px;">📧 ${invoiceSettings?.email || BRAND.contactEmail}</p>
           ${invoiceSettings?.website ? `<p style="margin-top: 4px;">🌐 ${invoiceSettings.website}</p>` : ''}
           ${(() => {
             const isVipOrder = (order.userId && usersMap[order.userId]?.role === 'vip') || (order as any).isVip;

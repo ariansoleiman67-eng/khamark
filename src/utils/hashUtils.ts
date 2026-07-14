@@ -39,7 +39,7 @@ const simpleHash = (str: string): string => {
 
 /**
  * Generate email from phone number for Firebase Auth
- * Format: {phone}@haryadapp.internal
+ * Format: {phone}@asankaryapp.internal
  * 
  * @param phone - Phone number in E.164 format
  * @returns Email address for Firebase Auth
@@ -47,7 +47,7 @@ const simpleHash = (str: string): string => {
 export const phoneToEmail = (phone: string): string => {
   // Remove + sign and spaces
   const cleaned = phone.replace(/[\+\s]/g, '');
-  return `${cleaned}@haryadapp.internal`;
+  return `${cleaned}@asankaryapp.internal`;
 };
 
 /**
@@ -58,7 +58,7 @@ export const phoneToEmail = (phone: string): string => {
  * @returns Phone number with + prefix
  */
 export const emailToPhone = (email: string): string | null => {
-  const match = email.match(/^(\d+)@haryadapp\.internal$/);
+  const match = email.match(/^(\d+)@asankaryapp\.internal$/);
   if (!match) return null;
   return `+${match[1]}`;
 };
@@ -67,30 +67,30 @@ export const emailToPhone = (email: string): string | null => {
  * Validate if email is a generated phone email
  */
 export const isPhoneEmail = (email: string): boolean => {
-  return email.endsWith('@haryadapp.internal');
+  return email.endsWith('@asankaryapp.internal');
 };
 
 /**
- * True only for the legacy fully-internal placeholder email ({phone}@haryadapp.internal),
+ * True only for the legacy fully-internal placeholder email ({phone}@asankaryapp.internal),
  * which is hidden from the user.
  *
- * NOTE: The phone-login emails {phone}@haryad.app (customer) and
- * {phone}@haryad.admin (admin) are intentionally NOT treated as synthetic here —
+ * NOTE: The phone-login emails {phone}@asankary.app (customer) and
+ * {phone}@asankary.admin (admin) are intentionally NOT treated as synthetic here —
  * they are the credential the user actually signs in with, so we display them on
  * the account screens until the user replaces them with a real email.
  */
 export const isSyntheticEmail = (email?: string | null): boolean => {
   if (!email) return false;
-  return email.includes('@haryadapp.');
+  return email.includes('@asankaryapp.');
 };
 
 /**
- * The phone-derived login emails {phone}@haryad.app (customer) and
- * {phone}@haryad.admin (admin). These ARE shown to the account owner (it's the
+ * The phone-derived login emails {phone}@asankary.app (customer) and
+ * {phone}@asankary.admin (admin). These ARE shown to the account owner (it's the
  * credential they sign in with), but are meaningless noise when shown to
  * someone else — e.g. an admin viewing a customer — so hide them there.
  */
 export const isPhoneAuthEmail = (email?: string | null): boolean => {
   if (!email) return false;
-  return email.endsWith('@haryad.app') || email.endsWith('@haryad.admin');
+  return email.endsWith('@asankary.app') || email.endsWith('@asankary.admin');
 };

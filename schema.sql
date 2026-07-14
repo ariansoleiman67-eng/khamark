@@ -1,4 +1,4 @@
--- Supabase Postgres Schema for HAryad App Migration
+-- Supabase Postgres Schema for Asankary App
 
 -- 1. Create Users Table (extends Supabase Auth auth.users)
 CREATE TABLE public.users (

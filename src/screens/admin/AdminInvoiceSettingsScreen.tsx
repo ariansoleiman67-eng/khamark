@@ -299,19 +299,19 @@ const AdminInvoiceSettingsScreen: React.FC = () => {
               t('admin.invoiceSettings.companyNameEn', { defaultValue: 'Company Name (English)' }),
               companyName,
               setCompanyName,
-              { placeholder: 'e.g. HARYAD AUTO PARTS' }
+              { placeholder: 'e.g. Asankary' }
             )}
             {renderInput(
               t('admin.invoiceSettings.companyNameAr', { defaultValue: 'Company Name (العربية)' }),
               companyNameAr,
               setCompanyNameAr,
-              { placeholder: 'e.g. هرياد أوتو بارت', rtl: true }
+              { placeholder: 'e.g. Asankary', rtl: true }
             )}
             {renderInput(
               t('admin.invoiceSettings.companyNameKu', { defaultValue: 'Company Name (کوردی)' }),
               companyNameKu,
               setCompanyNameKu,
-              { placeholder: 'e.g. هەریاد ئۆتۆ پارت', rtl: true }
+              { placeholder: 'e.g. Asankary', rtl: true }
             )}
           </View>
 

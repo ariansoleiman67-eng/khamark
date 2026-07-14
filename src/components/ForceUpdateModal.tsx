@@ -101,7 +101,7 @@ const ForceUpdateModal: React.FC<ForceUpdateModalProps> = ({ onCheckComplete }) 
       setUpdateMessage(
         updateMode === 'soft'
           ? (appConfigService.getLocalizedSoftMessage(cfg, i18n.language) ||
-             t('update.softMessage', { defaultValue: 'A new version of Haryad Auto Part is available with improvements and fixes.' }))
+             t('update.softMessage', { defaultValue: 'A new version of Asankary is available with improvements and fixes.' }))
           : getLocalizedMessage(cfg)
       );
       setVisible(true);

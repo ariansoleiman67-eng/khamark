@@ -1,6 +1,6 @@
-# Haryad Auto Part - Firebase Cloud Functions
+# Asankary - Firebase Cloud Functions
 
-This directory contains Firebase Cloud Functions for the Haryad Auto Part mobile application.
+This directory contains Firebase Cloud Functions for the Asankary mobile application.
 
 ## Setup Instructions
 
@@ -65,7 +65,7 @@ The functions runtime loads `functions/.env` directly, so the mobile app env and
 ### Local Sora CLI with Backend Env
 If you want to run the local Sora helper while keeping the key in `functions/.env`, use:
 ```bash
-zsh scripts/run_sora_with_functions_env.sh create --prompt-file tmp/sora/haryad-app-teaser-v1.txt --no-augment --model sora-2 --size 720x1280 --seconds 8
+zsh scripts/run_sora_with_functions_env.sh create --prompt-file tmp/sora/asankary-app-teaser-v1.txt --no-augment --model sora-2 --size 720x1280 --seconds 8
 ```
 
 ## Available Functions
@@ -142,7 +142,7 @@ zsh scripts/run_sora_with_functions_env.sh create --prompt-file tmp/sora/haryad-
 firebase functions:config:set imgbb.api_key="YOUR_IMGBB_API_KEY"
 
 # Add other config variables as needed
-firebase functions:config:set app.name="Haryad Auto Part"
+firebase functions:config:set app.name="Asankary"
 firebase functions:config:set app.version="1.0.0"
 ```
 

@@ -53,7 +53,7 @@ const Logo: React.FC<LogoProps> = ({
     ]}>
       {!imageError ? (
         <Image
-          source={require('../../assets/images/haryadlogo.png')}
+          source={require('../../assets/images/asankarylogo.png')}
           style={[
             styles.logo,
             // In responsive mode, use percentage-based sizing

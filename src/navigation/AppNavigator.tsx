@@ -284,7 +284,7 @@ const AppNavigator: React.FC = () => {
   }), [theme]);
 
   const linking = React.useMemo(() => ({
-    prefixes: ['https://haryadautoparts.com', 'https://www.haryadautoparts.com', 'haryad://'],
+    prefixes: ['https://ASANKARY_DOMAIN_TBD', 'https://www.ASANKARY_DOMAIN_TBD', 'asankary://'],
     config: {
       screens: {
         ProductDetails: 'product/:productId',
@@ -316,7 +316,7 @@ const AppNavigator: React.FC = () => {
           adjustsFontSizeToFit
           numberOfLines={1}
         >
-          Haryad Auto Parts
+          Asankary
         </Text>
         <Text allowFontScaling={false} 
           style={{
@@ -381,7 +381,7 @@ const AppNavigator: React.FC = () => {
             <Stack.Screen name="AdminStoreLocations" component={AdminStoreLocationsScreen} />
             <Stack.Screen name="AdminEditStoreLocation" component={AdminEditStoreLocationScreen} />
             <Stack.Screen name="AdminDiscounts" component={AdminDiscountsScreen} />
-            <Stack.Screen name="AdminCategories" component={AdminCategoriesScreen} />
+            <Stack.Screen name={"AdminCategories" as any} component={AdminCategoriesScreen} />
             <Stack.Screen name="AdminEditDiscount" component={AdminEditDiscountScreen} />
             <Stack.Screen name="AdminConversationsListScreen" component={AdminConversationsListScreen} />
             <Stack.Screen name="AdminStoreProfile" component={AdminStoreProfileScreen} />

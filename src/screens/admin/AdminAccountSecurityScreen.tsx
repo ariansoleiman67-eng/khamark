@@ -136,10 +136,10 @@ const AdminAccountSecurityScreen: React.FC = () => {
   // ─── Derived State ──────────────────────────────────────
   const authState = getAuthState(user?.email);
 
-  // Only the legacy {phone}@haryadapp.internal placeholder is hidden. The
-  // {phone}@haryad.admin login email IS shown so the admin can see/use the
+  // Only the legacy {phone}@asankaryapp.internal placeholder is hidden. The
+  // {phone}@asankary.admin login email IS shown so the admin can see/use the
   // credential they sign in with (until they add a real email).
-  const isInternalEmail = (e: string) => e.includes('@haryadapp.');
+  const isInternalEmail = (e: string) => e.includes('@asankaryapp.');
 
   const authEmail = authState.email || '';
   const isAuthEmailInternal = isInternalEmail(authEmail);

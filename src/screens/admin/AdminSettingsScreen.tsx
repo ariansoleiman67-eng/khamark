@@ -315,7 +315,7 @@ const AdminSettingsScreen: React.FC = () => {
       const jsonString = JSON.stringify(exportData, null, 2);
       
       // Save to temp file
-      const fileUri = FileSystem.documentDirectory + 'haryad_export.json';
+      const fileUri = FileSystem.documentDirectory + 'asankary_export.json';
       await FileSystem.writeAsStringAsync(fileUri, jsonString, { encoding: FileSystem.EncodingType.UTF8 });
       
       // Share file
@@ -765,7 +765,7 @@ const AdminSettingsScreen: React.FC = () => {
             <View style={{ alignItems: 'center', marginTop: 8, marginBottom: 8 }}>
               <Text allowFontScaling={false} style={{ fontSize: 13, color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.25)' }}
                 adjustsFontSizeToFit numberOfLines={1}>
-                Haryad Admin v1.0.0
+                Asankary Admin v1.0.0
               </Text>
             </View>
           </View>
@@ -811,7 +811,7 @@ const AdminSettingsScreen: React.FC = () => {
                   paddingHorizontal: 16, paddingVertical: 10,
                   marginBottom: 20,
                 }}
-                placeholder={t('admin.settings.storeNamePlaceholder', { defaultValue: 'e.g., Haryad Auto Part' })}
+                placeholder={t('admin.settings.storeNamePlaceholder', { defaultValue: 'e.g., Asankary' })}
                 placeholderTextColor={theme.colors.textSecondary}
                 value={storeName}
                 onChangeText={setStoreName}

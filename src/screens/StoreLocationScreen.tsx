@@ -36,6 +36,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '../components/ThemeProvider';
 import { SPACING } from '../constants/theme';
+import { BRAND } from '../constants/config';
 import { locationService, StoreLocation } from '../services/locationService';
 
 export const StoreLocationScreen: React.FC = () => {
@@ -48,8 +49,8 @@ export const StoreLocationScreen: React.FC = () => {
   const [selectedLocation, setSelectedLocation] = useState<StoreLocation | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('map');
   const [mapRegion, setMapRegion] = useState({
-    latitude: 36.1911, // Default to Erbil
-    longitude: 44.0094,
+    latitude: BRAND.storeCoords.latitude, // Default store region
+    longitude: BRAND.storeCoords.longitude,
     latitudeDelta: 0.5,
     longitudeDelta: 0.5,
   });
@@ -100,7 +101,7 @@ export const StoreLocationScreen: React.FC = () => {
   const openWhatsApp = (storeLocation: StoreLocation) => {
     const phoneNumber = storeLocation.phone;
     const storeName = locationService.getLocalizedName(storeLocation, i18n.language);
-    const message = `Hello, I would like to inquire about Volvo truck parts at ${storeName}.`;
+    const message = `Hello, I would like to inquire about products at ${storeName}.`;
     const url = `whatsapp://send?phone=${phoneNumber}&text=${encodeURIComponent(message)}`;
     Linking.openURL(url).catch(() => {
       Alert.alert('Error', 'WhatsApp is not installed on this device');

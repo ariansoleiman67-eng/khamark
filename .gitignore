@@ -46,3 +46,8 @@ type-errors.txt
 *.swp
 .idea/
 .vscode/
+
+# Supabase local link/temp
+supabase/.temp/
+.branches
+.temp

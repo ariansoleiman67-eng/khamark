@@ -54,7 +54,7 @@ const UpdateEmailScreen: React.FC = () => {
   const reauthRef = useRef<ReauthModalHandle>(null);
 
   const currentEmail = user?.email || '';
-  const isInternalEmail = isSyntheticEmail(currentEmail) || currentEmail.includes('@haryadapp.');
+  const isInternalEmail = isSyntheticEmail(currentEmail) || currentEmail.includes('@asankaryapp.');
 
   const [newEmail, setNewEmail] = useState('');
   const [loading, setLoading] = useState(false);
@@ -86,7 +86,7 @@ const UpdateEmailScreen: React.FC = () => {
       const authState = getAuthState();
       const isPhoneUser = !authState.email ||
         isSyntheticEmail(authState.email) ||
-        authState.email.includes('@haryadapp.');
+        authState.email.includes('@asankaryapp.');
 
       // Everyone uses verifyBeforeUpdateEmail (requestEmailChange)
       // This sends the verification link and updates the email ONLY when the link is clicked,

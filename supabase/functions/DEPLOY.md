@@ -32,9 +32,9 @@ npx supabase secrets set QICARD_TERMINAL_ID="237984"
 
 # QiCard requires the webhook + return URLs on the merchant's OWN domain (not
 # *.supabase.co). A Cloudflare Worker (cloudflare/qicard-proxy-worker.js) proxies
-# haryadautoparts.com/qicard-webhook and /payment-complete to these functions.
+# ASANKARY_DOMAIN_TBD/qicard-webhook and /payment-complete to these functions.
 # Point create-qicard-payment at that domain:
-npx supabase secrets set QICARD_PUBLIC_BASE="https://haryadautoparts.com"
+npx supabase secrets set QICARD_PUBLIC_BASE="https://ASANKARY_DOMAIN_TBD"
 ```
 
 `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected automatically — do not set them.

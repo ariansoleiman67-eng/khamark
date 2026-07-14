@@ -22,7 +22,7 @@ export const PhoneAuthService = {
       // Resolve via a SECURITY DEFINER RPC: the locked-down RLS blocks a direct
       // pre-auth read of `users` (which made sign-in say "Account Not Found"),
       // and this also matches phone-derived login emails (e.g. the admin, whose
-      // users.phone is null but whose email is {digits}@haryad.admin).
+      // users.phone is null but whose email is {digits}@asankary.admin).
       const { data, error } = await supabase.rpc('account_id_for_phone', { p_phone: phoneE164 });
       if (error || !data) return null;
       return data as string;

@@ -1,14 +1,14 @@
 {
   "expo": {
-    "name": "Haryad Autoparts",
-    "slug": "Haryad Autoparts",
-    "scheme": "haryad",
+    "name": "Asankary",
+    "slug": "Asankary",
+    "scheme": "asankary",
     "version": "1.9.43",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "primaryColor": "#1a365d",
-    "description": "Premium auto parts for Volvo, Scania, DAF trucks in Kurdistan. Browse thousands of genuine truck parts with fast delivery across Iraq.",
+    "description": "Shop consumer electronics and accessories with fast delivery across Iraq. Browse thousands of products in our online store.",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -23,11 +23,11 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.haryad.autopart",
+      "bundleIdentifier": "com.asankary.app",
       "buildNumber": "73",
       "associatedDomains": [
-        "applinks:haryadautoparts.com",
-        "applinks:www.haryadautoparts.com"
+        "applinks:ASANKARY_DOMAIN_TBD",
+        "applinks:www.ASANKARY_DOMAIN_TBD"
       ],
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "This app needs location access to provide accurate delivery addresses and find nearby parts.",
@@ -41,7 +41,7 @@
       "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
-      "package": "com.haryad.autopart",
+      "package": "com.asankary.app",
       "versionCode": 134,
       "versionName": "1.9.43",
       "googleServicesFile": "./google-services.json",
@@ -83,16 +83,16 @@
           "data": [
             {
               "scheme": "https",
-              "host": "haryadautoparts.com",
+              "host": "ASANKARY_DOMAIN_TBD",
               "pathPrefix": "/product"
             },
             {
               "scheme": "https",
-              "host": "www.haryadautoparts.com",
+              "host": "www.ASANKARY_DOMAIN_TBD",
               "pathPrefix": "/product"
             },
             {
-              "scheme": "haryad"
+              "scheme": "asankary"
             }
           ],
           "category": [

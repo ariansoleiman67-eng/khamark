@@ -1,4 +1,4 @@
-# 📱 Manual Testing Checklist - Haryad Auto Parts App
+# 📱 Manual Testing Checklist - Asankary App
 
 ## 🎯 **USABILITY/UX TESTING**
 

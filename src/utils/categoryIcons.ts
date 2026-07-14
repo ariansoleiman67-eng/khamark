@@ -29,7 +29,7 @@ export const getCategoryIconName = (categoryName: string) => {
   if (n.includes('oil')) return 'oil';
   if (n.includes('accessories')) return 'toolbox';
 
-  // VOLVO TRUCK Focus: Use an articulated semi-truck/tractor trailer instead of a delivery van!
+  // General / other: neutral catch-all category icon
   if (n.includes('general') || n.includes('other')) return 'truck-trailer';
 
   return 'truck-trailer'; // fallback

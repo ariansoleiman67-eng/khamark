@@ -1,5 +1,5 @@
 -- =============================================================================
--- HARYAD — Notification triggers (run on the NEW project)
+-- ASANKARY — Notification triggers (run on the NEW project)
 -- =============================================================================
 -- On every new order / message, POST to the on-db-change Edge Function, which
 -- writes the in-app notification and sends the FCM push. Uses pg_net directly

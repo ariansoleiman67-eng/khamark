@@ -1,4 +1,4 @@
-# 🚀 Haryad Auto Parts - App Store & Marketing Preparation Checklist
+# 🚀 Asankary - App Store & Marketing Preparation Checklist
 
 ## 📱 App Store Submission Checklist
 
@@ -21,8 +21,8 @@
 - [ ] In-app purchases properly implemented
 
 #### ✅ **Store Listing**
-- [ ] App title (max 50 characters): "Haryad Auto Parts - Truck Parts"
-- [ ] Short description (max 80 characters): "Premium auto parts for Volvo, Scania, DAF trucks in Kurdistan"
+- [ ] App title (max 50 characters): "Asankary - Online Store"
+- [ ] Short description (max 80 characters): "Shop electronics and accessories with fast delivery across Iraq"
 - [ ] Full description (max 4000 characters) - detailed, keyword-rich
 - [ ] App icon (512x512 px, PNG)
 - [ ] Feature graphic (1024x500 px)
@@ -59,56 +59,55 @@
 
 ### Keywords Research
 **Primary Keywords:**
-- Auto parts
-- Truck parts
-- Volvo parts
-- Scania parts
-- DAF parts
-- Kurdistan auto parts
-- Heavy duty truck parts
-- Commercial vehicle parts
+- Online store
+- Electronics
+- Accessories
+- Gadgets
+- Phones
+- Kurdistan shopping
+- Iraq online store
+- Fast delivery
 
 **Long-tail Keywords:**
-- "Volvo truck parts Kurdistan"
-- "Heavy duty auto parts Iraq"
-- "Commercial vehicle spare parts"
-- "Truck maintenance parts"
+- "Online electronics store Kurdistan"
+- "Buy accessories Iraq"
+- "Consumer electronics Erbil"
+- "Fast delivery online shopping Iraq"
 
 ### App Description Template
 
 ```
-🚛 HARYAD AUTO PARTS - Your Trusted Partner for Heavy-Duty Truck Parts
+🛍️ ASANKARY - Your Online Store for Electronics & Accessories
 
-Find premium auto parts for Volvo, Scania, DAF, and other commercial vehicles in Kurdistan and Iraq. Browse thousands of genuine and compatible parts with fast delivery.
+Shop consumer electronics and everyday accessories in Kurdistan and Iraq. Browse thousands of products with fast delivery.
 
 🔧 KEY FEATURES:
-✅ Extensive catalog of truck parts and accessories
-✅ Genuine and compatible parts from trusted suppliers
-✅ Advanced search with part numbers and vehicle compatibility
+✅ Extensive catalog of electronics and accessories
+✅ Quality products from trusted suppliers
+✅ Advanced search with categories, brands, and filters
 ✅ Secure online ordering and payment
 ✅ Fast delivery across Kurdistan region
 ✅ Expert customer support in Kurdish, Arabic, and English
 ✅ Order tracking and history
-✅ Professional installation guidance
+✅ Personalized recommendations
 
-🚚 SUPPORTED BRANDS:
-• Volvo (FH, FM, FMX series)
-• Scania (R, S, P, G series)
-• DAF (XF, CF, LF series)
-• Mercedes-Benz Actros
-• MAN TGX/TGS
-• Iveco Stralis
+🚚 POPULAR CATEGORIES:
+• Phones and mobile accessories
+• Audio and headphones
+• Chargers and cables
+• Smart-home gadgets
+• Everyday accessories
 
 📍 SERVING:
 Kurdistan Region, Iraq - Erbil, Sulaymaniyah, Dohuk, and surrounding areas
 
-⭐ WHY CHOOSE HARYAD?
-With over [X] years of experience in commercial vehicle parts, we understand the importance of quality and reliability. Our team of experts ensures you get the right parts for your vehicle.
+⭐ WHY CHOOSE ASANKARY?
+We focus on quality and reliability, making it easy to find the right products with a smooth, trustworthy shopping experience.
 
 📞 CUSTOMER SUPPORT:
 24/7 customer service available in Kurdish, Arabic, and English.
 
-Download now and keep your trucks running smoothly! 🚛💪
+Download now and start shopping! 🛍️💪
 ```
 
 ## 📸 Visual Assets Checklist
@@ -185,9 +184,9 @@ Download now and keep your trucks running smoothly! 🚛💪
 - [ ] Social media campaigns (Facebook, Instagram, LinkedIn)
 - [ ] Google Ads campaign
 - [ ] Industry partnerships
-- [ ] Truck driver communities outreach
+- [ ] Online shopping communities outreach
 - [ ] Trade show participation
-- [ ] Print advertising in trucking magazines
+- [ ] Print advertising in local retail media
 
 ### Launch Timeline
 **Week -4:**
@@ -249,9 +248,9 @@ Download now and keep your trucks running smoothly! 🚛💪
 ---
 
 ## 📞 Contact Information
-**Support Team:** volvoha2025@gmail.com
-**Marketing:** volvoha2025@gmail.com
-**Technical:** volvoha2025@gmail.com
+**Support Team:** TODO_CONTACT_EMAIL
+**Marketing:** TODO_CONTACT_EMAIL
+**Technical:** TODO_CONTACT_EMAIL
 
 ---
 *This checklist should be reviewed and updated regularly as app stores update their requirements and best practices.*

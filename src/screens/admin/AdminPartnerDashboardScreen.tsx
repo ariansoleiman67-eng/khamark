@@ -561,7 +561,7 @@ export default function AdminPartnerDashboardScreen() {
               const color = isIn ? PROFIT : isItem ? '#F59E0B' : '#EF4444';
               const icon = isIn ? 'arrow-down' : isManual ? 'cash-outline' : isItem ? 'cube-outline' : 'arrow-up';
               const kindLabel = isManual
-                ? (e.qty ? t('admin.partnerDashboard.tookOutUnits', { count: e.qty, defaultValue: `Took out ${e.qty} units` }) : t('admin.partnerDashboard.tookOut', { defaultValue: 'Took out value' }))
+                ? ((e as any).qty ? t('admin.partnerDashboard.tookOutUnits', { count: (e as any).qty, defaultValue: `Took out ${(e as any).qty} units` }) : t('admin.partnerDashboard.tookOut', { defaultValue: 'Took out value' }))
                 : t('admin.partnerDashboard.returnedItem', { defaultValue: 'Returned item' });
               const label = e.note || (isIn ? t('admin.partnerDashboard.depositLabel', { defaultValue: 'Deposit' }) : isItem ? kindLabel : t('admin.partnerDashboard.payoutLabel', { defaultValue: 'Payout' }));
               return (

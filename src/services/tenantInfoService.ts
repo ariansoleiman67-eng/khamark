@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { BRAND } from '../constants/config';
 
 export interface TenantContactInfo {
   id: string;
@@ -10,10 +11,10 @@ export interface TenantContactInfo {
 
 const DEFAULT_CONTACT: TenantContactInfo = {
   id: 'default',
-  name: 'Haryad Auto Part',
-  phone: '+9647701279797',
-  whatsapp: '9647701279797',
-  email: 'volvoha2025@gmail.com',
+  name: BRAND.name,
+  phone: BRAND.contactPhone,
+  whatsapp: BRAND.contactPhone,
+  email: BRAND.contactEmail,
 };
 
 export async function getTenantContactInfo(tenantId: string): Promise<TenantContactInfo> {

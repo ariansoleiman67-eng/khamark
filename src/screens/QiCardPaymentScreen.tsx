@@ -6,7 +6,7 @@
  * directly in QiCard's hosted payment page.
  * 
  * After payment completion, QiCard redirects to our finishPaymentUrl
- * (haryad://payment-complete), which the WebView intercepts. We then
+ * (asankary://payment-complete), which the WebView intercepts. We then
  * poll for the payment status and navigate accordingly.
  */
 
@@ -192,7 +192,7 @@ const QiCardPaymentScreen: React.FC = () => {
       const { url } = navState;
 
       // Intercept the finishPaymentUrl redirect
-      if (url && (url.startsWith('haryad://payment-complete') || url.includes('payment-complete'))) {
+      if (url && (url.startsWith('asankary://payment-complete') || url.includes('payment-complete'))) {
         handlePaymentComplete();
       }
     },
@@ -202,7 +202,7 @@ const QiCardPaymentScreen: React.FC = () => {
   // Also intercept via onShouldStartLoadWithRequest for immediate interception
   const handleShouldStartLoad = useCallback(
     (request: { url: string }) => {
-      if (request.url.startsWith('haryad://') || request.url.includes('payment-complete')) {
+      if (request.url.startsWith('asankary://') || request.url.includes('payment-complete')) {
         handlePaymentComplete();
         return false; // Prevent WebView from loading this URL
       }
@@ -406,12 +406,12 @@ const QiCardPaymentScreen: React.FC = () => {
           scalesPageToFit={true}
           mixedContentMode="compatibility"
           // Allow QiCard to handle redirects
-          originWhitelist={['https://*', 'haryad://*', 'http://*']}
+          originWhitelist={['https://*', 'asankary://*', 'http://*']}
           onError={(syntheticEvent) => {
             const { nativeEvent } = syntheticEvent;
             console.error('WebView error:', nativeEvent);
             // Only show error if it's not a custom scheme redirect
-            if (!nativeEvent.url?.startsWith('haryad://')) {
+            if (!nativeEvent.url?.startsWith('asankary://')) {
               setError(t('qiCard.webviewError', { defaultValue: 'Failed to load payment form. Please try again.' }));
               setResultStatus('failed');
             }

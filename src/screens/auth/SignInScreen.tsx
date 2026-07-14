@@ -563,7 +563,7 @@ const SignInScreen: React.FC = () => {
             >
               <View style={styles.logoCircle}>
                 <Image
-                  source={require('../../../assets/images/haryad-signin-logo.png')}
+                  source={require('../../../assets/images/asankary-signin-logo.png')}
                   style={styles.logoImage}
                   contentFit="contain"
                 />

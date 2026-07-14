@@ -21,13 +21,13 @@ export const getCategoryPlaceholderImage = (category: string): string => {
     'Suspension': 'https://acko-cms.s3.ap-south-1.amazonaws.com/large_car_suspensions_8d5beb6494.jpg', // wheel/suspension
     'Body Parts': 'https://sc04.alicdn.com/kf/H0585afa0ad12420dbdfa4f46a01ee49ff.png', // body panel
     'Interior': 'https://img.ccjdigital.com/files/base/randallreilly/all/image/2022/10/Peterbilt_SuperTruck_Interior.6358aeef1526c.png?auto=format%2Ccompress&fit=max&q=70&w=1200', // dash detail
-    'Exterior': 'https://assets.volvo.com/is/image/VolvoInformationTechnologyAB/electric-landing-volvo-fh-aero-electric-cgi-exterior-side-2?qlt=82&wid=1440&ts=1706022161032&dpr=off&fit=constrain&fmt=png-alpha', // truck exterior
+    'Exterior': 'https://placehold.co/1440x900?text=Product', // exterior
     'Filters': 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT4V6HeTPl2gBr1hlDFBdnCoHXYd9OIwpOIyA&s', // filter/engine bay
-    'Fluids': 'https://s18391.pcdn.co/wp-content/uploads/2022/06/Volvo-Hydrogen-fuel-cell-Truck-1400-copy.jpg', // oil/fluids
+    'Fluids': 'https://placehold.co/1400x900?text=Product', // oil/fluids
   };
   
-  // Return category-specific placeholder or default auto parts image
-  return categoryPlaceholders[category] || 'https://www.volvotrucks.com/content/dam/volvo-trucks/markets/master/p2764/trucks/models/volvo-fh/landing/some-image-volvo-fh-diesel-cgi-exterior.jpg';
+  // Return category-specific placeholder or default product image
+  return categoryPlaceholders[category] || 'https://placehold.co/800x800?text=Product';
 };
 
 /**

@@ -1,12 +1,12 @@
-# Haryad Auto Part - Volvo Truck Spare Parts App
+# Asankary - Online Retail Store App
 
-A comprehensive React Native Expo application for selling Volvo truck spare parts in Iraq, featuring multilingual support (English, Arabic, Kurdish) with RTL layout, secure payment processing, and real-time order tracking.
+A comprehensive React Native Expo application for online retail (consumer electronics & accessories) in Iraq, featuring multilingual support (English, Arabic, Kurdish) with RTL layout, secure payment processing, and real-time order tracking.
 
 ## 🚀 Features
 
 ### 🛒 **E-commerce Core**
-- **Product Catalog**: Browse thousands of authentic Volvo truck spare parts
-- **Advanced Search**: Filter by category, price, part number, and availability
+- **Product Catalog**: Browse thousands of products across the store
+- **Advanced Search**: Filter by category, price, SKU, and availability
 - **Smart Cart**: Persistent cart with real-time price calculations
 - **Secure Checkout**: Multiple payment options (COD, QI Card, FIB Card)
 - **Order Tracking**: Real-time order status updates with delivery estimates
@@ -17,8 +17,8 @@ A comprehensive React Native Expo application for selling Volvo truck spare part
 - **Adaptive UI**: Dynamic text direction and layout adjustments
 - **Cultural Localization**: Date formats, currency, and cultural preferences
 
-### 🎨 **Volvo-Inspired Design**
-- **Brand Consistency**: Volvo's signature blue and premium aesthetics
+### 🎨 **Brand Design**
+- **Brand Consistency**: Cohesive brand palette and premium aesthetics
 - **Dark/Light Modes**: Seamless theme switching with persistence
 - **Smooth Animations**: Fluid transitions using Reanimated 3
 - **Responsive Design**: Optimized for all screen sizes
@@ -95,7 +95,7 @@ src/
 1. **Clone the repository**
    ```bash
    git clone <repository-url>
-   cd HaryadAutoPart
+   cd Asankary
    ```
 
 2. **Install dependencies**
@@ -150,7 +150,7 @@ EXPO_PUBLIC_IMGBB_API_KEY=your_imgbb_key
 EXPO_PUBLIC_IMGBB_API_URL=https://api.imgbb.com/1/upload
 
 # App Configuration
-EXPO_PUBLIC_APP_NAME=Haryad Auto Part
+EXPO_PUBLIC_APP_NAME=Asankary
 EXPO_PUBLIC_NODE_ENV=development
 ```
 
@@ -256,11 +256,11 @@ npm run deploy:functions   # Deploy Cloud Functions
 ### **Test Accounts**
 ```
 Test User:
-Email: test@haryadautopart.com
+Email: test@ASANKARY_DOMAIN_TBD
 Password: TestUser123!
 
 Admin User:
-Email: admin@haryadautopart.com
+Email: admin@ASANKARY_DOMAIN_TBD
 Password: AdminUser123!
 ```
 
@@ -393,9 +393,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 **Support**
 
 For technical support or business inquiries:
-- **Email**: support@haryadautopart.com
-- **WhatsApp**: +964 770 123 4567
-- **Address**: Erbil, Kurdistan Region, Iraq
+- **Email**: TODO_CONTACT_EMAIL
+- **WhatsApp**: TODO_CONTACT_PHONE
+- **Address**: TODO_CONTACT_ADDRESS
 
 ## 🎯 **Roadmap**
 
@@ -414,24 +414,23 @@ For technical support or business inquiries:
 - [ ] B2B wholesale features
 
 ### **Version 2.0 (Long-term)**
-- [ ] Fleet management integration
-- [ ] Maintenance scheduling
-- [ ] Parts compatibility checker
-- [ ] Service center locator
-- [ ] IoT device integration
+- [ ] Loyalty and rewards program
+- [ ] Subscription and repeat-order scheduling
+- [ ] Personalized product recommendations
+- [ ] Store/pickup locator
+- [ ] Smart-device integrations
 
 ## 🏆 **Acknowledgments**
 
-- **Volvo Group**: For inspiring the design language and brand identity
 - **Firebase Team**: For providing robust backend infrastructure
 - **Expo Team**: For simplifying React Native development
 - **React Native Community**: For excellent libraries and resources
 
 ---
 
-**Built with ❤️ for the Kurdish trucking community in Iraq**
+**Built with ❤️ for shoppers across Iraq**
 
-*"Connecting Kurdish truckers with authentic Volvo parts, one delivery at a time."*
+*"Bringing great products to customers across Iraq, one delivery at a time."*
 
 
 npm run android local gradle for image fix image can fix intro call to junk file 

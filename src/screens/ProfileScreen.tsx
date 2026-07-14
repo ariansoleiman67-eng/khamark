@@ -25,6 +25,7 @@ import { ImageService } from '../services/imageService';
 
 import Logo from '../components/Logo';
 import { changeLanguage, getDirection } from '../locales';
+import { BRAND } from '../constants/config';
 
 // Tab bar height constant
 const TAB_BAR_HEIGHT = 60;
@@ -175,7 +176,7 @@ export const ProfileScreen: React.FC = () => {
         throw new Error('No email address found. Please add your email in Edit Profile first.');
       }
       // Supabase: set this email on the auth account (phone users have a synthetic
-      // @haryadapp.internal auth email) and send its confirmation link.
+      // @asankaryapp.internal auth email) and send its confirmation link.
       const { error } = await supabase.auth.updateUser({ email: emailToVerify });
       if (error) throw error;
       Alert.alert(t('auth.success'), t('profile.emailVerification.sent', { defaultValue: 'Verification email sent!' }));
@@ -570,8 +571,8 @@ export const ProfileScreen: React.FC = () => {
                 <Divider isDark={isDark} />
                 <LuxuryMenuItem icon="chatbubble-outline" title={t('profile.menu.contactUs')}
                   onPress={() => Alert.alert(
-                    'Contact Haryad Auto Parts',
-                    'Email: haryadautoparts@gmail.com\nWhatsApp: +964 770 127 9797\n\nStore Location:\nIraq - Erbil - North Industry\nKurdistan Region, Iraq\n\nBusiness Hours:\nSat-Thu: 8:00 AM - 6:00 PM\nFriday: Closed'
+                    `Contact ${BRAND.name}`,
+                    `Email: ${BRAND.contactEmail}\nWhatsApp: ${BRAND.contactPhone}\n\nStore Location:\n${BRAND.address}\n\nBusiness Hours:\nSat-Thu: 8:00 AM - 6:00 PM\nFriday: Closed`
                   )}
                   theme={theme} isDark={isDark} tintBg={tintBg} />
                 <Divider isDark={isDark} />

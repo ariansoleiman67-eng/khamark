@@ -1,6 +1,7 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
+import { BRAND } from '../../constants/config';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const formatCurrency = (val: number) =>
@@ -72,7 +73,7 @@ const labelsFor = (lang: Lang, invoiceSettings: any) => {
     earnedFromSales: 'Earned from Sales',
     totals: 'Totals',
     noItems: 'No products assigned.',
-    company: invoiceSettings?.companyName || 'HARYAD AUTO PARTS',
+    company: invoiceSettings?.companyName || BRAND.name,
     phone: invoiceSettings?.phone || '',
     email: invoiceSettings?.email || '',
     address: invoiceSettings?.address || '',

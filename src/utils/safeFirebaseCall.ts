@@ -11,7 +11,7 @@
 import { Platform } from 'react-native';
 import { getAuth, getIdToken } from '@react-native-firebase/auth';
 
-const PROJECT_ID = 'haryads-56e68';
+const PROJECT_ID = 'REPLACE_WITH_ASANKARY_FIREBASE_PROJECT_ID';
 const REGION = 'us-central1';
 
 /**

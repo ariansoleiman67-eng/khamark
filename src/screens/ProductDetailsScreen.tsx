@@ -649,14 +649,14 @@ export const ProductDetailsScreen: React.FC = () => {
     if (!product) return;
 
     try {
-      const shareUrl = `https://www.haryadautoparts.com/product/${product.id}`;
+      const shareUrl = `https://ASANKARY_DOMAIN_TBD/product/${product.id}`;
 
       await Share.share({
         message: `${product.name} - ${product.partNumber}\n${formatPrice(
           product.priceUSD,
           currentCurrency as any,
           exchangeRateIQD
-        )}\n\nCheck out this Volvo spare part on Haryad Auto Part app!\n${shareUrl}`,
+        )}\n\nCheck out this product on Asankary!\n${shareUrl}`,
         url: product.imageUrls?.[0],
       });
     } catch (error) {

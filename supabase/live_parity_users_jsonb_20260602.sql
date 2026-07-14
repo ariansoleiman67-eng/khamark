@@ -1,5 +1,5 @@
 -- =============================================================================
--- HARYAD AUTO PART — users private-jsonb parity patch
+-- ASANKARY — users private-jsonb parity patch
 -- =============================================================================
 -- Adds two jsonb columns the app already expects but neither Supabase project has:
 --   * shipping_info        — ShippingInfoScreen + CheckoutScreen (shipping office)

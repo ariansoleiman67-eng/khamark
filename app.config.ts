@@ -1,8 +1,8 @@
 import { ConfigContext, ExpoConfig } from "expo/config";
 
-// Volvo-inspired color palette
+// Brand color palette (finalized in Phase 3)
 const colors = {
-  primary: "#1a365d", // Volvo blue
+  primary: "#1a365d",
   primaryVariant: "#2c5282",
   secondary: "#3182ce",
   background: "#ffffff",
@@ -11,10 +11,10 @@ const colors = {
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: "Haryad Autoparts",
-  slug: "haryad-auto-part",
-  scheme: "haryad",
-  version: "1.9.43",
+  name: "Asankary",
+  slug: "asankary",
+  scheme: "asankary",
+  version: "1.0.0",
   newArchEnabled: true,
   orientation: "portrait",
   icon: "./assets/icon.png",
@@ -28,14 +28,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 
   runtimeVersion: "1.0.0",
   updates: {
-    url: "https://u.expo.dev/9b207ec5-bad2-40c7-bd5c-4107571dfc55"
+    // Phase 2: set to the new EAS updates URL after `eas init` under the Asankary account.
+    url: "https://u.expo.dev/REPLACE_WITH_ASANKARY_EAS_PROJECT_ID"
   },
 
   ios: {
     supportsTablet: true,
-    bundleIdentifier: "com.haryad.autopart",
-    buildNumber: "73",
-    associatedDomains: ["applinks:haryadautoparts.com", "applinks:www.haryadautoparts.com"],
+    bundleIdentifier: "com.asankary.app",
+    buildNumber: "1",
+    associatedDomains: ["applinks:ASANKARY_DOMAIN_TBD"],
     usesAppleSignIn: true,
     googleServicesFile: "./GoogleService-Info.plist",
     config: {
@@ -44,25 +45,25 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
     infoPlist: {
       NSCameraUsageDescription:
-        "Haryad Auto Part uses your camera to take photos of auto parts and for profile pictures.",
+        "Asankary uses your camera to take product photos and profile pictures.",
       NSMicrophoneUsageDescription:
-        "Haryad Auto Part needs access to your microphone when recording video for products.",
+        "Asankary needs access to your microphone when recording product videos.",
       NSPhotoLibraryUsageDescription:
-        "Haryad Auto Part needs access to your photo library to select images for parts and profile pictures.",
+        "Asankary needs access to your photo library to select images for products and profile pictures.",
       NSLocationWhenInUseUsageDescription:
-        "Haryad Auto Part uses your location to provide accurate delivery and find nearby service centers.",
+        "Asankary uses your location to provide accurate delivery.",
       NSUserTrackingUsageDescription:
         "This identifier will be used to deliver personalized ads to you.",
       UIBackgroundModes: ["fetch", "remote-notification"],
       CFBundleURLTypes: [
         {
           CFBundleURLSchemes: [
-            "com.googleusercontent.apps.677342244115-l2rbot0d1pfd27sl3tphrmn6k1f6gksu"
+            "REPLACE_WITH_ASANKARY_GOOGLE_REVERSED_CLIENT_ID"
           ]
         },
         {
           CFBundleURLSchemes: [
-            "haryad"
+            "asankary"
           ]
         }
       ],
@@ -76,23 +77,22 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       foregroundImage: "./assets/adaptive-icon.png",
       backgroundColor: colors.primary,
     },
-    package: "com.haryad.autopart",
-    versionCode: 134,
+    package: "com.asankary.app",
+    versionCode: 1,
     googleServicesFile: "./google-services.json",
     intentFilters: [
       {
         action: "VIEW",
         autoVerify: true,
         data: [
-          { scheme: "https", host: "haryadautoparts.com", pathPrefix: "/product" },
-          { scheme: "https", host: "www.haryadautoparts.com", pathPrefix: "/product" }
+          { scheme: "https", host: "ASANKARY_DOMAIN_TBD", pathPrefix: "/product" }
         ],
         category: ["BROWSABLE", "DEFAULT"]
       },
       {
         action: "VIEW",
         data: [
-          { scheme: "haryad" }
+          { scheme: "asankary" }
         ],
         category: ["BROWSABLE", "DEFAULT"]
       }
@@ -103,7 +103,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 
     config: {
       googleMaps: {
-        apiKey: "REPLACE_WITH_ASANKARY_FIREBASE_API_KEY",
+        apiKey: "REPLACE_WITH_ASANKARY_GOOGLE_MAPS_KEY",
       },
     },
     permissions: [
@@ -140,7 +140,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       "@react-native-google-signin/google-signin",
       {
         iosUrlScheme:
-          "com.googleusercontent.apps.677342244115-l2rbot0d1pfd27sl3tphrmn6k1f6gksu",
+          "REPLACE_WITH_ASANKARY_GOOGLE_REVERSED_CLIENT_ID",
       },
     ],
     [
@@ -155,16 +155,16 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       "expo-image-picker",
       {
         photosPermission:
-          "Haryad Auto Part needs access to your photo library to select images for auto parts and profile pictures.",
+          "Asankary needs access to your photo library to select images for products and profile pictures.",
         cameraPermission:
-          "Haryad Auto Part needs access to your camera to take photos of auto parts and for profile pictures.",
+          "Asankary needs access to your camera to take product photos and profile pictures.",
       },
     ],
     [
       "expo-camera",
       {
         cameraPermission:
-          "Haryad Auto Part needs camera access to scan part numbers and take photos of auto parts.",
+          "Asankary needs camera access to scan barcodes and take product photos.",
       },
     ],
     "expo-font",
@@ -173,10 +173,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       "react-native-fbsdk-next",
       {
-        appID: "1097414742525033",
-        clientToken: "e101dd542f0e6d640dc3c30a7b07bd4f",
-        displayName: "Haryad Autoparts",
-        scheme: "fb1097414742525033",
+        appID: "REPLACE_WITH_ASANKARY_FB_APP_ID",
+        clientToken: "REPLACE_WITH_ASANKARY_FB_CLIENT_TOKEN",
+        displayName: "Asankary",
+        scheme: "fbREPLACE_WITH_ASANKARY_FB_APP_ID",
         advertiserIDCollectionEnabled: false,
         autoLogAppEventsEnabled: false,
         isAutoInitEnabled: true,
@@ -187,7 +187,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       "expo-location",
       {
         locationWhenInUsePermission:
-          "Haryad Auto Part uses your location to provide accurate delivery and find nearby service centers.",
+          "Asankary uses your location to provide accurate delivery.",
       },
     ],
     [
@@ -214,7 +214,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 
   extra: {
     eas: {
-      projectId: "9b207ec5-bad2-40c7-bd5c-4107571dfc55",
+      // Phase 2: replace after `eas init` under the Asankary account.
+      projectId: "REPLACE_WITH_ASANKARY_EAS_PROJECT_ID",
     },
   },
 });

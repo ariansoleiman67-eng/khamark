@@ -10,6 +10,7 @@ import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 import { LOGO_BASE64 } from '../../constants/logoBase64';
 import { formatPrice } from '../../utils/currency';
+import { BRAND } from '../../constants/config';
 import { useNavigation } from '@react-navigation/native';
 
 // expo-print won't wait for remote <img> to download, so product images came out
@@ -325,7 +326,7 @@ export const ReportsGenerator = () => {
       : `${now.getDate()} ${MONTHS[lang][now.getMonth()]} ${now.getFullYear()}`;
 
     const L: any = {
-      company: invoiceSettings?.companyName || 'HARYAD AUTO PARTS',
+      company: invoiceSettings?.companyName || BRAND.name,
       eyebrow: 'Wholesale Ledger', title: 'Revenue Report', asOf: 'As of', products: 'products', units: 'units',
       revenue: 'Wholesale Revenue', cost: 'Cost of Goods', profit: 'Net Profit', margin: 'margin',
       colProduct: 'Part No.', colSold: 'Sold', colStock: 'In Stock', colBuy: 'Buy', colWs: 'Wholesale',
@@ -653,7 +654,7 @@ export const ReportsGenerator = () => {
     const endAlign = isRTL ? 'left' : 'right';
 
     const L: any = {
-      title: 'UNPAID INVOICE', company: invoiceSettings?.companyName || 'HARYAD AUTO PARTS',
+      title: 'UNPAID INVOICE', company: invoiceSettings?.companyName || BRAND.name,
       customer: 'Customer', phone: 'Phone', order: 'Order', date: 'Date',
       product: 'Product', qty: 'Qty', unit: 'Unit Price', lineTotal: 'Total',
       orderTotal: 'Order Total', paid: 'Paid', remaining: 'Remaining',

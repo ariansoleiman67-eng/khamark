@@ -1,8 +1,8 @@
-# Haryad Auto Part - Store Submission Checklist ✅
+# Asankary - Store Submission Checklist ✅
 
 ## Publication Readiness Status: **READY FOR SUBMISSION** 🚀
 
-This document confirms that the Haryad Auto Part mobile application has been thoroughly audited and is production-ready for submission to Apple App Store and Google Play Store.
+This document confirms that the Asankary mobile application has been thoroughly audited and is production-ready for submission to Apple App Store and Google Play Store.
 
 ---
 
@@ -15,8 +15,8 @@ This document confirms that the Haryad Auto Part mobile application has been tho
   - Required permissions (Camera, Location, Storage)
   - Production-ready icon and splash screen references
 - ✅ `package.json` with all required dependencies and scripts
-- ✅ iOS bundle ID: `com.haryad.autopart`
-- ✅ Android package: `com.haryad.autopart`
+- ✅ iOS bundle ID: `com.asankary.app`
+- ✅ Android package: `com.asankary.app`
 - ✅ Version codes properly set (iOS: 1.0.0, Android: versionCode 1)
 
 ### 💻 **Code Quality & Build System**
@@ -39,9 +39,9 @@ This document confirms that the Haryad Auto Part mobile application has been tho
 
 ### 🎨 **Branding & Content**
 - ✅ All placeholder content removed
-- ✅ Real company information: Haryad Auto Parts
-- ✅ Contact details updated: volvoha2025@gmail.com, +964750692908
-- ✅ Location: Erbil, Kurdistan Region, Iraq
+- ✅ Real company information: Asankary
+- ✅ Contact details updated: TODO_CONTACT_EMAIL, TODO_CONTACT_PHONE_2
+- ✅ Location: TODO_CONTACT_ADDRESS
 - ✅ Professional app icons and splash screens
 - ✅ Consistent branding throughout the app
 
@@ -58,7 +58,7 @@ This document confirms that the Haryad Auto Part mobile application has been tho
 - ✅ High-quality app icons (1024x1024 recommended)
 - ✅ Adaptive icons for Android
 - ✅ Splash screen assets properly sized
-- ✅ All images using Haryad branding
+- ✅ All images using Asankary branding
 - ✅ Notification icons configured
 
 ### 🔥 **Firebase Production Setup**
@@ -84,7 +84,7 @@ This document confirms that the Haryad Auto Part mobile application has been tho
 ## 📋 **STORE SUBMISSION REQUIREMENTS**
 
 ### **Apple App Store Requirements**
-- ✅ Bundle ID registered: `com.haryad.autopart`
+- ✅ Bundle ID registered: `com.asankary.app`
 - ✅ iOS deployment target: 15.1+
 - ✅ Required permission descriptions added to Info.plist:
   - Camera usage: "Take photos for profile and support tickets"
@@ -94,7 +94,7 @@ This document confirms that the Haryad Auto Part mobile application has been tho
 - ✅ Privacy policy accessible within app
 
 ### **Google Play Store Requirements**  
-- ✅ Package name: `com.haryad.autopart`
+- ✅ Package name: `com.asankary.app`
 - ✅ Target SDK: 34, Compile SDK: 34
 - ✅ Required permissions declared in Android manifest
 - ✅ Adaptive icon configured
@@ -148,17 +148,17 @@ This document confirms that the Haryad Auto Part mobile application has been tho
 
 ## 📞 **App Information**
 
-**Company:** Haryad Auto Parts Co.  
-**Industry:** Automotive Parts (Volvo, Scania, DAF trucks)  
+**Company:** Asankary  
+**Industry:** Online Retail (Consumer Electronics & Accessories)  
 **Region:** Kurdistan Region, Iraq  
 **Languages:** English, Arabic, Kurdish  
 **Category:** Business/Shopping  
 **Content Rating:** Everyone  
 
 **Contact Information:**  
-- Email: volvoha2025@gmail.com
-- Phone: +964 750 692 908  
-- Location: Erbil, Kurdistan Region, Iraq
+- Email: TODO_CONTACT_EMAIL
+- Phone: TODO_CONTACT_PHONE_2  
+- Location: TODO_CONTACT_ADDRESS
 
 ---
 

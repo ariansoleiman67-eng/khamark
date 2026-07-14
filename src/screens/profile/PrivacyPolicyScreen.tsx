@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../components/ThemeProvider';
 import { SPACING } from '../../constants/theme';
+import { BRAND } from '../../constants/config';
 
 const PrivacyPolicyScreen: React.FC = () => {
   const { theme } = useTheme();
@@ -20,11 +21,11 @@ const PrivacyPolicyScreen: React.FC = () => {
     {
       title: "1. INFORMATION WE COLLECT",
       content: `1.1 PERSONAL INFORMATION
-When you use our Haryad Auto Parts app, we collect:
+When you use our ${BRAND.name} app, we collect:
 • Full name and contact information
 • Phone numbers and email addresses
 • Delivery addresses and billing information
-• Vehicle information (make, model, year, VIN)
+• Order and product preferences
 • Payment information (securely processed)
 
 1.2 AUTOMATICALLY COLLECTED DATA
@@ -36,7 +37,7 @@ When you use our Haryad Auto Parts app, we collect:
 
 1.3 OPTIONAL INFORMATION
 • Profile photos and preferences
-• Vehicle maintenance history
+• Wishlist and saved items
 • Product reviews and ratings
 • Communication preferences
 • Marketing consent preferences`
@@ -254,22 +255,22 @@ Data may be retained longer if:
       content: `For privacy-related questions or concerns:
 
 PRIVACY OFFICER
-Haryad Auto Parts Co.
-Address: Iraq-Erbil-North Industry
-Phone: +964 750 692 9085
-Email: volvoha2025@gmail.com
-WhatsApp: +964 750 692 9085
+${BRAND.name}
+Address: ${BRAND.address}
+Phone: ${BRAND.contactPhone2}
+Email: ${BRAND.contactEmail}
+WhatsApp: ${BRAND.contactPhone2}
 
 DATA PROTECTION QUERIES
-Email: volvoha2025@gmail.com
-Alternate Phone: +964 773 432 2255
+Email: ${BRAND.contactEmail}
+Alternate Phone: ${BRAND.contactPhone3}
 Response Time: Within 72 hours
 Business Hours: Saturday-Thursday 8AM-6PM, Friday 8AM-12PM
 
 GENERAL SUPPORT
-Email: volvoha2025@gmail.com
-Phone: +964 750 692 9085
-Alternate: +964 773 432 2255
+Email: ${BRAND.contactEmail}
+Phone: ${BRAND.contactPhone2}
+Alternate: ${BRAND.contactPhone3}
 Available: 6 days a week
 
 Last Updated: January 2025
@@ -472,7 +473,7 @@ Policy Version: 2.1`
                   fontWeight: '600',
                   color: 'white',
                 }}>
-                  volvoha2025@gmail.com
+                  {BRAND.contactEmail}
                 </Text>
               </View>
             </View>

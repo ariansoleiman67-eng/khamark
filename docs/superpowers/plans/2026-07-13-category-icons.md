@@ -446,7 +446,7 @@ useEffect(() => {
 ```
 (Add `import { tenantAdminService, TenantCategory } from '../../services/tenantAdminService';` if not already imported.)
 
-- [ ] **Step 2: Replace the picker body** — swap the `VOLVO_CATEGORIES.map(...)` block (the modal at ~3005) to iterate `managedCategories`, showing icon + localized name, and on select copy all three name fields:
+- [ ] **Step 2: Replace the picker body** — swap the `STORE_CATEGORIES.map(...)` block (the modal at ~3005) to iterate `managedCategories`, showing icon + localized name, and on select copy all three name fields:
 
 ```tsx
 {managedCategories.length === 0 ? (

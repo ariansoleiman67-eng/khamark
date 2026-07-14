@@ -557,7 +557,7 @@ const AdminStoreProfileScreen: React.FC = () => {
               label={t('admin.storeProfile.storeName', { defaultValue: 'Store Name (English)' }) + ' *'}
               value={profile.storeName}
               onChangeText={(text) => handleChange('storeName', text)}
-              placeholder="e.g., Haryad Auto Part"
+              placeholder="e.g., Asankary"
               containerStyle={styles.input}
             />
             
@@ -565,7 +565,7 @@ const AdminStoreProfileScreen: React.FC = () => {
               label={t('admin.storeProfile.storeNameAr', { defaultValue: 'Store Name (Arabic)' })}
               value={profile.storeNameAr}
               onChangeText={(text) => handleChange('storeNameAr', text)}
-              placeholder="مثال: هارياد قطع غيار السيارات"
+              placeholder="مثال: Asankary"
               containerStyle={styles.input}
             />
             
@@ -573,7 +573,7 @@ const AdminStoreProfileScreen: React.FC = () => {
               label={t('admin.storeProfile.storeNameKu', { defaultValue: 'Store Name (Kurdish)' })}
               value={profile.storeNameKu}
               onChangeText={(text) => handleChange('storeNameKu', text)}
-              placeholder="نموونە: هاریاد پارچەکانی ئۆتۆمبێل"
+              placeholder="نموونە: Asankary"
               containerStyle={styles.input}
             />
           </View>

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Haryad Auto Part — a React Native (0.81) / Expo (SDK 54, New Architecture enabled) mobile app selling Volvo truck spare parts in Iraq. Multilingual (English / Arabic / Kurdish) with RTL, multi-tenant admin model, and a customer + admin app in one binary. TypeScript strict mode.
+Asankary — a React Native (0.81) / Expo (SDK 54, New Architecture enabled) mobile app selling consumer electronics and accessories in Iraq. Multilingual (English / Arabic / Kurdish) with RTL, multi-tenant admin model, and a customer + admin app in one binary. TypeScript strict mode.
 
 Note: `README.md` is largely aspirational/marketing and describes an older Firebase-only design. Trust the code over the README — in particular the service layer and the backend split below.
 
@@ -50,7 +50,7 @@ CurrencyProvider → CartProvider → FavoritesProvider → NotificationProvider
 Each provider has a matching `useX()` hook in `src/contexts/` that throws if used outside its provider. There is no Redux/Zustand — Context + hooks + per-service AsyncStorage caching is the state model.
 
 ### Navigation
-`src/navigation/AppNavigator.tsx` is the active root (React Navigation v7 native-stack + bottom-tabs). Auth, customer, and admin screens all live in one navigator; admin tabs are in `AdminTabNavigator.tsx`. `*Minimal.tsx` / `SimpleAppNavigator.tsx` are unused fallbacks. Deep links use the `haryad://` scheme and universal links for `haryadautoparts.com`.
+`src/navigation/AppNavigator.tsx` is the active root (React Navigation v7 native-stack + bottom-tabs). Auth, customer, and admin screens all live in one navigator; admin tabs are in `AdminTabNavigator.tsx`. `*Minimal.tsx` / `SimpleAppNavigator.tsx` are unused fallbacks. Deep links use the `asankary://` scheme and universal links for `ASANKARY_DOMAIN_TBD`.
 
 ### Layout / directory map
 - `src/services/` — all backend access + business logic (class-based statics like `OrderService`, or exported functions). One file per domain.
@@ -81,7 +81,7 @@ Each provider has a matching `useX()` hook in `src/contexts/` that throws if use
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **HAryad** (5842 symbols, 12656 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **Asankary** (5842 symbols, 12656 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
@@ -104,10 +104,10 @@ This project is indexed by GitNexus as **HAryad** (5842 symbols, 12656 relations
 
 | Resource | Use for |
 |----------|---------|
-| `gitnexus://repo/HAryad/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/HAryad/clusters` | All functional areas |
-| `gitnexus://repo/HAryad/processes` | All execution flows |
-| `gitnexus://repo/HAryad/process/{name}` | Step-by-step execution trace |
+| `gitnexus://repo/Asankary/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/Asankary/clusters` | All functional areas |
+| `gitnexus://repo/Asankary/processes` | All execution flows |
+| `gitnexus://repo/Asankary/process/{name}` | Step-by-step execution trace |
 
 ## CLI
 

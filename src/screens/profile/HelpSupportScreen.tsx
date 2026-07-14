@@ -17,6 +17,7 @@ import { useTheme } from '../../components/ThemeProvider';
 import { useTranslation } from 'react-i18next';
 import { getDirection } from '../../locales';
 import { SPACING, SHADOW_STYLES } from '../../constants/theme';
+import { BRAND } from '../../constants/config';
 
 interface FAQItem {
   id: string;
@@ -317,7 +318,7 @@ const HelpSupportScreen: React.FC = () => {
               </Text>
               <TouchableOpacity
                 onPress={() => {
-                  openWhatsApp('9647701279797', "Hi, I need help with my question that's not covered in the FAQ");
+                  openWhatsApp(BRAND.contactPhone, "Hi, I need help with my question that's not covered in the FAQ");
                 }}
                 style={{
                   backgroundColor: theme.colors.primary,

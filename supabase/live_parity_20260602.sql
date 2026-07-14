@@ -1,5 +1,5 @@
 -- =============================================================================
--- HARYAD AUTO PART — LIVE-PROJECT parity patch  (project: pocdgbrpkuaqxgjcwsqk)
+-- ASANKARY — LIVE-PROJECT parity patch  (project: pocdgbrpkuaqxgjcwsqk)
 -- =============================================================================
 -- Purpose: bring the CURRENTLY-LIVE Supabase project up to schema parity with
 -- the consolidated schema by adding ONLY the 12 tables it is missing, so the

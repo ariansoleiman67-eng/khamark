@@ -543,13 +543,13 @@ export type RootStackParamList = {
   Register: { requireAuth?: boolean; returnReason?: string; method?: 'phone' | 'email'; email?: string } | undefined;
   ForgotPassword: undefined;
   VerifyPhone: {
-    mode: 'register' | 'forgot_password' | 'admin-register' | 'fallback' | 'link' | 'otp-login';
+    mode: 'register' | 'forgot_password' | 'admin-register' | 'partner-register' | 'fallback' | 'link' | 'otp-login';
     phone: string;
     name?: string; // Required for registration
     storeName?: string; // Required for admin registration
   };
-  SetNewPassword: { 
-    mode: 'register' | 'reset' | 'admin-register'; 
+  SetNewPassword: {
+    mode: 'register' | 'reset' | 'admin-register' | 'partner-register';
     phone: string;
     name?: string; // Required for registration
     storeName?: string; // Required for admin registration

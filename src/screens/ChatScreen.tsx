@@ -3079,7 +3079,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     minHeight: 38,
-    paddingVertical: 6,
     includeFontPadding: false,
     maxHeight: 120,
     paddingHorizontal: 0,

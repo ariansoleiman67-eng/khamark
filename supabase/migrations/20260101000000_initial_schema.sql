@@ -1,5 +1,5 @@
 -- =============================================================================
--- HARYAD AUTO PART — Consolidated initial schema for the NEW Supabase project
+-- ASANKARY — Consolidated initial schema for the NEW Supabase project
 -- =============================================================================
 -- Replaces the scattered schema.sql + update_schema_*.sql files with one
 -- ordered, indexed, RLS-aware migration. Run it once on the brand-new project:

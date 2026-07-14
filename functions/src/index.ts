@@ -22,8 +22,8 @@ const CONFIG = {
   openAiApiKey: process.env.OPENAI_API_KEY || '',
   imgbbApiKey: process.env.IMGBB_API_KEY || '',
   bunnyStoragePassword: process.env.BUNNY_STORAGE_PASSWORD || '',
-  bunnyStorageZone: process.env.BUNNY_STORAGE_ZONE || 'haryadautopart',
-  bunnyCdnHostname: process.env.BUNNY_CDN_HOSTNAME || 'haryadautoparts.b-cdn.net',
+  bunnyStorageZone: process.env.BUNNY_STORAGE_ZONE || 'ASANKARY_BUNNY_STORAGE_ZONE_TBD',
+  bunnyCdnHostname: process.env.BUNNY_CDN_HOSTNAME || 'ASANKARY_BUNNY_CDN_TBD.b-cdn.net',
   smtpUser: process.env.SMTP_USER || '',
   smtpPass: process.env.SMTP_PASS || '',
   phoneHashSecret: process.env.PHONE_HASH_SECRET || '',
@@ -955,7 +955,7 @@ async function maybeGenerateAiReply(conversationId: string, messageId: string, m
     text: sanitizePlainText(aiResult.response),
     senderType: 'admin',
     senderId: latestConversation.adminId || 'ai-bot',
-    senderName: latestConversation.adminSnapshot?.name || 'Haryad Assistant',
+    senderName: latestConversation.adminSnapshot?.name || 'Asankary Assistant',
     createdAt: FieldValue.serverTimestamp(),
     type: 'text',
     isAi: true,
@@ -2009,32 +2009,32 @@ export const sendCustomVerificationEmail = functions.https.onCall(async (data, c
   }
 
   const verificationLink = await admin.auth().generateEmailVerificationLink(email, {
-    url: 'https://haryadautoparts.com/profile',
+    url: 'https://ASANKARY_DOMAIN_TBD/profile',
     handleCodeInApp: false,
   });
 
   await transporter.sendMail({
-    from: `"Haryad Auto Parts" <${CONFIG.smtpUser}>`,
+    from: `"Asankary" <${CONFIG.smtpUser}>`,
     to: email,
-    subject: 'Verify your email address for Haryad Auto Parts',
+    subject: 'Verify your email address for Asankary',
     html: `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Verify your Email - Haryad Auto Parts</title>
+        <title>Verify your Email - Asankary</title>
       </head>
       <body style="margin:0;padding:0;background-color:#f4f7fa;font-family:Helvetica,Arial,sans-serif;">
         <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f7fa;padding:40px 0;">
           <tr><td align="center">
             <table width="600" cellpadding="0" cellspacing="0" border="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);max-width:600px;width:100%;">
               <tr><td align="center" style="background:#121223;padding:40px 20px;border-bottom:4px solid #FF7622;">
-                <h1 style="color:#fff;font-size:28px;margin:0;font-weight:800;">Haryad Auto Parts</h1>
+                <h1 style="color:#fff;font-size:28px;margin:0;font-weight:800;">Asankary</h1>
               </td></tr>
               <tr><td style="padding:40px 48px;">
                 <h2 style="color:#32343E;font-size:24px;margin:0 0 24px;">Welcome to the family</h2>
-                <p style="color:#646982;font-size:16px;line-height:24px;margin:0 0 32px;">Thank you for joining Haryad Auto Parts. Please verify your email address to secure your account.</p>
+                <p style="color:#646982;font-size:16px;line-height:24px;margin:0 0 32px;">Thank you for joining Asankary. Please verify your email address to secure your account.</p>
                 <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center">
                   <a href="${verificationLink}" style="display:inline-block;background:#FF7622;color:#fff;text-decoration:none;padding:16px 48px;border-radius:12px;font-weight:bold;">Verify Email Address</a>
                 </td></tr></table>
@@ -2077,9 +2077,9 @@ export const sendAdminEmailOTP = functions.https.onCall(async (data) => {
   });
 
   await transporter.sendMail({
-    from: `"Haryad Auto Parts" <${CONFIG.smtpUser}>`,
+    from: `"Asankary" <${CONFIG.smtpUser}>`,
     to: email,
-    subject: 'Your admin verification code — Haryad Auto Parts',
+    subject: 'Your admin verification code — Asankary',
     html: `
       <!DOCTYPE html>
       <html>
@@ -2088,7 +2088,7 @@ export const sendAdminEmailOTP = functions.https.onCall(async (data) => {
           <tr><td align="center">
             <table width="520" cellpadding="0" cellspacing="0" border="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);max-width:520px;width:100%;">
               <tr><td align="center" style="background:#121223;padding:32px 20px;border-bottom:4px solid #FF7622;">
-                <h1 style="color:#fff;font-size:22px;margin:0;font-weight:700;">Haryad Auto Parts</h1>
+                <h1 style="color:#fff;font-size:22px;margin:0;font-weight:700;">Asankary</h1>
               </td></tr>
               <tr><td style="padding:40px;">
                 <h2 style="color:#32343E;font-size:22px;margin:0 0 16px;">Admin verification code</h2>
@@ -2190,7 +2190,7 @@ export const resolvePhoneLogin = functions.https.onCall(async (data) => {
       const uid = safeString(mapping.data()?.uid);
       if (uid) {
         const userRecord = await admin.auth().getUser(uid).catch(() => null);
-        return { internalEmail: userRecord?.email || `${uid}@haryadapp.internal` };
+        return { internalEmail: userRecord?.email || `${uid}@asankaryapp.internal` };
       }
     }
   } catch {
@@ -2203,7 +2203,7 @@ export const resolvePhoneLogin = functions.https.onCall(async (data) => {
       if (!snapshot.empty) {
         const uid = snapshot.docs[0].id;
         const userRecord = await admin.auth().getUser(uid).catch(() => null);
-        return { internalEmail: userRecord?.email || `${uid}@haryadapp.internal` };
+        return { internalEmail: userRecord?.email || `${uid}@asankaryapp.internal` };
       }
     }
   }
@@ -2337,7 +2337,7 @@ export const deleteUserAccount = functions.https.onCall(async (data, context) =>
 
 export const setInternalEmail = functions.https.onCall(async (data, context) => {
   const uid = requireAuth(context);
-  const internalEmail = `${uid}@haryadapp.internal`;
+  const internalEmail = `${uid}@asankaryapp.internal`;
   const password = safeString(data?.password);
 
   const updates: admin.auth.UpdateRequest = {};

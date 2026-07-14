@@ -1,13 +1,13 @@
 import { Theme } from '../types';
 
-// Volvo-inspired color palette
+// Brand palette — finalized in Phase 3
 const COLORS = {
-  // Primary Colors (Volvo Navy Blue)
+  // Primary Colors (Navy Blue)
   primary: '#1a365d',
   primaryDark: '#153e75',
   primaryLight: '#2b77ad',
-  
-  // Secondary Colors (Volvo Silver)
+
+  // Secondary Colors (Silver)
   secondary: '#718096',
   secondaryDark: '#4a5568',
   secondaryLight: '#a0aec0',

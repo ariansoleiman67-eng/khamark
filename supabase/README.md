@@ -1,6 +1,6 @@
 # Supabase — new project migration
 
-This folder holds the schema and migration plan for moving Haryad Auto Part fully
+This folder holds the schema and migration plan for moving Asankary fully
 off Firebase onto a **brand-new Supabase project**. The app is **live**, so we use a
 strangler migration: the new project runs alongside Firebase, one slice moves at a
 time, nothing is deleted until the replacement is proven in production.

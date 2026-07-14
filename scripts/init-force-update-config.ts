@@ -31,15 +31,15 @@ const config = {
   minBuildNumber: buildNumber,
   forceUpdate: false, // Change to true when you want to force users to update
   updateMessage:
-    'A new version of Haryad Auto Part is available with important updates. Please update to continue.',
+    'A new version of Asankary is available with important updates. Please update to continue.',
   updateMessageAr:
-    'إصدار جديد من تطبيق هرياد متاح. الرجاء التحديث للاستمرار.',
+    'إصدار جديد من تطبيق Asankary متاح. الرجاء التحديث للاستمرار.',
   updateMessageKu:
-    'وەشانی نوێی ئەپی هەریاد بەردەستە. تکایە نوێ بکەرەوە.',
+    'وەشانی نوێی ئەپی Asankary بەردەستە. تکایە نوێ بکەرەوە.',
   androidStoreUrl:
-    'https://play.google.com/store/apps/details?id=com.haryad.autopart',
+    'https://play.google.com/store/apps/details?id=com.asankary.app',
   iosStoreUrl:
-    'https://apps.apple.com/app/haryad-auto-part/id123456789',
+    'https://apps.apple.com/app/asankary/id123456789',
   updatedAt: new Date(),
 };
 
