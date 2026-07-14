@@ -612,8 +612,8 @@ const AdminSettingsScreen: React.FC = () => {
                   theme={theme} isDark={isDark} tintBg={tintBg} />
                 <Divider isDark={isDark} />
                 <LuxuryMenuItem icon="pricetags" title={t('admin.categories.title', { defaultValue: 'Categories' })}
-                  subtitle={t('admin.categories.subtitle', { defaultValue: 'Manage categories & icons' })}
-                  onPress={() => navigation.navigate('AdminCategories')}
+                  subtitle={t('admin.categories.subtitle', { defaultValue: 'Manage categories & logos' })}
+                  onPress={() => navigation.navigate('AdminCategoryManagement')}
                   color="#7C4DFF"
                   theme={theme} isDark={isDark} tintBg={tintBg} />
                 <Divider isDark={isDark} />

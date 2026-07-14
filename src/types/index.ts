@@ -612,6 +612,7 @@ export type RootStackParamList = {
   AdminCreateOrder: { partner?: { uid: string; name: string } } | undefined;
   AdminBannerManagement: undefined;
   AdminBrandManagement: undefined;
+  AdminCategoryManagement: undefined;
   AdminChatScreen: { conversationId: string };
   
   // Chat Screens
