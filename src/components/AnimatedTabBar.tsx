@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { CartIcon } from './icons/CartIcon';
 import { useCart } from '../contexts/CartContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -11,16 +10,11 @@ import AppNumber from './AppNumber';
 import Animated, {
   useAnimatedStyle,
   withSpring,
-  withTiming,
   useSharedValue,
-  runOnJS,
 } from 'react-native-reanimated';
 import { useTheme } from './ThemeProvider';
 import { subscribeToUserConversations, getUserUnreadCount } from '../services/chatService';
 
-
-const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
-const AnimatedText = Animated.createAnimatedComponent(Text);
 
 interface TabBarIconProps {
   routeName: string;
@@ -42,8 +36,8 @@ const CartIconWithBadge = ({ size, color, itemCount }: CartIconWithBadgeProps) =
       <CartIcon size={size} color={color} />
       {itemCount > 0 && (
         <View style={styles.cartBadge}>
-          <AppNumber 
-            value={itemCount > 99 ? 99 : itemCount} 
+          <AppNumber
+            value={itemCount > 99 ? 99 : itemCount}
             style={styles.cartBadgeText}
           />
         </View>
@@ -146,7 +140,6 @@ interface AnimatedTabButtonProps {
   onPress: () => void;
   onLongPress: () => void;
   label: string;
-  index: number;
   cartItemCount?: number; // ALIBABA: Pass cart count for badge
   messageBadgeCount?: number; // Unread messages badge count
   ordersBadgeCount?: number; // Unread orders badge count
@@ -158,98 +151,111 @@ const AnimatedTabButton: React.FC<AnimatedTabButtonProps> = ({
   onPress,
   onLongPress,
   label,
-  index,
   cartItemCount,
   messageBadgeCount,
   ordersBadgeCount,
 }) => {
-  const { theme } = useTheme();
-  
-  // Animated values
+  const { theme, currentCustomTheme } = useTheme();
+  // aynAlfahad: raised active pill is a pure-white card floating over the bar.
+  // `card` lives on the raw custom theme; fall back to surface when unavailable.
+  const cardColor = currentCustomTheme?.colors.card ?? theme.colors.surface;
+
+  // Animated press/scale value (kept from the original Reanimated behavior)
   const scale = useSharedValue(1);
-  const dotOpacity = useSharedValue(focused ? 1 : 0);
-  const dotWidth = useSharedValue(focused ? 1 : 0);
-  
-  // Update animations when focused state changes
+
+  // Gentle bump when a tab becomes focused
   React.useEffect(() => {
-    scale.value = withSpring(focused ? 1.08 : 1, {
+    scale.value = withSpring(focused ? 1.06 : 1, {
       damping: 14,
       stiffness: 180,
     });
-    
-    dotOpacity.value = withTiming(focused ? 1 : 0, {
-      duration: 250,
-    });
-    
-    dotWidth.value = withSpring(focused ? 1 : 0, {
-      damping: 14,
-      stiffness: 160,
-    });
   }, [focused]);
 
-  // Animated styles
-  const iconAnimatedStyle = useAnimatedStyle(() => ({
+  // Raised active badge: lift it above the bar (translateY) then apply the scale.
+  const activeAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: -18 }, { scale: scale.value }],
+  }));
+
+  // Inactive icon: just the press/scale feedback.
+  const inactiveAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
 
-  const dotAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: dotOpacity.value,
-    transform: [{ scaleX: dotWidth.value }, { scaleY: dotWidth.value }],
-  }));
-
   const handlePress = () => {
-    // Subtle press feedback
-    scale.value = withSpring(0.95, { duration: 100 }, () => {
-      scale.value = withSpring(focused ? 1.05 : 1, {
+    // Subtle press feedback, then settle to the focused/unfocused resting scale.
+    scale.value = withSpring(0.92, { damping: 15, stiffness: 300 }, () => {
+      scale.value = withSpring(focused ? 1.06 : 1, {
         damping: 15,
         stiffness: 200,
       });
     });
-    
-    runOnJS(onPress)();
+
+    onPress();
   };
 
+  const iconColor = focused ? theme.colors.primary : theme.colors.textSecondary;
+
   return (
-    <AnimatedTouchableOpacity
+    <TouchableOpacity
       style={styles.tabButton}
       onPress={handlePress}
       onLongPress={onLongPress}
-      activeOpacity={0.7}
+      activeOpacity={0.8}
     >
-      {/* Blue dot indicator above icon */}
-      <Animated.View 
-        style={[
-          styles.activeIndicatorDot,
-          { backgroundColor: '#FF5000' }, // Alibaba Orange
-          dotAnimatedStyle,
-        ]} 
-      />
-      
-      <Animated.View style={[styles.iconContainer, iconAnimatedStyle]}>
-        {getTabBarIcon({
-          routeName: route.name,
-          focused,
-          color: focused ? '#FF5000' : theme.colors.textSecondary,
-          size: 26,
-          cartItemCount,
-          messageBadgeCount,
-          ordersBadgeCount,
-        })}
-      </Animated.View>
-      
-      <Text allowFontScaling={false}
+      <View style={styles.iconSlot}>
+        {focused ? (
+          <Animated.View
+            style={[
+              styles.activeBadge,
+              {
+                backgroundColor: cardColor,
+                borderColor: theme.colors.border,
+                shadowColor: '#000',
+              },
+              activeAnimatedStyle,
+            ]}
+          >
+            {getTabBarIcon({
+              routeName: route.name,
+              focused,
+              color: iconColor,
+              size: 24,
+              cartItemCount,
+              messageBadgeCount,
+              ordersBadgeCount,
+            })}
+          </Animated.View>
+        ) : (
+          <Animated.View style={inactiveAnimatedStyle}>
+            {getTabBarIcon({
+              routeName: route.name,
+              focused,
+              color: iconColor,
+              size: 24,
+              cartItemCount,
+              messageBadgeCount,
+              ordersBadgeCount,
+            })}
+          </Animated.View>
+        )}
+      </View>
+
+      <Text
+        allowFontScaling={false}
         style={[
           styles.tabLabel,
           {
-            color: focused ? '#FF5000' : theme.colors.textSecondary, // Alibaba Orange
-            fontWeight: focused ? '600' : '400',
+            color: iconColor,
+            fontWeight: focused ? '700' : '500',
           },
         ]}
-        numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.85}
       >
         {label}
       </Text>
-    </AnimatedTouchableOpacity>
+    </TouchableOpacity>
   );
 };
 
@@ -258,7 +264,7 @@ const AnimatedTabBar: React.FC<BottomTabBarProps> = ({
   descriptors,
   navigation,
 }) => {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const { getCartItemCount } = useCart(); // ALIBABA: Get live cart count
   const { user, isGuest } = useAuth();
   const { ordersBadgeCount } = useNotification();
@@ -282,109 +288,124 @@ const AnimatedTabBar: React.FC<BottomTabBarProps> = ({
 
     return () => unsubscribe();
   }, [user?.uid, isGuest]);
-  
+
   // Get cart item count for badge
   const cartItemCount = getCartItemCount();
 
   return (
-    <View style={[styles.tabBar, { 
-      backgroundColor: theme.colors.surface,
-    }]}>
+    // box-none lets taps in the floating margins fall through to the content below.
+    <View style={styles.root} pointerEvents="box-none">
+      <View
+        style={[
+          styles.bar,
+          {
+            backgroundColor: theme.colors.surface,
+            borderColor: theme.colors.border,
+            borderWidth: isDark ? StyleSheet.hairlineWidth : 0,
+            shadowColor: '#000',
+            shadowOpacity: isDark ? 0 : 0.1,
+            elevation: isDark ? 0 : 8,
+          },
+        ]}
+      >
+        {state.routes.map((route, index) => {
+          const { options } = descriptors[route.key];
+          const label = options.tabBarLabel?.toString() || route.name;
+          const isFocused = state.index === index;
 
-        
-        {/* Tab buttons container */}
-        <View style={styles.tabsContainer}>
-          {state.routes.map((route, index) => {
-            const { options } = descriptors[route.key];
-            const label = options.tabBarLabel?.toString() || route.name;
-            const isFocused = state.index === index;
+          const onPress = () => {
+            const event = navigation.emit({
+              type: 'tabPress',
+              target: route.key,
+              canPreventDefault: true,
+            });
 
-            const onPress = () => {
-              const event = navigation.emit({
-                type: 'tabPress',
-                target: route.key,
-                canPreventDefault: true,
-              });
+            if (!isFocused && !event.defaultPrevented) {
+              navigation.navigate(route.name, route.params);
+            }
+          };
 
-              if (!isFocused && !event.defaultPrevented) {
-                navigation.navigate(route.name, route.params);
-              }
-            };
+          const onLongPress = () => {
+            navigation.emit({
+              type: 'tabLongPress',
+              target: route.key,
+            });
+          };
 
-            const onLongPress = () => {
-              navigation.emit({
-                type: 'tabLongPress',
-                target: route.key,
-              });
-            };
-
-            return (
-              <AnimatedTabButton
-                key={route.key}
-                route={route}
-                focused={isFocused}
-                onPress={onPress}
-                onLongPress={onLongPress}
-                label={label}
-                index={index}
-                cartItemCount={cartItemCount}
-                messageBadgeCount={messageBadgeCount}
-                ordersBadgeCount={ordersBadgeCount}
-              />
-            );
-          })}
+          return (
+            <AnimatedTabButton
+              key={route.key}
+              route={route}
+              focused={isFocused}
+              onPress={onPress}
+              onLongPress={onLongPress}
+              label={label}
+              cartItemCount={cartItemCount}
+              messageBadgeCount={messageBadgeCount}
+              ordersBadgeCount={ordersBadgeCount}
+            />
+          );
+        })}
       </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  tabBar: {
+  // Absolute anchor at the screen bottom; provides the floating margins + safe-area gap.
+  root: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
     bottom: 0,
-    left: 0,
-    position: 'absolute',
-    right: 0,
+    paddingHorizontal: 16,
+    paddingBottom: 24, // sits above the bottom inset / home indicator
+    paddingTop: 24, // headroom so the raised active badge never clips
   },
-  fadeOverlay: {
-    height: 30,
-    left: 0,
-    position: 'absolute',
-    right: 0,
-    top: -30,
-  },
-  tabsContainer: {
+  // The floating pill bar.
+  bar: {
     flexDirection: 'row',
-    paddingBottom: 28,
-    paddingHorizontal: 8,
+    alignItems: 'flex-start',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
     paddingTop: 14,
+    paddingBottom: 12,
+    paddingHorizontal: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 16,
   },
   tabButton: {
     alignItems: 'center',
     flex: 1,
-    justifyContent: 'center',
-    paddingVertical: 6,
-    position: 'relative',
+    justifyContent: 'flex-start',
   },
-  iconContainer: {
+  // Fixed-height slot keeps every label on the same baseline regardless of the raised badge.
+  iconSlot: {
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 4,
-    marginTop: 6,
+  },
+  // Raised circular badge for the active tab.
+  activeBadge: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 8,
   },
   tabLabel: {
     fontSize: 10,
-    fontWeight: '600',
     letterSpacing: 0.3,
     marginTop: 3,
     textAlign: 'center',
     textTransform: 'uppercase',
-  },
-  activeIndicatorDot: {
-    borderRadius: 2,
-    height: 3,
-    position: 'absolute',
-    top: 0,
-    width: 20,
   },
   // ALIBABA: Cart badge styles
   cartIconWrapper: {

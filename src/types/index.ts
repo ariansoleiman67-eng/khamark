@@ -420,11 +420,13 @@ export interface Theme {
     accent: string;
     background: string;
     surface: string;
+    card: string;
     error: string;
     warning: string;
     success: string;
     text: string;
     textSecondary: string;
+    textOnPrimary: string;
     border: string;
     placeholder: string;
     disabled: string;

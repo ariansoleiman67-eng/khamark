@@ -419,7 +419,11 @@
       "fastDelivery": "گەیاندنی خێرا",
       "fastDeliverySubtitle": "گەیاندن لە هەمان ڕۆژدا لە ناوچەی هەولێر"
     },
-    "noProducts": "هیچ بەرهەمێک بەردەست نییە"
+    "noProducts": "هیچ بەرهەمێک بەردەست نییە",
+    "hello": "سڵاو",
+    "guest": "میوان",
+    "ourBrands": "براندەکانمان",
+    "featured": "تایبەت"
   },
   "products": {
     "product": "بەرهەم",

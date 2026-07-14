@@ -15,11 +15,13 @@ import {
   InteractionManager,
   Modal,
   ActivityIndicator,
+  I18nManager,
+  useWindowDimensions,
 } from 'react-native';
 import { Image } from 'expo-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../components/ThemeProvider';
@@ -32,10 +34,10 @@ import AppNumber from '../components/AppNumber';
 import ProductService from '../services/productService';
 
 import { useTenant } from '../contexts/TenantContext';
-import { getCategoryIconName } from '../utils/categoryIcons';
 import { categoryService } from '../services/categoryService';
 import { storeProfileService, StoreProfile } from '../services/storeProfileService';
 import BannerCarousel from '../components/BannerCarousel';
+import BrandTile from '../components/home/BrandTile';
 
 
 
@@ -89,11 +91,13 @@ const CategoriesScreen: React.FC = () => {
   const { isFavorite, toggleFavorite } = useFavorites();
   const { tenantId } = useTenant();
   const insets = useSafeAreaInsets();
-  
+  const { width: windowWidth } = useWindowDimensions();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
+
   // State
   const [categories, setCategories] = useState<Category[]>([]);
   // Uploaded category icons (name -> imageUrl) from the shop's managed categories.
-  // When present, they replace the guessed MaterialCommunityIcons glyph.
+  // When present, the BrandTile shows this image; otherwise it falls back to an initial.
   const [iconByName, setIconByName] = useState<Record<string, string>>({});
   useEffect(() => {
     if (!tenantId) return;
@@ -109,6 +113,8 @@ const CategoriesScreen: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  // aynAlfahad: the count row's filter button toggles the category filter grid.
+  const [showFilters, setShowFilters] = useState(true);
 
   // Helper to get translated name for headers
   const translatedSelectedCategory = useMemo(() => {
@@ -635,22 +641,23 @@ const CategoriesScreen: React.FC = () => {
     </View>
   ), [handleProductPress, handleAddToCart, isFavorite, toggleFavorite]);
 
-  // Category filter renderer - ALIBABA-STYLE GRID with Icons
+  // Category filter renderer — aynAlfahad BrandTile look (flat light-gray rounded
+  // tiles with uploaded icon or initial). Orange ring marks the active category.
   const renderCategoryFilter = () => {
-    // We need both the original name (for logic) and the translated name (for display)
+    // Original name (for filter logic) + translated name (for display).
     const categoryOptions = [
-      { id: 'All', originalName: 'All', displayName: t('categories.all'), gradientColors: ['#FF6A00', '#FF8E53'] },
+      { id: 'All', originalName: 'All', displayName: t('categories.all') },
       ...categories.map(cat => {
         let displayName = cat.name;
 
         // Create a safe translation key: lowercase and remove spaces
         const translationKey = cat.name.toLowerCase().replace(/\s+/g, '');
         const fallback = t(`categories.${translationKey}`);
-        
+
         // If we have a successful translation from our JSON files (it didn't return the raw key)
         if (fallback !== `categories.${translationKey}`) {
           displayName = fallback;
-        } 
+        }
         // Otherwise try the database fields
         else if (i18n.language === 'ar' && cat.nameAr && cat.nameAr.trim() !== '') {
           displayName = cat.nameAr;
@@ -659,88 +666,47 @@ const CategoriesScreen: React.FC = () => {
         } else {
           displayName = cat.name;
         }
-        
-        return {
-          id: cat.id,
-          originalName: cat.name,
-          displayName,
-          gradientColors: cat.gradientColors,
-        };
+
+        return { id: cat.id, originalName: cat.name, displayName };
       })
     ];
-    
-    // Calculate item width for responsive grid
-    const H_PADDING = 14;
+
+    // Responsive 3-column grid. OUTER_PADDING matches the header's paddingHorizontal;
+    // subtract 4 for the 2px selection ring drawn on each side of a tile.
+    const OUTER_PADDING = 12;
     const GAP = 10;
-    const COLUMNS = 3; // 3 columns for category cards
-    
-    // Get screen width (approximate, won't change during render)
-    const screenWidth = 360; // Safe default, cards will stretch
-    const totalGaps = GAP * (COLUMNS - 1);
-    const available = screenWidth - H_PADDING * 2 - totalGaps;
-    const itemWidth = Math.floor(available / COLUMNS);
-    
+    const COLUMNS = 3;
+    const available = windowWidth - OUTER_PADDING * 2 - GAP * (COLUMNS - 1);
+    const tileWidth = Math.floor(available / COLUMNS) - 4;
+
     return (
-      <View style={styles.categoryFilterContainer}>
-        <View style={styles.categoryGridAlt}>
-          {categoryOptions.map((cat) => {
-            const isSelected = selectedCategory === cat.originalName;
-            const iconName = getCategoryIconName(cat.originalName === 'All' ? 'all' : cat.originalName);
-            const uploadedIcon = iconByName[cat.originalName];
-            
-            // ALIBABA ORANGE styling for selected state
-            const ORANGE_COLOR = '#FF6A00';
-            
-            const borderColor = isSelected ? ORANGE_COLOR + '55' : theme.colors.border + '35';
-            const bg = isSelected ? ORANGE_COLOR + '12' : theme.colors.surface;
-            const iconColor = isSelected ? ORANGE_COLOR : theme.colors.textSecondary;
-            const iconBg = isSelected ? ORANGE_COLOR + '18' : theme.colors.background;
-            
-            return (
-              <TouchableOpacity
-                key={cat.originalName}
+      <View
+        style={[
+          styles.categoryGridWrap,
+          { flexDirection: isRTL ? 'row-reverse' : 'row', gap: GAP },
+        ]}
+      >
+        {categoryOptions.map((cat) => {
+          const isSelected = selectedCategory === cat.originalName;
+          const uploadedIcon = cat.originalName === 'All' ? undefined : iconByName[cat.originalName];
+
+          return (
+            <View
+              key={cat.originalName}
+              style={[
+                styles.categoryTileWrap,
+                isSelected && { borderColor: theme.colors.primary },
+              ]}
+            >
+              <BrandTile
+                label={cat.displayName}
+                imageUrl={uploadedIcon}
+                width={tileWidth}
                 onPress={() => handleCategoryFilter(cat.originalName)}
-                activeOpacity={0.88}
-                style={[
-                  styles.alibabaGridCard,
-                  {
-                    backgroundColor: bg,
-                    borderColor,
-                  },
-                ]}
-              >
-                <View style={styles.alibabaIconWrap}>
-                  {uploadedIcon ? (
-                    <Image
-                      source={{ uri: uploadedIcon }}
-                      style={StyleSheet.absoluteFillObject}
-                      contentFit="cover"
-                      cachePolicy="memory-disk"
-                    />
-                  ) : (
-                    <>
-                      <LinearGradient
-                        colors={(cat.gradientColors as any) || ['#FF6A00', '#FF8E53']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={StyleSheet.absoluteFillObject}
-                      />
-                      <MaterialCommunityIcons name={iconName as any} size={28} color="#FFFFFF" />
-                    </>
-                  )}
-                </View>
-                <Text allowFontScaling={false}
-                  style={[styles.alibabaGridTitle, { color: isSelected ? ORANGE_COLOR : theme.colors.text }]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.85}
-                >
-                  {cat.displayName}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+              />
+            </View>
+          );
+        })}
       </View>
     );
   };
@@ -814,37 +780,67 @@ const CategoriesScreen: React.FC = () => {
 
 
 
-      {/* Search Bar - NO animations */}
-      <View style={[styles.searchContainer, { backgroundColor: theme.colors.surface }]}>
-        <LinearGradient
-          colors={['#FF6A00', '#FF8F00']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.searchGradient}
+      {/* Search pill — restyled airy/light; still navigates to the Search screen */}
+      <TouchableOpacity
+        onPress={handleSearchPress}
+        activeOpacity={0.85}
+        style={[
+          styles.searchPill,
+          {
+            backgroundColor: isDark ? theme.colors.surface : '#F0F0F2',
+            flexDirection: isRTL ? 'row-reverse' : 'row',
+          },
+        ]}
+      >
+        <Ionicons name="search" size={20} color={theme.colors.textSecondary} />
+        <Text
+          allowFontScaling={false}
+          numberOfLines={1}
+          style={[
+            styles.searchPillText,
+            { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' },
+          ]}
         >
-          <TouchableOpacity
-            onPress={handleSearchPress}
-            style={styles.searchTouchable}
-          >
-            <Ionicons name="search" size={20} color="#ffffff" />
-            <Text allowFontScaling={false} style={styles.searchPlaceholder}>{t('search.placeholder')}</Text>
-            <Ionicons name="filter" size={16} color="rgba(255, 255, 255, 0.8)" />
-          </TouchableOpacity>
-        </LinearGradient>
+          {t('search.placeholder')}
+        </Text>
+      </TouchableOpacity>
+
+      {/* Count row: bold "{n} Products" (number LTR) + filter toggle button */}
+      <View style={[styles.countRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        <View style={[styles.countLabelWrap, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+          <AppNumber
+            value={filteredProducts.length}
+            style={[styles.countNumber, { color: theme.colors.text }]}
+          />
+          <Text allowFontScaling={false} style={[styles.countText, { color: theme.colors.text }]}>
+            {' '}{t('common.products')}
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          onPress={() => setShowFilters((v) => !v)}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          style={[
+            styles.filterButton,
+            {
+              backgroundColor: showFilters
+                ? theme.colors.primary + '18'
+                : (isDark ? theme.colors.surface : '#F0F0F2'),
+              borderColor: showFilters ? theme.colors.primary : 'transparent',
+            },
+          ]}
+        >
+          <Ionicons
+            name="options-outline"
+            size={20}
+            color={showFilters ? theme.colors.primary : theme.colors.text}
+          />
+        </TouchableOpacity>
       </View>
 
-    {renderCategoryFilter()}
-      
-      {/* Results Count - NO animations */}
-      <View style={styles.resultsHeader}>
-        <Text allowFontScaling={false} style={[styles.resultsCount, { color: theme.colors.text }]} adjustsFontSizeToFit>
-          {selectedCategory !== 'All' && (
-            <Text allowFontScaling={false} style={[styles.categoryFilterLabel, { color: theme.colors.primary }]} adjustsFontSizeToFit>
-              {t('common.in')} {translatedSelectedCategory}
-            </Text>
-          )}
-        </Text>
-      </View>
+      {/* Category filter grid (toggled by the filter button) */}
+      {showFilters && renderCategoryFilter()}
     </View>
   );
 
@@ -882,7 +878,7 @@ const CategoriesScreen: React.FC = () => {
     
     return (
       <SafeAreaView 
-        style={[styles.container, { backgroundColor: isDark ? theme.colors.background : '#FAFAF5' }]}
+        style={[styles.container, { backgroundColor: theme.colors.background }]}
         edges={['left', 'right']}
       >
         <View style={styles.header}>
@@ -932,7 +928,7 @@ const CategoriesScreen: React.FC = () => {
   // Show error state
   if (error) {
     return (
-      <View style={[styles.container, styles.centered, { backgroundColor: isDark ? theme.colors.background : '#FAFAF5' }]}>
+      <View style={[styles.container, styles.centered, { backgroundColor: theme.colors.background }]}>
         <Ionicons name="alert-circle-outline" size={64} color={theme.colors.error} />
         <Text allowFontScaling={false} style={[styles.errorTitle, { color: theme.colors.text, marginTop: 16 }]}>
           {t('common.error')}
@@ -952,7 +948,7 @@ const CategoriesScreen: React.FC = () => {
 
   return (
     <SafeAreaView 
-      style={[styles.container, { backgroundColor: isDark ? theme.colors.background : '#FAFAF5' }]}
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
       edges={Platform.OS === 'android' ? ['top', 'left', 'right'] : ['left', 'right']}
     >
       {/* GOLDEN TEMPLATE: KeyboardAvoidingView same as Login/Home */}
@@ -1057,6 +1053,58 @@ const styles = StyleSheet.create({
   header: {
     marginBottom: 2,
     paddingHorizontal: 12,
+  },
+  // aynAlfahad: light search pill
+  searchPill: {
+    alignItems: 'center',
+    borderRadius: 16,
+    marginBottom: 18,
+    marginTop: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  searchPillText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
+    marginHorizontal: 10,
+  },
+  // aynAlfahad: count row + filter toggle
+  countRow: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  countLabelWrap: {
+    alignItems: 'center',
+  },
+  countNumber: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  countText: {
+    fontSize: 18,
+    fontWeight: '800',
+    includeFontPadding: false,
+  },
+  filterButton: {
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  // aynAlfahad: category tiles grid (BrandTile look + orange selection ring)
+  categoryGridWrap: {
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+    marginBottom: 8,
+  },
+  categoryTileWrap: {
+    borderColor: 'transparent',
+    borderRadius: 18,
+    borderWidth: 2,
   },
   // Hero Section - NO fixed heights
   heroSection: {

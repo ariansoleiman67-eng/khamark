@@ -472,7 +472,11 @@
       "fastDelivery": "Fast Delivery",
       "fastDeliverySubtitle": "Same day delivery in Erbil region"
     },
-    "noProducts": "No products available"
+    "noProducts": "No products available",
+    "hello": "Hello",
+    "guest": "Guest",
+    "ourBrands": "Our Brands",
+    "featured": "Featured"
   },
   "store": {
     "home": "Home",

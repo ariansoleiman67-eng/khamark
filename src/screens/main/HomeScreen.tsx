@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,19 +10,20 @@ import {
   Alert,
   Platform,
   KeyboardAvoidingView,
+  I18nManager,
 } from 'react-native';
 
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import { changeLanguage } from '../../locales';
 import { getThumbnailUrl } from '../../utils/imageUtils';
 import { useTheme } from '../../components/ThemeProvider';
 import { useTenant } from '../../contexts/TenantContext';
 import MasonryProductCard from '../../components/MasonryProductCard';
+import SectionHeader from '../../components/home/SectionHeader';
+import BrandTile from '../../components/home/BrandTile';
 import AppNumber from '../../components/AppNumber';
-import Logo from '../../components/Logo';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Product } from '../../types';
@@ -45,10 +46,12 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BOTTOM_NAV_HEIGHT = 80;
 const PAGE_SIZE = 20;
 
-// Banner carousel configuration — loaded from Firestore
-const BANNER_AUTO_SCROLL_INTERVAL = 4000; // 4 seconds
-
-
+// "Our Brands" 2-column grid metrics (client-side derived tiles).
+const BRAND_GRID_PADDING = 16;
+const BRAND_GRID_GAP = 12;
+const BRAND_TILE_WIDTH = (SCREEN_WIDTH - BRAND_GRID_PADDING * 2 - BRAND_GRID_GAP) / 2;
+// How many brand-spotlight carousels to surface at the top of the feed.
+const MAX_SPOTLIGHTS = 4;
 
 interface Banner {
   id: string;
@@ -59,30 +62,25 @@ interface Banner {
   isActive: boolean;
 }
 
-interface Category {
-  id: string;
-  name: string;
-  icon: string;
-  count: number;
+interface BrandGroup {
+  brand: string;
+  products: Product[];
 }
 
 /**
- * HOME SCREEN - GOLDEN TEMPLATE
- * 
- * Architecture:
- * SafeAreaView (edges: ['top','left','right'])
- *  └── KeyboardAvoidingView
- *      └── FlatList (SINGLE vertical scroll owner)
- *          ├── ListHeaderComponent (header, banner, categories)
- *          ├── Product Cards (infinite feed)
- *          └── contentContainerStyle.paddingBottom for bottom nav
- * 
- * Rules enforced:
- * - ONE vertical scroll owner
- * - NO fixed heights (aspectRatio only)
- * - NO layout animations
- * - Header INSIDE the scroll
- * - Guest can browse freely
+ * HOME SCREEN — aynAlfahad re-skin.
+ *
+ * Architecture (single vertical scroll owner):
+ *  SafeAreaView (edges: top/left/right)
+ *   ├── FIXED header row (menu + greeting | cart · favorites · notifications · language)
+ *   └── KeyboardAvoidingView
+ *       └── FlatList (data = newArrivals, numColumns=2) — the only vertical scroller
+ *           ├── ListHeaderComponent: hero banner, "Our Brands" grid,
+ *           │   per-brand spotlight carousels, "New Arrivals" header
+ *           └── 2-column masonry grid body (infinite feed)
+ *
+ * Data flow is untouched: loadBanners/loadNewArrivals/loadMoreProducts/onRefresh,
+ * the StartOrderBottomSheet add-to-cart flow, favorites, badges.
  */
 const HomeScreen: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -90,11 +88,14 @@ const HomeScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const { addToCart } = useCart();
-  const { favoritesCount, isFavorite: isFavorites, toggleFavorite } = useFavorites(); // Renamed to isFavorites to avoid conflict if needed, or just use isFavorite
+  const { favoritesCount, isFavorite: isFavorites, toggleFavorite } = useFavorites();
   const { tenantId } = useTenant();
-  const { user, isVip } = useAuth(); // Import isVip and user from AuthContext
+  const { user, isVip } = useAuth();
   // ALIBABA-STYLE: Real-time badge from NotificationContext (no polling)
   const badgeCount = useBadgeCount();
+
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
+  const textAlign: 'left' | 'right' = isRTL ? 'right' : 'left';
 
   // Ref for scroll-to-top functionality
   const flatListRef = useRef<FlatList>(null);
@@ -121,8 +122,6 @@ const HomeScreen: React.FC = () => {
     loadData();
   }, [tenantId]);
 
-
-
   const loadData = async () => {
     try {
       setLoading(true);
@@ -136,8 +135,6 @@ const HomeScreen: React.FC = () => {
       setLoading(false);
     }
   };
-
-
 
   const loadBanners = async () => {
     try {
@@ -154,8 +151,6 @@ const HomeScreen: React.FC = () => {
       setBannerImages((prev) => (prev.length === 0 ? prev : []));
     }
   };
-
-
 
   const loadNewArrivals = async () => {
     try {
@@ -233,8 +228,6 @@ const HomeScreen: React.FC = () => {
     }
   };
 
-
-
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -287,12 +280,6 @@ const HomeScreen: React.FC = () => {
     }
   }, [cartSheetProduct, addToCart, navigation, t]);
 
-
-
-  const handleSearchPress = useCallback(() => {
-    navigation.navigate('Search');
-  }, [navigation]);
-
   const handleNotificationPress = useCallback(() => {
     navigation.navigate('Notifications');
   }, [navigation]);
@@ -301,89 +288,143 @@ const HomeScreen: React.FC = () => {
     navigation.navigate('Favorites');
   }, [navigation]);
 
+  const handleCartPress = useCallback(() => {
+    navigation.navigate('Cart');
+  }, [navigation]);
+
+  // A hamburger "menu" that browses the category catalogue.
+  const handleMenuPress = useCallback(() => {
+    navigation.navigate('Categories');
+  }, [navigation]);
+
+  const handleBrandsSeeAll = useCallback(() => {
+    navigation.navigate('Categories');
+  }, [navigation]);
+
   const handleLanguageSelect = (languageCode: string) => {
     changeLanguage(languageCode);
   };
 
-  // GOLDEN TEMPLATE: ListHeaderComponent contains content that scrolls WITH the list.
-  // It MUST be a stable reference: an inline `() => ...` gives ListHeaderComponent a
-  // brand-new component type every render, so FlatList remounts the whole header
-  // (including the BannerCarousel) on each pagination/scroll re-render. That reset the
-  // banner's measured aspect ratio to null → it jumped to the fallback height ("banner
-  // gets big") and, because the image is cached, onLoad didn't re-fire to fix it.
-  // Depend on the BOOLEAN hasArrivals (NOT the newArrivals array) so loading more
-  // products never changes this callback's identity.
-  const hasArrivals = newArrivals.length > 0;
+  // -------------------------------------------------------------------------
+  // Client-side derivations from the SAME newArrivals data (no extra fetches):
+  //   • brands          — unique, non-empty brand names (for "Our Brands" grid)
+  //   • brandSpotlights — brands with >=2 products (for "Featured <Brand>" rows)
+  // -------------------------------------------------------------------------
+  const { brands, brandSpotlights, hasArrivals } = useMemo(() => {
+    const order: string[] = [];
+    const groups = new Map<string, BrandGroup>();
+    for (const p of newArrivals) {
+      const b = (p.brand || '').trim();
+      if (!b) continue;
+      const key = b.toLowerCase();
+      const existing = groups.get(key);
+      if (existing) {
+        existing.products.push(p);
+      } else {
+        groups.set(key, { brand: b, products: [p] });
+        order.push(key);
+      }
+    }
+    const brandList = order.map((k) => groups.get(k)!.brand);
+    const spots = order
+      .map((k) => groups.get(k)!)
+      .filter((g) => g.products.length >= 2)
+      .sort((a, b) => b.products.length - a.products.length)
+      .slice(0, MAX_SPOTLIGHTS);
+    return { brands: brandList, brandSpotlights: spots, hasArrivals: newArrivals.length > 0 };
+  }, [newArrivals]);
+
+  // GOLDEN TEMPLATE: keep ListHeaderComponent a STABLE reference so the
+  // BannerCarousel is reconciled (never remounted) as the feed grows / favorites
+  // toggle — a remount would reset the carousel to slide 0 and re-flash the image.
+  // Volatile inputs (favorites state, the derived brand data) are read through
+  // refs so this callback's identity only changes on language/theme/banner change.
+  const favActionsRef = useRef({ isFavorite: isFavorites, toggleFavorite });
+  favActionsRef.current = { isFavorite: isFavorites, toggleFavorite };
+  const stableIsFavorite = useCallback((id: string) => favActionsRef.current.isFavorite(id), []);
+  const stableToggleFavorite = useCallback((id: string) => favActionsRef.current.toggleFavorite(id), []);
+
+  const headerDataRef = useRef({ brands, brandSpotlights, hasArrivals });
+  headerDataRef.current = { brands, brandSpotlights, hasArrivals };
+
+  const renderSpotlightCard = useCallback(({ item }: { item: Product }) => (
+    <MasonryProductCard
+      product={item}
+      onPress={handleProductPress}
+      onAddToCart={handleAddToCartPress}
+      isFavorite={stableIsFavorite(item.id)}
+      onToggleFavorite={stableToggleFavorite}
+    />
+  ), [handleProductPress, handleAddToCartPress, stableIsFavorite, stableToggleFavorite]);
+
   const renderListHeader = useCallback(() => {
+    const { brands: brandList, brandSpotlights: spotlights, hasArrivals: hasItems } = headerDataRef.current;
     return (
       <View>
-        {/* Banner Section - Only show if banners exist */}
+        {/* a. Hero banner */}
         {bannerImages.length > 0 && (
           <BannerCarousel images={bannerImages} />
         )}
 
-        {/* New Arrivals — Luxury Section Header */}
-        {hasArrivals && (
-          <View style={[styles.sectionHeader, { marginTop: 16, marginBottom: 12 }]}>
-            <Text allowFontScaling={false} style={{
-              fontSize: 13, fontWeight: '600',
-              color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.38)',
-              letterSpacing: 0.5, textTransform: 'uppercase',
-            }}>
-              {t('home.newArrivals')}
-            </Text>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('Categories')}
-              activeOpacity={0.7}
-              style={{
-                backgroundColor: theme.colors.primary + '12',
-                paddingHorizontal: 14, paddingVertical: 6,
-                borderRadius: 12,
-              }}
-            >
-              <Text allowFontScaling={false} style={{ fontSize: 13, fontWeight: '600', color: theme.colors.primary }}>
-                {t('common.seeAll')}
-              </Text>
-            </TouchableOpacity>
+        {/* b. Our Brands — 2-column grid derived from unique brands */}
+        {brandList.length > 0 && (
+          <View>
+            <SectionHeader title={t('home.ourBrands')} onSeeAll={handleBrandsSeeAll} />
+            <View style={[styles.brandsGrid, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              {brandList.map((brand) => (
+                <BrandTile
+                  key={brand}
+                  label={brand}
+                  width={BRAND_TILE_WIDTH}
+                  onPress={handleBrandsSeeAll}
+                />
+              ))}
+            </View>
           </View>
         )}
+
+        {/* c. Brand-spotlight carousels ("Featured <Brand>") */}
+        {spotlights.map((group) => (
+          <View key={group.brand}>
+            <SectionHeader title={group.brand} onSeeAll={handleBrandsSeeAll} />
+            <FlatList
+              data={group.products}
+              renderItem={renderSpotlightCard}
+              keyExtractor={(item) => `${group.brand}-${item.id}`}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.spotlightList}
+            />
+          </View>
+        ))}
+
+        {/* d. New Arrivals header above the 2-column grid body */}
+        {hasItems && <SectionHeader title={t('home.newArrivals')} />}
       </View>
     );
-  }, [bannerImages, hasArrivals, isDark, t, navigation, theme.colors.primary]);
+  }, [bannerImages, isRTL, t, handleBrandsSeeAll, renderSpotlightCard]);
 
-
-
-  // Product card renderer - 2 column grid (memoized to prevent re-renders)
-  const renderProduct = useCallback(({ item, index }: { item: Product; index: number }) => {
-    return (
-      <View style={[
-        styles.productCardWrapper,
-        {
-          paddingLeft: 0,
-          paddingRight: 0,
-        }
-      ]}>
-        <MasonryProductCard
-          product={item}
-          onPress={handleProductPress}
-          onAddToCart={handleAddToCartPress}
-          // GOLDEN ESTIMATION: Pass pure props to avoid internal context hooks in list items
-          isFavorite={isFavorites(item.id)}
-          onToggleFavorite={toggleFavorite}
-        />
-      </View>
-    );
-  }, [handleProductPress, handleAddToCartPress, isFavorites, toggleFavorite]);
-
-
+  // Product card renderer — 2 column grid (memoized to prevent re-renders)
+  const renderProduct = useCallback(({ item }: { item: Product }) => (
+    <View style={styles.productCardWrapper}>
+      <MasonryProductCard
+        product={item}
+        onPress={handleProductPress}
+        onAddToCart={handleAddToCartPress}
+        // GOLDEN ESTIMATION: Pass pure props to avoid internal context hooks in list items
+        isFavorite={isFavorites(item.id)}
+        onToggleFavorite={toggleFavorite}
+      />
+    </View>
+  ), [handleProductPress, handleAddToCartPress, isFavorites, toggleFavorite]);
 
   // Empty list component
   const renderEmptyProducts = () => (
     <View style={[
       styles.emptyState,
       {
-        backgroundColor: isDark ? theme.colors.surface : '#FFFFFF',
-        marginHorizontal: 20, borderRadius: 16,
+        backgroundColor: theme.colors.surface,
+        marginHorizontal: 20, borderRadius: 20,
         shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
         shadowOpacity: isDark ? 0 : 0.06, shadowRadius: 8, elevation: 2,
       }
@@ -398,8 +439,8 @@ const HomeScreen: React.FC = () => {
       <Text allowFontScaling={false} style={{ fontSize: 17, fontWeight: '600', color: theme.colors.text, textAlign: 'center' }}>
         {t('home.noProducts', { defaultValue: 'No products available' })}
       </Text>
-      <Text allowFontScaling={false} style={{ fontSize: 14, color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)', textAlign: 'center', marginTop: 6 }}>
-        Pull down to refresh
+      <Text allowFontScaling={false} style={{ fontSize: 14, color: theme.colors.textSecondary, textAlign: 'center', marginTop: 6 }}>
+        {t('common.pullToRefresh', { defaultValue: 'Pull down to refresh' })}
       </Text>
     </View>
   );
@@ -410,46 +451,45 @@ const HomeScreen: React.FC = () => {
   // =================================================================
   if (loading) {
     const skBg = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
-    const pageBg = isDark ? theme.colors.background : '#F5F5F7';
 
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: pageBg }]} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top', 'left', 'right']}>
         <StatusBar style={isDark ? 'light' : 'dark'} translucent backgroundColor="transparent" />
 
         {/* Skeleton Header */}
-        <View style={[styles.header, { backgroundColor: isDark ? theme.colors.surface : '#FFFFFF' }]}>
+        <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
           <View style={styles.headerLeft}>
             <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: skBg }} />
-            <View style={{ marginLeft: 10 }}>
-              <View style={{ width: 100, height: 14, borderRadius: 7, backgroundColor: skBg }} />
-              <View style={{ width: 60, height: 10, borderRadius: 5, backgroundColor: skBg, marginTop: 6 }} />
+            <View style={{ marginHorizontal: 10 }}>
+              <View style={{ width: 60, height: 10, borderRadius: 5, backgroundColor: skBg }} />
+              <View style={{ width: 100, height: 14, borderRadius: 7, backgroundColor: skBg, marginTop: 6 }} />
             </View>
           </View>
           <View style={styles.headerRight}>
             {[1, 2, 3, 4].map((i) => (
-              <View key={i} style={{ width: 40, height: 40, borderRadius: 14, backgroundColor: skBg, marginLeft: 8 }} />
+              <View key={i} style={{ width: 30, height: 30, borderRadius: 12, backgroundColor: skBg, marginLeft: 12 }} />
             ))}
           </View>
         </View>
 
         {/* Skeleton Banner */}
-        <View style={{ paddingHorizontal: 20, marginTop: 12 }}>
-          <View style={{ width: '100%', aspectRatio: 16 / 9, borderRadius: 16, backgroundColor: skBg }} />
+        <View style={{ paddingHorizontal: 12, marginTop: 12 }}>
+          <View style={{ width: '100%', aspectRatio: 16 / 9, borderRadius: 20, backgroundColor: skBg }} />
         </View>
 
         {/* Skeleton Section Label */}
-        <View style={{ paddingHorizontal: 20, marginTop: 20, flexDirection: 'row', justifyContent: 'space-between' }}>
-          <View style={{ width: 100, height: 12, borderRadius: 6, backgroundColor: skBg }} />
-          <View style={{ width: 60, height: 24, borderRadius: 12, backgroundColor: skBg }} />
+        <View style={{ paddingHorizontal: 16, marginTop: 24, flexDirection: 'row', justifyContent: 'space-between' }}>
+          <View style={{ width: 120, height: 18, borderRadius: 6, backgroundColor: skBg }} />
+          <View style={{ width: 60, height: 16, borderRadius: 8, backgroundColor: skBg }} />
         </View>
 
         {/* Skeleton Products */}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, marginTop: 12 }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 3, marginTop: 12 }}>
           {[1, 2, 3, 4].map((i) => (
-            <View key={i} style={{ width: '50%', paddingHorizontal: 4, marginBottom: 12 }}>
+            <View key={i} style={{ width: '50%', paddingHorizontal: 3, marginBottom: 12 }}>
               <View style={{
-                backgroundColor: isDark ? theme.colors.surface : '#FFFFFF',
-                borderRadius: 16, overflow: 'hidden',
+                backgroundColor: theme.colors.surface,
+                borderRadius: 20, overflow: 'hidden',
                 shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
                 shadowOpacity: isDark ? 0 : 0.04, shadowRadius: 6, elevation: 1,
               }}>
@@ -469,93 +509,59 @@ const HomeScreen: React.FC = () => {
   return (
     // GOLDEN TEMPLATE: SafeAreaView with edges (NO bottom - handled by padding)
     <SafeAreaView
-      style={[styles.container, { backgroundColor: isDark ? theme.colors.background : '#FAFAF5' }]}
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
       edges={['top', 'left', 'right']}
     >
       <StatusBar style={isDark ? 'light' : 'dark'} translucent backgroundColor="transparent" />
 
-      {/* ---- Luxury Header ---- */}
+      {/* ---- Fixed header (menu + greeting | cart · favorites · notifications · language) ---- */}
       <View style={[
         styles.header,
-        {
-          backgroundColor: isDark ? theme.colors.surface : '#FFFFFF',
-          shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: isDark ? 0 : 0.05, shadowRadius: 12,
-          elevation: 3, zIndex: 10,
-        },
+        { backgroundColor: theme.colors.surface, flexDirection: isRTL ? 'row-reverse' : 'row' },
       ]}>
-        <View style={styles.headerLeft}>
-          <View style={{ position: 'relative', marginRight: 8 }}>
-            {isVip && (
-              <MaterialCommunityIcons
-                name="crown"
-                size={18}
-                color="#FFD700"
-                style={{
-                  position: 'absolute',
-                  top: -9,
-                  left: 1,
-                  transform: [{ rotate: '-20deg' }],
-                  shadowColor: '#FFD700',
-                  shadowOffset: { width: 0, height: 0 },
-                  shadowOpacity: 0.8,
-                  shadowRadius: 4,
-                  elevation: 5,
-                  zIndex: -1,
-                }}
-              />
-            )}
-            <Logo size={32} />
-          </View>
-          <View style={{ flexShrink: 1, flexDirection: 'row', alignItems: 'center' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Image
-                source={require('../../../assets/header-logo-dark.png')}
-                style={styles.headerTextLogo}
-                contentFit="contain"
-                tintColor={isVip ? '#FFD700' : (isDark ? '#ffffff' : undefined)}
-              />
+        {/* Left: hamburger + two-line greeting */}
+        <View style={[styles.headerLeft, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+          <TouchableOpacity onPress={handleMenuPress} hitSlop={8} style={styles.iconBtn} accessibilityRole="button">
+            <Ionicons name="menu" size={26} color={theme.colors.text} />
+          </TouchableOpacity>
+          <View style={styles.greeting}>
+            <Text allowFontScaling={false} numberOfLines={1} style={{ fontSize: 12, color: theme.colors.textSecondary, textAlign }}>
+              {t('home.hello')}
+            </Text>
+            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center' }}>
+              <Text allowFontScaling={false} numberOfLines={1} style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text, textAlign }}>
+                {user?.name || t('home.guest')}
+              </Text>
+              {isVip && (
+                <MaterialCommunityIcons name="crown" size={16} color="#FFD700" style={{ marginHorizontal: 4 }} />
+              )}
             </View>
           </View>
         </View>
-        <View style={styles.headerRight}>
-          {/* Search */}
-          <TouchableOpacity
-            style={[styles.headerButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderRadius: 12, width: 36, height: 36, alignItems: 'center', justifyContent: 'center', marginLeft: 6 }]}
-            onPress={handleSearchPress}
-          >
-            <Ionicons name="search-outline" size={18} color={theme.colors.text} />
+
+        {/* Right: cart (orange) + favorites + notifications + language */}
+        <View style={[styles.headerRight, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+          <TouchableOpacity onPress={handleCartPress} hitSlop={8} style={styles.iconBtn} accessibilityRole="button">
+            <Ionicons name="cart-outline" size={26} color={theme.colors.primary} />
           </TouchableOpacity>
-          {/* Language */}
-          <TouchableOpacity
-            style={[styles.headerButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderRadius: 12, width: 36, height: 36, alignItems: 'center', justifyContent: 'center', marginLeft: 6 }]}
-            onPress={() => setLanguagePickerVisible(true)}
-          >
-            <Ionicons name="language-outline" size={18} color={theme.colors.text} />
-          </TouchableOpacity>
-          {/* Favorites */}
-          <TouchableOpacity
-            style={[styles.headerButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderRadius: 12, width: 36, height: 36, alignItems: 'center', justifyContent: 'center', marginLeft: 6 }]}
-            onPress={handleFavoritesPress}
-          >
-            <Ionicons name="heart-outline" size={18} color={theme.colors.text} />
+          <TouchableOpacity onPress={handleFavoritesPress} hitSlop={8} style={styles.iconBtn} accessibilityRole="button">
+            <Ionicons name="heart-outline" size={24} color={theme.colors.text} />
             {favoritesCount > 0 && (
               <View style={styles.badge}>
                 <AppNumber value={favoritesCount > 99 ? 99 : favoritesCount} style={styles.badgeText} />
               </View>
             )}
           </TouchableOpacity>
-          {/* Notifications */}
-          <TouchableOpacity
-            style={[styles.headerButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderRadius: 12, width: 36, height: 36, alignItems: 'center', justifyContent: 'center', marginLeft: 6 }]}
-            onPress={handleNotificationPress}
-          >
-            <Ionicons name="notifications-outline" size={18} color={theme.colors.text} />
+          <TouchableOpacity onPress={handleNotificationPress} hitSlop={8} style={styles.iconBtn} accessibilityRole="button">
+            <Ionicons name="notifications-outline" size={24} color={theme.colors.text} />
             {badgeCount > 0 && (
               <View style={styles.badge}>
                 <AppNumber value={badgeCount > 99 ? 99 : badgeCount} style={styles.badgeText} />
               </View>
             )}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setLanguagePickerVisible(true)} hitSlop={8} style={styles.iconBtn} accessibilityRole="button">
+            <Ionicons name="language-outline" size={24} color={theme.colors.text} />
           </TouchableOpacity>
         </View>
       </View>
@@ -574,6 +580,7 @@ const HomeScreen: React.FC = () => {
           renderItem={renderProduct}
           keyExtractor={(item) => item.id}
           numColumns={2}
+          columnWrapperStyle={styles.columnWrapper}
           ListHeaderComponent={renderListHeader}
           ListEmptyComponent={renderEmptyProducts}
           showsVerticalScrollIndicator={false}
@@ -598,12 +605,12 @@ const HomeScreen: React.FC = () => {
             setShowScrollHint(y > 200);
           }}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
           }
         />
       </KeyboardAvoidingView>
 
-      {/* Luxury scroll-to-top FAB */}
+      {/* Scroll-to-top FAB */}
       {showScrollHint && (
         <TouchableOpacity
           activeOpacity={0.8}
@@ -656,50 +663,29 @@ const styles = StyleSheet.create({
   keyboardAvoid: {
     flex: 1,
   },
-  // Header styles - NO fixed heights
+  // Fixed header — airy, no elevation (surface tone), tokens only.
   header: {
     alignItems: 'center',
-    flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 12,
   },
   headerLeft: {
     alignItems: 'center',
-    flexShrink: 1,
-    flexDirection: 'row',
+    flex: 1,
   },
-  headerLogoImage: {
-    maxHeight: 35,
-    width: 120,
-    // GOLDEN TEMPLATE: No fixed height, use maxHeight
-  },
-  locationRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  locationText: {
-    fontSize: 12,
-    fontWeight: '500',
-    marginLeft: 4,
-  },
-
-  headerTextLogo: {
-    height: 20,
-    marginTop: 4,
-    maxWidth: 80,
-    width: 80,
+  greeting: {
+    marginHorizontal: 10,
     flexShrink: 1,
   },
   headerRight: {
     alignItems: 'center',
-    flexDirection: 'row',
     flexShrink: 0,
+    gap: 14,
   },
-  headerButton: {
-    marginLeft: 16,
+  iconBtn: {
     position: 'relative',
+    padding: 2,
   },
   /**
    * SAMSUNG ARABIC FIX (LOCKED - ALIBABA/AMAZON PATTERN):
@@ -732,164 +718,30 @@ const styles = StyleSheet.create({
     textAlign: 'right', // RTL-safe (Samsung fix)
     textAlignVertical: 'center',
   },
-  // Banner styles - Alibaba style full-width carousel
-  bannerSection: {
-    marginTop: 8,
+  // "Our Brands" 2-column grid (static wrap, no nested scroll).
+  brandsGrid: {
+    flexWrap: 'wrap',
+    paddingHorizontal: BRAND_GRID_PADDING,
+    gap: BRAND_GRID_GAP,
   },
-  bannerWrapper: {
-    aspectRatio: 16 / 9, // GOLDEN TEMPLATE: aspectRatio for responsive sizing
-    overflow: 'hidden',
-    position: 'relative',
-    width: SCREEN_WIDTH, // Full screen width for smooth paging
+  // Brand-spotlight horizontal carousel padding (aligns first card to the grid).
+  spotlightList: {
+    paddingHorizontal: 13,
+    paddingVertical: 2,
   },
-  paginationContainer: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 12,
-  },
-  paginationDot: {
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    borderRadius: 4,
-    height: 8,
-    marginHorizontal: 4,
-    width: 8,
-  },
-  paginationDotActive: {
-    backgroundColor: '#1a365d',
-    width: 24,
-  },
-  bannerImage: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  bannerContent: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-  },
-  bannerTitle: {
-    color: '#ffffff',
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  bannerButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  bannerButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  // Section styles - ALIBABA: Visual rhythm with asymmetric spacing
-  sectionHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-    marginTop: 12, // ALIBABA: Visual rhythm - tighter for categories
-    paddingHorizontal: 20,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  seeAllText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-
   // Product grid styles
+  columnWrapper: {
+    justifyContent: 'space-between',
+    paddingHorizontal: 3,
+  },
   productCardWrapper: {
     marginBottom: 2,
-    width: '50%',
-  },
-  loadingFooter: {
-    alignItems: 'center',
-    paddingVertical: 20,
   },
   // Empty state
   emptyState: {
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 40,
-  },
-  emptyText: {
-    fontSize: 16,
-    marginTop: 12,
-    textAlign: 'center',
-  },
-  // =================================================================
-  // ALIBABA: Skeleton Loading Styles (static, no shimmer)
-  // All use aspectRatio to match real components
-  // =================================================================
-  skeletonCircle: {
-    borderRadius: 16,
-    height: 32,
-    width: 32,
-  },
-  skeletonText: {
-    borderRadius: 4,
-    height: 12,
-  },
-  skeletonIconButton: {
-    borderRadius: 12,
-    height: 24,
-    marginLeft: 16,
-    width: 24,
-  },
-  skeletonBanner: {
-    aspectRatio: 16 / 9, // Same as real banner
-    borderRadius: 16,
-    width: '100%',
-  },
-  skeletonCategoriesRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-  },
-  skeletonCategoryCard: {
-    alignItems: 'center',
-    marginRight: 12,
-    width: 88,
-  },
-  skeletonCategoryIcon: {
-    aspectRatio: 1, // Same as real category icon
-    borderRadius: 24,
-    width: 48,
-  },
-  skeletonProductsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 16,
-  },
-  skeletonProductCard: {
-    marginBottom: 8,
-    paddingHorizontal: 4,
-    width: '50%',
-  },
-  skeletonProductImage: {
-    aspectRatio: 1, // Same as product card image
-    borderRadius: 12,
-    width: '100%',
-  },
-  vipBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  vipText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    marginLeft: 2,
-    color: '#000',
-    letterSpacing: 0.5,
   },
 });
 

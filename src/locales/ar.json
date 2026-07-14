@@ -472,7 +472,11 @@
       "fastDelivery": "توصيل سريع",
       "fastDeliverySubtitle": "توصيل في نفس اليوم في منطقة أربيل"
     },
-    "noProducts": "لا توجد منتجات متاحة"
+    "noProducts": "لا توجد منتجات متاحة",
+    "hello": "مرحباً",
+    "guest": "زائر",
+    "ourBrands": "علاماتنا التجارية",
+    "featured": "مميز"
   },
   "products": {
     "product": "منتج",

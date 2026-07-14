@@ -12,7 +12,6 @@ import {
 import { Image } from "expo-image";
 import { useTheme } from "./ThemeProvider";
 import { Product } from "../types";
-import { SHADOW_STYLES } from "../constants/theme";
 import { getProductImageUrl, getThumbnailUrl } from "../utils/imageUtils";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
@@ -28,13 +27,14 @@ import Animated, {
 
 const { width: screenWidth } = Dimensions.get("window");
 
-// Fixed dimensions for masonry layout - NEVER CHANGE THESE
-const CARD_MARGIN = 1;
+// Fixed card size for the 2-column masonry grid + horizontal carousels.
+const CARD_MARGIN = 6;
 const NUM_COLUMNS = 2;
 const AVAILABLE_WIDTH = screenWidth - CARD_MARGIN * (NUM_COLUMNS + 1);
 const CARD_WIDTH = Math.floor(AVAILABLE_WIDTH / NUM_COLUMNS);
 const IMAGE_SIZE = CARD_WIDTH;
-const TEXT_CONTAINER_HEIGHT = 119;
+// title(2 lines) + brand + price + pill CTA + padding
+const TEXT_CONTAINER_HEIGHT = 168;
 const CARD_HEIGHT = IMAGE_SIZE + TEXT_CONTAINER_HEIGHT;
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -47,8 +47,6 @@ interface MasonryProductCardProps {
   onToggleFavorite?: (productId: string) => void;
   style?: StyleProp<ViewStyle>;
 }
-
-// Static formatter removed - using global formatPrice
 
 const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
   product,
@@ -66,6 +64,7 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
 
   const isRTL =
     I18nManager.isRTL || i18n.language === "ar" || i18n.language === "ku";
+  const textAlign = isRTL ? "right" : "left";
 
   // Animation
   const scale = useSharedValue(1);
@@ -74,43 +73,31 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
   const scaleAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
-
   const favoriteAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: favoriteScale.value }],
   }));
 
   const handlePressIn = () => {
-    scale.value = withSpring(0.95, { damping: 12, stiffness: 200 });
+    scale.value = withSpring(0.97, { damping: 12, stiffness: 200 });
   };
-
   const handlePressOut = () => {
     scale.value = withSpring(1, { damping: 12, stiffness: 200 });
   };
-
-  const handlePress = () => {
-    onPress(product.id, product);
-  };
+  const handlePress = () => onPress(product.id, product);
 
   const handleFavoritePress = () => {
     favoriteScale.value = withSpring(0.8, {}, () => {
       favoriteScale.value = withSpring(1);
     });
-    if (onToggleFavorite) {
-      onToggleFavorite(product.id);
-    }
+    onToggleFavorite?.(product.id);
   };
 
-  // Ref for add-to-cart button (fly animation)
   const addToCartRef = React.useRef<View>(null);
 
   const handleAddToCart = () => {
-    // Trigger fly-to-cart animation with product image
     const imageUrl = product.imageUrls?.[0];
-
     if (imageUrl) {
       addToCartRef.current?.measureInWindow((x, y, width, height) => {
-        // Dynamic require to avoid circular dependencies if any, though likely safe here
-        // Using try-catch just in case the module location changes or implicit dependency issues
         try {
           const { flyToCart } = require("../ui/FlyToCartLayer");
           flyToCart(imageUrl, x + width / 2 - 20, y + height / 2 - 20);
@@ -119,12 +106,10 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
         }
       });
     }
-
     scale.value = withSpring(1.02, {}, () => {
       scale.value = withSpring(1, { damping: 12, stiffness: 200 });
     });
-
-    if (onAddToCart && hasValidPrice) {
+    if (onAddToCart && purchasable) {
       onAddToCart(product.id, product);
     }
   };
@@ -137,7 +122,7 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
 
   const getPriceDisplay = () => {
     if (product.priceTiers && product.priceTiers.length > 0) {
-      const minPrice = Math.min(...product.priceTiers.map((t) => t.priceUSD));
+      const minPrice = Math.min(...product.priceTiers.map((tier) => tier.priceUSD));
       const minFormatted = formatPrice(minPrice, currency, exchangeRateIQD);
       const maxFormatted = formatPrice(product.priceUSD, currency, exchangeRateIQD, { symbol: false });
       return `${minFormatted} - ${maxFormatted}`;
@@ -150,19 +135,28 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
       ? product.variations.reduce((sum, v) => sum + (v.stockQuantity || 0), 0)
       : product.stockQty;
 
-  // A product is purchasable only if it has a real positive price. Hard guard so
-  // a $0 product (bad/missing price) can never be added to cart or bought for free.
   const hasValidPrice =
     (product.priceUSD || 0) > 0 ||
-    (product.priceTiers?.some((t) => (t.priceUSD || 0) > 0) ?? false);
+    (product.priceTiers?.some((tier) => (tier.priceUSD || 0) > 0) ?? false);
+
+  const isComingSoon = product.status === "coming_soon";
+  const isOnTheWay = product.status === "on_the_way";
+  const inStock = effectiveStock > 0 && (!product.status || product.status === "available");
+  const purchasable = inStock && hasValidPrice && !!onAddToCart;
+
+  // Bottom CTA label + enabled state
+  let ctaLabel = t("product.addToCart", { defaultValue: "Add to Cart" });
+  if (isComingSoon) ctaLabel = t("products.status.comingSoon", { defaultValue: "Coming Soon" });
+  else if (isOnTheWay) ctaLabel = t("products.status.onTheWay", { defaultValue: "On the Way" });
+  else if (!inStock) ctaLabel = t("product.outOfStock", { defaultValue: "Out of Stock" });
+
+  const brandLine = product.brand || product.category || "";
 
   const imageUri = getProductImageUrl({
     imageUrls: product.imageUrls,
     images: product.images || product.imageUrls,
     category: product.category,
   });
-  // Lightweight WebP thumbnail for the grid; fall back to the original if the
-  // resizing CDN ever fails, then to the placeholder.
   const displayUri = thumbFailed ? imageUri : getThumbnailUrl(imageUri, 400);
 
   return (
@@ -176,30 +170,24 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
         scaleAnimatedStyle,
         styles.card,
         {
-          backgroundColor: theme.colors.surface,
+          backgroundColor: theme.colors.card,
           width: CARD_WIDTH,
           height: CARD_HEIGHT,
-          borderWidth: 0,
-          elevation: 6,
-          shadowColor: isDark ? 'transparent' : theme.colors.primary,
-          shadowOpacity: 0.25,
-          shadowOffset: { width: 0, height: 6 },
-          shadowRadius: 14,
+          shadowColor: isDark ? "transparent" : "#000",
+          shadowOpacity: isDark ? 0 : 0.08,
+          shadowOffset: { width: 0, height: 8 },
+          shadowRadius: 16,
+          elevation: isDark ? 0 : 4,
         },
       ]}
     >
-      {/* Image Container */}
-      <View style={styles.imageContainer}>
+      {/* Image */}
+      <View style={[styles.imageContainer, { backgroundColor: "#FFFFFF" }]}>
         {imageError ? (
-          <View
-            style={[
-              styles.imagePlaceholder,
-              { backgroundColor: theme.colors.background },
-            ]}
-          >
+          <View style={[styles.imagePlaceholder, { backgroundColor: theme.colors.background }]}>
             <MaterialCommunityIcons
-              name="truck-outline"
-              size={36}
+              name="image-off-outline"
+              size={40}
               color={theme.colors.textSecondary}
             />
           </View>
@@ -212,21 +200,16 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
             cachePolicy="memory-disk"
             priority="normal"
             recyclingKey={product.id}
-            onError={() => { if (!thumbFailed) setThumbFailed(true); else setImageError(true); }}
+            onError={() => {
+              if (!thumbFailed) setThumbFailed(true);
+              else setImageError(true);
+            }}
           />
         )}
 
-        {/* Favorite Button */}
+        {/* Favorite */}
         <Pressable
-          style={({ pressed }) => [
-            styles.favoriteButton,
-            {
-              backgroundColor: isFavorite
-                ? "#fff"
-                : "rgba(255, 255, 255, 0.85)",
-              opacity: pressed ? 0.8 : 1,
-            },
-          ]}
+          style={({ pressed }) => [styles.favoriteButton, { opacity: pressed ? 0.85 : 1 }]}
           onPress={handleFavoritePress}
           hitSlop={8}
         >
@@ -234,128 +217,81 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
             <Ionicons
               name={isFavorite ? "heart" : "heart-outline"}
               size={18}
-              color={isFavorite ? "#FF5A00" : "#757575"}
+              color={theme.colors.primary}
             />
           </Animated.View>
         </Pressable>
 
-        {/* Badges */}
-        {product.status === "coming_soon" && (
+        {/* Status badges (coming soon / on the way) */}
+        {isComingSoon && (
           <View style={[styles.statusBadge, { backgroundColor: "#FF9800" }]}>
-            <Ionicons name="time-outline" size={10} color="#ffffff" />
-            <AppText
-              fontSize={11}
-              style={styles.statusText}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.5}
-            >
-              {t("products.status.comingSoon").replace(/ /g, '\u00A0')}
+            <Ionicons name="time-outline" size={10} color="#fff" />
+            <AppText fontSize={11} style={styles.statusText} numberOfLines={1}>
+              {t("products.status.comingSoon").replace(/ /g, " ")}
             </AppText>
           </View>
         )}
-
-        {product.status === "on_the_way" && (
+        {isOnTheWay && (
           <View style={[styles.statusBadge, { backgroundColor: "#2196F3" }]}>
-            <MaterialCommunityIcons name="truck-fast-outline" size={12} color="#ffffff" style={{ marginRight: 2 }} />
-            <AppText
-              fontSize={11}
-              style={styles.statusText}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.5}
-            >
-              {t("products.status.onTheWay").replace(/ /g, '\u00A0')}
+            <MaterialCommunityIcons name="truck-fast-outline" size={12} color="#fff" style={{ marginRight: 2 }} />
+            <AppText fontSize={11} style={styles.statusText} numberOfLines={1}>
+              {t("products.status.onTheWay").replace(/ /g, " ")}
             </AppText>
           </View>
         )}
-
-        {effectiveStock === 0 &&
-          (!product.status || product.status === "available") && (
-            <View style={[styles.statusBadge, { backgroundColor: "#F44336" }]}>
-              <Ionicons name="close-circle-outline" size={12} color="#ffffff" />
-              <AppText
-                fontSize={11}
-                style={styles.statusText}
-              numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.5}
-              >
-                {t("product.outOfStock", { defaultValue: "Out of Stock" }).replace(/ /g, '\u00A0')}
-              </AppText>
-            </View>
-          )}
       </View>
 
-      {/* Text Container */}
-      <View style={[styles.textContainer, { height: TEXT_CONTAINER_HEIGHT }]}>
+      {/* Text + CTA */}
+      <View style={styles.textContainer}>
         <AppText
-          fontSize={13}
-          style={[
-            styles.title,
-            {
-              color: theme.colors.text,
-              textAlign: isRTL ? "right" : "left",
-            },
-          ]}
+          fontSize={14}
+          style={[styles.title, { color: theme.colors.text, textAlign }]}
           numberOfLines={2}
         >
           {getDisplayTitle()}
         </AppText>
 
-        <AppText
-          fontSize={11}
-          style={[
-            styles.category,
-            {
-              color: theme.colors.textSecondary,
-              textAlign: isRTL ? "right" : "left",
-            },
-          ]}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-        >
-          {product.partNumber && (
-            <AppText
-              style={[styles.partNumberBold, { color: theme.colors.text }]}
-            >{`(${product.partNumber})`}</AppText>
-          )}
-        </AppText>
+        {!!brandLine && (
+          <AppText
+            fontSize={12}
+            style={[styles.brand, { color: theme.colors.textSecondary, textAlign }]}
+            numberOfLines={1}
+          >
+            {brandLine}
+          </AppText>
+        )}
 
-        <View
-          style={[
-            styles.footer,
-            { flexDirection: isRTL ? "row-reverse" : "row" },
-          ]}
-        >
-          <View style={styles.priceContainer}>
-            <AppNumber
-              value={getPriceDisplay()}
-              numberOfLines={1}
-              style={[styles.price, { color: theme.colors.primary }]}
-            />
+        <View style={styles.bottom}>
+          <AppNumber
+            value={getPriceDisplay()}
+            numberOfLines={1}
+            style={[styles.price, { color: theme.colors.text, textAlign }]}
+          />
+
+          <View ref={addToCartRef} collapsable={false}>
+            <Pressable
+              disabled={!purchasable}
+              style={({ pressed }) => [
+                styles.cta,
+                {
+                  backgroundColor: purchasable ? theme.colors.primary : theme.colors.disabled,
+                  opacity: pressed && purchasable ? 0.85 : 1,
+                },
+              ]}
+              onPress={handleAddToCart}
+            >
+              <AppText
+                fontSize={14}
+                style={[
+                  styles.ctaText,
+                  { color: purchasable ? theme.colors.textOnPrimary : theme.colors.textSecondary },
+                ]}
+                numberOfLines={1}
+              >
+                {ctaLabel}
+              </AppText>
+            </Pressable>
           </View>
-
-          {effectiveStock > 0 &&
-            onAddToCart &&
-            hasValidPrice &&
-            (!product.status || product.status === "available") && (
-              <View ref={addToCartRef} collapsable={false}>
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.addButton,
-                    {
-                      backgroundColor: theme.colors.primary,
-                      opacity: pressed ? 0.8 : 1,
-                    },
-                  ]}
-                  onPress={handleAddToCart}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Ionicons name="cart-outline" size={18} color="#ffffff" />
-                </Pressable>
-              </View>
-            )}
         </View>
       </View>
     </AnimatedPressable>
@@ -365,81 +301,36 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
 const arePropsEqual = (
   prevProps: MasonryProductCardProps,
   nextProps: MasonryProductCardProps,
-) => {
-  return (
-    prevProps.isFavorite === nextProps.isFavorite &&
-    prevProps.product.id === nextProps.product.id &&
-    prevProps.product.name === nextProps.product.name &&
-    prevProps.product.priceUSD === nextProps.product.priceUSD &&
-    prevProps.product.imageUrls?.[0] === nextProps.product.imageUrls?.[0] &&
-    prevProps.product.stockQty === nextProps.product.stockQty &&
-    prevProps.product.status === nextProps.product.status &&
-    prevProps.product.partNumber === nextProps.product.partNumber &&
-    prevProps.onPress === nextProps.onPress &&
-    prevProps.onAddToCart === nextProps.onAddToCart &&
-    prevProps.onToggleFavorite === nextProps.onToggleFavorite
-  );
-};
+) =>
+  prevProps.isFavorite === nextProps.isFavorite &&
+  prevProps.product.id === nextProps.product.id &&
+  prevProps.product.name === nextProps.product.name &&
+  prevProps.product.brand === nextProps.product.brand &&
+  prevProps.product.priceUSD === nextProps.product.priceUSD &&
+  prevProps.product.imageUrls?.[0] === nextProps.product.imageUrls?.[0] &&
+  prevProps.product.stockQty === nextProps.product.stockQty &&
+  prevProps.product.status === nextProps.product.status &&
+  prevProps.onPress === nextProps.onPress &&
+  prevProps.onAddToCart === nextProps.onAddToCart &&
+  prevProps.onToggleFavorite === nextProps.onToggleFavorite;
 
 const styles = StyleSheet.create({
-  addButton: {
-    alignItems: "center",
-    borderRadius: 16,
-    height: 32,
-    justifyContent: "center",
-    marginHorizontal: 8,
-    width: 32,
+  cardWrapper: {
+    margin: CARD_MARGIN / 2,
   },
   card: {
-    backgroundColor: "#ffffff",
-    borderRadius: 8,
-    borderWidth: 0,
-    elevation: 2,
+    borderRadius: 20,
     overflow: "hidden",
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  cardWrapper: {
-    borderRadius: 8,
-    margin: CARD_MARGIN / 2, // Moved logic to wrapper for better shadow
-  },
-  category: {
-    fontSize: 14,
-    fontWeight: "900",
-    height: 26,
-    lineHeight: 22,
-    marginBottom: 2,
-  },
-  favoriteButton: {
-    alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.95)",
-    borderRadius: 16,
-    height: 32,
-    justifyContent: "center",
-    position: "absolute",
-    right: 6,
-    top: 6,
-    width: 32,
-    ...SHADOW_STYLES.small,
-    elevation: 0,
-  },
-  footer: {
-    alignItems: "center",
-    flexDirection: "row",
-    height: 32,
-    justifyContent: "space-between",
-  },
-  image: {
-    height: "100%",
-    width: "100%",
   },
   imageContainer: {
     alignSelf: "center",
     height: IMAGE_SIZE,
-    padding: 0,
     position: "relative",
-    width: IMAGE_SIZE,
+    width: "100%",
+  },
+  image: {
+    height: "100%",
+    width: "100%",
   },
   imagePlaceholder: {
     alignItems: "center",
@@ -447,54 +338,77 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: "100%",
   },
-  partNumberBold: {
-    fontSize: 14,
-    fontWeight: "900",
-  },
-  price: {
-    fontSize: 16,
-    fontWeight: "800",
-  },
-  priceContainer: {
-    flex: 1,
-    marginRight: 6,
-    minWidth: 0,
+  favoriteButton: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    height: 32,
+    justifyContent: "center",
+    position: "absolute",
+    right: 8,
+    top: 8,
+    width: 32,
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 2,
   },
   statusBadge: {
     alignItems: "center",
-    borderRadius: 6,
+    borderRadius: 8,
     flexDirection: "row",
     justifyContent: "center",
-    left: 6,
-    minHeight: 28,
+    left: 8,
+    minHeight: 26,
     paddingHorizontal: 8,
     paddingVertical: 4,
     position: "absolute",
-    top: 6,
+    top: 8,
     zIndex: 1,
-    maxWidth: '85%',
-    flexShrink: 1,
+    maxWidth: "85%",
   },
   statusText: {
-    color: "#ffffff",
+    color: "#FFFFFF",
     fontWeight: "600",
     includeFontPadding: false,
     marginStart: 4,
     paddingTop: Platform.OS === "android" ? 1 : 0,
     textAlign: "center",
-    textAlignVertical: "center",
-    flexShrink: 1,
   },
   textContainer: {
-    justifyContent: "space-between",
+    flex: 1,
+    justifyContent: "flex-start",
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingTop: 10,
+    paddingBottom: 12,
   },
   title: {
-    fontSize: 14,
-    fontWeight: "900",
+    fontWeight: "700",
     height: 40,
     lineHeight: 20,
+  },
+  brand: {
+    fontWeight: "500",
+    marginTop: 4,
+  },
+  bottom: {
+    marginTop: "auto",
+  },
+  price: {
+    fontWeight: "800",
+    fontSize: 17,
+    marginBottom: 10,
+  },
+  cta: {
+    alignItems: "center",
+    borderRadius: 999,
+    height: 44,
+    justifyContent: "center",
+    width: "100%",
+  },
+  ctaText: {
+    fontWeight: "700",
   },
 });
 
