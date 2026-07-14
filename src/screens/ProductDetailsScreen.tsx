@@ -148,6 +148,7 @@ export const ProductDetailsScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [addingToCart, setAddingToCart] = useState(false);
   const [quantity, setQuantity] = useState(1);
+  const [overviewExpanded, setOverviewExpanded] = useState(false);
   const [qtyText, setQtyText] = useState('1');
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [imageModalVisible, setImageModalVisible] = useState(false);
@@ -2174,7 +2175,37 @@ export const ProductDetailsScreen: React.FC = () => {
                 </View>
               </View>
 
+              {/* Product Overview (collapsible) */}
+              <View style={styles.section}>
+                <TouchableOpacity
+                  style={[styles.overviewBar, { backgroundColor: isDark ? theme.colors.surface : '#F0F0F2', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                  onPress={() => setOverviewExpanded(v => !v)}
+                  activeOpacity={0.7}
+                >
+                  <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text, marginBottom: 0 }]}>
+                    {t('product.overview', { defaultValue: 'Product Overview' })}
+                  </Text>
+                  <Ionicons name={overviewExpanded ? 'chevron-up' : 'chevron-down'} size={20} color={theme.colors.textSecondary} />
+                </TouchableOpacity>
+                {overviewExpanded && (
+                  <Text allowFontScaling={false} style={[styles.descriptionText, { color: theme.colors.textSecondary, marginTop: 12, textAlign: isRTL ? 'right' : 'left' }]}>
+                    {product.description || t('product.noOverview', { defaultValue: 'No additional details available.' })}
+                  </Text>
+                )}
+              </View>
 
+              {/* Payment Methods */}
+              <View style={styles.section}>
+                <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+                  {t('product.paymentMethods', { defaultValue: 'Payment Methods' })}
+                </Text>
+                <View style={[styles.paymentRow, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDark ? theme.colors.surface : '#F0F0F2' }]}>
+                  <Ionicons name="cash-outline" size={22} color={theme.colors.primary} />
+                  <Text allowFontScaling={false} style={[styles.paymentText, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+                    {t('product.cashOnDelivery', { defaultValue: 'Cash on Delivery' })}
+                  </Text>
+                </View>
+              </View>
 
             </View>
 
@@ -2939,6 +2970,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     lineHeight: 20,
+  },
+  overviewBar: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: 14,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 14,
+  },
+  paymentRow: {
+    alignItems: 'center',
+    borderRadius: 14,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 14,
+    marginTop: 10,
+    gap: 10,
+  },
+  paymentText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
 
   // Option chips
