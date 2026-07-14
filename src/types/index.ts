@@ -514,6 +514,7 @@ export type RootStackParamList = {
   Main: { screen?: string; params?: any } | undefined;
   Home: undefined;
   Categories: { selectedCategory?: string } | undefined;
+  CategoryProducts: { category: string; title?: string };
   Search: { 
     query?: string; 
     category?: string;

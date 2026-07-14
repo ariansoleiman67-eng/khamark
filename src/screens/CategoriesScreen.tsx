@@ -702,7 +702,11 @@ const CategoriesScreen: React.FC = () => {
                 label={cat.displayName}
                 imageUrl={uploadedIcon}
                 width={tileWidth}
-                onPress={() => handleCategoryFilter(cat.originalName)}
+                onPress={() =>
+                  cat.originalName === 'All'
+                    ? handleCategoryFilter('All')
+                    : (navigation as any).navigate('CategoryProducts', { category: cat.originalName, title: cat.displayName })
+                }
               />
             </View>
           );

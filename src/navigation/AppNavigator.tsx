@@ -73,6 +73,7 @@ import UpdateEmailScreen from '../screens/profile/UpdateEmailScreen';
 import UpdatePhoneScreen from '../screens/profile/UpdatePhoneScreen';
 import ShippingInfoScreen from '../screens/profile/ShippingInfoScreen';
 import ThemeCustomizationScreen from '../screens/ThemeCustomizationScreen';
+import CategoryProductsScreen from '../screens/CategoryProductsScreen';
 
 import { RootStackParamList, MainTabParamList } from '../types';
 
@@ -424,6 +425,7 @@ const AppNavigator: React.FC = () => {
         <Stack.Screen name="Cart" component={CartScreen} />
         <Stack.Screen name="StoreLocation" component={StoreLocationScreen} />
         <Stack.Screen name="ThemeCustomization" component={ThemeCustomizationScreen} />
+        <Stack.Screen name="CategoryProducts" component={CategoryProductsScreen} />
         
         {/* Auth Screens - Accessible for intent-based login */}
         <Stack.Screen name="LoginGate" component={LoginGateScreen} />
