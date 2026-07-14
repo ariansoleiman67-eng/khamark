@@ -85,4 +85,9 @@ Full list in `PURGED.md`. Summary: Gemini key `AIzaSyBia9D1BpP…`, Google Maps/
 - **Brand audit:** `git grep -i "haryad\|volvo"` → zero hits outside `PURGED.md` / handover docs.
 - **Secret audit:** no live keys in the tree (pattern grep for `AIzaSy`, `sk-`, `sb_publishable_`, JWTs, known Haryad ids). `gitleaks`/`trufflehog` were not installed in the build environment — run one of them as a final gate before publishing the repo.
 - **i18n:** en/ar/ku reconciled to identical key sets.
-- **Runtime UI review still pending** — no device/emulator in this environment. Run `npm run android` (dev client) and review Home + Categories in en (LTR) and ar (RTL), light + dark, before sign-off.
+- **Runtime verified on Android emulator**: app boots, dev-client bundles, and renders. Confirmed the Amber theme, the custom floating tab bar (raised active tab), and the redesigned Home header (menu + Hello/Guest greeting + orange cart). Product lists show the themed empty state ("No products available") because the placeholder Supabase has no data — a real backend populates them. Still recommended before sign-off: review with real data in ar (RTL) and dark mode on a device.
+
+### Runtime fixes applied during verification
+- **Missing asset:** Phase 1 renamed the sign-in logo import to `asankary-signin-logo.png` but not the file (tsc can't see PNG imports). Generated Asankary placeholder logos (`assets/images/asankary-signin-logo.png`, `asankarylogo.png`) and deleted the Haryad ones. Replace with the real logo.
+- **Supabase boot crash:** `createClient()` throws on a non-URL, so the placeholder is now a valid HTTPS URL (`https://replace-with-asankary.supabase.co`) in `config.ts` + `eas.json` — the app boots and network calls fail gracefully until the real project URL is set.
+- **Android build:** needs `android/local.properties` with `sdk.dir` (or `ANDROID_HOME`); `withManifestMergerFix` plugin resolves the expo-notifications ↔ firebase-messaging FCM meta-data conflict.

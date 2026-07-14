@@ -38,8 +38,10 @@ export const FIREBASE_CONFIG = firebaseConfig;
 
 // Supabase (primary backend) — client-safe values from env; placeholders until Phase 2 setup.
 export const SUPABASE_CONFIG = {
-  URL: process.env.EXPO_PUBLIC_SUPABASE_URL || 'REPLACE_WITH_ASANKARY_SUPABASE_URL',
-  ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'REPLACE_WITH_ASANKARY_SUPABASE_ANON_KEY',
+  // Must be a VALID https URL so createClient() doesn't throw at boot; a real project
+  // replaces it via EXPO_PUBLIC_SUPABASE_URL. Network calls to this host just fail gracefully.
+  URL: process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://replace-with-asankary.supabase.co',
+  ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'replace_with_asankary_supabase_anon_key',
 };
 
 // Google Maps client key (Static Maps + native SDK). Empty until configured.
