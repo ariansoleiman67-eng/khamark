@@ -2,19 +2,19 @@ import { Theme } from '../types';
 
 // Brand palette — finalized in Phase 3
 const COLORS = {
-  // Primary Colors (Navy Blue)
-  primary: '#1a365d',
-  primaryDark: '#153e75',
-  primaryLight: '#2b77ad',
+  // Primary Colors (Amber Retail)
+  primary: '#F5A00A',
+  primaryDark: '#D6870A',
+  primaryLight: '#FFB840',
 
-  // Secondary Colors (Silver)
+  // Secondary Colors (Neutral gray)
   secondary: '#718096',
   secondaryDark: '#4a5568',
   secondaryLight: '#a0aec0',
-  
-  // Accent Colors
-  accent: '#3182ce',
-  accentLight: '#63b3ed',
+
+  // Accent Colors (Amber)
+  accent: '#FF9F0D',
+  accentLight: '#FFB840',
   
   // Status Colors
   success: '#38a169',

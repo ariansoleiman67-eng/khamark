@@ -71,7 +71,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   useEffect(() => {
     if (themeMode === 'system') {
       const preset = systemColorScheme === 'dark' ? 
-        getPresetById('midnight-aurora') : getPresetById('ocean-breeze');
+        getPresetById('amber-retail-dark') : getPresetById('amber-retail');
       if (preset) {
         setCurrentCustomThemeState(preset.theme);
       }
@@ -118,23 +118,23 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     
     let selectedPresetId: string | undefined;
     if (mode === 'light') {
-      const lightPreset = getPresetById('ocean-breeze');
+      const lightPreset = getPresetById('amber-retail');
       if (lightPreset) {
         setCurrentCustomThemeState(lightPreset.theme);
-        selectedPresetId = 'ocean-breeze';
+        selectedPresetId = 'amber-retail';
       }
     } else if (mode === 'dark') {
-      const darkPreset = getPresetById('midnight-aurora');
+      const darkPreset = getPresetById('amber-retail-dark');
       if (darkPreset) {
         setCurrentCustomThemeState(darkPreset.theme);
-        selectedPresetId = 'midnight-aurora';
+        selectedPresetId = 'amber-retail-dark';
       }
     } else if (mode === 'system') {
       const preset = systemColorScheme === 'dark' ? 
-        getPresetById('midnight-aurora') : getPresetById('ocean-breeze');
+        getPresetById('amber-retail-dark') : getPresetById('amber-retail');
       if (preset) {
         setCurrentCustomThemeState(preset.theme);
-        selectedPresetId = preset.theme.isDark ? 'midnight-aurora' : 'ocean-breeze';
+        selectedPresetId = preset.theme.isDark ? 'amber-retail-dark' : 'amber-retail';
       }
     }
     

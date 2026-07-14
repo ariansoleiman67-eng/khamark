@@ -1,12 +1,12 @@
 import { ConfigContext, ExpoConfig } from "expo/config";
 
-// Brand color palette (finalized in Phase 3)
+// Brand color palette — Amber Retail (Phase 3). Drives splash + adaptive-icon + notification bg.
 const colors = {
-  primary: "#1a365d",
-  primaryVariant: "#2c5282",
-  secondary: "#3182ce",
-  background: "#ffffff",
-  surface: "#f7fafc",
+  primary: "#F5A00A",
+  primaryVariant: "#FF9F0D",
+  secondary: "#2B2B2B",
+  background: "#F4F4F6",
+  surface: "#FFFFFF",
 };
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
