@@ -628,6 +628,7 @@ export const OrdersScreen: React.FC = () => {
                     {i18n.language === 'ar' && ((item as any).productNameAr || (item as any).productSnapshot?.nameAr) ? ((item as any).productNameAr || (item as any).productSnapshot?.nameAr) : i18n.language === 'ku' && ((item as any).productNameKu || (item as any).productSnapshot?.nameKu) ? ((item as any).productNameKu || (item as any).productSnapshot?.nameKu) : item.productName}
                   </Text>
                   <Text allowFontScaling={false}
+                    numberOfLines={1}
                     style={{
                       fontSize: 14,
                       fontWeight: '600',
@@ -792,7 +793,7 @@ export const OrdersScreen: React.FC = () => {
           {isCancelledStatus(order.status) && (
             <View
               style={{
-                backgroundColor: STATUS_CONFIG.cancelled.bgColor,
+                backgroundColor: isDark ? theme.colors.error + '22' : STATUS_CONFIG.cancelled.bgColor,
                 padding: SPACING.md,
                 borderRadius: 12,
                 marginBottom: SPACING.lg,

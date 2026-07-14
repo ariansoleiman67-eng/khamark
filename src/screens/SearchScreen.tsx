@@ -14,6 +14,7 @@ import {
   Animated,
   AccessibilityInfo,
   KeyboardAvoidingView,
+  I18nManager,
 } from 'react-native';
 import { FlashList as FlashListBase } from '@shopify/flash-list';
 // Cast to any: this FlashList version's types don't model the `masonry` prop, though it works at runtime.
@@ -61,7 +62,7 @@ const SearchScreen: React.FC = () => {
   const { isFavorite, toggleFavorite } = useFavorites();
   const { user } = useAuth();
   const { i18n, t } = useTranslation();
-  const isRTL = i18n?.language === 'ar' || i18n?.language === 'ku';
+  const isRTL = I18nManager.isRTL || i18n?.language === 'ar' || i18n?.language === 'ku';
   const { tenantId } = useTenant();
   const inputRef = useRef<TextInput>(null);
   
@@ -669,13 +670,13 @@ const SearchScreen: React.FC = () => {
       {renderFiltersModal()}
       
       {/* Header - ALIBABA: activeOpacity for feedback */}
-      <View style={[styles.header, { backgroundColor: isDark ? theme.colors.background : '#FFF3E0' }]}>
-        <TouchableOpacity 
+      <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDark ? theme.colors.background : '#FFF3E0' }]}>
+        <TouchableOpacity
           onPress={() => navigation.goBack()}
-          style={styles.backButton}
+          style={[styles.backButton, isRTL && { marginRight: 0, marginLeft: 8 }]}
           activeOpacity={0.7}
         >
-          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+          <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color={theme.colors.text} />
         </TouchableOpacity>
         
         <Text allowFontScaling={false} style={[styles.headerTitle, { color: theme.colors.text }]}>
@@ -688,6 +689,7 @@ const SearchScreen: React.FC = () => {
         style={[
           styles.searchInputContainer,
           {
+            flexDirection: isRTL ? 'row-reverse' : 'row',
             backgroundColor: isDark ? theme.colors.background : '#f0f2f5',
             // Keep the border ALWAYS present and only change its COLOR on focus. Toggling
             // borderWidth 0→1.5 grew the row by 3px when the field focused, shoving the layout
@@ -703,7 +705,7 @@ const SearchScreen: React.FC = () => {
           color={isSearchFocused ? theme.colors.primary : theme.colors.textSecondary} 
         />
         <TextInput allowFontScaling={false}
-          style={[styles.searchInput, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}
+          style={[styles.searchInput, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }, isRTL && { marginLeft: 0, marginRight: 12 }]}
           placeholder={t('search.placeholder')}
           placeholderTextColor={theme.colors.placeholder}
           value={searchQuery}

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, I18nManager } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -37,6 +37,8 @@ const OrderConfirmationScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const { currency, exchangeRateIQD } = useCurrency();
+
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
 
   const { orderId, orderNumber } = route.params;
 
@@ -136,30 +138,30 @@ const OrderConfirmationScreen: React.FC = () => {
           <>
             {/* Status card — same layout as Order Details */}
             <View style={[styles.card, { backgroundColor: cardBg }]}>
-              <View style={styles.statusHeader}>
-                <View style={[styles.statusIconContainer, { backgroundColor: statusColor + '20' }]}>
+              <View style={[styles.statusHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <View style={[styles.statusIconContainer, { backgroundColor: statusColor + '20', marginRight: isRTL ? 0 : 16, marginLeft: isRTL ? 16 : 0 }]}>
                   <Ionicons name={getStatusIcon(status) as any} size={28} color={statusColor} />
                 </View>
                 <View style={styles.statusInfo}>
-                  <Text allowFontScaling={false} style={[styles.statusTitle, { color: theme.colors.text }]}>
+                  <Text allowFontScaling={false} style={[styles.statusTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
                     {t(`orders.status.${status}`, { defaultValue: 'Processing' })}
                   </Text>
-                  <Text allowFontScaling={false} style={[styles.orderNumber, { color: theme.colors.primary }]}>
+                  <Text allowFontScaling={false} style={[styles.orderNumber, { color: theme.colors.primary, textAlign: isRTL ? 'right' : 'left' }]}>
                     {cleanNumber}
                   </Text>
                 </View>
               </View>
 
-              <View style={[styles.orderMeta, { borderTopColor: theme.colors.border }]}>
-                <View style={styles.metaItem}>
+              <View style={[styles.orderMeta, { borderTopColor: theme.colors.border, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <View style={[styles.metaItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                   <Ionicons name="calendar-outline" size={16} color={theme.colors.textSecondary} />
-                  <Text allowFontScaling={false} style={[styles.metaText, { color: theme.colors.textSecondary }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+                  <Text allowFontScaling={false} style={[styles.metaText, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
                     {formatFirestoreDate(order.createdAt, i18n.language)}
                   </Text>
                 </View>
-                <View style={styles.metaItem}>
+                <View style={[styles.metaItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                   <Ionicons name="pricetag-outline" size={16} color={theme.colors.primary} />
-                  <Text allowFontScaling={false} style={[styles.metaText, { color: theme.colors.primary, fontWeight: '600' }]}>
+                  <Text allowFontScaling={false} style={[styles.metaText, { color: theme.colors.primary, fontWeight: '600', textAlign: isRTL ? 'right' : 'left' }]}>
                     {formatPrice(order.totalUSD || 0, displayCurrency, displayExchangeRate)}
                   </Text>
                 </View>
@@ -169,7 +171,7 @@ const OrderConfirmationScreen: React.FC = () => {
             {/* Items Ordered — wholesale badge + struck-through original, like Order Details */}
             {order.items.length > 0 && (
               <View style={[styles.card, { backgroundColor: cardBg }]}>
-                <Text allowFontScaling={false} style={[styles.cardTitle, { color: theme.colors.text }]}>
+                <Text allowFontScaling={false} style={[styles.cardTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
                   {t('orders.itemsOrdered', { defaultValue: 'Items Ordered' })} ({order.items.length})
                 </Text>
 
@@ -189,34 +191,34 @@ const OrderConfirmationScreen: React.FC = () => {
                       key={`${item.productId}-${index}`}
                       style={[
                         styles.orderItem,
-                        { borderBottomColor: theme.colors.border },
+                        { borderBottomColor: theme.colors.border, flexDirection: isRTL ? 'row-reverse' : 'row' },
                         index === order.items.length - 1 && { borderBottomWidth: 0 },
                       ]}
                     >
                       <Image
                         source={{ uri: getProductImageUrl({ imageUrl: (item as any).imageUrl, category: item.productName }) }}
-                        style={[styles.itemImage, { backgroundColor: theme.colors.background }]}
+                        style={[styles.itemImage, { backgroundColor: theme.colors.background, marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }]}
                         contentFit="cover"
                       />
                       <View style={styles.itemDetails}>
-                        <Text allowFontScaling={false} style={[styles.itemName, { color: theme.colors.text }]} numberOfLines={2}>
+                        <Text allowFontScaling={false} style={[styles.itemName, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={2}>
                           {name}
                         </Text>
                         {!!item.partNumber && (
-                          <Text allowFontScaling={false} style={[styles.itemPartNumber, { color: theme.colors.textSecondary }]}>
+                          <Text allowFontScaling={false} style={[styles.itemPartNumber, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
                             {item.partNumber}
                           </Text>
                         )}
 
                         {item.selectedOptions && (
-                          <View style={styles.selectedOptionsContainer}>
+                          <View style={[styles.selectedOptionsContainer, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
                             {!!item.selectedOptions.color && (
-                              <Text allowFontScaling={false} style={[styles.selectedOptionText, { color: theme.colors.textSecondary }]}>
+                              <Text allowFontScaling={false} style={[styles.selectedOptionText, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
                                 {t('order.color', { defaultValue: 'Color' })}: {item.selectedOptions.color}
                               </Text>
                             )}
                             {!!item.selectedOptions.size && (
-                              <Text allowFontScaling={false} style={[styles.selectedOptionText, { color: theme.colors.textSecondary }]}>
+                              <Text allowFontScaling={false} style={[styles.selectedOptionText, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
                                 {t('order.size', { defaultValue: 'Size' })}: {item.selectedOptions.size}
                               </Text>
                             )}
@@ -233,15 +235,15 @@ const OrderConfirmationScreen: React.FC = () => {
                           </View>
                         )}
 
-                        <View style={styles.priceRow}>
-                          <Text allowFontScaling={false} style={[styles.itemPrice, { color: theme.colors.primary, flex: 1 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                        <View style={[styles.priceRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                          <Text allowFontScaling={false} style={[styles.itemPrice, { color: theme.colors.primary, flex: 1, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                             {`${item.quantity} x ${formatPrice(item.priceUSD, displayCurrency, displayExchangeRate)} = `}
                             <Text allowFontScaling={false} style={hasWholesaleDiscount ? { color: theme.colors.success } : undefined}>
                               {formatPrice(item.priceUSD * item.quantity, displayCurrency, displayExchangeRate)}
                             </Text>
                           </Text>
                           {hasWholesaleDiscount && (
-                            <Text allowFontScaling={false} style={[styles.originalPrice, { color: theme.colors.error }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+                            <Text allowFontScaling={false} style={[styles.originalPrice, { color: theme.colors.error, marginLeft: isRTL ? 0 : 8, marginRight: isRTL ? 8 : 0 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
                               {formatPrice(item.originalPriceUSD! * item.quantity, displayCurrency, displayExchangeRate)}
                             </Text>
                           )}
@@ -255,15 +257,15 @@ const OrderConfirmationScreen: React.FC = () => {
 
             {/* Payment summary */}
             <View style={[styles.card, { backgroundColor: cardBg }]}>
-              <Text allowFontScaling={false} style={[styles.cardTitle, { color: theme.colors.text }]}>
+              <Text allowFontScaling={false} style={[styles.cardTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
                 {t('checkout.orderSummary', { defaultValue: 'Order Summary' })}
               </Text>
 
-              <View style={styles.summaryItemRow}>
-                <Text allowFontScaling={false} style={[styles.summaryItemLabel, { color: theme.colors.textSecondary }]} numberOfLines={1} adjustsFontSizeToFit>
+              <View style={[styles.summaryItemRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <Text allowFontScaling={false} style={[styles.summaryItemLabel, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1} adjustsFontSizeToFit>
                   {t('orders.subtotal', { defaultValue: 'Subtotal' })}
                 </Text>
-                <Text allowFontScaling={false} style={[styles.summaryItemValue, { color: theme.colors.text }]} numberOfLines={1} adjustsFontSizeToFit>
+                <Text allowFontScaling={false} style={[styles.summaryItemValue, { color: theme.colors.text, textAlign: isRTL ? 'left' : 'right' }]} numberOfLines={1} adjustsFontSizeToFit>
                   {formatPrice(order.subtotalUSD || 0, displayCurrency, displayExchangeRate)}
                 </Text>
               </View>
@@ -272,11 +274,11 @@ const OrderConfirmationScreen: React.FC = () => {
                 const shippingPrice = getShippingAmount(order);
                 const isFree = shippingPrice === 0;
                 return (
-                  <View style={styles.summaryItemRow}>
-                    <Text allowFontScaling={false} style={[styles.summaryItemLabel, { color: theme.colors.textSecondary }]} numberOfLines={1} adjustsFontSizeToFit>
+                  <View style={[styles.summaryItemRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                    <Text allowFontScaling={false} style={[styles.summaryItemLabel, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1} adjustsFontSizeToFit>
                       {t('orders.shipping', { defaultValue: 'Shipping' })}
                     </Text>
-                    <Text allowFontScaling={false} style={[styles.summaryItemValue, isFree ? { color: theme.colors.success } : { color: theme.colors.text }]} numberOfLines={1} adjustsFontSizeToFit>
+                    <Text allowFontScaling={false} style={[styles.summaryItemValue, { textAlign: isRTL ? 'left' : 'right' }, isFree ? { color: theme.colors.success } : { color: theme.colors.text }]} numberOfLines={1} adjustsFontSizeToFit>
                       {isFree ? t('cart.freeShipping', { defaultValue: 'Free Shipping' }) : formatPrice(shippingPrice, displayCurrency, displayExchangeRate)}
                     </Text>
                   </View>
@@ -284,22 +286,22 @@ const OrderConfirmationScreen: React.FC = () => {
               })()}
 
               {(order.taxUSD || 0) > 0 && (
-                <View style={styles.summaryItemRow}>
-                  <Text allowFontScaling={false} style={[styles.summaryItemLabel, { color: theme.colors.textSecondary }]} numberOfLines={1} adjustsFontSizeToFit>
+                <View style={[styles.summaryItemRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                  <Text allowFontScaling={false} style={[styles.summaryItemLabel, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1} adjustsFontSizeToFit>
                     {t('orders.tax', { defaultValue: 'Tax' })}
                   </Text>
-                  <Text allowFontScaling={false} style={[styles.summaryItemValue, { color: theme.colors.text }]} numberOfLines={1} adjustsFontSizeToFit>
+                  <Text allowFontScaling={false} style={[styles.summaryItemValue, { color: theme.colors.text, textAlign: isRTL ? 'left' : 'right' }]} numberOfLines={1} adjustsFontSizeToFit>
                     {formatPrice(order.taxUSD || 0, displayCurrency, displayExchangeRate)}
                   </Text>
                 </View>
               )}
 
               {order.appliedDiscount && order.appliedDiscount.savedAmount > 0 && (
-                <View style={styles.summaryItemRow}>
-                  <Text allowFontScaling={false} style={[styles.summaryItemLabel, { color: theme.colors.success }]} numberOfLines={1} adjustsFontSizeToFit>
+                <View style={[styles.summaryItemRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                  <Text allowFontScaling={false} style={[styles.summaryItemLabel, { color: theme.colors.success, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1} adjustsFontSizeToFit>
                     {order.appliedDiscount.discountName}
                   </Text>
-                  <Text allowFontScaling={false} style={[styles.summaryItemValue, { color: theme.colors.success }]} numberOfLines={1} adjustsFontSizeToFit>
+                  <Text allowFontScaling={false} style={[styles.summaryItemValue, { color: theme.colors.success, textAlign: isRTL ? 'left' : 'right' }]} numberOfLines={1} adjustsFontSizeToFit>
                     -{formatPrice(order.appliedDiscount.savedAmount, displayCurrency, displayExchangeRate)}
                   </Text>
                 </View>
@@ -307,11 +309,11 @@ const OrderConfirmationScreen: React.FC = () => {
 
               <View style={[styles.divider, { borderBottomColor: theme.colors.border }]} />
 
-              <View style={styles.summaryItemRow}>
-                <Text allowFontScaling={false} style={[styles.summaryItemLabel, styles.summaryTotalText, { color: theme.colors.text }]} numberOfLines={1} adjustsFontSizeToFit>
+              <View style={[styles.summaryItemRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <Text allowFontScaling={false} style={[styles.summaryItemLabel, styles.summaryTotalText, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1} adjustsFontSizeToFit>
                   {t('orders.total', { defaultValue: 'Total' })}
                 </Text>
-                <Text allowFontScaling={false} style={[styles.summaryItemValue, styles.summaryTotalValue, { color: theme.colors.primary }]} numberOfLines={1} adjustsFontSizeToFit>
+                <Text allowFontScaling={false} style={[styles.summaryItemValue, styles.summaryTotalValue, { color: theme.colors.primary, textAlign: isRTL ? 'left' : 'right' }]} numberOfLines={1} adjustsFontSizeToFit>
                   {formatPrice(order.totalUSD || 0, displayCurrency, displayExchangeRate)}
                 </Text>
               </View>

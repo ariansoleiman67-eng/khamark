@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabase';
 import { isSyntheticEmail } from '../utils/hashUtils';
-import { View, Text, ScrollView, TouchableOpacity, Alert, Switch, ActivityIndicator, ImageBackground } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert, Switch, ActivityIndicator, ImageBackground, I18nManager } from 'react-native';
 import { Image } from 'expo-image';
 
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -173,7 +173,7 @@ export const ProfileScreen: React.FC = () => {
       // Get the user's email — prefer Firestore email (may differ from Auth for phone users)
       const emailToVerify = user?.email;
       if (!emailToVerify || isSyntheticEmail(emailToVerify)) {
-        throw new Error('No email address found. Please add your email in Edit Profile first.');
+        throw new Error(t('profile.emailVerification.noEmail', { defaultValue: 'No email address found. Please add your email in Edit Profile first.' }));
       }
       // Supabase: set this email on the auth account (phone users have a synthetic
       // @asankaryapp.internal auth email) and send its confirmation link.
@@ -338,7 +338,7 @@ export const ProfileScreen: React.FC = () => {
                     <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
                       <Text allowFontScaling={false} style={{ fontSize: 22, fontWeight: '700', color: 'white', letterSpacing: -0.3 }}
                         adjustsFontSizeToFit numberOfLines={1}>
-                        {user ? (user.fullName || 'Your Name') : t('profile.guest.welcome', { defaultValue: 'Welcome, Guest!' })}
+                        {user ? (user.fullName || t('profile.yourName', { defaultValue: 'Your Name' })) : t('profile.guest.welcome', { defaultValue: 'Welcome, Guest!' })}
                       </Text>
                       {user && (
                         <TouchableOpacity onPress={() => (navigation as any).navigate('EditProfile')} style={{ marginLeft: 8, padding: 4 }} activeOpacity={0.7}>
@@ -571,8 +571,8 @@ export const ProfileScreen: React.FC = () => {
                 <Divider isDark={isDark} />
                 <LuxuryMenuItem icon="chatbubble-outline" title={t('profile.menu.contactUs')}
                   onPress={() => Alert.alert(
-                    `Contact ${BRAND.name}`,
-                    `Email: ${BRAND.contactEmail}\nWhatsApp: ${BRAND.contactPhone}\n\nStore Location:\n${BRAND.address}\n\nBusiness Hours:\nSat-Thu: 8:00 AM - 6:00 PM\nFriday: Closed`
+                    t('profile.contactUs.title', { name: BRAND.name, defaultValue: 'Contact {{name}}' }),
+                    `${t('profile.contactUs.email', { defaultValue: 'Email:' })} ${BRAND.contactEmail}\n${t('profile.contactUs.whatsapp', { defaultValue: 'WhatsApp:' })} ${BRAND.contactPhone}\n\n${t('profile.contactUs.storeLocation', { defaultValue: 'Store Location:' })}\n${BRAND.address}\n\n${t('profile.contactUs.businessHours', { defaultValue: 'Business Hours:' })}\n${t('profile.contactUs.hoursSatThu', { defaultValue: 'Sat-Thu: 8:00 AM - 6:00 PM' })}\n${t('profile.contactUs.fridayClosed', { defaultValue: 'Friday: Closed' })}`
                   )}
                   theme={theme} isDark={isDark} tintBg={tintBg} />
                 <Divider isDark={isDark} />
@@ -652,12 +652,18 @@ const SectionTitle: React.FC<{ title: string; labelColor: string }> = ({ title, 
   </Text>
 );
 
-const Divider: React.FC<{ isDark: boolean }> = ({ isDark }) => (
-  <View style={{
-    height: 0.5, marginLeft: 68,
-    backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
-  }} />
-);
+const Divider: React.FC<{ isDark: boolean }> = ({ isDark }) => {
+  const { i18n } = useTranslation();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
+  return (
+    <View style={{
+      height: 0.5,
+      marginLeft: isRTL ? 0 : 68,
+      marginRight: isRTL ? 68 : 0,
+      backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
+    }} />
+  );
+};
 
 
 
@@ -674,6 +680,8 @@ const LuxuryMenuItem: React.FC<{
   isDark: boolean;
   tintBg: string;
 }> = ({ icon, title, subtitle, onPress, hasSwitch, switchValue, onSwitchChange, destructive, theme, isDark, tintBg }) => {
+  const { i18n } = useTranslation();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const iconColor = destructive ? theme.colors.error : theme.colors.primary;
   const iconBg = destructive
     ? (isDark ? 'rgba(239,68,68,0.12)' : 'rgba(239,68,68,0.08)')
@@ -685,13 +693,14 @@ const LuxuryMenuItem: React.FC<{
       disabled={hasSwitch}
       activeOpacity={0.6}
       style={{
-        flexDirection: 'row', alignItems: 'center', padding: 16,
+        flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', padding: 16,
       }}
     >
       <View style={{
         width: 40, height: 40, borderRadius: 12,
         backgroundColor: iconBg,
-        justifyContent: 'center', alignItems: 'center', marginRight: 14,
+        justifyContent: 'center', alignItems: 'center',
+        marginRight: isRTL ? 0 : 14, marginLeft: isRTL ? 14 : 0,
       }}>
         <Ionicons name={icon as any} size={20} color={iconColor} />
       </View>
@@ -699,11 +708,12 @@ const LuxuryMenuItem: React.FC<{
         <Text allowFontScaling={false} style={{
           fontSize: 16, fontWeight: '500',
           color: destructive ? theme.colors.error : theme.colors.text,
+          textAlign: isRTL ? 'right' : 'left',
         }}>
           {title}
         </Text>
         {subtitle && (
-          <Text allowFontScaling={false} style={{ fontSize: 13, color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)', marginTop: 2 }}
+          <Text allowFontScaling={false} style={{ fontSize: 13, color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)', marginTop: 2, textAlign: isRTL ? 'right' : 'left' }}
             numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
             {subtitle}
           </Text>
@@ -714,7 +724,7 @@ const LuxuryMenuItem: React.FC<{
           trackColor={{ false: theme.colors.border, true: theme.colors.primary + '50' }}
           thumbColor={switchValue ? theme.colors.primary : theme.colors.textSecondary} />
       ) : (
-        <Ionicons name="chevron-forward" size={18} color={isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)'} />
+        <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={18} color={isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)'} />
       )}
     </TouchableOpacity>
   );

@@ -7,6 +7,7 @@ import {
   RefreshControl,
   Alert,
   FlatList,
+  I18nManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -27,7 +28,8 @@ type FavoritesScreenNavigationProp = NativeStackNavigationProp<RootStackParamLis
 const FavoritesScreen: React.FC = () => {
   const navigation = useNavigation<FavoritesScreenNavigationProp>();
   const { theme, isDark } = useTheme();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const { favorites, clearFavorites, isLoading: favoritesLoading } = useFavorites();
   const { addToCart } = useCart();
   const { isFavorite, toggleFavorite } = useFavorites();
@@ -137,13 +139,13 @@ const FavoritesScreen: React.FC = () => {
     
     return (
       <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-        <View style={styles.header}>
+        <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => navigation.goBack()}
             activeOpacity={0.7}
           >
-            <Feather name="arrow-left" size={24} color={theme.colors.text} />
+            <Feather name={isRTL ? 'arrow-right' : 'arrow-left'} size={24} color={theme.colors.text} />
           </TouchableOpacity>
           <Text allowFontScaling={false} style={styles.title}>{t('favorites.title')}</Text>
           <View style={styles.headerSpacer} />
@@ -165,12 +167,12 @@ const FavoritesScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Feather name="arrow-left" size={24} color={theme.colors.text} />
+          <Feather name={isRTL ? 'arrow-right' : 'arrow-left'} size={24} color={theme.colors.text} />
         </TouchableOpacity>
         <Text allowFontScaling={false} style={styles.title}>{t('favorites.title')}</Text>
         {favorites.length > 0 ? (
@@ -207,9 +209,9 @@ const FavoritesScreen: React.FC = () => {
       ) : (
         <>
           {/* Favorites Count */}
-          <View style={styles.countContainer}>
+          <View style={[styles.countContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <Ionicons name="heart" size={16} color={theme.colors.primary} />
-            <Text allowFontScaling={false} style={styles.countText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+            <Text allowFontScaling={false} style={[styles.countText, isRTL ? { marginLeft: 0, marginRight: theme.spacing.xs } : null]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
               {t('favorites.count', { count: products.length })}
             </Text>
           </View>

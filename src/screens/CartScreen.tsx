@@ -13,6 +13,7 @@ import {
   AccessibilityInfo,
   Animated,
   TextInput,
+  I18nManager,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -88,6 +89,7 @@ const CartItemComponent: React.FC<CartItemComponentProps> = ({
 }) => {
   const { currency, exchangeRateIQD } = useCurrency();
   const { isVip } = useAuth();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const [localQuantity, setLocalQuantity] = useState(item.quantity);
   const [localQtyText, setLocalQtyText] = useState(String(item.quantity));
   const [isQuantityLoading, setIsQuantityLoading] = useState(false);
@@ -202,9 +204,9 @@ const CartItemComponent: React.FC<CartItemComponentProps> = ({
     <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY }] }}>
       <View style={[styles.cartItem, theme.dark && { backgroundColor: theme.colors.surface }]}>
         {/* ===== TOP ROW: Image + Product Details ===== */}
-        <View style={styles.cartItemTop}>
+        <View style={[styles.cartItemTop, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           {/* Product Image */}
-          <View style={[styles.productThumbContainer, { backgroundColor: bgColor }]}>
+          <View style={[styles.productThumbContainer, { backgroundColor: bgColor, marginRight: isRTL ? 0 : 14, marginLeft: isRTL ? 14 : 0 }]}>
             <Image
               source={{ uri: getThumbnailUrl(getProductImageUrl({
                 imageUrls: item.product.imageUrls,
@@ -235,27 +237,27 @@ const CartItemComponent: React.FC<CartItemComponentProps> = ({
           {/* Product Info */}
           <View style={styles.productInfo}>
             {/* Product Name - clear and prominent */}
-            <AppText style={[styles.productName, { color: theme.colors.text }]} numberOfLines={2}>
+            <AppText style={[styles.productName, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={2}>
               {i18n.language === 'ar' && item.product.nameAr ? item.product.nameAr : i18n.language === 'ku' && item.product.nameKu ? item.product.nameKu : item.product.name}
             </AppText>
 
             {/* Part Number */}
             {item.product.partNumber ? (
-              <Text allowFontScaling={false} style={styles.partNumberText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+              <Text allowFontScaling={false} style={[styles.partNumberText, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
                 {item.product.partNumber}
               </Text>
             ) : null}
 
             {/* Selected options (color/size) */}
             {item.selectedOptions && (
-              <View style={styles.selectedOptionsRow}>
+              <View style={[styles.selectedOptionsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 {item.selectedOptions.color && (
-                  <AppText style={styles.optionText}>
+                  <AppText style={[styles.optionText, { backgroundColor: theme.colors.surface, color: theme.colors.textSecondary }]}>
                     {item.selectedOptions.color}
                   </AppText>
                 )}
                 {item.selectedOptions.size && (
-                  <AppText style={styles.optionText}>
+                  <AppText style={[styles.optionText, { backgroundColor: theme.colors.surface, color: theme.colors.textSecondary }]}>
                     {item.selectedOptions.size}
                   </AppText>
                 )}
@@ -410,6 +412,7 @@ const CartScreen: React.FC = () => {
   const { user, isVip } = useAuth();
   const cartAccent = isDark ? theme.colors.primary : FIGMA_ORANGE;
   const { t } = useTranslation();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const insets = useSafeAreaInsets();
   
   const [isUpdating, setIsUpdating] = useState(false);
@@ -656,12 +659,12 @@ const CartScreen: React.FC = () => {
         {/* FIGMA: Orange header */}
         <View style={styles.headerContainer}>
           {/* Go back button with pill background */}
-          <TouchableOpacity 
-            style={styles.goBackPill}
+          <TouchableOpacity
+            style={[styles.goBackPill, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={() => navigation.goBack()}
           >
-            <Ionicons name="chevron-back" size={20} color="#000" />
-            <AppText style={styles.goBackText}>{t('common.back', 'Go back')}</AppText>
+            <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={20} color="#000" />
+            <AppText style={[styles.goBackText, isRTL && { marginLeft: 0, marginRight: 4 }]}>{t('common.back', 'Go back')}</AppText>
           </TouchableOpacity>
 
           {/* Title */}
@@ -724,7 +727,7 @@ const CartScreen: React.FC = () => {
 
 
                 {/* Total row */}
-                <View style={styles.totalRow}>
+                <View style={[styles.totalRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                   <View>
                     <AppText style={[styles.totalLabel, { color: isDark ? theme.colors.textSecondary : '#888' }]}>{t('cart.total', 'Total')}</AppText>
                     <View style={styles.totalPriceRow}>
