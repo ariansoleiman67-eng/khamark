@@ -14,6 +14,7 @@ import {
   ScrollView,
   Linking,
   Platform,
+  I18nManager,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -76,7 +77,8 @@ const contactLabel = (c: { email?: string | null; phone?: string | null }): stri
 const AdminCustomersScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
   const { tenantId, isLoading: tenantLoading } = useTenant();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const insets = useSafeAreaInsets();
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
@@ -255,12 +257,12 @@ const AdminCustomersScreen: React.FC = () => {
   const renderCustomerItem = ({ item, index }: { item: User; index: number }) => (
     <View>
       <TouchableOpacity
-        style={[styles.customerCard, { backgroundColor: theme.colors.surface }]}
+        style={[styles.customerCard, { backgroundColor: theme.colors.surface, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
         activeOpacity={0.7}
         onPress={() => handleCustomerPress(item)}
       >
         {/* Avatar */}
-        <View style={[styles.avatar, { backgroundColor: theme.colors.primary + '20' }]}>
+        <View style={[styles.avatar, { backgroundColor: theme.colors.primary + '20' }, isRTL ? { marginRight: 0, marginLeft: SPACING.sm } : null]}>
           <Text allowFontScaling={false} style={[styles.avatarText, { color: theme.colors.primary }]}>
             {(item.fullName || item.name || contactLabel(item))?.charAt(0)?.toUpperCase() || '?'}
           </Text>
@@ -268,8 +270,8 @@ const AdminCustomersScreen: React.FC = () => {
 
         {/* Customer Info */}
         <View style={styles.customerInfo}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-            <Text allowFontScaling={false} style={[styles.customerName, { color: theme.colors.text, marginBottom: 0 }]}>
+          <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', marginBottom: 4 }}>
+            <Text allowFontScaling={false} style={[styles.customerName, { color: theme.colors.text, marginBottom: 0, textAlign: isRTL ? 'right' : 'left' }]}>
               {item.fullName || item.name || contactLabel(item) || t('admin.customers.unknown')}
             </Text>
             {item.role === 'vip' && (
@@ -355,7 +357,7 @@ const AdminCustomersScreen: React.FC = () => {
         </View>
 
         {/* Chevron */}
-        <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+        <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={20} color={theme.colors.textSecondary} />
       </TouchableOpacity>
     </View>
   );
@@ -435,14 +437,14 @@ const AdminCustomersScreen: React.FC = () => {
 
       {/* Search Bar */}
       <View
-        style={[styles.searchSection, { paddingTop: insets.top + SPACING.md, flexDirection: 'row', alignItems: 'center' }]}
+        style={[styles.searchSection, { paddingTop: insets.top + SPACING.md, flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center' }]}
       >
         <TouchableOpacity
-          style={{ marginRight: SPACING.md, padding: 4 }}
+          style={[{ padding: 4 }, isRTL ? { marginLeft: SPACING.md } : { marginRight: SPACING.md }]}
           onPress={() => navigation.goBack()}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Ionicons name="chevron-back" size={28} color={theme.colors.text} />
+          <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={28} color={theme.colors.text} />
         </TouchableOpacity>
         <View style={[styles.searchContainer, { backgroundColor: theme.colors.surface, flex: 1 }]}>
           <Ionicons name="search" size={20} color={theme.colors.textSecondary} />
@@ -758,7 +760,7 @@ const AdminCustomersScreen: React.FC = () => {
                   return (
                     <View style={[styles.mapContainer, { alignItems: 'center', justifyContent: 'center' }]}>
                       <Ionicons name="map-outline" size={40} color={theme.colors.textSecondary} />
-                      <Text allowFontScaling={false} style={{ color: theme.colors.textSecondary, marginTop: 8 }}>Map unavailable</Text>
+                      <Text allowFontScaling={false} style={{ color: theme.colors.textSecondary, marginTop: 8 }}>{t('admin.customers.mapUnavailable', { defaultValue: 'Map unavailable' })}</Text>
                     </View>
                   );
                 }
@@ -791,7 +793,7 @@ const AdminCustomersScreen: React.FC = () => {
                 return (
                   <View style={[styles.mapContainer, { alignItems: 'center', justifyContent: 'center' }]}>
                     <Ionicons name="map-outline" size={40} color={theme.colors.textSecondary} />
-                    <Text allowFontScaling={false} style={{ color: theme.colors.textSecondary, marginTop: 8 }}>Map failed to load</Text>
+                    <Text allowFontScaling={false} style={{ color: theme.colors.textSecondary, marginTop: 8 }}>{t('admin.customers.mapFailedToLoad', { defaultValue: 'Map failed to load' })}</Text>
                   </View>
                 );
               }

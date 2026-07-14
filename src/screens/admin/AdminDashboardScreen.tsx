@@ -14,6 +14,7 @@ import {
   ImageBackground,
   Image,
   Platform,
+  I18nManager,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -102,7 +103,8 @@ const AdminDashboardScreen: React.FC = () => {
   const { t, i18n } = useTranslation();
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
-  
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
+
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -286,7 +288,8 @@ const AdminDashboardScreen: React.FC = () => {
     <TouchableOpacity 
       style={[
         styles.orderItem,
-        { 
+        {
+          flexDirection: isRTL ? 'row-reverse' : 'row',
           backgroundColor: isDark ? theme.colors.surface : '#FFFFFF',
           borderBottomColor: theme.colors.border + '30',
         }
@@ -303,14 +306,14 @@ const AdminDashboardScreen: React.FC = () => {
       
       <View style={styles.orderContent}>
         <Text allowFontScaling={false} 
-          style={[styles.orderNumber, { color: theme.colors.text }]}
+          style={[styles.orderNumber, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}
           adjustsFontSizeToFit
           numberOfLines={1}
         >
           {order.orderNumber?.replace?.(/^#?ORD-?/i, '').replace(/-/g, '') || order.id}
         </Text>
         <Text allowFontScaling={false} 
-          style={[styles.orderCustomer, { color: theme.colors.textSecondary }]}
+          style={[styles.orderCustomer, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}
           adjustsFontSizeToFit
           numberOfLines={1}
         >
@@ -472,14 +475,14 @@ const AdminDashboardScreen: React.FC = () => {
           elevation: 2,
         }]}>
           <TouchableOpacity 
-            style={styles.menuItem}
+            style={[styles.menuItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={navigateToOrders}
           >
             <View style={[styles.menuIconContainer, { backgroundColor: theme.colors.primary + '20' }]}>
               <Ionicons name="receipt-outline" size={20} color={theme.colors.primary} />
             </View>
-            <View style={styles.menuContent}>
-              <Text allowFontScaling={false} 
+            <View style={[styles.menuContent, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
+              <Text allowFontScaling={false}
                 style={[styles.menuTitle, { color: theme.colors.text }]}
                 adjustsFontSizeToFit
                 numberOfLines={1}
@@ -498,13 +501,13 @@ const AdminDashboardScreen: React.FC = () => {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.menuItem}
+            style={[styles.menuItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={() => navigation.navigate('AdminInStoreOrders')}
           >
             <View style={[styles.menuIconContainer, { backgroundColor: '#FF6A00' + '20' }]}>
               <Ionicons name="storefront-outline" size={20} color="#FF6A00" />
             </View>
-            <View style={styles.menuContent}>
+            <View style={[styles.menuContent, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
               <Text allowFontScaling={false} style={[styles.menuTitle, { color: theme.colors.text }]} adjustsFontSizeToFit numberOfLines={1}>
                 {t('admin.inStore.title', { defaultValue: 'In-Store Sales' })}
               </Text>
@@ -516,14 +519,14 @@ const AdminDashboardScreen: React.FC = () => {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.menuItem}
+            style={[styles.menuItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={navigateToProducts}
           >
             <View style={[styles.menuIconContainer, { backgroundColor: '#4CAF50' + '20' }]}>
               <Ionicons name="cube-outline" size={20} color="#4CAF50" />
             </View>
-            <View style={styles.menuContent}>
-              <Text allowFontScaling={false} 
+            <View style={[styles.menuContent, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
+              <Text allowFontScaling={false}
                 style={[styles.menuTitle, { color: theme.colors.text }]}
                 adjustsFontSizeToFit
                 numberOfLines={1}
@@ -542,14 +545,14 @@ const AdminDashboardScreen: React.FC = () => {
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={[styles.menuItem, styles.menuItemLast]}
+            style={[styles.menuItem, styles.menuItemLast, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={() => navigation.navigate('AdminSendNotification')}
           >
             <View style={[styles.menuIconContainer, { backgroundColor: '#9C27B0' + '20' }]}>
               <Ionicons name="notifications-outline" size={20} color="#9C27B0" />
             </View>
-            <View style={styles.menuContent}>
-              <Text allowFontScaling={false} 
+            <View style={[styles.menuContent, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
+              <Text allowFontScaling={false}
                 style={[styles.menuTitle, { color: theme.colors.text }]}
                 adjustsFontSizeToFit
                 numberOfLines={1}

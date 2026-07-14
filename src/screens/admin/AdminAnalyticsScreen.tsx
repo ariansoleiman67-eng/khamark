@@ -9,6 +9,7 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  I18nManager,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,7 +24,8 @@ import { ReportsGenerator } from './ReportsGenerator';
 const AdminAnalyticsScreen = () => {
   const navigation = useNavigation();
   const { theme } = useTheme();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const { tenantId } = useTenant(); // Get tenantId
   const [loading, setLoading] = useState(false);
   const [startDate, setStartDate] = useState(() => {
@@ -102,12 +104,12 @@ const AdminAnalyticsScreen = () => {
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
+      <View style={[styles.header, { borderBottomColor: theme.colors.border, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
-          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+          <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color={theme.colors.text} />
         </TouchableOpacity>
         <Text allowFontScaling={false} style={[styles.headerTitle, { color: theme.colors.text }]}>{t('admin.analytics.title')}</Text>
         <View style={styles.headerPlaceholder} />
@@ -120,7 +122,7 @@ const AdminAnalyticsScreen = () => {
           
           <View style={styles.dateContainer}>
             <View style={styles.dateWrapper}>
-              <Text allowFontScaling={false} style={[styles.label, { color: theme.colors.textSecondary }]}>From</Text>
+              <Text allowFontScaling={false} style={[styles.label, { color: theme.colors.textSecondary }]}>{t('admin.analytics.from', { defaultValue: 'From' })}</Text>
               {Platform.OS === 'android' ? (
                 <TouchableOpacity
                   style={[styles.dateButton, { borderColor: theme.colors.border }]}
@@ -142,7 +144,7 @@ const AdminAnalyticsScreen = () => {
             </View>
 
             <View style={styles.dateWrapper}>
-              <Text allowFontScaling={false} style={[styles.label, { color: theme.colors.textSecondary }]}>To</Text>
+              <Text allowFontScaling={false} style={[styles.label, { color: theme.colors.textSecondary }]}>{t('admin.analytics.to', { defaultValue: 'To' })}</Text>
               {Platform.OS === 'android' ? (
                 <TouchableOpacity
                   style={[styles.dateButton, { borderColor: theme.colors.border }]}
@@ -254,13 +256,13 @@ const AdminAnalyticsScreen = () => {
               displayStatus = status; // Fallback if translation is missing
             }
             return (
-            <View key={status} style={styles.statusRow}>
+            <View key={status} style={[styles.statusRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <View style={styles.statusLabelContainer}>
-                <Text allowFontScaling={false} style={[styles.statusLabel, { color: theme.colors.text }]}>
+                <Text allowFontScaling={false} style={[styles.statusLabel, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
                   {displayStatus}
                 </Text>
               </View>
-              <View style={styles.statusBarContainer}>
+              <View style={[styles.statusBarContainer, { backgroundColor: theme.colors.border }]}>
                 <View 
                   style={[
                     styles.statusBar, 

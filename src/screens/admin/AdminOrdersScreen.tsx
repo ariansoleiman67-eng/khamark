@@ -1702,7 +1702,7 @@ const AdminOrdersScreen: React.FC = () => {
                       {(selectedOrder?.userId && usersMap[selectedOrder.userId]?.phone) ? usersMap[selectedOrder.userId].phone : (selectedOrder?.shippingAddress?.phone || 'N/A')}
                     </Text>
                     <View style={styles.callBadge}>
-                      <Text allowFontScaling={false} style={styles.callBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>Call</Text>
+                      <Text allowFontScaling={false} style={styles.callBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{t('admin.orders.call', { defaultValue: 'Call' })}</Text>
                     </View>
                   </TouchableOpacity>
 
@@ -1737,7 +1737,7 @@ const AdminOrdersScreen: React.FC = () => {
                       {t('admin.orders.messageCustomer', { defaultValue: 'Message Customer' })}
                     </Text>
                     <View style={[styles.callBadge, { backgroundColor: '#EFF6FF' }]}>
-                      <Text allowFontScaling={false} style={[styles.callBadgeText, { color: '#3B82F6' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>Chat</Text>
+                      <Text allowFontScaling={false} style={[styles.callBadgeText, { color: '#3B82F6' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{t('admin.orders.chat', { defaultValue: 'Chat' })}</Text>
                     </View>
                   </TouchableOpacity>
 
@@ -2149,7 +2149,7 @@ const AdminOrdersScreen: React.FC = () => {
                 {['processing', 'shipped'].includes(selectedOrder?.status || '') && (
                   <View style={[styles.modalSection, { backgroundColor: theme.colors.background }]}>
                     <Text allowFontScaling={false} style={[styles.modalLabel, { color: theme.colors.textSecondary }]}>
-                      Tracking URL (GPSOPS)
+                      {t('admin.orders.trackingUrlLabel', { defaultValue: 'Tracking URL (GPSOPS)' })}
                     </Text>
                     <TextInput allowFontScaling={false}
                       style={[styles.trackingInput, {
@@ -2210,7 +2210,7 @@ const AdminOrdersScreen: React.FC = () => {
                     >
                       <Ionicons name="save-outline" size={16} color={theme.colors.surface} />
                       <Text allowFontScaling={false} style={[styles.saveTrackingButtonText, { color: theme.colors.surface }]}>
-                        Save Tracking URL
+                        {t('admin.orders.saveTrackingUrl', { defaultValue: 'Save Tracking URL' })}
                       </Text>
                     </TouchableOpacity>
 
@@ -2218,7 +2218,7 @@ const AdminOrdersScreen: React.FC = () => {
                     {(trackingUrl || selectedOrder?.trackingUrl) && (
                       <View style={{ marginTop: 12 }}>
                         <Text allowFontScaling={false} style={[styles.modalLabel, { color: theme.colors.textSecondary, marginBottom: 8 }]}>
-                          📍 GPS Tracking Preview
+                          📍 {t('admin.orders.gpsTrackingPreview', { defaultValue: 'GPS Tracking Preview' })}
                         </Text>
                         <LiveOrderMap
                           orderId={selectedOrder?.id || ''}
@@ -2288,7 +2288,7 @@ const AdminOrdersScreen: React.FC = () => {
                       <Text allowFontScaling={false} style={[styles.shippingOfficeLabel, { color: theme.colors.textSecondary, fontWeight: 'bold' }]}>
                         {t('admin.orders.amountPaid', 'Amount Paid')}:
                       </Text>
-                      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 8, paddingHorizontal: 12, height: 44 }}>
+                      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: isDark ? theme.colors.background : '#FFFFFF', borderRadius: 8, paddingHorizontal: 12, height: 44 }}>
                         <Text allowFontScaling={false} style={{ color: theme.colors.textSecondary, marginRight: 8, fontWeight: '600', fontSize: 16 }}>
                           {selectedOrder?.currency === 'IQD' ? 'IQD' : '$'}
                         </Text>
@@ -2339,7 +2339,7 @@ const AdminOrdersScreen: React.FC = () => {
                         paddingHorizontal: 4,
                         borderRadius: 8,
                         minHeight: 48,
-                        backgroundColor: '#FFFFFF',
+                        backgroundColor: isDark ? theme.colors.surface : '#FFFFFF',
                         borderColor: theme.colors.success,
                         borderWidth: 1
                       }}

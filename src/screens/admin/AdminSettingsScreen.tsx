@@ -12,6 +12,7 @@ import {
   TextInput,
   ImageBackground,
   Platform,
+  I18nManager,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -67,12 +68,18 @@ const SectionTitle: React.FC<{ title: string; labelColor: string }> = ({ title, 
   </Text>
 );
 
-const Divider: React.FC<{ isDark: boolean }> = ({ isDark }) => (
-  <View style={{
-    height: 0.5, marginLeft: 68,
-    backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
-  }} />
-);
+const Divider: React.FC<{ isDark: boolean }> = ({ isDark }) => {
+  const { i18n } = useTranslation();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
+  return (
+    <View style={{
+      height: 0.5,
+      marginLeft: isRTL ? 0 : 68,
+      marginRight: isRTL ? 68 : 0,
+      backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
+    }} />
+  );
+};
 
 const LuxuryMenuItem: React.FC<{
   icon: string;
@@ -88,6 +95,8 @@ const LuxuryMenuItem: React.FC<{
   tintBg: string;
   color?: string;
 }> = ({ icon, title, subtitle, onPress, hasSwitch, switchValue, onSwitchChange, destructive, theme, isDark, tintBg, color }) => {
+  const { i18n } = useTranslation();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const iconColor = destructive ? theme.colors.error : (color || theme.colors.primary);
   const iconBg = destructive
     ? (isDark ? 'rgba(239,68,68,0.12)' : 'rgba(239,68,68,0.08)')
@@ -99,13 +108,14 @@ const LuxuryMenuItem: React.FC<{
       disabled={hasSwitch}
       activeOpacity={0.6}
       style={{
-        flexDirection: 'row', alignItems: 'center', padding: 16,
+        flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', padding: 16,
       }}
     >
       <View style={{
         width: 40, height: 40, borderRadius: 12,
         backgroundColor: iconBg,
-        justifyContent: 'center', alignItems: 'center', marginRight: 14,
+        justifyContent: 'center', alignItems: 'center',
+        marginRight: isRTL ? 0 : 14, marginLeft: isRTL ? 14 : 0,
       }}>
         <Ionicons name={icon as any} size={20} color={iconColor} />
       </View>
@@ -113,11 +123,12 @@ const LuxuryMenuItem: React.FC<{
         <Text allowFontScaling={false} style={{
           fontSize: 16, fontWeight: '500',
           color: destructive ? theme.colors.error : theme.colors.text,
+          textAlign: isRTL ? 'right' : 'left',
         }}>
           {title}
         </Text>
         {subtitle && (
-          <Text allowFontScaling={false} style={{ fontSize: 13, color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)', marginTop: 2 }}
+          <Text allowFontScaling={false} style={{ fontSize: 13, color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)', marginTop: 2, textAlign: isRTL ? 'right' : 'left' }}
             numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
             {subtitle}
           </Text>
@@ -128,7 +139,7 @@ const LuxuryMenuItem: React.FC<{
           trackColor={{ false: theme.colors.border, true: theme.colors.primary + '50' }}
           thumbColor={switchValue ? theme.colors.primary : theme.colors.textSecondary} />
       ) : (
-        <Ionicons name="chevron-forward" size={18} color={isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)'} />
+        <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={18} color={isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)'} />
       )}
     </TouchableOpacity>
   );
@@ -688,11 +699,11 @@ const AdminSettingsScreen: React.FC = () => {
                 {exporting ? (
                   <View style={{ padding: 16, alignItems: 'center' }}>
                     <ActivityIndicator size="small" color="#10B981" />
-                    <Text allowFontScaling={false} style={{ marginTop: 8, color: theme.colors.text }}>Exporting data...</Text>
+                    <Text allowFontScaling={false} style={{ marginTop: 8, color: theme.colors.text }}>{t('admin.settings.exportingData', { defaultValue: 'Exporting data...' })}</Text>
                   </View>
                 ) : (
-                  <LuxuryMenuItem icon="download" title="Export All Data"
-                    subtitle="Export products, orders, and customers to JSON"
+                  <LuxuryMenuItem icon="download" title={t('admin.settings.exportData', { defaultValue: 'Export All Data' })}
+                    subtitle={t('admin.settings.exportDataSubtitle', { defaultValue: 'Export products, orders, and customers to JSON' })}
                     onPress={handleExportData}
                     color="#10B981"
                     theme={theme} isDark={isDark} tintBg={tintBg} />
