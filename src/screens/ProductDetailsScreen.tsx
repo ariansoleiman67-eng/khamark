@@ -695,7 +695,7 @@ export const ProductDetailsScreen: React.FC = () => {
 
     return (
       <SafeAreaView
-        style={[styles.container, { backgroundColor: isDark ? theme.colors.background : '#FFF3E0' }]}
+        style={[styles.container, { backgroundColor: theme.colors.background }]}
         edges={['top', 'left', 'right']}
       >
         {/* Skeleton: Image Gallery */}
@@ -1208,7 +1208,7 @@ export const ProductDetailsScreen: React.FC = () => {
 
   return (
     <SafeAreaView
-      style={[styles.container, { backgroundColor: isDark ? theme.colors.background : '#FFF3E0' }]}
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
       edges={['top', 'left', 'right']}
     >
       <StatusBar style={theme.dark ? 'light' : 'dark'} />
@@ -1334,9 +1334,17 @@ export const ProductDetailsScreen: React.FC = () => {
             </View>
 
             {/* Product Information */}
-            <View style={styles.infoContainer}>
+            <View style={[styles.infoContainer, { backgroundColor: theme.colors.card }]}>
               {/* Header Info */}
               <View style={styles.headerInfo}>
+                {!!product.brand && (
+                  <Text
+                    allowFontScaling={false}
+                    style={[styles.brandEyebrow, { color: theme.colors.primary, textAlign: isRTL ? 'right' : 'left' }]}
+                  >
+                    {product.brand}
+                  </Text>
+                )}
                 <Text allowFontScaling={false}
                   style={[
                     styles.productName,
@@ -2754,15 +2762,28 @@ const styles = StyleSheet.create({
 
   // Product Info
   infoContainer: {
-    padding: SPACING.md,
+    marginTop: -28,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: 28,
+    paddingBottom: SPACING.md,
   },
   headerInfo: {
     marginBottom: SPACING.lg,
   },
+  brandEyebrow: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1.6,
+    marginBottom: 6,
+    textTransform: 'uppercase',
+  },
   productName: {
-    fontSize: 26,
+    fontSize: 27,
     fontWeight: '800',
-    letterSpacing: -0.3,
+    letterSpacing: -0.4,
+    lineHeight: 34,
     marginBottom: SPACING.xs,
   },
   partNumber: {
@@ -2773,9 +2794,10 @@ const styles = StyleSheet.create({
   priceRow: {
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginTop: SPACING.sm,
   },
   price: {
-    fontSize: 30,
+    fontSize: 32,
     fontWeight: '800',
     letterSpacing: -0.5,
   },
