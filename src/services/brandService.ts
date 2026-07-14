@@ -13,20 +13,20 @@ export interface Brand {
   sortOrder: number;
 }
 
-const STORAGE_KEY = '@asankary_brands_mock';
+const STORAGE_KEY = '@asankary_brands_mock_v2';
 
-// Seed brands mirror the demo product brands. Logos come from a public logo CDN;
-// BrandTile falls back to a letter tile if a logo fails to load.
-const clearbit = (domain: string) => `https://logo.clearbit.com/${domain}`;
+// Seed brands mirror the demo product brands. No default logo (external logo CDNs
+// aren't reachable in every env) — clean amber letter tiles by default; the admin
+// adds real logos via the Brand Manager (persisted locally, works offline).
 const SEED_BRANDS: Brand[] = [
-  { id: 'br-momax', name: 'Momax', logoUrl: clearbit('momax.net'), isActive: true, sortOrder: 0 },
-  { id: 'br-samsung', name: 'Samsung', logoUrl: clearbit('samsung.com'), isActive: true, sortOrder: 1 },
-  { id: 'br-anker', name: 'Anker', logoUrl: clearbit('anker.com'), isActive: true, sortOrder: 2 },
-  { id: 'br-mcdodo', name: 'Mcdodo', logoUrl: clearbit('mcdodo.com.cn'), isActive: true, sortOrder: 3 },
-  { id: 'br-belkin', name: 'Belkin', logoUrl: clearbit('belkin.com'), isActive: true, sortOrder: 4 },
-  { id: 'br-tomtoc', name: 'tomtoc', logoUrl: clearbit('tomtoc.com'), isActive: true, sortOrder: 5 },
-  { id: 'br-havit', name: 'Havit', logoUrl: clearbit('havit.hk'), isActive: true, sortOrder: 6 },
-  { id: 'br-realme', name: 'Realme', logoUrl: clearbit('realme.com'), isActive: true, sortOrder: 7 },
+  { id: 'br-momax', name: 'Momax', isActive: true, sortOrder: 0 },
+  { id: 'br-samsung', name: 'Samsung', isActive: true, sortOrder: 1 },
+  { id: 'br-anker', name: 'Anker', isActive: true, sortOrder: 2 },
+  { id: 'br-mcdodo', name: 'Mcdodo', isActive: true, sortOrder: 3 },
+  { id: 'br-belkin', name: 'Belkin', isActive: true, sortOrder: 4 },
+  { id: 'br-tomtoc', name: 'tomtoc', isActive: true, sortOrder: 5 },
+  { id: 'br-havit', name: 'Havit', isActive: true, sortOrder: 6 },
+  { id: 'br-realme', name: 'Realme', isActive: true, sortOrder: 7 },
 ];
 
 async function readMock(): Promise<Brand[]> {

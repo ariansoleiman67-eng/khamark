@@ -23,6 +23,7 @@ import { useTenant } from '../../contexts/TenantContext';
 import MasonryProductCard from '../../components/MasonryProductCard';
 import SectionHeader from '../../components/home/SectionHeader';
 import BrandTile from '../../components/home/BrandTile';
+import { brandService, Brand } from '../../services/brandService';
 import AppNumber from '../../components/AppNumber';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -117,6 +118,9 @@ const HomeScreen: React.FC = () => {
   // Banner images — loaded from Firestore
   const [bannerImages, setBannerImages] = useState<any[]>([]);
 
+  // Admin-managed brands (name + logo) for the "Our Brands" grid.
+  const [managedBrands, setManagedBrands] = useState<Brand[]>([]);
+
   // Load data on mount and whenever tenantId changes (single effect avoids a double load).
   useEffect(() => {
     loadData();
@@ -128,11 +132,20 @@ const HomeScreen: React.FC = () => {
       await Promise.all([
         loadBanners(),
         loadNewArrivals(),
+        loadBrands(),
       ]);
     } catch (error) {
       Alert.alert(t('common.error'), t('errors.loadingData'));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadBrands = async () => {
+    try {
+      setManagedBrands(await brandService.getActiveBrands(tenantId || undefined));
+    } catch {
+      setManagedBrands([]);
     }
   };
 
@@ -344,8 +357,8 @@ const HomeScreen: React.FC = () => {
   const stableIsFavorite = useCallback((id: string) => favActionsRef.current.isFavorite(id), []);
   const stableToggleFavorite = useCallback((id: string) => favActionsRef.current.toggleFavorite(id), []);
 
-  const headerDataRef = useRef({ brands, brandSpotlights, hasArrivals });
-  headerDataRef.current = { brands, brandSpotlights, hasArrivals };
+  const headerDataRef = useRef({ brands, brandSpotlights, hasArrivals, managedBrands });
+  headerDataRef.current = { brands, brandSpotlights, hasArrivals, managedBrands };
 
   const renderSpotlightCard = useCallback(({ item }: { item: Product }) => (
     <MasonryProductCard
@@ -358,7 +371,10 @@ const HomeScreen: React.FC = () => {
   ), [handleProductPress, handleAddToCartPress, stableIsFavorite, stableToggleFavorite]);
 
   const renderListHeader = useCallback(() => {
-    const { brands: brandList, brandSpotlights: spotlights, hasArrivals: hasItems } = headerDataRef.current;
+    const { brands: brandList, brandSpotlights: spotlights, hasArrivals: hasItems, managedBrands: mBrands } = headerDataRef.current;
+    const brandTiles = mBrands.length > 0
+      ? mBrands.map(b => ({ key: b.id, label: b.name, logoUrl: b.logoUrl }))
+      : brandList.map(b => ({ key: b, label: b, logoUrl: undefined as string | undefined }));
     return (
       <View>
         {/* a. Hero banner */}
@@ -366,17 +382,18 @@ const HomeScreen: React.FC = () => {
           <BannerCarousel images={bannerImages} />
         )}
 
-        {/* b. Our Brands — 2-column grid derived from unique brands */}
-        {brandList.length > 0 && (
+        {/* b. Our Brands — admin-managed brands (name + logo); falls back to derived */}
+        {brandTiles.length > 0 && (
           <View>
             <SectionHeader title={t('home.ourBrands')} onSeeAll={handleBrandsSeeAll} />
             <View style={[styles.brandsGrid, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              {brandList.map((brand) => (
+              {brandTiles.map((b) => (
                 <BrandTile
-                  key={brand}
-                  label={brand}
+                  key={b.key}
+                  label={b.label}
+                  imageUrl={b.logoUrl}
                   width={BRAND_TILE_WIDTH}
-                  onPress={handleBrandsSeeAll}
+                  onPress={() => (navigation as any).navigate('CategoryProducts', { brand: b.label, title: b.label })}
                 />
               ))}
             </View>

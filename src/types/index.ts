@@ -514,7 +514,7 @@ export type RootStackParamList = {
   Main: { screen?: string; params?: any } | undefined;
   Home: undefined;
   Categories: { selectedCategory?: string } | undefined;
-  CategoryProducts: { category: string; title?: string };
+  CategoryProducts: { category?: string; brand?: string; title?: string };
   Search: { 
     query?: string; 
     category?: string;
@@ -611,6 +611,7 @@ export type RootStackParamList = {
   AdminInStoreOrders: { source?: 'in-store'; orderId?: string } | undefined;
   AdminCreateOrder: { partner?: { uid: string; name: string } } | undefined;
   AdminBannerManagement: undefined;
+  AdminBrandManagement: undefined;
   AdminChatScreen: { conversationId: string };
   
   // Chat Screens

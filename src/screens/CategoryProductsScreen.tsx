@@ -32,8 +32,9 @@ const CategoryProductsScreen: React.FC = () => {
   const { isFavorite, toggleFavorite } = useFavorites();
   const { tenantId } = useTenant();
 
-  const category: string = route.params?.category ?? 'All';
-  const title: string = route.params?.title ?? category;
+  const category: string | undefined = route.params?.category;
+  const brand: string | undefined = route.params?.brand;
+  const title: string = route.params?.title ?? brand ?? category ?? '';
 
   const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
 
@@ -44,14 +45,24 @@ const CategoryProductsScreen: React.FC = () => {
 
   const load = useCallback(async () => {
     try {
-      const items = await ProductService.getProductsByCategory(category, tenantId || undefined);
+      let items: Product[];
+      if (brand) {
+        const res = await ProductService.getProducts(
+          { brand },
+          { page: 1, limit: 500, total: 0, hasMore: true },
+          tenantId || undefined
+        );
+        items = res.products;
+      } else {
+        items = await ProductService.getProductsByCategory(category || 'All', tenantId || undefined);
+      }
       setProducts(items);
     } catch {
       setProducts([]);
     } finally {
       setLoading(false);
     }
-  }, [category, tenantId]);
+  }, [category, brand, tenantId]);
 
   useEffect(() => {
     load();

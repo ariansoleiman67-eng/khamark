@@ -617,6 +617,12 @@ const AdminSettingsScreen: React.FC = () => {
                   color="#7C4DFF"
                   theme={theme} isDark={isDark} tintBg={tintBg} />
                 <Divider isDark={isDark} />
+                <LuxuryMenuItem icon="ribbon" title={t('admin.brands.title', { defaultValue: 'Brands' })}
+                  subtitle={t('admin.brands.subtitle', { defaultValue: 'Manage brands & logos' })}
+                  onPress={() => navigation.navigate('AdminBrandManagement')}
+                  color="#F5A00A"
+                  theme={theme} isDark={isDark} tintBg={tintBg} />
+                <Divider isDark={isDark} />
                 <LuxuryMenuItem icon="receipt" title={t('admin.settings.invoiceSettings', { defaultValue: 'Invoice Settings' })}
                   subtitle={t('admin.settings.invoiceSettingsSubtitle', { defaultValue: 'Logo & business details for invoices' })}
                   onPress={() => navigation.navigate('AdminInvoiceSettings')}

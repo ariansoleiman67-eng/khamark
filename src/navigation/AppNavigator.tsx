@@ -98,6 +98,7 @@ import AdminStoreProfileScreen from '../screens/admin/AdminStoreProfileScreen';
 import AdminInvoiceSettingsScreen from '../screens/admin/AdminInvoiceSettingsScreen';
 import AdminChatScreen from '../screens/admin/AdminChatScreen';
 import AdminBannerScreen from '../screens/admin/AdminBannerScreen';
+import AdminBrandManagerScreen from '../screens/admin/AdminBrandManagerScreen';
 import AdminCustomersScreen from '../screens/admin/AdminCustomersScreen';
 import AdminPartnerManagementScreen from '../screens/admin/AdminPartnerManagementScreen';
 import AdminPartnerAssignmentScreen from '../screens/admin/AdminPartnerAssignmentScreen';
@@ -392,6 +393,7 @@ const AppNavigator: React.FC = () => {
             <Stack.Screen name="AdminInvoiceSettings" component={AdminInvoiceSettingsScreen} />
             <Stack.Screen name="AdminCustomers" component={AdminCustomersScreen} />
             <Stack.Screen name="AdminBannerManagement" component={AdminBannerScreen} />
+            <Stack.Screen name="AdminBrandManagement" component={AdminBrandManagerScreen} />
             <Stack.Screen name="AdminPartnerManagement" component={AdminPartnerManagementScreen} />
             <Stack.Screen name="AdminPartnerAssignment" component={AdminPartnerAssignmentScreen} />
             <Stack.Screen name="AdminPartnerDashboard" component={AdminPartnerDashboardScreen} />

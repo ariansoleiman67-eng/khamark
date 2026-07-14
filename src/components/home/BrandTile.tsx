@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, View, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
 import AppText from '../AppText';
@@ -14,6 +14,8 @@ interface BrandTileProps {
 // aynAlfahad "Our Brands" tile: flat light-gray rounded card, logo/initial centered, label beneath.
 const BrandTile: React.FC<BrandTileProps> = ({ label, imageUrl, width, onPress }) => {
   const { theme, isDark } = useTheme();
+  const [imgFailed, setImgFailed] = useState(false);
+  const showImage = !!imageUrl && !imgFailed;
 
   return (
     <Pressable
@@ -28,12 +30,13 @@ const BrandTile: React.FC<BrandTileProps> = ({ label, imageUrl, width, onPress }
       ]}
     >
       <View style={styles.imgWrap}>
-        {imageUrl ? (
+        {showImage ? (
           <Image
             source={{ uri: imageUrl }}
             style={styles.img}
             contentFit="contain"
             transition={0}
+            onError={() => setImgFailed(true)}
           />
         ) : (
           <View style={[styles.letter, { backgroundColor: theme.colors.primary }]}>
