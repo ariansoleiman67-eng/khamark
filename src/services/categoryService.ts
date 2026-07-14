@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import type { TenantCategory } from './tenantAdminService';
+import { USE_MOCK_DATA, mockActiveCategories } from './mockData';
 
 // snake_case DB row -> camelCase domain (same shape as tenantAdminService.mapCategory).
 const mapCategory = (row: any): TenantCategory => ({
@@ -23,6 +24,7 @@ export const categoryService = {
    * (returns [] on error so the UI can fall back to its default icons).
    */
   async getActiveCategories(tenantId: string): Promise<TenantCategory[]> {
+    if (USE_MOCK_DATA) return mockActiveCategories() as unknown as TenantCategory[];
     if (!tenantId) return [];
     const { data, error } = await supabase
       .from('categories')

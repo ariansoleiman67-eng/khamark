@@ -87,6 +87,9 @@ Full list in `PURGED.md`. Summary: Gemini key `AIzaSyBia9D1BpP…`, Google Maps/
 - **i18n:** en/ar/ku reconciled to identical key sets.
 - **Runtime verified on Android emulator**: app boots, dev-client bundles, and renders. Confirmed the Amber theme, the custom floating tab bar (raised active tab), and the redesigned Home header (menu + Hello/Guest greeting + orange cart). Product lists show the themed empty state ("No products available") because the placeholder Supabase has no data — a real backend populates them. Still recommended before sign-off: review with real data in ar (RTL) and dark mode on a device.
 
+### Demo mock data
+`src/services/mockData.ts` provides 18 demo products (Momax, Samsung, Anker, Mcdodo, Belkin, tomtoc, Havit, Realme), 4 banners and derived categories so the full UI (Home brand rows, Categories grid, Product Details) is viewable with no backend. `USE_MOCK_DATA` is **auto-on while Supabase is the placeholder URL and auto-off once `EXPO_PUBLIC_SUPABASE_URL` is set** — the product/banner/category services short-circuit to the mock when it's on. Delete `mockData.ts` + its guards if you never want it, or force it with `EXPO_PUBLIC_USE_MOCK_DATA=true/false`. Mock images come from picsum (need internet).
+
 ### Runtime fixes applied during verification
 - **Missing asset:** Phase 1 renamed the sign-in logo import to `asankary-signin-logo.png` but not the file (tsc can't see PNG imports). Generated Asankary placeholder logos (`assets/images/asankary-signin-logo.png`, `asankarylogo.png`) and deleted the Haryad ones. Replace with the real logo.
 - **Supabase boot crash:** `createClient()` throws on a non-URL, so the placeholder is now a valid HTTPS URL (`https://replace-with-asankary.supabase.co`) in `config.ts` + `eas.json` — the app boots and network calls fail gracefully until the real project URL is set.

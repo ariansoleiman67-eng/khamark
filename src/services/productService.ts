@@ -2,6 +2,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, uniqueChannel } from './supabase';
 import { Product, SearchFilters, PaginationInfo } from '../types';
 import { CACHE_EXPIRATION, PAGINATION } from '../constants/config';
+import {
+  USE_MOCK_DATA,
+  mockGetProducts,
+  mockGetProduct,
+  mockGetFeatured,
+  mockGetByCategory,
+  mockGetByIds,
+  mockSearch,
+  mockGetCategories,
+} from './mockData';
 
 // Helper to convert snake_case DB fields to camelCase for the frontend
 export const mapProduct = (data: any): Product => ({
@@ -107,6 +117,7 @@ export class ProductService {
     pageInfo: PaginationInfo = { page: 1, limit: PAGINATION.PRODUCTS_PER_PAGE, total: 0, hasMore: true },
     tenantId?: string
   ): Promise<{ products: Product[]; pagination: PaginationInfo }> {
+    if (USE_MOCK_DATA) return mockGetProducts(filters, pageInfo);
     try {
       const cacheKey = `products_${JSON.stringify(filters)}_${pageInfo.page}_${pageInfo.limit}_${tenantId || 'global'}`;
       const cached = await this.getCachedData(cacheKey);
@@ -173,6 +184,7 @@ export class ProductService {
     tenantId?: string
   ): Promise<Product[]> {
     try {
+      if (USE_MOCK_DATA) return mockSearch(searchQuery);
       if (!searchQuery || searchQuery.length < 2) return [];
 
       const cacheKey = `search_${searchQuery}_${JSON.stringify(filters)}_${tenantId || 'global'}`;
@@ -214,6 +226,7 @@ export class ProductService {
   }
 
   static async getProduct(productId: string, tenantId?: string): Promise<Product | null> {
+    if (USE_MOCK_DATA) return mockGetProduct(productId);
     try {
       const cacheKey = `product_${productId}_${tenantId || 'global'}`;
       const cached = await this.getCachedData(cacheKey);
@@ -238,6 +251,7 @@ export class ProductService {
   }
 
   static async getFeaturedProducts(tenantId?: string): Promise<Product[]> {
+    if (USE_MOCK_DATA) return mockGetFeatured();
     try {
       const cacheKey = `featured_products_${tenantId || 'global'}`;
       const cached = await this.getCachedData(cacheKey);
@@ -270,6 +284,7 @@ export class ProductService {
   // and refreshes in the background, so the favorites grid never waits on the network.
   // Pass forceRefresh=true (pull-to-refresh) to bypass the cache.
   static async getProductsByIds(ids: string[], forceRefresh = false): Promise<Product[]> {
+    if (USE_MOCK_DATA) return mockGetByIds(ids);
     const unique = Array.from(new Set((ids || []).filter(Boolean)));
     if (unique.length === 0) return [];
 
@@ -339,6 +354,7 @@ export class ProductService {
   }
 
   static async getProductsByCategory(category: string, tenantId?: string): Promise<Product[]> {
+    if (USE_MOCK_DATA) return mockGetByCategory(category);
     try {
       const cacheKey = `category_${category}_${tenantId || 'global'}`;
       const cached = await this.getCachedData(cacheKey);
@@ -367,6 +383,7 @@ export class ProductService {
   }
 
   static async getCategories(tenantId?: string): Promise<Array<{ name: string; count: number }>> {
+    if (USE_MOCK_DATA) return mockGetCategories();
     try {
       const cacheKey = `categories_with_counts_${tenantId || 'global'}`;
       const cached = await this.getCachedData(cacheKey);

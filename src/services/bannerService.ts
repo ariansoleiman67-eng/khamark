@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { USE_MOCK_DATA, MOCK_BANNERS } from './mockData';
 
 export interface BannerItem {
   id: string;
@@ -13,6 +14,7 @@ class BannerService {
    * Get all banners (active only by default), ordered by `order` field
    */
   async getBanners(activeOnly = true): Promise<BannerItem[]> {
+    if (USE_MOCK_DATA) return MOCK_BANNERS;
     try {
       let query = supabase.from('banners').select('*').order('sort_order', { ascending: true });
       if (activeOnly) {
