@@ -113,6 +113,7 @@ export interface Product {
   categoryKu: string;
   imageUrls: string[];  // Match what ProductCard expects
   priceUSD: number;
+  compareAtPriceUSD?: number; // "was" price for showing a strikethrough + Save% discount
   purchasePrice?: number;    // Cost/buy price from supplier (admin-only, not shown to customers)
   priceTiers?: PriceTier[];  // Quantity-based pricing tiers (wholesale pricing)
   shippingCost?: number; // Individual shipping cost for this product in USD

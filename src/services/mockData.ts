@@ -88,6 +88,12 @@ function build(s: Seed): Product {
 
 export const MOCK_PRODUCTS: Product[] = SEEDS.map(build);
 
+// Give some products a "was" price so the detail page shows a Save% + strikethrough.
+const COMPARE: Record<string, number> = { p1: 13.5, p4: 45, p7: 1399, p9: 60, p13: 44, p15: 28, p17: 117 };
+MOCK_PRODUCTS.forEach((p) => {
+  if (COMPARE[p.id]) p.compareAtPriceUSD = COMPARE[p.id];
+});
+
 export const MOCK_BANNERS = [1, 2, 3, 4].map((n) => ({
   id: `b${n}`,
   imageUrl: `https://picsum.photos/seed/asankary-banner-${n}/1000/420`,

@@ -1368,10 +1368,27 @@ export const ProductDetailsScreen: React.FC = () => {
                 </Text>
 
                 <View style={[styles.priceRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                  <AppNumber
-                    value={formatPrice(product.priceUSD, currentCurrency as any, exchangeRateIQD)}
-                    style={[styles.price, { color: theme.colors.primary }]}
-                  />
+                  <View style={{ flexShrink: 1 }}>
+                    <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                      <AppNumber
+                        value={formatPrice(product.priceUSD, currentCurrency as any, exchangeRateIQD)}
+                        style={[styles.price, { color: theme.colors.primary }]}
+                      />
+                      {!!product.compareAtPriceUSD && product.compareAtPriceUSD > product.priceUSD && (
+                        <AppNumber
+                          value={formatPrice(product.compareAtPriceUSD, currentCurrency as any, exchangeRateIQD)}
+                          style={[styles.comparePrice, { color: theme.colors.textSecondary }]}
+                        />
+                      )}
+                    </View>
+                    {!!product.compareAtPriceUSD && product.compareAtPriceUSD > product.priceUSD && (
+                      <View style={[styles.saveBadge, { alignSelf: isRTL ? 'flex-end' : 'flex-start' }]}>
+                        <Text allowFontScaling={false} style={styles.saveBadgeText}>
+                          {t('product.save', { defaultValue: 'Save' })} {Math.round((1 - product.priceUSD / product.compareAtPriceUSD) * 100)}%
+                        </Text>
+                      </View>
+                    )}
+                  </View>
 
                   <View
                     style={[
@@ -1433,6 +1450,33 @@ export const ProductDetailsScreen: React.FC = () => {
                         : t('product.outOfStock').replace(/ /g, '\u00A0')}
                     </AppText>
                   </View>
+                </View>
+              </View>
+
+              {/* Brand + Category chips */}
+              <View style={[styles.chipsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                {!!product.brand && (
+                  <View style={[styles.chipDark, { backgroundColor: theme.colors.text }]}>
+                    <Text allowFontScaling={false} style={[styles.chipText, { color: theme.colors.card }]}>{product.brand}</Text>
+                  </View>
+                )}
+                {!!product.category && (
+                  <View style={[styles.chipAccent, { backgroundColor: theme.colors.primary }]}>
+                    <Text allowFontScaling={false} style={[styles.chipText, { color: theme.colors.textOnPrimary }]}>{translateCategory(product)}</Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Sku / Manufacturer card */}
+              <View style={[styles.skuCard, { borderColor: theme.colors.border, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <View style={styles.skuCell}>
+                  <Text allowFontScaling={false} style={[styles.skuLabel, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>{t('product.sku', { defaultValue: 'Sku' })}</Text>
+                  <Text allowFontScaling={false} style={[styles.skuValue, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{product.partNumber}</Text>
+                </View>
+                <View style={[styles.skuDivider, { backgroundColor: theme.colors.border }]} />
+                <View style={styles.skuCell}>
+                  <Text allowFontScaling={false} style={[styles.skuLabel, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>{t('product.manufacturerCode', { defaultValue: 'Manufacturer Code' })}</Text>
+                  <Text allowFontScaling={false} style={[styles.skuValue, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{product.specifications?.['Manufacturer Code'] || product.specifications?.['Manufacturer'] || product.partNumber}</Text>
                 </View>
               </View>
 
@@ -2108,34 +2152,26 @@ export const ProductDetailsScreen: React.FC = () => {
                   {t('product.specifications')}
                 </Text>
 
-                <Surface style={[styles.specsContainer, { backgroundColor: theme.colors.surface }]} elevation={1}>
-                  <SpecRow label={t('product.partNumber')} value={product.partNumber} />
-                  <SpecRow label={t('product.category')} value={translateCategory(product)} />
-                  <SpecRow label={t('product.brand')} value={product.brand} />
-                  {product.condition && <SpecRow label={t('product.condition')} value={product.condition} />}
-                  {product.warranty && <SpecRow label={t('product.warranty')} value={product.warranty} />}
-                  <SpecRow
-                    label={t('product.availability')}
-                    value={
-                      product.status === 'on_the_way'
-                        ? t('products.status.onTheWay', { defaultValue: 'On The Way' })
-                        : product.status === 'coming_soon'
-                        ? t('products.status.comingSoon', { defaultValue: 'Coming Soon' })
-                        : inStock
-                        ? t('product.available')
-                        : t('product.unavailable')
-                    }
-                    valueColor={
-                      product.status === 'on_the_way'
-                        ? '#2196F3'
-                        : product.status === 'coming_soon'
-                        ? '#FF9800'
-                        : inStock
-                        ? theme.colors.success
-                        : theme.colors.error
-                    }
-                  />
-                </Surface>
+                <View style={[styles.infoCardsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                  <View style={[styles.infoCard, { backgroundColor: isDark ? theme.colors.surface : '#F0F0F2' }]}>
+                    <Text allowFontScaling={false} style={[styles.infoCardTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{t('product.condition', { defaultValue: 'Condition' })}</Text>
+                    <Text allowFontScaling={false} style={[styles.infoCardValue, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>{product.condition || t('product.available')}</Text>
+                  </View>
+                  <View style={[styles.infoCard, { backgroundColor: isDark ? theme.colors.surface : '#F0F0F2' }]}>
+                    <Text allowFontScaling={false} style={[styles.infoCardTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{t('product.authentic', { defaultValue: 'Authentic' })}</Text>
+                    <Text allowFontScaling={false} style={[styles.infoCardValue, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>{t('product.authenticValue', { defaultValue: '100% Authentic' })}</Text>
+                  </View>
+                </View>
+                <View style={[styles.infoCardsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                  <View style={[styles.infoCard, { backgroundColor: isDark ? theme.colors.surface : '#F0F0F2' }]}>
+                    <Text allowFontScaling={false} style={[styles.infoCardTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{t('product.warranty', { defaultValue: 'Warranty' })}</Text>
+                    <Text allowFontScaling={false} style={[styles.infoCardValue, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>{product.warranty || t('product.notAvailable', { defaultValue: 'Not Available' })}</Text>
+                  </View>
+                  <View style={[styles.infoCard, { backgroundColor: isDark ? theme.colors.surface : '#F0F0F2' }]}>
+                    <Text allowFontScaling={false} style={[styles.infoCardTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{t('product.availability', { defaultValue: 'Availability' })}</Text>
+                    <Text allowFontScaling={false} style={[styles.infoCardValue, { color: inStock ? theme.colors.success : theme.colors.error, textAlign: isRTL ? 'right' : 'left' }]}>{inStock ? t('product.available') : t('product.unavailable')}</Text>
+                  </View>
+                </View>
               </View>
 
 
@@ -2822,6 +2858,87 @@ const styles = StyleSheet.create({
     textAlignVertical: 'center', // Centers vertically
     paddingTop: Platform.OS === 'android' ? 1 : 0,
     flexShrink: 1,
+  },
+  comparePrice: {
+    fontSize: 16,
+    fontWeight: '600',
+    textDecorationLine: 'line-through',
+    marginHorizontal: 8,
+    marginBottom: 3,
+  },
+  saveBadge: {
+    backgroundColor: '#E53935',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    marginTop: 8,
+  },
+  saveBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: SPACING.md,
+  },
+  chipDark: {
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  chipAccent: {
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  chipText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  skuCard: {
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: SPACING.md,
+    marginBottom: SPACING.md,
+  },
+  skuCell: {
+    flex: 1,
+    paddingHorizontal: SPACING.md,
+  },
+  skuDivider: {
+    width: 1,
+  },
+  skuLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  skuValue: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  infoCardsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+  infoCard: {
+    flex: 1,
+    borderRadius: 16,
+    padding: SPACING.md,
+    minHeight: 92,
+  },
+  infoCardTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  infoCardValue: {
+    fontSize: 14,
+    fontWeight: '500',
+    lineHeight: 20,
   },
 
   // Option chips
