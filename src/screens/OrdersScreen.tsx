@@ -992,7 +992,7 @@ export const OrdersScreen: React.FC = () => {
         <Button
           title={t('orders.startShopping')}
           onPress={() => navigation.navigate('Home' as never)}
-          style={{ marginTop: SPACING.xl, backgroundColor: '#FF7816' }}
+          style={{ marginTop: SPACING.xl, backgroundColor: theme.colors.primary }}
           icon="storefront-outline"
         />
       )}
@@ -1023,8 +1023,8 @@ export const OrdersScreen: React.FC = () => {
               flex: 1,
             }}
           >
-            {ordersCount.filtered} of {ordersCount.total} orders
-            {ordersCount.pending > 0 && ` • ${ordersCount.pending} pending`}
+            {t('orders.countSummary', { defaultValue: '{{filtered}} of {{total}} orders', filtered: ordersCount.filtered, total: ordersCount.total })}
+            {ordersCount.pending > 0 && t('orders.pendingSummary', { defaultValue: ' • {{count}} pending', count: ordersCount.pending })}
           </Text>
         ) : (
           <View style={{ flex: 1 }} />

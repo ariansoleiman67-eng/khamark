@@ -12,8 +12,10 @@ import {
   ScrollView,
   ActivityIndicator,
   Dimensions,
+  I18nManager,
 } from 'react-native';
 import AppText from '../../components/AppText';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -41,6 +43,7 @@ import PhoneInput from '../../components/PhoneInput';
 import { getCountryInfo, CountryCode } from '../../utils/phoneUtils';
 import { useUserRegion } from '../../hooks/useUserRegion';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../components/ThemeProvider';
 import { signInWithGoogle, isGoogleSignInAvailable } from '../../services/auth';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
@@ -48,30 +51,20 @@ type RegisterMethod = 'phone' | 'email';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// ─── Luxury Dark Design Tokens ──────────────────────────
+// ─── Design Tokens (spacing / radius only — colors come from useTheme) ──────
 const LUX = {
-  gradientStart: '#0A0E27',
-  gradientMid: '#10143A',
-  gradientEnd: '#1A0B3E',
-  glass: 'rgba(255,255,255,0.07)',
-  glassBorder: 'rgba(255,255,255,0.12)',
-  inputBg: 'rgba(255,255,255,0.08)',
-  inputBorder: 'rgba(255,255,255,0.12)',
   accent: '#FF7622',
   gold: '#D4AF37',
-  heading: '#FFFFFF',
-  body: 'rgba(255,255,255,0.9)',
-  muted: 'rgba(255,255,255,0.5)',
-  placeholder: 'rgba(255,255,255,0.3)',
   error: '#FF6B6B',
   google: '#EA4335',
-  apple: '#FFFFFF',
 };
 
 const SPACING = { xs: 8, sm: 12, md: 16, lg: 24, xl: 32 };
-const RADIUS = { input: 14, button: 16, segment: 14, segmentPill: 12, card: 24, back: 22, social: 28 };
+const RADIUS = { input: 16, button: 16, segment: 14, segmentPill: 12, card: 24, back: 22, social: 16 };
 
-// ─── Floating Particle ────────────────────────────────────
+const ASANKARY_LOGO = require('../../../assets/images/asankarylogo.png');
+
+// ─── Floating Particle (preserved animation) ─────────────────
 const FloatingParticle = ({ delay, x, size, duration }: { delay: number; x: number; size: number; duration: number }) => {
   const translateY = useSharedValue(SCREEN_HEIGHT + 20);
   const opacity = useSharedValue(0);
@@ -94,8 +87,8 @@ const FloatingParticle = ({ delay, x, size, duration }: { delay: number; x: numb
   );
 };
 
-// ─── Animated Input Wrapper ──────────────────────────────
-const AnimatedInputWrapper = ({ children, isFocused }: { children: React.ReactNode; isFocused: boolean }) => {
+// ─── Animated Input Wrapper (preserved focus animation) ──────
+const AnimatedInputWrapper = ({ children, isFocused, borderColor = 'rgba(255,255,255,0.12)' }: { children: React.ReactNode; isFocused: boolean; borderColor?: string }) => {
   const focusProgress = useSharedValue(0);
   const glowScale = useSharedValue(1);
   const glowOpacity = useSharedValue(0);
@@ -111,11 +104,11 @@ const AnimatedInputWrapper = ({ children, isFocused }: { children: React.ReactNo
   }));
 
   const glowBorderStyle = useAnimatedStyle(() => ({
-    borderColor: interpolateColor(focusProgress.value, [0, 1], ['rgba(255,255,255,0.12)', 'rgba(255,118,34,0.6)']),
+    borderColor: interpolateColor(focusProgress.value, [0, 1], [borderColor, 'rgba(255,118,34,0.65)']),
     borderWidth: 1.5,
     shadowColor: '#FF7622',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: focusProgress.value * 0.4,
+    shadowOpacity: focusProgress.value * 0.35,
     shadowRadius: focusProgress.value * 12,
   }));
 
@@ -125,7 +118,7 @@ const AnimatedInputWrapper = ({ children, isFocused }: { children: React.ReactNo
 
   return (
     <Animated.View style={wrapperStyle}>
-      <Animated.View style={[{ borderRadius: 16, overflow: 'hidden' }, glowBorderStyle]}>
+      <Animated.View style={[{ borderRadius: RADIUS.input, overflow: 'hidden' }, glowBorderStyle]}>
         <Animated.View
           style={[
             {
@@ -148,21 +141,21 @@ const AnimatedInputWrapper = ({ children, isFocused }: { children: React.ReactNo
 };
 
 // ─── Email Input with Focus Animation ────────────────────
-const RegisterEmailInput = ({ email, setEmail, setErrorMessage, t }: any) => {
+const RegisterEmailInput = ({ email, setEmail, setErrorMessage, t, theme, isRTL }: any) => {
   const [isFocused, setIsFocused] = useState(false);
 
   return (
-    <View style={regEmailStyles.group}>
-      <AppText style={regEmailStyles.label}>
+    <View style={{ marginBottom: SPACING.md }}>
+      <AppText style={[regInputStyles.label, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
         {t('auth.emailAddress', { defaultValue: 'Email Address' })}
       </AppText>
-      <AnimatedInputWrapper isFocused={isFocused}>
-        <View style={regEmailStyles.wrapper}>
-          <Ionicons name="mail-outline" size={18} color={isFocused ? LUX.accent : LUX.placeholder} style={{ marginRight: 12 }} />
+      <AnimatedInputWrapper isFocused={isFocused} borderColor={theme.colors.border}>
+        <View style={[regInputStyles.wrapper, { backgroundColor: theme.colors.background, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+          <Ionicons name="mail-outline" size={20} color={isFocused ? LUX.accent : theme.colors.placeholder} />
           <TextInput allowFontScaling={false}
-            style={regEmailStyles.input}
+            style={[regInputStyles.input, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}
             placeholder="example@gmail.com"
-            placeholderTextColor={LUX.placeholder}
+            placeholderTextColor={theme.colors.placeholder}
             value={email}
             onChangeText={(text: string) => { setEmail(text); setErrorMessage(''); }}
             keyboardType="email-address"
@@ -177,28 +170,23 @@ const RegisterEmailInput = ({ email, setEmail, setErrorMessage, t }: any) => {
   );
 };
 
-const regEmailStyles = StyleSheet.create({
-  group: { marginBottom: SPACING.md },
+const regInputStyles = StyleSheet.create({
   label: {
-    color: LUX.muted,
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: '600',
     letterSpacing: 0.3,
     marginBottom: SPACING.xs,
-    textTransform: 'uppercase',
   },
   wrapper: {
     alignItems: 'center',
-    backgroundColor: LUX.inputBg,
-    flexDirection: 'row',
-    height: 56,
+    gap: 10,
+    height: 58,
     paddingHorizontal: SPACING.md,
   },
   input: {
-    color: LUX.body,
     flex: 1,
     fontSize: 16,
-    height: 40,
+    height: 42,
     includeFontPadding: false,
     paddingVertical: 0,
     textAlignVertical: 'center',
@@ -206,15 +194,15 @@ const regEmailStyles = StyleSheet.create({
 });
 
 // ─── Phone Input with Focus Animation ────────────────────
-const RegisterPhoneAnimated = ({ phone, setPhone, setErrorMessage, setSelectedCountry, defaultCountry, t }: any) => {
+const RegisterPhoneAnimated = ({ phone, setPhone, setErrorMessage, setSelectedCountry, defaultCountry, t, theme, isRTL }: any) => {
   const [isFocused, setIsFocused] = useState(false);
 
   return (
     <View style={{ marginBottom: SPACING.md }}>
-      <AppText style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: '500', letterSpacing: 0.3, marginBottom: 8, textTransform: 'uppercase' as const }}>
+      <AppText style={[regInputStyles.label, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
         {t('auth.phoneNumber', { defaultValue: 'Phone Number' })}
       </AppText>
-      <AnimatedInputWrapper isFocused={isFocused}>
+      <AnimatedInputWrapper isFocused={isFocused} borderColor={theme.colors.border}>
         <PhoneInput
           value={phone}
           onChangeText={(text: string) => { setPhone(text); setErrorMessage(''); }}
@@ -231,10 +219,13 @@ const RegisterPhoneAnimated = ({ phone, setPhone, setErrorMessage, setSelectedCo
 const RegisterScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<any>();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
   const userRegion = useUserRegion();
   const { signInWithApple, isAppleAvailable } = useAuth();
+  const { theme } = useTheme();
+
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
 
   const initialMethod = route.params?.method || 'phone';
   const initialEmail = route.params?.email || '';
@@ -363,19 +354,48 @@ const RegisterScreen: React.FC = () => {
     { delay: 0, x: SCREEN_WIDTH * 0.7, size: 2, duration: 12000 },
   ];
 
-  return (
-    <View style={styles.container}>
-      <LinearGradient
-        colors={[LUX.gradientStart, LUX.gradientMid, LUX.gradientEnd]}
-        style={StyleSheet.absoluteFill}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-      />
+  const rowDir = isRTL ? 'row-reverse' : 'row';
 
-      <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        {particles.map((p, i) => (
-          <FloatingParticle key={i} {...p} />
-        ))}
+  return (
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      {/* ── Amber Hero Band ── */}
+      <View style={[styles.hero, { paddingTop: insets.top + SPACING.sm }]}>
+        <LinearGradient
+          colors={[theme.colors.primary, theme.colors.accent]}
+          style={StyleSheet.absoluteFill}
+          start={{ x: 0.1, y: 0 }}
+          end={{ x: 0.9, y: 1 }}
+        />
+
+        {/* Floating particles (confined to the amber hero) */}
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          {particles.map((p, i) => (
+            <FloatingParticle key={i} {...p} />
+          ))}
+        </View>
+
+        {/* Back button */}
+        <Animated.View
+          entering={FadeIn.duration(400)}
+          style={[styles.backRow, { flexDirection: rowDir }]}
+        >
+          <TouchableOpacity style={styles.backButton} onPress={handleBack} activeOpacity={0.7}>
+            <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={22} color="#FFFFFF" />
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* Brand medallion */}
+        <Animated.View entering={FadeInDown.duration(600).delay(150)} style={styles.heroContent}>
+          <View style={[styles.logoMedallion, { backgroundColor: theme.colors.surface }]}>
+            <Image source={ASANKARY_LOGO} style={styles.logoImage} contentFit="contain" />
+          </View>
+          <Animated.Text allowFontScaling={false} entering={SlideInLeft.duration(500).delay(280)} style={styles.heroTitle}>
+            {t('auth.createAccount', { defaultValue: 'Create account' })}
+          </Animated.Text>
+          <Animated.Text allowFontScaling={false} entering={FadeIn.duration(500).delay(360)} style={styles.heroSubtitle}>
+            {t('auth.createAccountSubtitle', { defaultValue: 'Start with your phone or email.' })}
+          </Animated.Text>
+        </Animated.View>
       </View>
 
       <KeyboardAvoidingView
@@ -383,63 +403,42 @@ const RegisterScreen: React.FC = () => {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
-          contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 16, paddingBottom: 40 + insets.bottom }]}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: 40 + insets.bottom }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Back Button */}
-          <Animated.View entering={FadeIn.duration(400)}>
-            <TouchableOpacity style={styles.backButton} onPress={handleBack} activeOpacity={0.7}>
-              <Ionicons name="chevron-back" size={20} color={LUX.body} />
-            </TouchableOpacity>
-          </Animated.View>
-
-          {/* User icon */}
-          <Animated.View entering={FadeInDown.duration(600).delay(200)} style={styles.iconArea}>
-            <View style={styles.userCircle}>
-              <Ionicons name="person-add" size={32} color={LUX.accent} />
-            </View>
-          </Animated.View>
-
-          {/* Title */}
-          <Animated.Text allowFontScaling={false} entering={SlideInLeft.duration(500).delay(300)} style={styles.title}>
-            {t('auth.createAccount', { defaultValue: 'Create account' })}
-          </Animated.Text>
-          <Animated.Text allowFontScaling={false} entering={FadeIn.duration(500).delay(400)} style={styles.subtitle}>
-            {t('auth.createAccountSubtitle', { defaultValue: 'Start with your phone or email.' })}
-          </Animated.Text>
-
-          {/* Glass Card */}
-          <Animated.View entering={FadeInUp.duration(600).delay(400).springify().damping(14)} style={styles.glassCard}>
+          {/* ── Floating Card ── */}
+          <Animated.View
+            entering={FadeInUp.duration(600).delay(300).springify().damping(14)}
+            style={[styles.glassCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.border, shadowColor: theme.colors.shadow }]}
+          >
             {/* Segmented Control */}
-            <View style={styles.segmentContainer}>
+            <View style={[styles.segmentContainer, { backgroundColor: theme.colors.background, flexDirection: rowDir }]}>
               <TouchableOpacity
-                style={[styles.segmentButton, registerMethod === 'phone' && styles.segmentButtonActive]}
+                style={[styles.segmentButton, { flexDirection: rowDir }, registerMethod === 'phone' && { backgroundColor: theme.colors.primary }]}
                 onPress={() => { setRegisterMethod('phone'); setErrorMessage(''); }}
                 activeOpacity={0.8}
               >
                 <Ionicons
                   name="call-outline"
                   size={16}
-                  color={registerMethod === 'phone' ? '#fff' : LUX.muted}
-                  style={{ marginRight: 6 }}
+                  color={registerMethod === 'phone' ? theme.colors.textOnPrimary : theme.colors.textSecondary}
                 />
-                <AppText style={[styles.segmentText, registerMethod === 'phone' && styles.segmentTextActive]}>
+                <AppText style={[styles.segmentText, { color: registerMethod === 'phone' ? theme.colors.textOnPrimary : theme.colors.textSecondary }]}>
                   {t('auth.phone', { defaultValue: 'Phone' })}
                 </AppText>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.segmentButton, registerMethod === 'email' && styles.segmentButtonActive]}
+                style={[styles.segmentButton, { flexDirection: rowDir }, registerMethod === 'email' && { backgroundColor: theme.colors.primary }]}
                 onPress={() => { setRegisterMethod('email'); setErrorMessage(''); }}
                 activeOpacity={0.8}
               >
                 <Ionicons
                   name="mail-outline"
                   size={16}
-                  color={registerMethod === 'email' ? '#fff' : LUX.muted}
-                  style={{ marginRight: 6 }}
+                  color={registerMethod === 'email' ? theme.colors.textOnPrimary : theme.colors.textSecondary}
                 />
-                <AppText style={[styles.segmentText, registerMethod === 'email' && styles.segmentTextActive]}>
+                <AppText style={[styles.segmentText, { color: registerMethod === 'email' ? theme.colors.textOnPrimary : theme.colors.textSecondary }]}>
                   {t('auth.email', { defaultValue: 'Email' })}
                 </AppText>
               </TouchableOpacity>
@@ -454,6 +453,8 @@ const RegisterScreen: React.FC = () => {
                 setSelectedCountry={setSelectedCountry}
                 defaultCountry={userRegion}
                 t={t}
+                theme={theme}
+                isRTL={isRTL}
               />
             ) : (
               <RegisterEmailInput
@@ -461,29 +462,33 @@ const RegisterScreen: React.FC = () => {
                 setEmail={setEmail}
                 setErrorMessage={setErrorMessage}
                 t={t}
+                theme={theme}
+                isRTL={isRTL}
               />
             )}
 
             {/* Error */}
-            {!!errorMessage && <AppText style={styles.errorText}>{errorMessage}</AppText>}
+            {!!errorMessage && (
+              <AppText style={[styles.errorText, { textAlign: isRTL ? 'right' : 'left' }]}>{errorMessage}</AppText>
+            )}
 
             {/* Continue Button */}
             <TouchableOpacity
-              style={[styles.primaryButton, isDisabled && styles.primaryButtonDisabled]}
+              style={[styles.primaryButton, { shadowColor: theme.colors.primary }, isDisabled && styles.primaryButtonDisabled]}
               onPress={handleContinue}
               disabled={isDisabled}
               activeOpacity={0.85}
             >
               <LinearGradient
-                colors={['#FF8C3A', '#FF7622', '#FF5C00']}
+                colors={[theme.colors.primary, theme.colors.accent]}
                 style={styles.primaryButtonGradient}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
               >
                 {loading ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color={theme.colors.textOnPrimary} />
                 ) : (
-                  <AppText style={styles.primaryButtonText}>
+                  <AppText style={[styles.primaryButtonText, { color: theme.colors.textOnPrimary }]}>
                     {t('auth.continue', { defaultValue: 'Continue' })}
                   </AppText>
                 )}
@@ -493,32 +498,60 @@ const RegisterScreen: React.FC = () => {
 
           {/* ── Divider ── */}
           <Animated.View entering={FadeIn.duration(400).delay(600)} style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
-            <AppText style={styles.dividerText}>{t('common.or', { defaultValue: 'or' })}</AppText>
-            <View style={styles.dividerLine} />
+            <View style={[styles.dividerLine, { backgroundColor: theme.colors.border }]} />
+            <AppText style={[styles.dividerText, { color: theme.colors.textSecondary }]}>{t('common.or', { defaultValue: 'or' })}</AppText>
+            <View style={[styles.dividerLine, { backgroundColor: theme.colors.border }]} />
           </Animated.View>
 
-          {/* ── Social sign-up ── */}
-          <Animated.View entering={FadeInDown.duration(600).delay(650)} style={styles.socialRow}>
+          {/* ── Social sign-up (bordered pill rows) ── */}
+          <Animated.View entering={FadeInDown.duration(600).delay(650)} style={styles.socialCol}>
             {isGoogleSignInAvailable() && (
-              <TouchableOpacity style={[styles.socialButton, { backgroundColor: LUX.google }]} onPress={handleGoogleSignIn} disabled={googleLoading || appleLoading} activeOpacity={0.85}>
-                {googleLoading ? <ActivityIndicator color="#fff" size="small" /> : <AppText style={styles.socialIcon}>G</AppText>}
+              <TouchableOpacity
+                style={[styles.socialButton, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, flexDirection: rowDir }]}
+                onPress={handleGoogleSignIn}
+                disabled={googleLoading || appleLoading}
+                activeOpacity={0.85}
+              >
+                {googleLoading ? (
+                  <ActivityIndicator color={theme.colors.primary} size="small" />
+                ) : (
+                  <>
+                    <Ionicons name="logo-google" size={20} color={LUX.google} />
+                    <AppText style={[styles.socialText, { color: theme.colors.text }]}>
+                      {t('auth.continueWithGoogle', { defaultValue: 'Continue with Google' })}
+                    </AppText>
+                  </>
+                )}
               </TouchableOpacity>
             )}
             {Platform.OS === 'ios' && isAppleAvailable && (
-              <TouchableOpacity style={[styles.socialButton, { backgroundColor: LUX.apple }]} onPress={handleAppleSignIn} disabled={googleLoading || appleLoading} activeOpacity={0.85}>
-                {appleLoading ? <ActivityIndicator color="#000" size="small" /> : <Ionicons name="logo-apple" size={22} color="#000" />}
+              <TouchableOpacity
+                style={[styles.socialButton, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, flexDirection: rowDir }]}
+                onPress={handleAppleSignIn}
+                disabled={googleLoading || appleLoading}
+                activeOpacity={0.85}
+              >
+                {appleLoading ? (
+                  <ActivityIndicator color={theme.colors.text} size="small" />
+                ) : (
+                  <>
+                    <Ionicons name="logo-apple" size={22} color={theme.colors.text} />
+                    <AppText style={[styles.socialText, { color: theme.colors.text }]}>
+                      {t('auth.continueWithApple', { defaultValue: 'Continue with Apple' })}
+                    </AppText>
+                  </>
+                )}
               </TouchableOpacity>
             )}
           </Animated.View>
 
           {/* Sign In link */}
-          <Animated.View entering={FadeIn.duration(400).delay(700)}>
-            <TouchableOpacity onPress={handleSignIn} style={styles.quietLinkRow} activeOpacity={0.6}>
-              <AppText style={styles.quietText}>
+          <Animated.View entering={FadeIn.duration(400).delay(750)}>
+            <TouchableOpacity onPress={handleSignIn} style={[styles.quietLinkRow, { flexDirection: rowDir }]} activeOpacity={0.6}>
+              <AppText style={[styles.quietText, { color: theme.colors.textSecondary }]}>
                 {t('auth.haveAccount', { defaultValue: 'Already have an account?' })}{' '}
               </AppText>
-              <AppText style={styles.quietLink}>
+              <AppText style={[styles.quietLink, { color: theme.colors.primary }]}>
                 {t('auth.signIn', { defaultValue: 'Sign in' })}
               </AppText>
             </TouchableOpacity>
@@ -530,79 +563,87 @@ const RegisterScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  dividerRow: { alignItems: 'center', flexDirection: 'row', marginVertical: SPACING.lg },
-  dividerLine: { backgroundColor: LUX.glassBorder, flex: 1, height: 1 },
-  dividerText: { color: LUX.muted, fontSize: 13, marginHorizontal: SPACING.md, paddingHorizontal: 6, textAlign: 'center' },
-  socialRow: { flexDirection: 'row', gap: SPACING.md, justifyContent: 'center' },
-  socialButton: { alignItems: 'center', borderRadius: RADIUS.social, height: 56, justifyContent: 'center', width: 56 },
-  socialIcon: { color: '#FFFFFF', fontSize: 20, fontWeight: '700' },
   container: {
-    backgroundColor: LUX.gradientStart,
     flex: 1,
   },
-  scrollContent: {
+
+  // ── Hero ──
+  hero: {
+    borderBottomLeftRadius: 34,
+    borderBottomRightRadius: 34,
+    overflow: 'hidden',
+    paddingBottom: SPACING.xl + SPACING.md,
     paddingHorizontal: SPACING.lg,
   },
-
-  // Back
+  backRow: {
+    marginBottom: SPACING.sm,
+  },
   backButton: {
     alignItems: 'center',
-    backgroundColor: LUX.glass,
-    borderColor: LUX.glassBorder,
+    backgroundColor: 'rgba(255,255,255,0.22)',
     borderRadius: RADIUS.back,
-    borderWidth: 1,
     height: 44,
     justifyContent: 'center',
-    marginBottom: SPACING.xl,
     width: 44,
   },
-
-  // Icon
-  iconArea: {
+  heroContent: {
     alignItems: 'center',
-    marginBottom: SPACING.lg,
   },
-  userCircle: {
+  logoMedallion: {
     alignItems: 'center',
-    backgroundColor: LUX.glass,
-    borderColor: LUX.glassBorder,
-    borderRadius: 40,
-    borderWidth: 1,
-    height: 80,
+    borderRadius: 48,
+    elevation: 8,
+    height: 96,
     justifyContent: 'center',
-    width: 80,
+    marginBottom: SPACING.md,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    width: 96,
   },
-
-  // Typography
-  title: {
-    color: LUX.heading,
-    fontSize: 30,
+  logoImage: {
+    height: 58,
+    width: 58,
+  },
+  heroTitle: {
+    color: '#FFFFFF',
+    fontSize: 28,
     fontWeight: '800',
-    letterSpacing: -0.5,
-    marginBottom: SPACING.xs,
+    letterSpacing: -0.4,
+    marginBottom: 4,
+    textAlign: 'center',
   },
-  subtitle: {
-    color: LUX.muted,
+  heroSubtitle: {
+    color: 'rgba(255,255,255,0.92)',
     fontSize: 15,
     lineHeight: 22,
-    marginBottom: SPACING.lg,
+    maxWidth: 300,
+    textAlign: 'center',
   },
 
-  // Glass Card
+  // ── Scroll body ──
+  scrollContent: {
+    paddingHorizontal: SPACING.lg,
+    paddingTop: 0,
+  },
+
+  // ── Floating Card ──
   glassCard: {
-    backgroundColor: LUX.glass,
-    borderColor: LUX.glassBorder,
     borderRadius: RADIUS.card,
     borderWidth: 1,
+    elevation: 6,
     marginBottom: SPACING.lg,
+    marginTop: -SPACING.xl,
     padding: SPACING.lg,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
   },
 
-  // Segmented Control
+  // ── Segmented Control ──
   segmentContainer: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: RADIUS.segment,
-    flexDirection: 'row',
     marginBottom: SPACING.lg,
     padding: 4,
   },
@@ -610,55 +651,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: RADIUS.segmentPill,
     flex: 1,
-    flexDirection: 'row',
+    gap: 6,
     justifyContent: 'center',
     paddingVertical: 12,
   },
-  segmentButtonActive: {
-    backgroundColor: LUX.accent,
-  },
   segmentText: {
-    color: LUX.muted,
     fontSize: 13,
-    fontWeight: '600',
-  },
-  segmentTextActive: {
-    color: '#FFFFFF',
+    fontWeight: '700',
   },
 
-  // Input
-  inputGroup: {
-    marginBottom: SPACING.md,
-  },
-  label: {
-    color: LUX.muted,
-    fontSize: 13,
-    fontWeight: '500',
-    letterSpacing: 0.3,
-    marginBottom: SPACING.xs,
-    textTransform: 'uppercase',
-  },
-  inputWrapper: {
-    alignItems: 'center',
-    backgroundColor: LUX.inputBg,
-    borderColor: LUX.inputBorder,
-    borderRadius: RADIUS.input,
-    borderWidth: 1,
-    flexDirection: 'row',
-    height: 56,
-    paddingHorizontal: SPACING.md,
-  },
-  input: {
-    color: LUX.body,
-    flex: 1,
-    fontSize: 16,
-    height: 40,
-    includeFontPadding: false,
-    paddingVertical: 0,
-    textAlignVertical: 'center',
-  },
-
-  // Error
+  // ── Error ──
   errorText: {
     color: LUX.error,
     fontSize: 13,
@@ -667,10 +669,14 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
 
-  // Primary Button
+  // ── Primary Button ──
   primaryButton: {
     borderRadius: RADIUS.button,
+    elevation: 6,
     overflow: 'hidden',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.32,
+    shadowRadius: 12,
   },
   primaryButtonDisabled: {
     opacity: 0.55,
@@ -678,31 +684,62 @@ const styles = StyleSheet.create({
   primaryButtonGradient: {
     alignItems: 'center',
     borderRadius: RADIUS.button,
-    height: 54,
+    height: 56,
     justifyContent: 'center',
   },
   primaryButtonText: {
-    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 0.3,
   },
 
-  // Links
-  quietLinkRow: {
+  // ── Divider ──
+  dividerRow: {
     alignItems: 'center',
     flexDirection: 'row',
+    marginVertical: SPACING.lg,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+  },
+  dividerText: {
+    fontSize: 13,
+    marginHorizontal: SPACING.md,
+    paddingHorizontal: 6,
+    textAlign: 'center',
+  },
+
+  // ── Social ──
+  socialCol: {
+    gap: SPACING.sm,
+  },
+  socialButton: {
+    alignItems: 'center',
+    borderRadius: RADIUS.social,
+    borderWidth: 1,
+    gap: 10,
+    height: 56,
     justifyContent: 'center',
+  },
+  socialText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+
+  // ── Links ──
+  quietLinkRow: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: SPACING.lg,
     paddingVertical: SPACING.xs,
   },
   quietText: {
-    color: LUX.muted,
     fontSize: 14,
   },
   quietLink: {
-    color: LUX.accent,
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });
 

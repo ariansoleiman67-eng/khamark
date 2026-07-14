@@ -577,7 +577,7 @@ export const NotificationsScreen: React.FC = () => {
                   case 'order': return '#FF9800';
                   case 'promo': return '#9C27B0';
                   case 'system': return '#03A9F4';
-                  default: return '#FF5000'; // Alibaba Orange for 'All'
+                  default: return theme.colors.primary; // brand amber for 'All'
                 }
               };
 

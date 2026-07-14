@@ -1,5 +1,5 @@
 /* eslint-disable react-native/no-inline-styles, react-native/no-color-literals */
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   TextInput,
@@ -13,6 +13,7 @@ import {
   Dimensions,
   Modal,
   StatusBar,
+  I18nManager,
 } from 'react-native';
 import AppText from '../../components/AppText';
 import { Ionicons } from '@expo/vector-icons';
@@ -47,6 +48,7 @@ import {
 } from '../../services/auth';
 import { PhoneAuthService } from '../../services/phoneAuthService';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../components/ThemeProvider';
 import { RootStackParamList } from '../../types';
 import PhoneInput from '../../components/PhoneInput';
 import { getCountryInfo, CountryCode } from '../../utils/phoneUtils';
@@ -58,46 +60,22 @@ type LoginMethod = 'phone' | 'email';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// ─── Luxury Dark Design Tokens ──────────────────────────
+// ─── Static Design Tokens (theme colours come from useTheme) ─────────────
 const LUX = {
-  // Gradient backgrounds
-  gradientStart: '#0A0E27',
-  gradientMid: '#10143A',
-  gradientEnd: '#1A0B3E',
-
-  // Surfaces
-  glass: 'rgba(255,255,255,0.07)',
-  glassBorder: 'rgba(255,255,255,0.12)',
-  inputBg: 'rgba(255,255,255,0.08)',
-  inputBorder: 'rgba(255,255,255,0.12)',
-  inputFocus: 'rgba(255,118,34,0.3)',
-
-  // Brand
-  accent: '#FF7622',
-  accentGlow: 'rgba(255,118,34,0.25)',
-  gold: '#D4AF37',
-  goldSoft: 'rgba(212,175,55,0.15)',
-
-  // Text
-  heading: '#FFFFFF',
-  body: 'rgba(255,255,255,0.9)',
-  muted: 'rgba(255,255,255,0.5)',
-  placeholder: 'rgba(255,255,255,0.3)',
-
-  // Feedback
-  error: '#FF6B6B',
-
-  // Socials
-  google: '#EA4335',
-  facebook: '#1877F2',
-  apple: '#FFFFFF',
+  gold: 'rgba(255,255,255,0.55)',
 };
 
 const SPACING = { xs: 8, sm: 12, md: 16, lg: 24, xl: 32 };
-const RADIUS = { input: 14, button: 16, segment: 14, segmentPill: 12, card: 24, social: 28 };
+const RADIUS = { input: 16, button: 16, segment: 14, segmentPill: 11, card: 26, social: 14, coin: 30 };
 
 // ─── Floating Particle Component ─────────────────────────
-const FloatingParticle = ({ delay, x, size, duration }: { delay: number; x: number; size: number; duration: number }) => {
+const FloatingParticle = ({
+  delay,
+  x,
+  size,
+  duration,
+  color = LUX.gold,
+}: { delay: number; x: number; size: number; duration: number; color?: string }) => {
   const translateY = useSharedValue(SCREEN_HEIGHT + 20);
   const opacity = useSharedValue(0);
 
@@ -138,7 +116,7 @@ const FloatingParticle = ({ delay, x, size, duration }: { delay: number; x: numb
           width: size,
           height: size,
           borderRadius: size / 2,
-          backgroundColor: LUX.gold,
+          backgroundColor: color,
         },
         animatedStyle,
       ]}
@@ -146,8 +124,13 @@ const FloatingParticle = ({ delay, x, size, duration }: { delay: number; x: numb
   );
 };
 
-// ─── Animated Input Wrapper (luxury focus effects) ─────────
-const AnimatedInputWrapper = ({ children, isFocused }: { children: React.ReactNode; isFocused: boolean }) => {
+// ─── Animated Input Wrapper (premium focus glow, theme-aware) ─────────
+const AnimatedInputWrapper = ({
+  children,
+  isFocused,
+  colors,
+  fill,
+}: { children: React.ReactNode; isFocused: boolean; colors: any; fill: string }) => {
   const focusProgress = useSharedValue(0);
   const glowScale = useSharedValue(1);
   const glowOpacity = useSharedValue(0);
@@ -163,11 +146,11 @@ const AnimatedInputWrapper = ({ children, isFocused }: { children: React.ReactNo
   }));
 
   const glowBorderStyle = useAnimatedStyle(() => ({
-    borderColor: interpolateColor(focusProgress.value, [0, 1], ['rgba(255,255,255,0.12)', 'rgba(255,118,34,0.6)']),
+    borderColor: interpolateColor(focusProgress.value, [0, 1], [colors.border, colors.primary]),
     borderWidth: 1.5,
-    shadowColor: '#FF7622',
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: focusProgress.value * 0.4,
+    shadowOpacity: focusProgress.value * 0.35,
     shadowRadius: focusProgress.value * 12,
   }));
 
@@ -177,8 +160,8 @@ const AnimatedInputWrapper = ({ children, isFocused }: { children: React.ReactNo
 
   return (
     <Animated.View style={wrapperStyle}>
-      <Animated.View style={[{ borderRadius: 16, overflow: 'hidden' }, glowBorderStyle]}>
-        {/* Orange glow bar at top */}
+      <Animated.View style={[{ borderRadius: RADIUS.input, overflow: 'hidden', backgroundColor: fill }, glowBorderStyle]}>
+        {/* Amber glow bar at top */}
         <Animated.View
           style={[
             {
@@ -187,7 +170,7 @@ const AnimatedInputWrapper = ({ children, isFocused }: { children: React.ReactNo
               left: '15%',
               right: '15%',
               height: 2,
-              backgroundColor: LUX.accent,
+              backgroundColor: colors.primary,
               borderRadius: 1,
               zIndex: 10,
             },
@@ -201,22 +184,53 @@ const AnimatedInputWrapper = ({ children, isFocused }: { children: React.ReactNo
 };
 
 // ─── Email Input with Focus Animation ────────────────────
-const EmailInput = ({ email, setEmail, setErrorMessage, t }: any) => {
+const EmailInput = ({ email, setEmail, setErrorMessage, t, colors, isRTL, inputBg }: any) => {
   const [isFocused, setIsFocused] = useState(false);
 
   return (
-    <View style={emailInputStyles.group}>
-      <AppText style={emailInputStyles.label}>
+    <View style={{ marginBottom: SPACING.md }}>
+      <AppText
+        style={{
+          color: colors.textSecondary,
+          fontSize: 12.5,
+          fontWeight: '600',
+          letterSpacing: 0.4,
+          marginBottom: SPACING.xs,
+          textAlign: isRTL ? 'right' : 'left',
+          textTransform: 'uppercase',
+        }}
+      >
         {t('auth.emailAddress', { defaultValue: 'Email Address' })}
       </AppText>
-      <AnimatedInputWrapper isFocused={isFocused}>
-        <View style={emailInputStyles.wrapper}>
-          <Ionicons name="mail-outline" size={18} color={isFocused ? LUX.accent : LUX.placeholder} style={{ marginRight: 12 }} />
+      <AnimatedInputWrapper isFocused={isFocused} colors={colors} fill={inputBg}>
+        <View
+          style={{
+            alignItems: 'center',
+            flexDirection: isRTL ? 'row-reverse' : 'row',
+            height: 58,
+            paddingHorizontal: SPACING.md,
+          }}
+        >
+          <Ionicons
+            name="mail-outline"
+            size={20}
+            color={isFocused ? colors.primary : colors.placeholder}
+            style={{ marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }}
+          />
           <TextInput
             allowFontScaling={false}
-            style={emailInputStyles.input}
+            style={{
+              color: colors.text,
+              flex: 1,
+              fontSize: 16,
+              height: 40,
+              includeFontPadding: false,
+              paddingVertical: 0,
+              textAlign: isRTL ? 'right' : 'left',
+              textAlignVertical: 'center',
+            }}
             placeholder="example@gmail.com"
-            placeholderTextColor={LUX.placeholder}
+            placeholderTextColor={colors.placeholder}
             value={email}
             onChangeText={(text: string) => { setEmail(text); setErrorMessage(''); }}
             keyboardType="email-address"
@@ -231,44 +245,26 @@ const EmailInput = ({ email, setEmail, setErrorMessage, t }: any) => {
   );
 };
 
-const emailInputStyles = StyleSheet.create({
-  group: { marginBottom: SPACING.md },
-  label: {
-    color: LUX.muted,
-    fontSize: 13,
-    fontWeight: '500',
-    letterSpacing: 0.3,
-    marginBottom: SPACING.xs,
-    textTransform: 'uppercase',
-  },
-  wrapper: {
-    alignItems: 'center',
-    backgroundColor: LUX.inputBg,
-    flexDirection: 'row',
-    height: 56,
-    paddingHorizontal: SPACING.md,
-  },
-  input: {
-    color: LUX.body,
-    flex: 1,
-    fontSize: 16,
-    height: 40,
-    includeFontPadding: false,
-    paddingVertical: 0,
-    textAlignVertical: 'center',
-  },
-});
-
 // ─── Phone Input with Focus Animation ────────────────────
-const PhoneInputAnimated = ({ phone, setPhone, setErrorMessage, setSelectedCountry, defaultCountry, t }: any) => {
+const PhoneInputAnimated = ({ phone, setPhone, setErrorMessage, setSelectedCountry, defaultCountry, t, colors, isRTL, inputBg }: any) => {
   const [isFocused, setIsFocused] = useState(false);
 
   return (
     <View style={{ marginBottom: SPACING.md }}>
-      <AppText style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: '500', letterSpacing: 0.3, marginBottom: 8, textTransform: 'uppercase' as const }}>
+      <AppText
+        style={{
+          color: colors.textSecondary,
+          fontSize: 12.5,
+          fontWeight: '600',
+          letterSpacing: 0.4,
+          marginBottom: SPACING.xs,
+          textAlign: isRTL ? 'right' : 'left',
+          textTransform: 'uppercase' as const,
+        }}
+      >
         {t('auth.phoneNumber', { defaultValue: 'Phone Number' })}
       </AppText>
-      <AnimatedInputWrapper isFocused={isFocused}>
+      <AnimatedInputWrapper isFocused={isFocused} colors={colors} fill={inputBg}>
         <PhoneInput
           value={phone}
           onChangeText={(text: string) => { setPhone(text); setErrorMessage(''); }}
@@ -276,6 +272,7 @@ const PhoneInputAnimated = ({ phone, setPhone, setErrorMessage, setSelectedCount
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           defaultCountry={defaultCountry}
+          style={{ backgroundColor: 'transparent', borderWidth: 0, height: 58 }}
         />
       </AnimatedInputWrapper>
     </View>
@@ -283,15 +280,21 @@ const PhoneInputAnimated = ({ phone, setPhone, setErrorMessage, setSelectedCount
 };
 
 /**
- * Sign In Screen — Luxury Dark Theme
+ * Sign In Screen — Premium Amber Retail
  */
 const SignInScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<any>();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
   const { signInWithApple, isAppleAvailable } = useAuth();
+  const { theme, isDark } = useTheme();
   const userRegion = useUserRegion();
+
+  const colors = theme.colors as any;
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
+  const inputBg = isDark ? 'rgba(255,255,255,0.06)' : '#F1F1F4';
+  const styles = useMemo(() => createStyles(colors, isRTL, isDark), [colors, isRTL, isDark]);
 
   const isRequiredAuth = route.params?.requireAuth;
 
@@ -327,7 +330,7 @@ const SignInScreen: React.FC = () => {
             setEmail(credentials.email);
           } else {
             setLoginMethod('phone');
-            
+
             // Fix: remove country code from the saved phone if it starts with one,
             // otherwise the input will duplicate it when logging in next time.
             let savedPhone = credentials.email;
@@ -527,67 +530,70 @@ const SignInScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <LinearGradient
-        colors={[LUX.gradientStart, LUX.gradientMid, LUX.gradientEnd]}
-        style={StyleSheet.absoluteFill}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-      />
-
-      {/* Floating particles */}
-      <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        {particles.map((p, i) => (
-          <FloatingParticle key={i} {...p} />
-        ))}
-      </View>
+      <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
-          contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 20, paddingBottom: 40 + insets.bottom }]}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: 40 + insets.bottom }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* ── Logo ── */}
-          <Animated.View
-            entering={ZoomIn.duration(800).springify().damping(12)}
-            style={styles.logoArea}
+          {/* ── Amber Hero Band ── */}
+          <LinearGradient
+            colors={[colors.primaryVariant, colors.primary, colors.primaryDark]}
+            style={[styles.hero, { paddingTop: insets.top + SPACING.lg }]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
           >
-            <TouchableOpacity
-              onPress={handleTitleTap}
-              activeOpacity={1}
-              accessible={false}
-              style={styles.logoTouchable}
+            {/* Floating sparkles (clipped to hero) */}
+            <View style={StyleSheet.absoluteFill} pointerEvents="none">
+              {particles.map((p, i) => (
+                <FloatingParticle key={i} {...p} color="rgba(255,255,255,0.55)" />
+              ))}
+            </View>
+
+            {/* Logo coin */}
+            <Animated.View
+              entering={ZoomIn.duration(800).springify().damping(12)}
+              style={styles.logoArea}
             >
-              <View style={styles.logoCircle}>
-                <Image
-                  source={require('../../../assets/images/asankary-signin-logo.png')}
-                  style={styles.logoImage}
-                  contentFit="contain"
-                />
-              </View>
-            </TouchableOpacity>
-          </Animated.View>
+              <TouchableOpacity
+                onPress={handleTitleTap}
+                activeOpacity={1}
+                accessible={false}
+                style={styles.logoTouchable}
+              >
+                <View style={styles.logoCircle}>
+                  <Image
+                    source={require('../../../assets/images/asankarylogo.png')}
+                    style={styles.logoImage}
+                    contentFit="contain"
+                  />
+                </View>
+              </TouchableOpacity>
+            </Animated.View>
 
-          {/* ── Title ── */}
-          <Animated.Text
-            allowFontScaling={false}
-            entering={SlideInLeft.duration(600).delay(300)}
-            style={styles.title}
-          >
-            {t('auth.signIn', { defaultValue: 'Sign in' })}
-          </Animated.Text>
-          <Animated.Text
-            allowFontScaling={false}
-            entering={FadeIn.duration(600).delay(500)}
-            style={styles.subtitle}
-          >
-            {t('auth.signInSubtitle', { defaultValue: 'Continue with your phone or email.' })}
-          </Animated.Text>
+            {/* Title */}
+            <Animated.Text
+              allowFontScaling={false}
+              entering={SlideInLeft.duration(600).delay(300)}
+              style={styles.title}
+            >
+              {t('auth.signIn', { defaultValue: 'Sign in' })}
+            </Animated.Text>
+            <Animated.Text
+              allowFontScaling={false}
+              entering={FadeIn.duration(600).delay(500)}
+              style={styles.subtitle}
+            >
+              {t('auth.signInSubtitle', { defaultValue: 'Continue with your phone or email.' })}
+            </Animated.Text>
+          </LinearGradient>
 
-          {/* ── Glassmorphism Card ── */}
+          {/* ── Form Card (overlaps hero) ── */}
           <Animated.View
             entering={FadeInUp.duration(700).delay(400).springify().damping(14)}
             style={styles.glassCard}
@@ -602,8 +608,8 @@ const SignInScreen: React.FC = () => {
                 <Ionicons
                   name="call-outline"
                   size={16}
-                  color={loginMethod === 'phone' ? '#fff' : LUX.muted}
-                  style={{ marginRight: 6 }}
+                  color={loginMethod === 'phone' ? colors.textOnPrimary : colors.textSecondary}
+                  style={{ marginRight: isRTL ? 0 : 6, marginLeft: isRTL ? 6 : 0 }}
                 />
                 <AppText style={[styles.segmentText, loginMethod === 'phone' && styles.segmentTextActive]}>
                   {t('auth.phone', { defaultValue: 'Phone Number' })}
@@ -617,8 +623,8 @@ const SignInScreen: React.FC = () => {
                 <Ionicons
                   name="mail-outline"
                   size={16}
-                  color={loginMethod === 'email' ? '#fff' : LUX.muted}
-                  style={{ marginRight: 6 }}
+                  color={loginMethod === 'email' ? colors.textOnPrimary : colors.textSecondary}
+                  style={{ marginRight: isRTL ? 0 : 6, marginLeft: isRTL ? 6 : 0 }}
                 />
                 <AppText style={[styles.segmentText, loginMethod === 'email' && styles.segmentTextActive]}>
                   {t('auth.email', { defaultValue: 'Email Address' })}
@@ -635,6 +641,9 @@ const SignInScreen: React.FC = () => {
                 setSelectedCountry={setSelectedCountry}
                 defaultCountry={userRegion}
                 t={t}
+                colors={colors}
+                isRTL={isRTL}
+                inputBg={inputBg}
               />
             ) : (
               <EmailInput
@@ -642,6 +651,9 @@ const SignInScreen: React.FC = () => {
                 setEmail={setEmail}
                 setErrorMessage={setErrorMessage}
                 t={t}
+                colors={colors}
+                isRTL={isRTL}
+                inputBg={inputBg}
               />
             )}
 
@@ -658,7 +670,7 @@ const SignInScreen: React.FC = () => {
             >
               <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
                 {rememberMe && (
-                  <Ionicons name="checkmark" size={14} color="#fff" />
+                  <Ionicons name="checkmark" size={14} color={colors.textOnPrimary} />
                 )}
               </View>
               <AppText style={styles.rememberText}>
@@ -674,13 +686,13 @@ const SignInScreen: React.FC = () => {
               activeOpacity={0.85}
             >
               <LinearGradient
-                colors={['#FF8C3A', '#FF7622', '#FF5C00']}
+                colors={[colors.primary, colors.primaryDark]}
                 style={styles.primaryButtonGradient}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
               >
                 {loading ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color={colors.textOnPrimary} />
                 ) : (
                   <AppText style={styles.primaryButtonText}>
                     {t('auth.continue', { defaultValue: 'Continue' })}
@@ -716,48 +728,63 @@ const SignInScreen: React.FC = () => {
           </Animated.View>
 
           {/* ── Social Login ── */}
-          <Animated.View entering={FadeInDown.duration(600).delay(1000)} style={styles.socialRow}>
+          <Animated.View entering={FadeInDown.duration(600).delay(1000)} style={styles.socialColumn}>
             {isGoogleSignInAvailable() && (
               <TouchableOpacity
-                style={[styles.socialButton, { backgroundColor: LUX.google }]}
+                style={styles.socialButton}
                 onPress={handleGoogleSignIn}
                 disabled={isDisabled}
                 activeOpacity={0.85}
               >
                 {googleLoading ? (
-                  <ActivityIndicator color="#fff" size="small" />
+                  <ActivityIndicator color={colors.primary} size="small" />
                 ) : (
-                  <AppText style={styles.socialIcon}>G</AppText>
+                  <View style={styles.socialInner}>
+                    <Ionicons name="logo-google" size={20} color="#EA4335" style={{ marginRight: isRTL ? 0 : 10, marginLeft: isRTL ? 10 : 0 }} />
+                    <AppText style={styles.socialButtonText}>
+                      {t('auth.signInWithGoogle', { defaultValue: 'Continue with Google' })}
+                    </AppText>
+                  </View>
                 )}
               </TouchableOpacity>
             )}
 
             {false && isFacebookSignInAvailable() && (
               <TouchableOpacity
-                style={[styles.socialButton, { backgroundColor: LUX.facebook }]}
+                style={styles.socialButton}
                 onPress={handleFacebookSignIn}
                 disabled={isDisabled}
                 activeOpacity={0.85}
               >
                 {facebookLoading ? (
-                  <ActivityIndicator color="#fff" size="small" />
+                  <ActivityIndicator color={colors.primary} size="small" />
                 ) : (
-                  <Ionicons name="logo-facebook" size={22} color="#fff" />
+                  <View style={styles.socialInner}>
+                    <Ionicons name="logo-facebook" size={20} color="#1877F2" style={{ marginRight: isRTL ? 0 : 10, marginLeft: isRTL ? 10 : 0 }} />
+                    <AppText style={styles.socialButtonText}>
+                      {t('auth.signInWithFacebook', { defaultValue: 'Continue with Facebook' })}
+                    </AppText>
+                  </View>
                 )}
               </TouchableOpacity>
             )}
 
             {Platform.OS === 'ios' && isAppleAvailable && (
               <TouchableOpacity
-                style={[styles.socialButton, { backgroundColor: LUX.apple }]}
+                style={styles.socialButton}
                 onPress={handleAppleSignIn}
                 disabled={isDisabled}
                 activeOpacity={0.85}
               >
                 {appleLoading ? (
-                  <ActivityIndicator color="#000" size="small" />
+                  <ActivityIndicator color={colors.primary} size="small" />
                 ) : (
-                  <Ionicons name="logo-apple" size={22} color="#000" />
+                  <View style={styles.socialInner}>
+                    <Ionicons name="logo-apple" size={20} color={colors.text} style={{ marginRight: isRTL ? 0 : 10, marginLeft: isRTL ? 10 : 0 }} />
+                    <AppText style={styles.socialButtonText}>
+                      {t('auth.signInWithApple', { defaultValue: 'Continue with Apple' })}
+                    </AppText>
+                  </View>
                 )}
               </TouchableOpacity>
             )}
@@ -787,7 +814,7 @@ const SignInScreen: React.FC = () => {
         animationType="fade"
         onRequestClose={() => setShowLoginModal(false)}
       >
-        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill}>
+        <BlurView intensity={20} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill}>
           <View style={styles.modalOverlay}>
             <Animated.View
               entering={FadeInDown.duration(400).springify().damping(15)}
@@ -815,12 +842,12 @@ const SignInScreen: React.FC = () => {
                 activeOpacity={0.8}
               >
                 <LinearGradient
-                  colors={[LUX.accent, '#FF5C00']}
+                  colors={[colors.primary, colors.primaryDark]}
                   style={styles.modalButtonGradient}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                 >
-                  <Ionicons name="lock-closed-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
+                  <Ionicons name="lock-closed-outline" size={20} color={colors.textOnPrimary} style={{ marginRight: 8 }} />
                   <AppText style={styles.modalButtonText}>
                     {t('auth.withPassword', { defaultValue: 'Continue with Password' })}
                   </AppText>
@@ -838,7 +865,7 @@ const SignInScreen: React.FC = () => {
                 }}
                 activeOpacity={0.8}
               >
-                <Ionicons name="chatbubble-ellipses-outline" size={20} color={LUX.body} style={{ marginRight: 8 }} />
+                <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.text} style={{ marginRight: 8 }} />
                 <AppText style={styles.modalButtonSecondaryText}>
                   {t('auth.withOTP', { defaultValue: 'Send OTP Code' })}
                 </AppText>
@@ -865,14 +892,14 @@ const SignInScreen: React.FC = () => {
         animationType="fade"
         onRequestClose={() => setShowCreateAccountModal(false)}
       >
-        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill}>
+        <BlurView intensity={20} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill}>
           <View style={styles.modalOverlay}>
             <Animated.View
               entering={FadeInDown.duration(400).springify().damping(15)}
               style={styles.modalContent}
             >
               <View style={styles.modalIconCircle}>
-                <Ionicons name="person-add-outline" size={28} color={LUX.accent} />
+                <Ionicons name="person-add-outline" size={28} color={colors.primary} />
               </View>
               <AppText style={styles.modalTitle}>
                 {t('auth.accountNotFound', { defaultValue: 'Account Not Found' })}
@@ -890,7 +917,7 @@ const SignInScreen: React.FC = () => {
                 activeOpacity={0.8}
               >
                 <LinearGradient
-                  colors={[LUX.accent, '#FF5C00']}
+                  colors={[colors.primary, colors.primaryDark]}
                   style={styles.modalButtonGradient}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
@@ -919,20 +946,30 @@ const SignInScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any, isRTL: boolean, isDark: boolean) => StyleSheet.create({
   container: {
-    backgroundColor: LUX.gradientStart,
+    backgroundColor: colors.background,
     flex: 1,
   },
 
   scrollContent: {
+    flexGrow: 1,
+  },
+
+  // ── Hero ──
+  hero: {
+    alignItems: 'center',
+    borderBottomLeftRadius: 34,
+    borderBottomRightRadius: 34,
+    overflow: 'hidden',
+    paddingBottom: SPACING.xl + SPACING.lg,
     paddingHorizontal: SPACING.lg,
   },
 
   // ── Logo ──
   logoArea: {
     alignItems: 'center',
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.md,
   },
   logoTouchable: {
     alignItems: 'center',
@@ -940,45 +977,60 @@ const styles = StyleSheet.create({
   },
   logoCircle: {
     alignItems: 'center',
-    height: 110,
+    backgroundColor: colors.surface,
+    borderRadius: RADIUS.coin + 18,
+    elevation: 8,
+    height: 96,
     justifyContent: 'center',
-    width: 110,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    width: 96,
   },
   logoImage: {
-    height: 110,
-    width: 110,
+    height: 56,
+    width: 56,
   },
 
   // ── Typography ──
   title: {
-    color: LUX.heading,
-    fontSize: 34,
+    color: colors.textOnPrimary,
+    fontSize: 30,
     fontWeight: '800',
     letterSpacing: -0.5,
     marginBottom: SPACING.xs,
+    textAlign: 'center',
   },
   subtitle: {
-    color: LUX.muted,
-    fontSize: 15,
-    lineHeight: 22,
-    marginBottom: SPACING.lg,
+    color: colors.textOnPrimary,
+    fontSize: 14.5,
+    lineHeight: 21,
+    opacity: 0.85,
+    textAlign: 'center',
   },
 
-  // ── Glass Card ──
+  // ── Form Card (overlaps hero) ──
   glassCard: {
-    backgroundColor: LUX.glass,
-    borderColor: LUX.glassBorder,
+    backgroundColor: colors.card,
+    borderColor: colors.border,
     borderRadius: RADIUS.card,
-    borderWidth: 1,
-    marginBottom: SPACING.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    elevation: 10,
+    marginHorizontal: SPACING.lg,
+    marginTop: -SPACING.xl,
     padding: SPACING.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: isDark ? 0.35 : 0.1,
+    shadowRadius: 20,
   },
 
   // ── Segmented Control ──
   segmentContainer: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.045)',
     borderRadius: RADIUS.segment,
-    flexDirection: 'row',
+    flexDirection: isRTL ? 'row-reverse' : 'row',
     marginBottom: SPACING.lg,
     padding: 4,
   },
@@ -986,87 +1038,62 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: RADIUS.segmentPill,
     flex: 1,
-    flexDirection: 'row',
+    flexDirection: isRTL ? 'row-reverse' : 'row',
     justifyContent: 'center',
-    paddingVertical: 12,
+    paddingVertical: 11,
   },
   segmentButtonActive: {
-    backgroundColor: LUX.accent,
+    backgroundColor: colors.primary,
+    elevation: 3,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
   },
   segmentText: {
-    color: LUX.muted,
+    color: colors.textSecondary,
     fontSize: 13,
     fontWeight: '600',
   },
   segmentTextActive: {
-    color: '#FFFFFF',
-  },
-
-  // ── Input ──
-  inputGroup: {
-    marginBottom: SPACING.md,
-  },
-  label: {
-    color: LUX.muted,
-    fontSize: 13,
-    fontWeight: '500',
-    letterSpacing: 0.3,
-    marginBottom: SPACING.xs,
-    textTransform: 'uppercase',
-  },
-  inputWrapper: {
-    alignItems: 'center',
-    backgroundColor: LUX.inputBg,
-    borderColor: LUX.inputBorder,
-    borderRadius: RADIUS.input,
-    borderWidth: 1,
-    flexDirection: 'row',
-    height: 56,
-    paddingHorizontal: SPACING.md,
-  },
-  input: {
-    color: LUX.body,
-    flex: 1,
-    fontSize: 16,
-    height: 40,
-    includeFontPadding: false,
-    paddingVertical: 0,
-    textAlignVertical: 'center',
+    color: colors.textOnPrimary,
   },
 
   // ── Error ──
   errorText: {
-    color: LUX.error,
+    color: colors.error,
     fontSize: 13,
     fontWeight: '500',
     lineHeight: 18,
     marginBottom: SPACING.sm,
+    textAlign: isRTL ? 'right' : 'left',
   },
 
   // ── Remember Me ──
   rememberRow: {
     alignItems: 'center',
-    flexDirection: 'row',
+    flexDirection: isRTL ? 'row-reverse' : 'row',
     marginBottom: SPACING.md,
     paddingVertical: 4,
   },
   checkbox: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderColor: LUX.glassBorder,
-    borderRadius: 6,
+    backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)',
+    borderColor: colors.border,
+    borderRadius: 7,
     borderWidth: 2,
     height: 24,
     justifyContent: 'center',
-    marginRight: 10,
+    marginLeft: isRTL ? 10 : 0,
+    marginRight: isRTL ? 0 : 10,
     width: 24,
   },
   checkboxChecked: {
-    backgroundColor: LUX.accent,
-    borderColor: LUX.accent,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   rememberText: {
-    color: LUX.body,
+    color: colors.text,
     fontSize: 14,
     fontWeight: '500',
   },
@@ -1074,7 +1101,11 @@ const styles = StyleSheet.create({
   // ── Primary Button ──
   primaryButton: {
     borderRadius: RADIUS.button,
-    overflow: 'hidden',
+    elevation: 8,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 14,
   },
   primaryButtonDisabled: {
     opacity: 0.55,
@@ -1082,11 +1113,11 @@ const styles = StyleSheet.create({
   primaryButtonGradient: {
     alignItems: 'center',
     borderRadius: RADIUS.button,
-    height: 54,
+    height: 56,
     justifyContent: 'center',
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: colors.textOnPrimary,
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 0.3,
@@ -1095,33 +1126,35 @@ const styles = StyleSheet.create({
   // ── Links ──
   quietLinkRow: {
     alignItems: 'center',
-    flexDirection: 'row',
+    flexDirection: isRTL ? 'row-reverse' : 'row',
     justifyContent: 'center',
+    marginTop: SPACING.lg,
     paddingVertical: SPACING.xs,
   },
   quietText: {
-    color: LUX.muted,
+    color: colors.textSecondary,
     fontSize: 14,
   },
   quietLink: {
-    color: LUX.accent,
+    color: colors.primary,
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 
   // ── Divider ──
   dividerRow: {
     alignItems: 'center',
     flexDirection: 'row',
+    marginHorizontal: SPACING.lg,
     marginVertical: SPACING.lg,
   },
   dividerLine: {
-    backgroundColor: LUX.glassBorder,
+    backgroundColor: colors.border,
     flex: 1,
     height: 1,
   },
   dividerText: {
-    color: LUX.muted,
+    color: colors.textSecondary,
     fontSize: 13,
     marginHorizontal: SPACING.md,
     // Horizontal padding so Android doesn't clip the last Arabic glyph (أو -> أ).
@@ -1130,22 +1163,28 @@ const styles = StyleSheet.create({
   },
 
   // ── Social ──
-  socialRow: {
-    flexDirection: 'row',
-    gap: SPACING.md,
-    justifyContent: 'center',
+  socialColumn: {
+    gap: SPACING.sm,
+    marginHorizontal: SPACING.lg,
   },
   socialButton: {
     alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
     borderRadius: RADIUS.social,
-    height: 56,
+    borderWidth: 1,
+    height: 54,
     justifyContent: 'center',
-    width: 56,
   },
-  socialIcon: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '700',
+  socialInner: {
+    alignItems: 'center',
+    flexDirection: isRTL ? 'row-reverse' : 'row',
+    justifyContent: 'center',
+  },
+  socialButtonText: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '600',
   },
 
   // ── Guest ──
@@ -1155,31 +1194,31 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
   },
   guestText: {
-    color: LUX.muted,
+    color: colors.textSecondary,
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
   },
 
   // ── Modals ──
   modalOverlay: {
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
     flex: 1,
     justifyContent: 'center',
     padding: SPACING.lg,
   },
   modalContent: {
-    backgroundColor: LUX.gradientMid,
-    borderColor: LUX.glassBorder,
+    backgroundColor: colors.card,
+    borderColor: colors.border,
     borderRadius: RADIUS.card,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     padding: SPACING.lg,
     width: '100%',
   },
   modalIconCircle: {
     alignItems: 'center',
     alignSelf: 'center',
-    backgroundColor: LUX.accentGlow,
+    backgroundColor: isDark ? 'rgba(255,176,32,0.16)' : 'rgba(245,160,10,0.12)',
     borderRadius: 30,
     height: 60,
     justifyContent: 'center',
@@ -1187,14 +1226,14 @@ const styles = StyleSheet.create({
     width: 60,
   },
   modalTitle: {
-    color: LUX.heading,
+    color: colors.text,
     fontSize: 22,
     fontWeight: '700',
     marginBottom: SPACING.sm,
     textAlign: 'center',
   },
   modalDescription: {
-    color: LUX.muted,
+    color: colors.textSecondary,
     fontSize: 15,
     lineHeight: 22,
     marginBottom: SPACING.lg,
@@ -1212,14 +1251,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   modalButtonText: {
-    color: '#FFF',
+    color: colors.textOnPrimary,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   modalButtonSecondary: {
     alignItems: 'center',
-    backgroundColor: LUX.inputBg,
-    borderColor: LUX.inputBorder,
+    backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F1F4',
+    borderColor: colors.border,
     borderRadius: RADIUS.button,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1228,7 +1267,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   modalButtonSecondaryText: {
-    color: LUX.body,
+    color: colors.text,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -1238,7 +1277,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   modalButtonCancelText: {
-    color: LUX.muted,
+    color: colors.textSecondary,
     fontSize: 15,
     fontWeight: '500',
   },

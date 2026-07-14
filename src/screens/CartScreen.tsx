@@ -736,7 +736,7 @@ const CartScreen: React.FC = () => {
                           currency,
                           exchangeRateIQD
                         )}
-                        style={[styles.totalPrice, { color: '#0B1F4D' }]}
+                        style={[styles.totalPrice, { color: theme.colors.text }]}
                       />
                     </View>
                   </View>
