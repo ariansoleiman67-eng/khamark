@@ -113,8 +113,10 @@ const signInWithGoogleWeb = async (): Promise<User> => {
   }
 };
 
-// Web Client ID from google-services.json (client_type: 3)
-const WEB_CLIENT_ID = '677342244115-ssbp46l1hk7oga6q6eu5bhlp26v09pi6.apps.googleusercontent.com';
+import { GOOGLE_AUTH } from '../../constants/config';
+
+// Web Client ID — read from env (Phase 2 OAuth setup)
+const WEB_CLIENT_ID = GOOGLE_AUTH.WEB_CLIENT_ID;
 
 // Lazy-loaded Google Sign In module
 let GoogleSigninModule: typeof import('@react-native-google-signin/google-signin') | null = null;
@@ -156,7 +158,7 @@ const getGoogleSignin = async () => {
   if (!isConfigured) {
     GoogleSigninModule.GoogleSignin.configure({
       webClientId: WEB_CLIENT_ID,
-      iosClientId: '677342244115-l2rbot0d1pfd27sl3tphrmn6k1f6gksu.apps.googleusercontent.com',
+      iosClientId: GOOGLE_AUTH.IOS_CLIENT_ID,
     });
     isConfigured = true;
   }

@@ -36,6 +36,30 @@ if (__DEV__) {
 
 export const FIREBASE_CONFIG = firebaseConfig;
 
+// Supabase (primary backend) — client-safe values from env; placeholders until Phase 2 setup.
+export const SUPABASE_CONFIG = {
+  URL: process.env.EXPO_PUBLIC_SUPABASE_URL || 'REPLACE_WITH_ASANKARY_SUPABASE_URL',
+  ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'REPLACE_WITH_ASANKARY_SUPABASE_ANON_KEY',
+};
+
+// Google Maps client key (Static Maps + native SDK). Empty until configured.
+export const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+
+// Google Sign-In OAuth client IDs (from env; placeholders until Phase 2 OAuth setup).
+export const GOOGLE_AUTH = {
+  WEB_CLIENT_ID:
+    process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || 'REPLACE_WITH_ASANKARY_GOOGLE_WEB_CLIENT_ID',
+  IOS_CLIENT_ID:
+    process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || 'REPLACE_WITH_ASANKARY_GOOGLE_IOS_CLIENT_ID',
+};
+
+// Firebase Cloud Functions base URL (region + project). Derived from the Firebase project id.
+export const FIREBASE_PROJECT_ID =
+  process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || 'REPLACE_WITH_ASANKARY_FIREBASE_PROJECT_ID';
+export const FIREBASE_FUNCTIONS_URL =
+  process.env.EXPO_PUBLIC_FIREBASE_FUNCTIONS_URL ||
+  `https://us-central1-${FIREBASE_PROJECT_ID}.cloudfunctions.net`;
+
 // API Configuration
 export const API_CONFIG = {
   BASE_URL: process.env.EXPO_PUBLIC_API_URL || 'https://your-cloud-functions-url.com',

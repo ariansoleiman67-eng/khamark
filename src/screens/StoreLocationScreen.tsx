@@ -36,7 +36,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '../components/ThemeProvider';
 import { SPACING } from '../constants/theme';
-import { BRAND } from '../constants/config';
+import { BRAND, GOOGLE_MAPS_API_KEY } from '../constants/config';
 import { locationService, StoreLocation } from '../services/locationService';
 
 export const StoreLocationScreen: React.FC = () => {
@@ -230,7 +230,7 @@ export const StoreLocationScreen: React.FC = () => {
           {locations.map((storeLocation) => {
             if (!storeLocation) return null;
             const staticMapUrl = storeLocation.latitude && storeLocation.longitude
-              ? `https://maps.googleapis.com/maps/api/staticmap?center=${storeLocation.latitude},${storeLocation.longitude}&zoom=15&size=600x200&maptype=roadmap&markers=color:red%7C${storeLocation.latitude},${storeLocation.longitude}&key=REPLACE_WITH_ASANKARY_GOOGLE_MAPS_KEY`
+              ? `https://maps.googleapis.com/maps/api/staticmap?center=${storeLocation.latitude},${storeLocation.longitude}&zoom=15&size=600x200&maptype=roadmap&markers=color:red%7C${storeLocation.latitude},${storeLocation.longitude}&key=${GOOGLE_MAPS_API_KEY}`
               : null;
             return (
               <View key={storeLocation.id} style={[styles.storeCard, { backgroundColor: theme.colors.surface, borderLeftColor: locationService.getStoreTypeColor(storeLocation.type) }]}>

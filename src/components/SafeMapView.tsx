@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Platform, Linking, TouchableOpacity, Image } from 'react-native';
+import { GOOGLE_MAPS_API_KEY } from '../constants/config';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from './ThemeProvider';
 
@@ -79,7 +80,7 @@ const SafeMapView: React.FC<SafeMapViewProps> = ({
 
     // Use Google Static Maps API for a visual preview (no native module needed)
     const staticMapUrl = hasCoords
-      ? `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=15&size=600x300&maptype=roadmap&markers=color:red%7C${lat},${lng}&key=REPLACE_WITH_ASANKARY_GOOGLE_MAPS_KEY`
+      ? `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=15&size=600x300&maptype=roadmap&markers=color:red%7C${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}`
       : null;
 
     return (

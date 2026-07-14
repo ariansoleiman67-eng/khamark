@@ -21,7 +21,7 @@
 // handles the hostname — a dummy A record 192.0.2.1 proxied is fine).
 // =============================================================================
 
-const SUPABASE_ORIGIN = 'https://krquvafnjuoxdcvzjjtg.supabase.co';
+const SUPABASE_ORIGIN = 'https://REPLACE_WITH_ASANKARY_SUPABASE_PROJECT_REF.supabase.co';
 
 const ROUTES = {
   '/qicard-webhook': '/functions/v1/qicard-webhook',

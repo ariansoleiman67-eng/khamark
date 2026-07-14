@@ -8,8 +8,8 @@
 -- Without these, ShippingInfoScreen.select('shipping_info') 400s (PGRST 42703).
 --
 -- RUN ON BOTH PROJECTS (SQL Editor → New query → paste → Run):
---   1. LIVE project pocdgbrpkuaqxgjcwsqk   (so the shipped app works now)
---   2. NEW  project krquvafnjuoxdcvzjjtg    (so it's there at cutover)
+--   1. LIVE project REPLACE_WITH_ASANKARY_SUPABASE_PROJECT_REF_OLD   (so the shipped app works now)
+--   2. NEW  project REPLACE_WITH_ASANKARY_SUPABASE_PROJECT_REF    (so it's there at cutover)
 -- Idempotent — safe to re-run.
 -- =============================================================================
 

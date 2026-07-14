@@ -4,7 +4,7 @@ These replace the Firebase Cloud Functions. Run all commands with **your** Supab
 login (use the `!` prefix in Claude Code so they run in your shell):
 
 ```bash
-# Link the repo to the project once (project-ref = the krquvafnjuoxdcvzjjtg part):
+# Link the repo to the project once (project-ref = the REPLACE_WITH_ASANKARY_SUPABASE_PROJECT_REF part):
 npx supabase link --project-ref <project-ref>
 ```
 

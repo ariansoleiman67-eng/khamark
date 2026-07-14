@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform, Image as RNImage, Linking } from 'react-native';
+import { GOOGLE_MAPS_API_KEY } from '../constants/config';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from './ThemeProvider';
 
@@ -58,7 +59,7 @@ const SimpleMapPicker: React.FC<SimpleMapPickerProps> = ({
 
   // iOS: Show static map image instead of native MapView
   if (Platform.OS === 'ios' || !MapView) {
-    const staticMapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${latitude},${longitude}&zoom=15&size=600x400&maptype=roadmap&markers=color:red%7C${latitude},${longitude}&key=REPLACE_WITH_ASANKARY_GOOGLE_MAPS_KEY`;
+    const staticMapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${latitude},${longitude}&zoom=15&size=600x400&maptype=roadmap&markers=color:red%7C${latitude},${longitude}&key=${GOOGLE_MAPS_API_KEY}`;
 
     return (
       <View style={styles.container}>

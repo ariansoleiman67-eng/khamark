@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { GOOGLE_MAPS_API_KEY } from '../../constants/config';
 import {
   View,
   Text,
@@ -436,7 +437,7 @@ const AdminEditStoreLocationScreen = () => {
                   style={{ borderRadius: 12, overflow: 'hidden', height: 200 }}
                 >
                   <RNImage
-                    source={{ uri: `https://maps.googleapis.com/maps/api/staticmap?center=${latitude},${longitude}&zoom=15&size=600x400&maptype=roadmap&markers=color:red%7C${latitude},${longitude}&key=REPLACE_WITH_ASANKARY_GOOGLE_MAPS_KEY` }}
+                    source={{ uri: `https://maps.googleapis.com/maps/api/staticmap?center=${latitude},${longitude}&zoom=15&size=600x400&maptype=roadmap&markers=color:red%7C${latitude},${longitude}&key=${GOOGLE_MAPS_API_KEY}` }}
                     style={{ width: '100%', height: '100%' }}
                     resizeMode="cover"
                   />

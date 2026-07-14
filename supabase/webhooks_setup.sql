@@ -19,7 +19,7 @@ security definer
 as $$
 begin
   perform net.http_post(
-    url     := 'https://krquvafnjuoxdcvzjjtg.supabase.co/functions/v1/on-db-change',
+    url     := 'https://REPLACE_WITH_ASANKARY_SUPABASE_PROJECT_REF.supabase.co/functions/v1/on-db-change',
     headers := '{"Content-Type":"application/json"}'::jsonb,
     body    := jsonb_build_object(
       'type',   tg_op,

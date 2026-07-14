@@ -1,5 +1,5 @@
 -- =============================================================================
--- ASANKARY — LIVE-PROJECT parity patch  (project: pocdgbrpkuaqxgjcwsqk)
+-- ASANKARY — LIVE-PROJECT parity patch  (project: REPLACE_WITH_ASANKARY_SUPABASE_PROJECT_REF_OLD)
 -- =============================================================================
 -- Purpose: bring the CURRENTLY-LIVE Supabase project up to schema parity with
 -- the consolidated schema by adding ONLY the 12 tables it is missing, so the
@@ -16,7 +16,7 @@
 --     DROP ... IF EXISTS), so it can be re-run with no harm.
 --
 -- HOW TO RUN: New project? NO — the LIVE project's SQL Editor:
---   Supabase dashboard → project pocdgbrpkuaqxgjcwsqk → SQL Editor → New query
+--   Supabase dashboard → project REPLACE_WITH_ASANKARY_SUPABASE_PROJECT_REF_OLD → SQL Editor → New query
 --   → paste this whole file → Run.
 -- =============================================================================
 

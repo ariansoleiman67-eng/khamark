@@ -3,6 +3,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { Alert, Platform } from 'react-native';
 import { auth } from './firebase';
 import { getIdToken } from '@react-native-firebase/auth';
+import { FIREBASE_FUNCTIONS_URL } from '../constants/config';
 
 // Video upload configuration
 export const VIDEO_CONFIG = {
@@ -12,9 +13,8 @@ export const VIDEO_CONFIG = {
   ALLOWED_TYPES: ['video/mp4', 'video/quicktime', 'video/webm'],
 };
 
-// Get the Cloud Functions region/URL
-// This must match your Firebase project ID from deployment
-const FUNCTIONS_BASE_URL = 'https://us-central1-truckserviceapp-f9712-7b9d8.cloudfunctions.net';
+// Cloud Functions base URL — derived from the Firebase project id via env (see config.ts).
+const FUNCTIONS_BASE_URL = FIREBASE_FUNCTIONS_URL;
 
 export interface VideoPickResult {
   uri: string;

@@ -3,18 +3,15 @@ import { setupURLPolyfill } from 'react-native-url-polyfill';
 import { createClient, processLock } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from 'react-native';
+import { SUPABASE_CONFIG } from '../constants/config';
 
 // Polyfill URL for Supabase on React Native
 setupURLPolyfill();
 
-// ── ACTIVE project (post-cutover): the new project — data migrated 2026-06-02,
-//    Edge Functions (login, send-push, on-db-change) + notification triggers live here. ──
-const supabaseUrl = 'https://krquvafnjuoxdcvzjjtg.supabase.co';
-const supabaseAnonKey = 'sb_publishable_rZVwwpCiZNig_SzRDBJtvQ_miUFiXr6';
-
-// ── OLD project (pre-cutover) — kept here for rollback only. Do not use. ──
-// const supabaseUrl = 'https://pocdgbrpkuaqxgjcwsqk.supabase.co';
-// const supabaseAnonKey = 'sb_publishable_avUzaTNDFbf1AK3ZCQ38nQ_R7usRpbQ';
+// Supabase project — read from EXPO_PUBLIC_* env (see .env.example / SETUP_CHECKLIST.md).
+// Falls back to placeholder strings so the app still boots (network calls fail gracefully).
+const supabaseUrl = SUPABASE_CONFIG.URL;
+const supabaseAnonKey = SUPABASE_CONFIG.ANON_KEY;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {

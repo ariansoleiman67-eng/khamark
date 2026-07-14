@@ -1,5 +1,5 @@
 -- Restore product availability status lost during Firestore->Supabase migration.
--- Run in Supabase SQL editor (project krquvafnjuoxdcvzjjtg).
+-- Run in Supabase SQL editor (project REPLACE_WITH_ASANKARY_SUPABASE_PROJECT_REF).
 
 ALTER TABLE parts ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'available';
 

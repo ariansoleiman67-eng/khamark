@@ -1,6 +1,6 @@
 -- ============================================================================
 -- Complete Firestore -> Supabase backfill: schema additions
--- Run ONCE in the Supabase SQL editor (project krquvafnjuoxdcvzjjtg) BEFORE
+-- Run ONCE in the Supabase SQL editor (project REPLACE_WITH_ASANKARY_SUPABASE_PROJECT_REF) BEFORE
 -- running firestore_complete_sync.js. Idempotent.
 -- ============================================================================
 

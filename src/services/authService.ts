@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 import { safeCallFunction } from './safeCallFunction';
 import { User } from '../types';
+import { GOOGLE_AUTH } from '../constants/config';
 
 export class AuthService {
   static async signIn(email: string, password: string): Promise<User> {
@@ -459,7 +460,7 @@ export class AuthService {
   static async signInWithGoogle(): Promise<User> {
     try {
       const { GoogleSignin } = require('@react-native-google-signin/google-signin');
-      const webClientId = '677342244115-ssbp46l1hk7oga6q6eu5bhlp26v09pi6.apps.googleusercontent.com';
+      const webClientId = GOOGLE_AUTH.WEB_CLIENT_ID;
       
       GoogleSignin.configure({ webClientId, offlineAccess: true });
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
