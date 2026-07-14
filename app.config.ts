@@ -58,7 +58,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       CFBundleURLTypes: [
         {
           CFBundleURLSchemes: [
-            "REPLACE_WITH_ASANKARY_GOOGLE_REVERSED_CLIENT_ID"
+            "com.googleusercontent.apps.REPLACE_WITH_ASANKARY_GOOGLE_REVERSED_CLIENT_ID"
           ]
         },
         {
@@ -140,7 +140,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       "@react-native-google-signin/google-signin",
       {
         iosUrlScheme:
-          "REPLACE_WITH_ASANKARY_GOOGLE_REVERSED_CLIENT_ID",
+          "com.googleusercontent.apps.REPLACE_WITH_ASANKARY_GOOGLE_REVERSED_CLIENT_ID",
       },
     ],
     [

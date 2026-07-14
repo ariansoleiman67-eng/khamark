@@ -445,7 +445,8 @@
       "requiredPhone": "Please enter a phone number",
       "phoneExists": "This phone is already registered",
       "sendCode": "Send code"
-    }
+    },
+    "signInWithGoogle": "Sign in with Google"
   },
   "home": {
     "welcome": "Welcome to Asankary",
@@ -563,7 +564,9 @@
       "available": "Available",
       "comingSoon": "Coming Soon",
       "onTheWay": "On The Way"
-    }
+    },
+    "items": "items",
+    "totalSelected": "Total selected"
   },
   "cart": {
     "title": "Shopping Cart",
@@ -930,7 +933,11 @@
     "trackingUrlError": "Could not open tracking link",
     "pending": "Pending",
     "itemsLabel": "Items",
-    "viewOrder": "View Order"
+    "viewOrder": "View Order",
+    "confirmCancel": "Are you sure you want to cancel this order?",
+    "cancelled": "Order Cancelled",
+    "noAddress": "No Address",
+    "addAddressFirst": "Please add a delivery address first."
   },
   "order": {
     "order": "Order",
@@ -1847,7 +1854,11 @@
     "inStock": "In Stock",
     "outOfStock": "Out of Stock",
     "minOrderPiece": "Min. Order: 1 Piece",
-    "pn": "P/N"
+    "pn": "P/N",
+    "messages": "Messages",
+    "searchPlaceholder": "Search conversations...",
+    "archived": "Archived",
+    "loginRequired": "Login Required"
   },
   "adminSettings": {
     "businessSettings": "Business Settings",
@@ -2105,7 +2116,14 @@
       "setupFailed": "Failed to setup store",
       "setupSuccess": "Your store has been set up. You can now add products, manage discounts, and more!",
       "storeSetupRequired": "Store Setup Required",
-      "storeSetupRequiredSubtitle": "Tap to complete your store setup"
+      "storeSetupRequiredSubtitle": "Tap to complete your store setup",
+      "openInMaps": "Open in Maps",
+      "currentRole": "Current Role:",
+      "demoteToCustomer": "Demote to Customer",
+      "makeVip": "Make VIP",
+      "roleUpdatedCustomer": "Role updated to Customer",
+      "roleUpdatedVip": "Role updated to VIP",
+      "failedUpdateRole": "Failed to update role"
     },
     "stockReport": {
       "title": "Stock Report",
@@ -2379,7 +2397,9 @@
       "unlockSettings": "Unlock Settings",
       "masterPasswordRequired": "This requires the master admin password.",
       "enterAdminPassword": "Enter admin password",
-      "verifyAndProceed": "Verify & Proceed"
+      "verifyAndProceed": "Verify & Proceed",
+      "storeLabel": "Store",
+      "back": "Back"
     },
     "days": {
       "sunday": "Sunday",

@@ -11,7 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTranslation } from 'react-i18next';
 
-// NOTE (Asankary clone): the original Haryad OnboardingScreen was removed during the
+// NOTE (Asankary clone): the original OnboardingScreen was removed during the
 // Phase 0 purge before the first commit and its content could not be recovered. This is a
 // clean, minimal, branded recreation that preserves the app flow (App.tsx renders it as an
 // overlay and expects `onComplete`). Rebuild the full onboarding UX when the brand assets land.

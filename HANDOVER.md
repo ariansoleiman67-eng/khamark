@@ -75,4 +75,14 @@ Full list in `PURGED.md`. Summary: Gemini key `AIzaSyBia9D1BpP…`, Google Maps/
 - Kept all Iraq-market behavior: +964 / E.164 IQ phone validation, `IRAQI_CITIES`, `DEFAULT_REGION` Erbil, en/ar/ku, QiCard flow, currency handling.
 - Fixed 14 pre-existing TypeScript errors that a clean typecheck surfaced (they predate the clone).
 - **i18n key-set drift:** en/ar/ku were NOT perfectly in sync in the original (ar/ku carry extra keys). Reconcile to identical key sets (Phase 5 audit item).
-- Verification status (typecheck / prebuild / deep-link) — see Phase 5 section, updated after final verification run.
+
+---
+
+## Phase 5 — verification results
+- **`npx tsc --noEmit`: clean** (0 errors).
+- **`npx expo prebuild --clean --platform android`: succeeds** — regenerates `android/` with `applicationId`/`namespace` `com.asankary.app` and `android:scheme="asankary"` in the manifest. (Needed placeholder `google-services.json` + `GoogleService-Info.plist`, which are git-ignored; replace with the real Firebase files. The Google reversed-client-id placeholder is prefixed `com.googleusercontent.apps.…` so the config plugin validates.) iOS prebuild not run here (CocoaPods); should work once the real `GoogleService-Info.plist` is in place.
+- **Deep link:** `asankary://product/123` → `ProductDetails { productId: "123" }` (scheme registered in the generated manifest; `https://ASANKARY_DOMAIN_TBD` universal links activate once the domain is set).
+- **Brand audit:** `git grep -i "haryad\|volvo"` → zero hits outside `PURGED.md` / handover docs.
+- **Secret audit:** no live keys in the tree (pattern grep for `AIzaSy`, `sk-`, `sb_publishable_`, JWTs, known Haryad ids). `gitleaks`/`trufflehog` were not installed in the build environment — run one of them as a final gate before publishing the repo.
+- **i18n:** en/ar/ku reconciled to identical key sets.
+- **Runtime UI review still pending** — no device/emulator in this environment. Run `npm run android` (dev client) and review Home + Categories in en (LTR) and ar (RTL), light + dark, before sign-off.

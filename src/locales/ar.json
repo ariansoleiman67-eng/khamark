@@ -445,7 +445,8 @@
       "requiredPhone": "الرجاء إدخال رقم الهاتف",
       "phoneExists": "هذا الرقم مسجل بالفعل",
       "sendCode": "إرسال الرمز"
-    }
+    },
+    "signInWithGoogle": "تسجيل الدخول باستخدام Google"
   },
   "home": {
     "welcome": "مرحباً بك في Asankary",
@@ -525,7 +526,9 @@
       "available": "متوفر",
       "comingSoon": "قريباً",
       "onTheWay": "في الطريق"
-    }
+    },
+    "items": "عنصر",
+    "totalSelected": "إجمالي المحدد"
   },
   "cart": {
     "title": "سلة التسوق",
@@ -892,7 +895,11 @@
     "trackingUrlError": "تعذّر فتح رابط التتبّع",
     "pending": "قيد الانتظار",
     "itemsLabel": "عناصر",
-    "viewOrder": "عرض الطلب"
+    "viewOrder": "عرض الطلب",
+    "confirmCancel": "هل أنت متأكد من أنك تريد إلغاء هذا الطلب؟",
+    "cancelled": "تم إلغاء الطلب",
+    "noAddress": "لا يوجد عنوان",
+    "addAddressFirst": "الرجاء إضافة عنوان توصيل أولاً."
   },
   "order": {
     "color": "اللون",
@@ -1817,7 +1824,8 @@
     "inStock": "متوفر",
     "outOfStock": "غير متوفر",
     "minOrderPiece": "أقل طلب: قطعة واحدة",
-    "pn": "رقم القطعة"
+    "pn": "رقم القطعة",
+    "loginRequired": "تسجيل الدخول مطلوب"
   },
   "share": {
     "sendTo": "إرسال إلى...",
