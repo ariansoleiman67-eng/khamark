@@ -22,7 +22,8 @@ import { Image } from 'expo-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { USE_MOCK_DATA } from '../services/mockData';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../components/ThemeProvider';
 import { useCart } from '../contexts/CartContext';
@@ -99,14 +100,17 @@ const CategoriesScreen: React.FC = () => {
   // Uploaded category icons (name -> imageUrl) from the shop's managed categories.
   // When present, the BrandTile shows this image; otherwise it falls back to an initial.
   const [iconByName, setIconByName] = useState<Record<string, string>>({});
-  useEffect(() => {
-    if (!tenantId) return;
-    categoryService.getActiveCategories(tenantId).then(list => {
+  const loadCategoryIcons = React.useCallback(() => {
+    if (!tenantId && !USE_MOCK_DATA) return;
+    categoryService.getActiveCategories(tenantId || '').then(list => {
       const map: Record<string, string> = {};
       for (const c of list) { if (c.imageUrl) map[c.name] = c.imageUrl; }
       setIconByName(map);
     }).catch(() => {});
   }, [tenantId]);
+  useEffect(() => { loadCategoryIcons(); }, [loadCategoryIcons]);
+  // Refresh admin-managed category logos when the screen regains focus.
+  useFocusEffect(React.useCallback(() => { loadCategoryIcons(); }, [loadCategoryIcons]));
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');

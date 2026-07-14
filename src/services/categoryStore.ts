@@ -61,6 +61,10 @@ export const categoryStore = {
   },
 
   async save(cat: Partial<StoredCategory> & { name: string }): Promise<StoredCategory> {
+    if (!USE_MOCK_DATA) {
+      // TODO(live): upsert into Supabase `categories` via tenantAdminService.
+      return { id: cat.id || 'temp', name: cat.name, logoUrl: cat.logoUrl, isActive: cat.isActive ?? true, sortOrder: cat.sortOrder ?? 0 };
+    }
     const list = await readMock();
     if (cat.id) {
       const idx = list.findIndex(c => c.id === cat.id);
@@ -71,7 +75,7 @@ export const categoryStore = {
       }
     }
     const created: StoredCategory = {
-      id: `cat-${cat.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${list.length}`,
+      id: `cat-${cat.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`,
       name: cat.name,
       logoUrl: cat.logoUrl,
       isActive: cat.isActive ?? true,
@@ -83,6 +87,7 @@ export const categoryStore = {
   },
 
   async remove(id: string): Promise<void> {
+    if (!USE_MOCK_DATA) return;
     const list = (await readMock()).filter(c => c.id !== id);
     await writeMock(list);
   },

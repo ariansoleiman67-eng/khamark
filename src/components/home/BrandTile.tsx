@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Pressable, View, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
 import AppText from '../AppText';
@@ -15,6 +15,7 @@ interface BrandTileProps {
 const BrandTile: React.FC<BrandTileProps> = ({ label, imageUrl, width, onPress }) => {
   const { theme, isDark } = useTheme();
   const [imgFailed, setImgFailed] = useState(false);
+  useEffect(() => { setImgFailed(false); }, [imageUrl]);
   const showImage = !!imageUrl && !imgFailed;
 
   return (

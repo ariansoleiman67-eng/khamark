@@ -71,7 +71,7 @@ export const brandService = {
         }
       }
       const created: Brand = {
-        id: `br-${brand.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${brands.length}`,
+        id: `br-${brand.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`,
         name: brand.name,
         logoUrl: brand.logoUrl,
         isActive: brand.isActive ?? true,

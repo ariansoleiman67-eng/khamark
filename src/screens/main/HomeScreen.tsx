@@ -33,7 +33,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { storeProfileService, StoreProfile } from '../../services/storeProfileService';
 import settingsService from '../../services/settingsService';
 import bannerService from '../../services/bannerService';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useCart } from '../../contexts/CartContext';
 import { useFavorites } from '../../contexts/FavoritesContext';
 import { useBadgeCount } from '../../contexts/NotificationContext';
@@ -125,6 +125,13 @@ const HomeScreen: React.FC = () => {
   useEffect(() => {
     loadData();
   }, [tenantId]);
+
+  // Refresh admin-managed brands when Home regains focus (e.g. after an admin edit).
+  useFocusEffect(
+    React.useCallback(() => {
+      brandService.getActiveBrands(tenantId || undefined).then(setManagedBrands).catch(() => {});
+    }, [tenantId])
+  );
 
   const loadData = async () => {
     try {
