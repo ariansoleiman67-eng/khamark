@@ -539,7 +539,7 @@ export const ProfileScreen: React.FC = () => {
                   theme={theme} isDark={isDark} tintBg={tintBg} />
                 <Divider isDark={isDark} />
                 <LuxuryMenuItem icon="cash-outline" title={t('profile.menu.currency', { defaultValue: 'Currency' })}
-                  subtitle={currency === 'USD' ? 'US Dollar ($)' : 'Iraqi Dinar (IQD)'}
+                  subtitle={currency === 'USD' ? t('profile.currencyUsd', { defaultValue: 'US Dollar ($)' }) : t('profile.currencyIqd', { defaultValue: 'Iraqi Dinar (IQD)' })}
                   onPress={() => setCurrencyPickerVisible(true)}
                   theme={theme} isDark={isDark} tintBg={tintBg} />
               </View>

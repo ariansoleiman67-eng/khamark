@@ -358,46 +358,6 @@ const RegisterScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* ── Amber Hero Band ── */}
-      <View style={[styles.hero, { paddingTop: insets.top + SPACING.sm }]}>
-        <LinearGradient
-          colors={[theme.colors.primary, theme.colors.accent]}
-          style={StyleSheet.absoluteFill}
-          start={{ x: 0.1, y: 0 }}
-          end={{ x: 0.9, y: 1 }}
-        />
-
-        {/* Floating particles (confined to the amber hero) */}
-        <View style={StyleSheet.absoluteFill} pointerEvents="none">
-          {particles.map((p, i) => (
-            <FloatingParticle key={i} {...p} />
-          ))}
-        </View>
-
-        {/* Back button */}
-        <Animated.View
-          entering={FadeIn.duration(400)}
-          style={[styles.backRow, { flexDirection: rowDir }]}
-        >
-          <TouchableOpacity style={styles.backButton} onPress={handleBack} activeOpacity={0.7}>
-            <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={22} color="#FFFFFF" />
-          </TouchableOpacity>
-        </Animated.View>
-
-        {/* Brand medallion */}
-        <Animated.View entering={FadeInDown.duration(600).delay(150)} style={styles.heroContent}>
-          <View style={[styles.logoMedallion, { backgroundColor: theme.colors.surface }]}>
-            <Image source={ASANKARY_LOGO} style={styles.logoImage} contentFit="contain" />
-          </View>
-          <Animated.Text allowFontScaling={false} entering={SlideInLeft.duration(500).delay(280)} style={styles.heroTitle}>
-            {t('auth.createAccount', { defaultValue: 'Create account' })}
-          </Animated.Text>
-          <Animated.Text allowFontScaling={false} entering={FadeIn.duration(500).delay(360)} style={styles.heroSubtitle}>
-            {t('auth.createAccountSubtitle', { defaultValue: 'Start with your phone or email.' })}
-          </Animated.Text>
-        </Animated.View>
-      </View>
-
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -407,6 +367,48 @@ const RegisterScreen: React.FC = () => {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          {/* ── Amber Hero Band ── */}
+          <View style={[styles.hero, { paddingTop: insets.top + SPACING.sm }]}>
+            <LinearGradient
+              colors={[theme.colors.primary, theme.colors.accent]}
+              style={StyleSheet.absoluteFill}
+              start={{ x: 0.1, y: 0 }}
+              end={{ x: 0.9, y: 1 }}
+            />
+
+            {/* Floating particles (confined to the amber hero) */}
+            <View style={StyleSheet.absoluteFill} pointerEvents="none">
+              {particles.map((p, i) => (
+                <FloatingParticle key={i} {...p} />
+              ))}
+            </View>
+
+            {/* Back button */}
+            <Animated.View
+              entering={FadeIn.duration(400)}
+              style={[styles.backRow, { flexDirection: rowDir }]}
+            >
+              <TouchableOpacity style={styles.backButton} onPress={handleBack} activeOpacity={0.7}>
+                <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={22} color="#FFFFFF" />
+              </TouchableOpacity>
+            </Animated.View>
+
+            {/* Brand medallion */}
+            <Animated.View entering={FadeInDown.duration(600).delay(150)} style={styles.heroContent}>
+              <View style={[styles.logoMedallion, { backgroundColor: theme.colors.surface }]}>
+                <Image source={ASANKARY_LOGO} style={styles.logoImage} contentFit="contain" />
+              </View>
+              <Animated.Text allowFontScaling={false} entering={SlideInLeft.duration(500).delay(280)} style={styles.heroTitle}>
+                {t('auth.createAccount', { defaultValue: 'Create account' })}
+              </Animated.Text>
+              <Animated.Text allowFontScaling={false} entering={FadeIn.duration(500).delay(360)} style={styles.heroSubtitle}>
+                {t('auth.createAccountSubtitle', { defaultValue: 'Start with your phone or email.' })}
+              </Animated.Text>
+            </Animated.View>
+          </View>
+
+          {/* ── Body (overlaps hero) ── */}
+          <View style={styles.body}>
           {/* ── Floating Card ── */}
           <Animated.View
             entering={FadeInUp.duration(600).delay(300).springify().damping(14)}
@@ -556,6 +558,7 @@ const RegisterScreen: React.FC = () => {
               </AppText>
             </TouchableOpacity>
           </Animated.View>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -624,8 +627,11 @@ const styles = StyleSheet.create({
 
   // ── Scroll body ──
   scrollContent: {
-    paddingHorizontal: SPACING.lg,
     paddingTop: 0,
+  },
+  body: {
+    marginTop: -SPACING.xl,
+    paddingHorizontal: SPACING.lg,
   },
 
   // ── Floating Card ──
@@ -634,7 +640,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     elevation: 6,
     marginBottom: SPACING.lg,
-    marginTop: -SPACING.xl,
     padding: SPACING.lg,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.12,
