@@ -1,0 +1,8 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "module": "esnext"
+  },
+  "exclude": ["node_modules", "supabase/functions", "functions", "tamagui.config.ts"]
+}

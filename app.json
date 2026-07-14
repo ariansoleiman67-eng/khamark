@@ -1,0 +1,115 @@
+{
+  "expo": {
+    "name": "Haryad Autoparts",
+    "slug": "Haryad Autoparts",
+    "scheme": "haryad",
+    "version": "1.9.43",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "primaryColor": "#1a365d",
+    "description": "Premium auto parts for Volvo, Scania, DAF trucks in Kurdistan. Browse thousands of genuine truck parts with fast delivery across Iraq.",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1a365d"
+    },
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#1a365d"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.haryad.autopart",
+      "buildNumber": "73",
+      "associatedDomains": [
+        "applinks:haryadautoparts.com",
+        "applinks:www.haryadautoparts.com"
+      ],
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "This app needs location access to provide accurate delivery addresses and find nearby parts.",
+        "NSCameraUsageDescription": "This app needs camera access to take photos for profile and support tickets.",
+        "NSPhotoLibraryUsageDescription": "This app needs photo library access to select images for profile and support.",
+        "NSMicrophoneUsageDescription": "This app needs microphone access for sending voice messages in chat."
+      },
+      "config": {
+        "googleMapsApiKey": "REPLACE_WITH_ASANKARY_FIREBASE_API_KEY"
+      },
+      "googleServicesFile": "./GoogleService-Info.plist"
+    },
+    "android": {
+      "package": "com.haryad.autopart",
+      "versionCode": 134,
+      "versionName": "1.9.43",
+      "googleServicesFile": "./google-services.json",
+      "softwareKeyboardLayoutMode": "resize",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1a365d"
+      },
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "CAMERA",
+        "POST_NOTIFICATIONS",
+        "VIBRATE",
+        "ACCESS_NETWORK_STATE",
+        "ACCESS_WIFI_STATE",
+        "INTERNET",
+        "RECORD_AUDIO"
+      ],
+      "blockedPermissions": [
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "REPLACE_WITH_ASANKARY_FIREBASE_API_KEY"
+        }
+      },
+      "metaData": [
+        {
+          "name": "com.google.firebase.messaging.default_notification_channel_id",
+          "value": "default_v1"
+        }
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "haryadautoparts.com",
+              "pathPrefix": "/product"
+            },
+            {
+              "scheme": "https",
+              "host": "www.haryadautoparts.com",
+              "pathPrefix": "/product"
+            },
+            {
+              "scheme": "haryad"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
+    },
+    "plugins": [
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging",
+      "@react-native-firebase/auth",
+      "./plugins/withFmtFix.js"
+    ],
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}

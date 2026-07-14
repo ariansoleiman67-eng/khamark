@@ -1,0 +1,80 @@
+{
+  "cli": {
+    "version": ">= 12.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "prebuildCommand": "npx expo prebuild --clean",
+      "env": {
+        "RCT_NEW_ARCH_ENABLED": "1"
+      },
+      "android": {
+        "gradleCommand": ":app:assembleDebug"
+      },
+      "ios": {
+        "buildConfiguration": "Debug"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "prebuildCommand": "npx expo prebuild --clean",
+      "env": {
+        "RCT_NEW_ARCH_ENABLED": "1"
+      },
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
+      },
+      "ios": {
+        "buildConfiguration": "Release"
+      }
+    },
+    "production": {
+      "channel": "production",
+      "distribution": "store",
+      "prebuildCommand": "npx expo prebuild --clean",
+      "env": {
+        "RCT_NEW_ARCH_ENABLED": "1",
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "REPLACE_WITH_ASANKARY_FIREBASE_API_KEY",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "haryads-56e68.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "haryads-56e68",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "haryads-56e68.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "677342244115",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:677342244115:android:ef7421ed684af9f0343ee6",
+        "EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID": "",
+        "EXPO_PUBLIC_IMGBB_API_KEY": "8d51352f9e73b795846038977c0f0502",
+        "EXPO_PUBLIC_APP_NAME": "Haryad Auto Part",
+        "EXPO_PUBLIC_APP_VERSION": "1.0.0",
+        "EXPO_PUBLIC_API_URL": "https://your-cloud-functions-url.com",
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "REPLACE_WITH_ASANKARY_GOOGLE_MAPS_KEY",
+        "EXPO_PUBLIC_ENABLE_MAPS": "true"
+      },
+      "android": {
+        "buildType": "app-bundle",
+        "gradleCommand": ":app:bundleRelease"
+      },
+      "ios": {
+        "buildConfiguration": "Release",
+        "image": "macos-sequoia-15.6-xcode-26.2"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "track": "internal",
+        "releaseStatus": "draft",
+        "changesNotSentForReview": true
+      }
+    },
+    "preview": {
+      "android": {
+        "track": "internal",
+        "releaseStatus": "draft"
+      }
+    }
+  }
+}

@@ -1,0 +1,1167 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+  RefreshControl,
+  FlatList,
+  Platform,
+  KeyboardAvoidingView,
+  AccessibilityInfo,
+  Animated,
+  TextInput,
+} from 'react-native';
+import { Image } from 'expo-image';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Feather, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { StatusBar } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
+
+import { useTheme } from '../components/ThemeProvider';
+import { formatPrice } from '../utils/currency';
+import { getProductImageUrl, getThumbnailUrl, logImageDebug } from '../utils/imageUtils';
+import { useAuth } from '../contexts/AuthContext';
+import { useCart } from '../contexts/CartContext';
+import { useCurrency } from '../contexts/CurrencyContext';
+import { useTranslation } from 'react-i18next';
+import i18n from '../locales';
+import { CartItem, AppliedDiscount, Discount } from '../types';
+import { CartService } from '../services/cartService';
+import { LocalCartService } from '../services/localCartService';
+import discountService from '../services/discountService';
+import addressService from '../services/addressService';
+import { RootStackParamList } from '../navigation/types';
+import { Theme } from '../types';
+import AppNumber from '../components/AppNumber';
+import AppText from '../components/AppText';
+import { CartIcon } from '../components/icons/CartIcon';
+import { useAuthGate } from '../hooks/useAuthGate';
+
+type CartScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Cart'>;
+
+// FIGMA: Primary orange color from design
+const FIGMA_ORANGE = '#FFA451';
+const FIGMA_DARK = '#27214D';
+
+// Summary bar height for padding calculation
+const SUMMARY_BAR_BASE_HEIGHT = 200;
+
+interface CartItemComponentProps {
+  item: CartItem;
+  index: number;
+  onUpdateQuantity: (productId: string, quantity: number, selectedOptions?: { color?: string; size?: string }) => void;
+  onRemove: (productId: string, selectedOptions?: { color?: string; size?: string }) => void;
+  isUpdating: boolean;
+  theme: Theme;
+  t: (key: string, options?: any) => string;
+}
+
+// Color palette for product thumbnail backgrounds
+const PRODUCT_BG_COLORS = [
+  '#FFFAEB', // Warm cream
+  '#FEF0F0', // Soft pink
+  '#F1EFF6', // Lavender
+  '#E8F5E9', // Mint
+  '#FFF3E0', // Peach
+  '#E3F2FD', // Sky blue
+];
+
+/**
+ * Cart Item Component - FIGMA DESIGN
+ * - Colored thumbnail background
+ * - Clean product info layout
+ * - Price on the right side
+ */
+const CartItemComponent: React.FC<CartItemComponentProps> = ({
+  item,
+  index,
+  onUpdateQuantity,
+  onRemove,
+  isUpdating,
+  theme,
+  t,
+}) => {
+  const { currency, exchangeRateIQD } = useCurrency();
+  const { isVip } = useAuth();
+  const [localQuantity, setLocalQuantity] = useState(item.quantity);
+  const [localQtyText, setLocalQtyText] = useState(String(item.quantity));
+  const [isQuantityLoading, setIsQuantityLoading] = useState(false);
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const translateY = React.useRef(new Animated.Value(20)).current;
+  const typingTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    };
+  }, []);
+
+  // Animate in
+  React.useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [fadeAnim, translateY, index]);
+
+  // Sync localQuantity when item.quantity changes from outside
+  useEffect(() => {
+    setLocalQuantity(item.quantity);
+    setLocalQtyText(String(item.quantity));
+  }, [item.quantity]);
+
+  // Calculate available stock based on variations
+  const availableStock = React.useMemo(() => {
+    // 1. Try to find by ID first
+    if (item.variationId) {
+      const sizeVar = item.product.variations?.find(v => v.variationId === item.variationId);
+      if (sizeVar) return sizeVar.stockQuantity;
+
+      const colorVar = item.product.colorVariations?.find(v => v.variationId === item.variationId);
+      if (colorVar) return colorVar.stockQuantity;
+    }
+
+    // 2. Fallback to matching Selected Options
+    if (item.selectedOptions) {
+      const sizeVal = item.selectedOptions.size?.trim().toLowerCase();
+      const colorVal = item.selectedOptions.color?.trim().toLowerCase();
+
+      if (sizeVal && item.product.variations) {
+        const v = item.product.variations.find(v => 
+          v.variationId === item.variationId ||
+          v.sizeValue?.trim().toLowerCase() === sizeVal || 
+          `${v.sizeValue} ${v.sizeUnit || ''}`.trim().toLowerCase() === sizeVal
+        );
+        if (v) return v.stockQuantity;
+      }
+
+      if (colorVal && item.product.colorVariations) {
+        const v = item.product.colorVariations.find(v => 
+          v.variationId === item.variationId ||
+          v.colorValue?.trim().toLowerCase() === colorVal
+        );
+        if (v) return v.stockQuantity;
+      }
+    }
+
+    // 3. Fallback to main stock
+    return item.product.stockQty;
+  }, [item.product, item.variationId, item.selectedOptions]);
+
+  const handleQuantityChange = useCallback(async (newQuantity: number) => {
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    
+    if (newQuantity === item.quantity) {
+      setLocalQuantity(item.quantity);
+      setLocalQtyText(String(item.quantity));
+      return;
+    }
+    
+    setIsQuantityLoading(true);
+    setLocalQuantity(newQuantity);
+    setLocalQtyText(String(newQuantity));
+
+    try {
+      await onUpdateQuantity(item.productId, newQuantity, item.selectedOptions);
+    } catch {
+      setLocalQuantity(item.quantity);
+      setLocalQtyText(String(item.quantity));
+    } finally {
+      setIsQuantityLoading(false);
+    }
+  }, [item.productId, item.quantity, item.selectedOptions, onUpdateQuantity]);
+
+  const handleRemove = useCallback(() => {
+    onRemove(item.productId, item.selectedOptions);
+  }, [item.productId, item.selectedOptions, onRemove]);
+
+  // Get tiered pricing
+  const tieredPrice = LocalCartService.getTieredPrice(item.product, localQuantity, isVip);
+  const hasDiscount = item.product.priceTiers && item.product.priceTiers.length > 0 && tieredPrice < item.product.priceUSD;
+  const discountedTotal = tieredPrice * localQuantity;
+
+  // Get background color for this item — now using a very subtle tint
+  const bgColor = PRODUCT_BG_COLORS[index % PRODUCT_BG_COLORS.length];
+
+  return (
+    <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY }] }}>
+      <View style={[styles.cartItem, theme.dark && { backgroundColor: theme.colors.surface }]}>
+        {/* ===== TOP ROW: Image + Product Details ===== */}
+        <View style={styles.cartItemTop}>
+          {/* Product Image */}
+          <View style={[styles.productThumbContainer, { backgroundColor: bgColor }]}>
+            <Image
+              source={{ uri: getThumbnailUrl(getProductImageUrl({
+                imageUrls: item.product.imageUrls,
+                category: item.product.category
+              }), 160) }}
+              style={styles.productImage}
+              contentFit="cover"
+              transition={0}
+              cachePolicy="memory-disk"
+              priority="normal"
+              recyclingKey={`${item.productId}-${item.selectedOptions?.color || ''}-${item.selectedOptions?.size || ''}`}
+              onError={() => {
+                if (__DEV__) {
+                  logImageDebug({
+                    imageUrls: item.product.imageUrls,
+                    category: item.product.category
+                  }, `CartScreen - ${item.product.name}`);
+                }
+              }}
+            />
+            {!item.product.isActive && (
+              <View style={styles.unavailableOverlay}>
+                <Text allowFontScaling={false} style={styles.unavailableText}>{t('products.unavailable')}</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Product Info */}
+          <View style={styles.productInfo}>
+            {/* Product Name - clear and prominent */}
+            <AppText style={[styles.productName, { color: theme.colors.text }]} numberOfLines={2}>
+              {i18n.language === 'ar' && item.product.nameAr ? item.product.nameAr : i18n.language === 'ku' && item.product.nameKu ? item.product.nameKu : item.product.name}
+            </AppText>
+
+            {/* Part Number */}
+            {item.product.partNumber ? (
+              <Text allowFontScaling={false} style={styles.partNumberText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+                {item.product.partNumber}
+              </Text>
+            ) : null}
+
+            {/* Selected options (color/size) */}
+            {item.selectedOptions && (
+              <View style={styles.selectedOptionsRow}>
+                {item.selectedOptions.color && (
+                  <AppText style={styles.optionText}>
+                    {item.selectedOptions.color}
+                  </AppText>
+                )}
+                {item.selectedOptions.size && (
+                  <AppText style={styles.optionText}>
+                    {item.selectedOptions.size}
+                  </AppText>
+                )}
+              </View>
+            )}
+
+            {/* Stock warnings */}
+            {availableStock <= 5 && availableStock > 0 && (
+              <AppText style={styles.lowStockWarning}>
+                {t('products.lowStock', { count: availableStock })}
+              </AppText>
+            )}
+
+            {/* Wholesale badge */}
+            {hasDiscount && (
+              <View style={styles.wholesaleBadge}>
+                <AppText style={styles.wholesaleText}>
+                  {t('product.wholesalePricing', 'Bulk discount')}
+                </AppText>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* ===== BOTTOM ROW: Qty Controls + Price + Delete ===== */}
+        <View style={styles.cartItemBottom}>
+          {/* Quantity controls */}
+          <View style={[styles.actionsColumn, {
+            backgroundColor: theme.dark ? 'rgba(255,255,255,0.06)' : '#f2f2f2',
+            borderColor: theme.dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.03)',
+            borderRadius: 24,
+            paddingHorizontal: 4,
+            paddingVertical: 4,
+            borderWidth: 1,
+          }]}>
+            <TouchableOpacity
+              style={[styles.qtyBtn, { backgroundColor: theme.colors.background }, localQuantity <= 1 && styles.qtyBtnDisabled]}
+              onPress={() => handleQuantityChange(Math.max(1, localQuantity - 1))}
+              disabled={localQuantity <= 1 || isQuantityLoading || isUpdating}
+            >
+              <Ionicons name="remove" size={20} color={localQuantity <= 1 ? '#ccc' : theme.colors.primary} />
+            </TouchableOpacity>
+
+            <View style={{ position: 'relative', justifyContent: 'center', alignItems: 'center' }}>
+              <TextInput allowFontScaling={false}
+                value={localQtyText}
+                onChangeText={(text) => {
+                  const cleaned = text.replace(/[^0-9]/g, '');
+                  setLocalQtyText(cleaned);
+                  
+                  if (typingTimeoutRef.current) {
+                    clearTimeout(typingTimeoutRef.current);
+                  }
+                  
+                  if (cleaned.length > 0) {
+                    const num = parseInt(cleaned, 10);
+                    if (num > availableStock) {
+                      setLocalQuantity(availableStock);
+                      setLocalQtyText(String(availableStock));
+                      typingTimeoutRef.current = setTimeout(() => {
+                        handleQuantityChange(availableStock);
+                      }, 500);
+                    } else if (num >= 1) {
+                      setLocalQuantity(num);
+                      typingTimeoutRef.current = setTimeout(() => {
+                        handleQuantityChange(num);
+                      }, 500);
+                    }
+                  }
+                }}
+                onBlur={() => {
+                  if (typingTimeoutRef.current) {
+                    clearTimeout(typingTimeoutRef.current);
+                  }
+                  const num = parseInt(localQtyText, 10);
+                  if (isNaN(num) || num < 1) {
+                    handleQuantityChange(1);
+                  } else if (num > availableStock) {
+                    handleQuantityChange(availableStock);
+                  } else {
+                    handleQuantityChange(num);
+                  }
+                }}
+                keyboardType="number-pad"
+                selectTextOnFocus
+                style={[styles.qtyNumber, {
+                  color: theme.dark ? '#F2EDE6' : FIGMA_DARK,
+                  includeFontPadding: false,
+                  padding: 0,
+                  height: 40,
+                  paddingVertical: 0,
+                  textAlignVertical: 'center',
+                  opacity: isQuantityLoading ? 0 : 1,
+                }]}
+              />
+              {isQuantityLoading && (
+                <ActivityIndicator 
+                  size="small" 
+                  color={theme.dark ? theme.colors.primary : FIGMA_ORANGE} 
+                  style={{ position: 'absolute' }} 
+                />
+              )}
+            </View>
+
+            <TouchableOpacity
+              style={[styles.qtyBtn, { backgroundColor: theme.colors.background }, localQuantity >= availableStock && styles.qtyBtnDisabled]}
+              onPress={() => handleQuantityChange(Math.min(availableStock, localQuantity + 1))}
+              disabled={localQuantity >= availableStock || isQuantityLoading || isUpdating}
+            >
+              <Ionicons name="add" size={20} color={localQuantity >= availableStock ? '#ccc' : theme.colors.primary} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Price */}
+          <View style={styles.priceColumn}>
+            <AppNumber
+              value={formatPrice(discountedTotal, currency, exchangeRateIQD)}
+              style={[styles.itemPrice, { color: theme.dark ? theme.colors.primary : FIGMA_DARK }]}
+            />
+          </View>
+
+          {/* Delete button */}
+          <TouchableOpacity
+            style={[styles.removeBtn, theme.dark && { backgroundColor: 'rgba(255, 107, 107, 0.15)' }]}
+            onPress={handleRemove}
+            disabled={isUpdating}
+          >
+            <Feather name="trash-2" size={16} color="#FF6B6B" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Animated.View>
+  );
+};
+
+/**
+ * CART SCREEN - FIGMA DESIGN
+ * 
+ * Features:
+ * - Orange header with "My Basket" / "Shopping Cart" title
+ * - White content area with rounded top corners overlapping header
+ * - Go back button with pill background
+ * - Product items with colored thumbnail backgrounds
+ * - Sticky bottom bar with Total and Checkout button
+ */
+const CartScreen: React.FC = () => {
+  const navigation = useNavigation<CartScreenNavigationProp>();
+  const { requireAuth } = useAuthGate();
+  const { cart, refreshCart, isLoading, updateQuantity, removeFromCart } = useCart();
+  const { currency, exchangeRateIQD } = useCurrency();
+  const { theme, isDark } = useTheme();
+  const { user, isVip } = useAuth();
+  const cartAccent = isDark ? theme.colors.primary : FIGMA_ORANGE;
+  const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
+  
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [appliedDiscount, setAppliedDiscount] = useState<AppliedDiscount | null>(null);
+  const [discountLoading, setDiscountLoading] = useState(false);
+  const [opportunities, setOpportunities] = useState<{ discount: Discount; missingQuantity?: number; missingAmount?: number }[]>([]);
+  
+  // Motion safety state
+  const [reduceMotionEnabled, setReduceMotionEnabled] = useState(false);
+  
+  // Check Reduce Motion on mount
+  useEffect(() => {
+    const checkReduceMotion = async () => {
+      try {
+        const isEnabled = await AccessibilityInfo.isReduceMotionEnabled();
+        setReduceMotionEnabled(isEnabled);
+      } catch {
+        // Default to false
+      }
+    };
+    checkReduceMotion();
+  }, []);
+
+  // Auto-sync: Refresh product data when cart opens
+  useEffect(() => {
+    const syncCartData = async () => {
+      if (!user?.uid || !cart?.items?.length) return;
+      
+      try {
+        await CartService.syncCartWithLatestData(user.uid);
+        await refreshCart();
+      } catch {
+        // Silent fail - cart will show cached data
+      }
+    };
+    
+    syncCartData();
+  }, [user?.uid]);
+
+  const handleUpdateQuantity = useCallback(async (
+    productId: string, 
+    quantity: number,
+    selectedOptions?: { color?: string; size?: string }
+  ) => {
+    setIsUpdating(true);
+    try {
+      await updateQuantity(productId, quantity, selectedOptions);
+    } catch (error: any) {
+      Alert.alert(t('common.error'), error.message || t('cart.updateError', { defaultValue: 'Failed to update quantity' }));
+    } finally {
+      setIsUpdating(false);
+    }
+  }, [updateQuantity, t]);
+
+  const handleRemoveItem = useCallback(async (
+    productId: string,
+    selectedOptions?: { color?: string; size?: string }
+  ) => {
+    setIsUpdating(true);
+    try {
+      await removeFromCart(productId, selectedOptions);
+    } catch (error: any) {
+      Alert.alert(t('common.error'), error.message || t('cart.removeError', { defaultValue: 'Failed to remove item' }));
+    } finally {
+      setIsUpdating(false);
+    }
+  }, [removeFromCart, t]);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refreshCart();
+    setRefreshing(false);
+  }, [refreshCart]);
+
+  // Use useAuthGate for checkout
+  const handleCheckout = useCallback(() => {
+    if (!cart?.items.length) return;
+    
+    requireAuth(() => {
+      (navigation as any).navigate('Checkout');
+    }, 'checkout');
+  }, [cart, navigation, requireAuth]);
+
+  // Fetch and apply best discount
+  useEffect(() => {
+    const loadDiscounts = async () => {
+      if (!cart || cart.items.length === 0) {
+        setAppliedDiscount(null);
+        return;
+      }
+
+      setDiscountLoading(true);
+      try {
+        const bestDiscount = await discountService.getBestDiscountForCart(cart, isVip);
+        if (bestDiscount) {
+          const applied = discountService.applyDiscountToCart(cart, bestDiscount, isVip);
+          setAppliedDiscount(applied);
+        } else {
+          setAppliedDiscount(null);
+        }
+      } catch {
+        setAppliedDiscount(null);
+      } finally {
+        setDiscountLoading(false);
+      }
+      
+      try {
+        const potential = await discountService.getPotentialDiscounts(cart);
+        setOpportunities(potential);
+      } catch {
+        // Silent fail
+      }
+    };
+
+    loadDiscounts();
+  }, [cart, isVip]);
+
+  const [shippingRegion, setShippingRegion] = useState('Erbil');
+  const [shippingCountry, setShippingCountry] = useState('');
+
+  // Fetch user default address for shipping calculation once
+  useEffect(() => {
+    let isMounted = true;
+    const fetchUserAddress = async () => {
+      if (!user?.uid) return;
+      try {
+        const addresses = await addressService.getUserAddresses(user.uid);
+        if (addresses && addresses.length > 0) {
+          const defaultAddress = addresses.find(addr => addr.isDefault) || addresses[0];
+          if (defaultAddress && isMounted) {
+            setShippingRegion(defaultAddress.city || 'Erbil');
+            setShippingCountry(defaultAddress.region || '');
+          }
+        }
+      } catch (error) {
+        // Fallback to default
+      }
+    };
+    fetchUserAddress();
+    return () => { isMounted = false; };
+  }, [user?.uid]);
+
+  // Calculate cart summary
+  const [cartSummary, setCartSummary] = useState<{
+    subtotal: number;
+    shipping: number;
+    total: number;
+    itemCount: number;
+    freeShippingThreshold: number;
+    remainingForFreeShipping: number;
+  } | null>(null);
+
+  useEffect(() => {
+    const loadCartSummary = async () => {
+      if (!cart || !cart.items.length) {
+        setCartSummary(null);
+        return;
+      }
+
+      try {
+        const summary = await CartService.getCartSummaryAsync(cart, shippingRegion, shippingCountry, isVip);
+        setCartSummary(summary);
+      } catch (error) {
+        console.error('Failed to load cart summary', error);
+      }
+    };
+
+    loadCartSummary();
+  }, [cart, shippingRegion, shippingCountry, isVip]);
+
+  // Render cart item
+  const renderCartItem = useCallback(({ item, index }: { item: CartItem; index: number }) => (
+    <CartItemComponent
+      item={item}
+      index={index}
+      onUpdateQuantity={handleUpdateQuantity}
+      onRemove={handleRemoveItem}
+      isUpdating={isUpdating}
+      theme={theme}
+      t={t}
+    />
+  ), [handleUpdateQuantity, handleRemoveItem, isUpdating, theme, t]);
+
+  // Render empty state
+  const renderEmptyState = useCallback(() => (
+    <View style={styles.emptyContainer}>
+      <View style={[styles.emptyIconContainer, { backgroundColor: cartAccent + '20' }]}>
+        <CartIcon size={60} color={cartAccent} />
+      </View>
+      <Text allowFontScaling={false} style={[styles.emptyTitle, { color: theme.colors.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>{t('cart.empty')}</Text>
+      <AppText style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
+        {t('cart.emptySubtitle')}
+      </AppText>
+      <TouchableOpacity 
+        style={[styles.shopButton, { backgroundColor: cartAccent }]}
+        onPress={() => navigation.navigate('Main', { screen: 'Categories' })}
+      >
+        <AppText style={styles.shopButtonText}>{t('orders.startShopping')}</AppText>
+      </TouchableOpacity>
+    </View>
+  ), [t, navigation]);
+
+  // Loading skeleton
+  if (isLoading && !cart) {
+    return (
+      <View style={[styles.container, { backgroundColor: cartAccent }]}>
+        <StatusBar style="light" />
+        <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+          {/* Orange header skeleton */}
+          <View style={styles.headerContainer}>
+            <View style={styles.goBackPill}>
+              <View style={[styles.skeletonCircle, { backgroundColor: '#fff', opacity: 0.3 }]} />
+            </View>
+            <View style={[styles.skeletonTitle, { backgroundColor: '#fff', opacity: 0.5 }]} />
+          </View>
+          
+          {/* White content area skeleton */}
+          <View style={styles.contentContainer}>
+            <View style={{ padding: 20 }}>
+              {[1, 2, 3].map((i) => (
+                <View key={i} style={[styles.cartItem, { marginBottom: 16 }]}>
+                  <View style={[styles.productThumbContainer, { backgroundColor: '#f0f0f0' }]} />
+                  <View style={styles.productInfo}>
+                    <View style={[styles.skeletonText, { width: '70%', height: 16 }]} />
+                    <View style={[styles.skeletonText, { width: '40%', height: 14, marginTop: 8 }]} />
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
+  const hasItems = cart?.items && cart.items.length > 0;
+
+  return (
+    <View style={[styles.container, { backgroundColor: cartAccent }]}>
+      <StatusBar style="light" />
+      
+      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+        {/* FIGMA: Orange header */}
+        <View style={styles.headerContainer}>
+          {/* Go back button with pill background */}
+          <TouchableOpacity 
+            style={styles.goBackPill}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="chevron-back" size={20} color="#000" />
+            <AppText style={styles.goBackText}>{t('common.back', 'Go back')}</AppText>
+          </TouchableOpacity>
+
+          {/* Title */}
+          <AppText style={styles.headerTitle}>{t('cart.title')}</AppText>
+
+          {/* Spacer for centering */}
+          <View style={{ width: 80 }} />
+        </View>
+
+        {/* FIGMA: White content area with rounded top corners */}
+        <View style={[styles.contentContainer, { backgroundColor: isDark ? theme.colors.background : '#fff' }]}>
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          >
+            <FlatList
+              data={hasItems ? cart.items : []}
+              renderItem={renderCartItem}
+              keyExtractor={(item) => `${item.productId}-${item.selectedOptions?.color || ''}-${item.selectedOptions?.size || ''}`}
+              ListEmptyComponent={renderEmptyState}
+              showsVerticalScrollIndicator={false}
+              removeClippedSubviews={true}
+              initialNumToRender={6}
+              maxToRenderPerBatch={4}
+              windowSize={5}
+              keyboardDismissMode="interactive"
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{
+                flexGrow: 1,
+                paddingHorizontal: 20,
+                paddingTop: 24,
+                paddingBottom: hasItems && cartSummary ? SUMMARY_BAR_BASE_HEIGHT + insets.bottom : 40,
+              }}
+              refreshControl={
+                <RefreshControl 
+                  refreshing={refreshing} 
+                  onRefresh={handleRefresh}
+                  colors={[cartAccent]}
+                  tintColor={cartAccent}
+                />
+              }
+              ItemSeparatorComponent={() => <View style={styles.separator} />}
+            />
+
+            {/* FIGMA: Sticky bottom summary bar */}
+            {hasItems && cartSummary && (
+              <View style={[
+                styles.summaryContainer,
+                { paddingBottom: insets.bottom + 16, backgroundColor: isDark ? theme.colors.surface : '#FFF8F2' }
+              ]}>
+                {/* Discount banner */}
+                {appliedDiscount && (
+                  <View style={styles.discountBanner}>
+                    <Feather name="tag" size={16} color="#4CAF50" />
+                    <Text allowFontScaling={false} style={styles.discountBannerText}>
+                      {appliedDiscount.discountName}{' - '}{t('cart.saving', 'Saving')}{' '}{formatPrice(appliedDiscount.savedAmount, currency, exchangeRateIQD)}
+                    </Text>
+                  </View>
+                )}
+
+
+                {/* Total row */}
+                <View style={styles.totalRow}>
+                  <View>
+                    <AppText style={[styles.totalLabel, { color: isDark ? theme.colors.textSecondary : '#888' }]}>{t('cart.total', 'Total')}</AppText>
+                    <View style={styles.totalPriceRow}>
+                      <AppNumber
+                        value={formatPrice(
+                          appliedDiscount
+                            ? Math.max(0, cartSummary.total - appliedDiscount.savedAmount)
+                            : cartSummary.total,
+                          currency,
+                          exchangeRateIQD
+                        )}
+                        style={[styles.totalPrice, { color: '#0B1F4D' }]}
+                      />
+                    </View>
+                  </View>
+
+                  {/* Checkout button — gradient; stays solid during qty edits (no loading flash) */}
+                  <TouchableOpacity
+                    onPress={handleCheckout}
+                    activeOpacity={0.85}
+                    style={styles.checkoutButtonShadow}
+                  >
+                    <LinearGradient
+                      colors={['#22C55E', '#16A34A']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.checkoutButton}
+                    >
+                      <Feather name="shopping-bag" size={16} color="#fff" style={{ marginRight: 8 }} />
+                      <AppText style={styles.checkoutButtonText}>
+                        {t('cart.checkout', 'Checkout')}
+                      </AppText>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </KeyboardAvoidingView>
+        </View>
+      </SafeAreaView>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+
+  // ========== LUXURY HEADER ==========
+  headerContainer: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingTop: 14,
+    paddingVertical: 22,
+  },
+  goBackPill: {
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 999,
+    elevation: 2,
+    flexDirection: 'row',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+  },
+  goBackText: {
+    color: FIGMA_DARK,
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: 0.1,
+    marginLeft: 4,
+  },
+  headerTitle: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+    textAlign: 'center',
+  },
+
+  // ========== LUXURY CONTENT AREA ==========
+  contentContainer: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    flex: 1,
+    marginTop: -8,
+  },
+
+  // ========== LUXURY CART ITEMS ==========
+  cartItem: {
+    backgroundColor: '#FFF5EE', // overridden inline for dark mode
+    borderRadius: 20,
+    marginBottom: 10,
+    overflow: 'hidden',
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+  cartItemTop: {
+    alignItems: 'center',
+    flexDirection: 'row',
+  },
+  cartItemBottom: {
+    alignItems: 'center',
+    borderTopColor: 'rgba(0,0,0,0.06)',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 12,
+    paddingTop: 12,
+  },
+  productThumbContainer: {
+    alignItems: 'center',
+    borderRadius: 14,
+    height: 72,
+    justifyContent: 'center',
+    marginRight: 14,
+    overflow: 'hidden',
+    width: 72,
+  },
+  productImage: {
+    height: '100%',
+    width: '100%',
+  },
+  unavailableOverlay: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 16,
+    bottom: 0,
+    justifyContent: 'center',
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  unavailableText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+  productInfo: {
+    flex: 1,
+    gap: 3,
+  },
+  productName: {
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.1,
+    marginBottom: 2,
+  },
+  partNumberText: {
+    color: '#999',
+    fontSize: 12,
+    fontWeight: '500',
+    letterSpacing: 0.3,
+    marginBottom: 2,
+  },
+
+  selectedOptionsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 6,
+  },
+  optionText: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    color: '#888',
+    fontSize: 12,
+    fontWeight: '500',
+    letterSpacing: 0.2,
+    overflow: 'hidden',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  lowStockWarning: {
+    color: '#FF9800',
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+    marginTop: 4,
+  },
+  wholesaleBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#E8F5E9',
+    borderRadius: 8,
+    marginTop: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  wholesaleText: {
+    color: '#4CAF50',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  priceColumn: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  itemPrice: {
+    color: FIGMA_DARK,
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+
+  // ========== LUXURY QUANTITY CONTROLS ==========
+  actionsColumn: {
+    alignItems: 'center',
+    flexDirection: 'row',
+  },
+  qtyBtn: {
+    alignItems: 'center',
+    borderRadius: 20,
+    height: 38,
+    justifyContent: 'center',
+    width: 38,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  qtyBtnDisabled: {
+    opacity: 0.4,
+  },
+  qtyNumber: {
+    color: FIGMA_DARK,
+    fontSize: 16,
+    fontWeight: '700',
+    minWidth: 40,
+    textAlign: 'center',
+  },
+  removeBtn: {
+    alignItems: 'center',
+    backgroundColor: '#FFF0F0',
+    borderRadius: 10,
+    height: 34,
+    justifyContent: 'center',
+    width: 34,
+  },
+  separator: {
+    backgroundColor: '#F4F4F4',
+    height: StyleSheet.hairlineWidth,
+    marginVertical: 6,
+  },
+
+  // ========== LUXURY EMPTY STATE ==========
+  emptyContainer: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    padding: 40,
+  },
+  emptyIconContainer: {
+    alignItems: 'center',
+    borderRadius: 999,
+    height: 130,
+    justifyContent: 'center',
+    marginBottom: 28,
+    width: 130,
+  },
+  emptyTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+    marginBottom: 10,
+    textAlign: 'center',
+    width: '100%',
+  },
+  emptySubtitle: {
+    fontSize: 15,
+    lineHeight: 24,
+    marginBottom: 36,
+    opacity: 0.6,
+    textAlign: 'center',
+  },
+  shopButton: {
+    borderRadius: 16,
+    elevation: 4,
+    paddingHorizontal: 36,
+    paddingVertical: 16,
+    shadowColor: FIGMA_ORANGE,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+  },
+  shopButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+
+  // ========== LUXURY SUMMARY BAR ==========
+  summaryContainer: {
+    backgroundColor: '#FFF8F2',
+    borderTopColor: '#FFE8D6',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    elevation: 16,
+    paddingHorizontal: 24,
+    paddingTop: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+  },
+  discountBanner: {
+    alignItems: 'center',
+    backgroundColor: '#E8F5E9',
+    borderRadius: 12,
+    flexDirection: 'row',
+    marginBottom: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  discountBannerText: {
+    color: '#4CAF50',
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.1,
+    marginLeft: 10,
+  },
+  subtotalRow: {
+    alignItems: 'center',
+    borderBottomColor: '#FFE0C4',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+    paddingBottom: 14,
+  },
+  itemCountBadge: {
+    backgroundColor: '#0077BE' + '20',
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+  },
+  itemCountText: {
+    color: '#0077BE',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  subtotalPriceRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+  },
+  subtotalLabel: {
+    color: '#888',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  subtotalPrice: {
+    color: '#0077BE',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  totalRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  totalLabel: {
+    color: '#888',
+    fontSize: 12,
+    fontWeight: '500',
+    letterSpacing: 0.3,
+    marginBottom: 3,
+    textTransform: 'uppercase',
+  },
+  totalPriceRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+  },
+  totalPrice: {
+    color: '#0077BE',
+    fontSize: 30,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  checkoutButton: {
+    alignItems: 'center',
+    backgroundColor: FIGMA_ORANGE,
+    borderRadius: 18,
+    elevation: 8,
+    flexDirection: 'row',
+    paddingHorizontal: 36,
+    paddingVertical: 18,
+    shadowColor: FIGMA_ORANGE,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+  },
+  checkoutButtonShadow: {
+    borderRadius: 18,
+    elevation: 10,
+    shadowColor: '#16A34A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 14,
+  },
+  checkoutButtonDisabled: {
+    opacity: 0.6,
+  },
+  checkoutButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+
+  // ========== SKELETON ==========
+  skeletonCircle: {
+    borderRadius: 12,
+    height: 24,
+    width: 24,
+  },
+  skeletonTitle: {
+    borderRadius: 8,
+    height: 24,
+    width: 120,
+  },
+  skeletonText: {
+    backgroundColor: '#e0e0e0',
+    borderRadius: 6,
+  },
+});
+
+export default CartScreen;

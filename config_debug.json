@@ -1,0 +1,75 @@
+﻿env: load .env
+env: export EXPO_PUBLIC_FIREBASE_API_KEY EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN EXPO_PUBLIC_FIREBASE_PROJECT_ID EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID EXPO_PUBLIC_FIREBASE_APP_ID EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID IMGBB_API_KEY EXPO_PUBLIC_IMGBB_API_KEY QI_PAYMENT_API_KEY FIB_PAYMENT_API_KEY PAYMENT_WEBHOOK_SECRET EXPO_PUBLIC_APP_NAME EXPO_PUBLIC_APP_VERSION EXPO_PUBLIC_API_URL GOOGLE_MAPS_API_KEY EXPO_PUBLIC_GOOGLE_MAPS_API_KEY EXPO_PUBLIC_ENABLE_MAPS
+
+{
+  name: [32m'Haryad-Auto-Part'[39m,
+  slug: [32m'haryad-auto-part'[39m,
+  version: [32m'1.2.3'[39m,
+  orientation: [32m'portrait'[39m,
+  icon: [32m'./assets/icon.png'[39m,
+  userInterfaceStyle: [32m'automatic'[39m,
+  primaryColor: [32m'#1a365d'[39m,
+  description: [32m'Premium auto parts for Volvo, Scania, DAF trucks in Kurdistan. Browse thousands of genuine truck parts with fast delivery across Iraq.'[39m,
+  assetBundlePatterns: [
+    [32m'**/*'[39m
+  ],
+  sdkVersion: [32m'54.0.0'[39m,
+  platforms: [
+    [32m'ios'[39m,
+    [32m'android'[39m
+  ],
+  runtimeVersion: [32m'1.0.0'[39m,
+  plugins: [],
+  splash: {
+    image: [32m'./assets/splash-icon.png'[39m,
+    backgroundColor: [32m'#1a365d'[39m,
+    resizeMode: [32m'contain'[39m
+  },
+  notification: {
+    icon: [32m'./assets/notification-icon.png'[39m,
+    color: [32m'#1a365d'[39m
+  },
+  ios: {
+    supportsTablet: [33mtrue[39m,
+    bundleIdentifier: [32m'com.haryad.autopart'[39m,
+    buildNumber: [32m'1'[39m,
+    usesAppleSignIn: [33mtrue[39m,
+    infoPlist: {
+      NSCameraUsageDescription: [32m'Haryad Auto Part uses your camera to take photos of auto parts and for profile pictures.'[39m,
+      NSPhotoLibraryUsageDescription: [32m'Haryad Auto Part needs access to your photo library to select images for parts and profile pictures.'[39m,
+      NSLocationWhenInUseUsageDescription: [32m'Haryad Auto Part uses your location to provide accurate delivery and find nearby service centers.'[39m,
+      NSLocationAlwaysAndWhenInUseUsageDescription: [32m'Haryad Auto Part uses your location to provide accurate delivery and find nearby service centers.'[39m
+    }
+  },
+  android: {
+    package: [32m'com.haryad.autopart'[39m,
+    versionCode: [33m27[39m,
+    googleServicesFile: [32m'./google-services.json'[39m,
+    permissions: [
+      [32m'android.permission.CAMERA'[39m,
+      [32m'android.permission.READ_MEDIA_IMAGES'[39m,
+      [32m'android.permission.POST_NOTIFICATIONS'[39m,
+      [32m'android.permission.VIBRATE'[39m,
+      [32m'android.permission.ACCESS_NETWORK_STATE'[39m,
+      [32m'android.permission.ACCESS_WIFI_STATE'[39m,
+      [32m'android.permission.INTERNET'[39m,
+      [32m'android.permission.ACCESS_FINE_LOCATION'[39m,
+      [32m'android.permission.ACCESS_COARSE_LOCATION'[39m
+    ],
+    allowBackup: [33mfalse[39m,
+    adaptiveIcon: {
+      foregroundImage: [32m'./assets/adaptive-icon.png'[39m,
+      backgroundColor: [32m'#1a365d'[39m
+    }
+  },
+  web: {
+    favicon: [32m'./assets/favicon.png'[39m,
+    bundler: [32m'metro'[39m
+  },
+  extra: {
+    eas: {
+      projectId: [32m'6293ca0a-3654-4dcf-8f64-a690d6aaae1e'[39m
+    }
+  }
+}
+
