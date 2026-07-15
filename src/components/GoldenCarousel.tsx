@@ -356,7 +356,9 @@ const GoldenCarousel: React.FC<GoldenCarouselProps> = ({
 
 const styles = StyleSheet.create({
   bottomOverlay: {
-    bottom: 0,
+    // Sit above the info sheet, which overlaps the carousel bottom (~28px),
+    // so the pagination progress bar is never clipped by the rising sheet.
+    bottom: 42,
     left: 0,
     position: 'absolute',
     right: 0,

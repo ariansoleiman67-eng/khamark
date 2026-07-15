@@ -11,7 +11,9 @@ interface BrandTileProps {
   onPress?: () => void;
 }
 
-// aynAlfahad "Our Brands" tile: flat light-gray rounded card, logo/initial centered, label beneath.
+// aynAlfahad "Our Brands" tile: flat light-gray rounded card. When the admin has
+// uploaded a real logo, it's shown centered with the name beneath. Otherwise the
+// brand name is rendered as a clean bold wordmark (a text logo) filling the card.
 const BrandTile: React.FC<BrandTileProps> = ({ label, imageUrl, width, onPress }) => {
   const { theme, isDark } = useTheme();
   const [imgFailed, setImgFailed] = useState(false);
@@ -30,59 +32,72 @@ const BrandTile: React.FC<BrandTileProps> = ({ label, imageUrl, width, onPress }
         },
       ]}
     >
-      <View style={styles.imgWrap}>
-        {showImage ? (
-          <Image
-            source={{ uri: imageUrl }}
-            style={styles.img}
-            contentFit="contain"
-            transition={0}
-            onError={() => setImgFailed(true)}
-          />
-        ) : (
-          <View style={[styles.letter, { backgroundColor: theme.colors.primary }]}>
-            <AppText fontSize={22} style={styles.letterText}>
-              {(label || '?').charAt(0).toUpperCase()}
-            </AppText>
+      {showImage ? (
+        <>
+          <View style={styles.imgWrap}>
+            <Image
+              source={{ uri: imageUrl }}
+              style={styles.img}
+              contentFit="contain"
+              transition={0}
+              onError={() => setImgFailed(true)}
+            />
           </View>
-        )}
-      </View>
-      <AppText
-        fontSize={13}
-        numberOfLines={1}
-        style={[styles.label, { color: theme.colors.textSecondary }]}
-      >
-        {label}
-      </AppText>
+          <AppText
+            fontSize={13}
+            numberOfLines={1}
+            style={[styles.label, { color: theme.colors.textSecondary }]}
+          >
+            {label}
+          </AppText>
+        </>
+      ) : (
+        <View style={styles.wordmarkWrap}>
+          <AppText
+            fontSize={20}
+            numberOfLines={2}
+            adjustsFontSizeToFit
+            minimumFontScale={0.6}
+            style={[styles.wordmark, { color: theme.colors.text }]}
+          >
+            {label}
+          </AppText>
+        </View>
+      )}
     </Pressable>
   );
 };
 
 const styles = StyleSheet.create({
   tile: {
-    borderRadius: 16,
-    paddingVertical: 18,
-    paddingHorizontal: 12,
+    borderRadius: 18,
+    minHeight: 128,
+    paddingVertical: 16,
+    paddingHorizontal: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
   imgWrap: {
-    height: 56,
+    height: 78,
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
   },
-  img: { width: '72%', height: 52 },
-  letter: {
-    width: 52,
-    height: 52,
-    borderRadius: 14,
+  img: { width: '82%', height: 70 },
+  label: { fontWeight: '600' },
+  wordmarkWrap: {
+    flex: 1,
+    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 4,
   },
-  letterText: { color: '#FFFFFF', fontWeight: '800' },
-  label: { fontWeight: '600' },
+  wordmark: {
+    fontWeight: '800',
+    textAlign: 'center',
+    letterSpacing: 0.2,
+  },
 });
 
 export default BrandTile;

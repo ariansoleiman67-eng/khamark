@@ -13,11 +13,12 @@ export interface Brand {
   sortOrder: number;
 }
 
-const STORAGE_KEY = '@asankary_brands_mock_v2';
+const STORAGE_KEY = '@asankary_brands_mock_v4';
 
-// Seed brands mirror the demo product brands. No default logo (external logo CDNs
-// aren't reachable in every env) — clean amber letter tiles by default; the admin
-// adds real logos via the Brand Manager (persisted locally, works offline).
+// Seed brands mirror the demo product brands. No default logo image (external
+// logo CDNs are blocked in this env) — BrandTile renders a clean bold wordmark
+// of the brand name. Admin uploads a real logo via the Brand Manager (local uri,
+// reliable) to replace the wordmark.
 const SEED_BRANDS: Brand[] = [
   { id: 'br-momax', name: 'Momax', isActive: true, sortOrder: 0 },
   { id: 'br-samsung', name: 'Samsung', isActive: true, sortOrder: 1 },
