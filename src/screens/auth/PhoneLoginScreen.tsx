@@ -1,3 +1,4 @@
+/* eslint-disable react-native/no-inline-styles, react-native/no-color-literals */
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -10,6 +11,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  I18nManager,
 } from 'react-native';
 import AppText from '../../components/AppText';
 import { Ionicons } from '@expo/vector-icons';
@@ -31,6 +33,7 @@ import { useUserRegion } from '../../hooks/useUserRegion';
 import { RootStackParamList } from '../../types';
 import PhoneInput from '../../components/PhoneInput';
 import { CredentialStorage } from '../../services/credentialStorage';
+import { useTheme } from '../../components/ThemeProvider';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 type LoginMethod = 'phone' | 'email';
@@ -54,9 +57,21 @@ const COLORS = {
 const PhoneLoginScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<any>();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
   const userRegion = useUserRegion();
+  const { theme, isDark } = useTheme();
+  const colors = theme.colors as any;
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
+
+  // Dark-mode-aware colour tokens. In light mode these resolve to the original
+  // Figma constants, so the light design stays pixel-identical.
+  const surfaceBg = isDark ? colors.surface : COLORS.white;
+  const fieldBg = isDark ? 'rgba(255,255,255,0.06)' : COLORS.inputBg;
+  const primaryText = isDark ? colors.text : COLORS.textDark;
+  const secondaryText = isDark ? colors.textSecondary : COLORS.textGray;
+  const placeholderColor = isDark ? colors.textSecondary : COLORS.placeholder;
+  const dividerColor = isDark ? colors.border : COLORS.borderLight;
 
   const isRequiredAuth = route.params?.requireAuth;
   
@@ -134,22 +149,22 @@ const PhoneLoginScreen: React.FC = () => {
     try {
       if (loginMethod === 'phone') {
         if (!phone.trim()) {
-          Alert.alert(t('auth.error'), 'Please enter your phone number');
+          Alert.alert(t('auth.error'), t('auth.enterPhone', { defaultValue: 'Please enter your phone number' }));
           return;
         }
         if (!validatePhone(phone, selectedCountry)) {
-          Alert.alert(t('auth.error'), 'Please enter a valid phone number');
+          Alert.alert(t('auth.error'), t('auth.invalidPhone', { defaultValue: 'Please enter a valid phone number' }));
           return;
         }
       } else {
         if (!email.trim()) {
-          Alert.alert(t('auth.error'), 'Please enter your email');
+          Alert.alert(t('auth.error'), t('auth.enterEmail', { defaultValue: 'Please enter your email' }));
           return;
         }
       }
 
       if (!password.trim()) {
-        Alert.alert(t('auth.error'), 'Please enter your password');
+        Alert.alert(t('auth.error'), t('auth.enterPassword', { defaultValue: 'Please enter your password' }));
         return;
       }
 
@@ -180,7 +195,7 @@ const PhoneLoginScreen: React.FC = () => {
       await refreshUser();
       handleSuccessfulLogin();
     } catch (error: any) {
-      Alert.alert(t('auth.error'), error.message || 'Login failed');
+      Alert.alert(t('auth.error'), error.message || t('auth.loginFailed', { defaultValue: 'Login failed' }));
     } finally {
       setLoading(false);
     }
@@ -306,7 +321,7 @@ const PhoneLoginScreen: React.FC = () => {
 
       {/* White Card Form Section */}
       <KeyboardAvoidingView
-        style={styles.whiteCard}
+        style={[styles.whiteCard, { backgroundColor: surfaceBg }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
@@ -315,7 +330,7 @@ const PhoneLoginScreen: React.FC = () => {
           showsVerticalScrollIndicator={false}
         >
           {/* Login Method Toggle */}
-          <View style={styles.toggleContainer}>
+          <View style={[styles.toggleContainer, { backgroundColor: fieldBg }, isRTL && { flexDirection: 'row-reverse' }]}>
             <TouchableOpacity
               style={[
                 styles.toggleButton,
@@ -323,14 +338,14 @@ const PhoneLoginScreen: React.FC = () => {
               ]}
               onPress={() => setLoginMethod('phone')}
             >
-              <Ionicons 
-                name="call-outline" 
-                size={16} 
-                color={loginMethod === 'phone' ? COLORS.white : COLORS.textGray} 
+              <Ionicons
+                name="call-outline"
+                size={16}
+                color={loginMethod === 'phone' ? COLORS.white : secondaryText}
               />
               <AppText style={[
                 styles.toggleText,
-                loginMethod === 'phone' && styles.toggleTextActive,
+                loginMethod === 'phone' ? styles.toggleTextActive : { color: secondaryText },
               ]} adjustsFontSizeToFit numberOfLines={1}>
                 {t('auth.phoneNumber', { defaultValue: 'Phone' })}
               </AppText>
@@ -342,14 +357,14 @@ const PhoneLoginScreen: React.FC = () => {
               ]}
               onPress={() => setLoginMethod('email')}
             >
-              <Ionicons 
-                name="mail-outline" 
-                size={16} 
-                color={loginMethod === 'email' ? COLORS.white : COLORS.textGray} 
+              <Ionicons
+                name="mail-outline"
+                size={16}
+                color={loginMethod === 'email' ? COLORS.white : secondaryText}
               />
               <AppText style={[
                 styles.toggleText,
-                loginMethod === 'email' && styles.toggleTextActive,
+                loginMethod === 'email' ? styles.toggleTextActive : { color: secondaryText },
               ]} adjustsFontSizeToFit numberOfLines={1}>
                 {t('auth.email', { defaultValue: 'Email' })}
               </AppText>
@@ -369,14 +384,14 @@ const PhoneLoginScreen: React.FC = () => {
             </View>
           ) : (
             <View style={styles.inputGroup}>
-              <AppText style={styles.label} adjustsFontSizeToFit numberOfLines={1}>
+              <AppText style={[styles.label, { color: primaryText }, isRTL && { textAlign: 'right' }]} adjustsFontSizeToFit numberOfLines={1}>
                 {t('auth.email', { defaultValue: 'Email' })}
               </AppText>
-              <View style={styles.inputWrapper}>
+              <View style={[styles.inputWrapper, { backgroundColor: fieldBg }]}>
                 <TextInput allowFontScaling={false}
-                  style={styles.input}
+                  style={[styles.input, { color: primaryText }]}
                   placeholder="example@gmail.com"
-                  placeholderTextColor={COLORS.placeholder}
+                  placeholderTextColor={placeholderColor}
                   value={email}
                   onChangeText={setEmail}
                   keyboardType="email-address"
@@ -389,46 +404,51 @@ const PhoneLoginScreen: React.FC = () => {
 
           {/* Password Input */}
           <View style={styles.inputGroup}>
-            <AppText style={styles.label} adjustsFontSizeToFit numberOfLines={1}>
+            <AppText style={[styles.label, { color: primaryText }, isRTL && { textAlign: 'right' }]} adjustsFontSizeToFit numberOfLines={1}>
               {t('auth.password', { defaultValue: 'Password' })}
             </AppText>
-            <View style={styles.inputWrapper}>
+            <View style={[styles.inputWrapper, { backgroundColor: fieldBg }]}>
               <TextInput allowFontScaling={false}
-                style={styles.input}
+                style={[styles.input, { color: primaryText }]}
                 placeholder="••••••••••"
-                placeholderTextColor={COLORS.placeholder}
+                placeholderTextColor={placeholderColor}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
                 autoCorrect={false}
               />
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={() => setShowPassword(!showPassword)}
                 style={styles.eyeButton}
               >
-                <Ionicons 
-                  name={showPassword ? 'eye-off-outline' : 'eye-outline'} 
-                  size={20} 
-                  color={COLORS.placeholder} 
+                <Ionicons
+                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                  size={20}
+                  color={placeholderColor}
                 />
               </TouchableOpacity>
             </View>
           </View>
 
           {/* Remember me & Forgot Password Row */}
-          <View style={styles.optionsRow}>
-            <TouchableOpacity 
-              style={styles.rememberMe} 
+          <View style={[styles.optionsRow, isRTL && { flexDirection: 'row-reverse' }]}>
+            <TouchableOpacity
+              style={[styles.rememberMe, isRTL && { flexDirection: 'row-reverse' }]}
               onPress={() => setRememberMe(!rememberMe)}
               activeOpacity={0.7}
             >
-              <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
+              <View style={[
+                styles.checkbox,
+                rememberMe && styles.checkboxChecked,
+                isDark && !rememberMe && { backgroundColor: 'transparent', borderColor: colors.border },
+                isRTL && { marginRight: 0, marginLeft: 10 },
+              ]}>
                 {rememberMe && (
                   <Ionicons name="checkmark" size={14} color={COLORS.white} />
                 )}
               </View>
-              <AppText style={styles.rememberText} adjustsFontSizeToFit numberOfLines={1}>
+              <AppText style={[styles.rememberText, isDark && { color: colors.textSecondary }]} adjustsFontSizeToFit numberOfLines={1}>
                 {t('auth.rememberMe', { defaultValue: 'Remember me' })}
               </AppText>
             </TouchableOpacity>
@@ -457,8 +477,8 @@ const PhoneLoginScreen: React.FC = () => {
 
           {/* Passwordless code login (Iraqi numbers via OTPIQ) */}
           {loginMethod === 'phone' && (
-            <TouchableOpacity onPress={handleCodeLogin} style={styles.codeLoginButton} activeOpacity={0.85}>
-              <Ionicons name="chatbox-ellipses-outline" size={18} color={COLORS.orange} style={{ marginRight: 8 }} />
+            <TouchableOpacity onPress={handleCodeLogin} style={[styles.codeLoginButton, isRTL && { flexDirection: 'row-reverse' }]} activeOpacity={0.85}>
+              <Ionicons name="chatbox-ellipses-outline" size={18} color={COLORS.orange} style={{ marginRight: isRTL ? 0 : 8, marginLeft: isRTL ? 8 : 0 }} />
               <AppText style={styles.codeLoginText} adjustsFontSizeToFit numberOfLines={1}>
                 {t('auth.signInWithCode', { defaultValue: 'Sign in with a code' })}
               </AppText>
@@ -466,12 +486,12 @@ const PhoneLoginScreen: React.FC = () => {
           )}
 
           {/* Register Link */}
-          <View style={styles.registerRow}>
-            <AppText style={styles.registerText} adjustsFontSizeToFit numberOfLines={1}>
+          <View style={[styles.registerRow, isRTL && { flexDirection: 'row-reverse' }]}>
+            <AppText style={[styles.registerText, { color: secondaryText }]} adjustsFontSizeToFit numberOfLines={1}>
               {t('auth.noAccount', { defaultValue: "Don't have an account?" })}
             </AppText>
             <TouchableOpacity onPress={handleRegister}>
-              <AppText style={styles.registerLink} adjustsFontSizeToFit numberOfLines={1}>
+              <AppText style={[styles.registerLink, isRTL && { marginLeft: 0, marginRight: 6 }]} adjustsFontSizeToFit numberOfLines={1}>
                 {t('auth.registerAction', { defaultValue: 'Sign Up' })}
               </AppText>
             </TouchableOpacity>
@@ -479,11 +499,11 @@ const PhoneLoginScreen: React.FC = () => {
 
           {/* Divider */}
           <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
-            <AppText style={styles.dividerText} adjustsFontSizeToFit numberOfLines={1}>
+            <View style={[styles.dividerLine, { backgroundColor: dividerColor }]} />
+            <AppText style={[styles.dividerText, { color: secondaryText }]} adjustsFontSizeToFit numberOfLines={1}>
               {t('common.or', { defaultValue: 'Or' })}
             </AppText>
-            <View style={styles.dividerLine} />
+            <View style={[styles.dividerLine, { backgroundColor: dividerColor }]} />
           </View>
 
           {/* Social Login Buttons */}
@@ -539,7 +559,7 @@ const PhoneLoginScreen: React.FC = () => {
             style={styles.guestButton}
             onPress={handleContinueAsGuest}
           >
-            <AppText style={styles.guestText} adjustsFontSizeToFit numberOfLines={1}>
+            <AppText style={[styles.guestText, { color: secondaryText }]} adjustsFontSizeToFit numberOfLines={1}>
               {t('auth.continueAsGuest', { defaultValue: 'Continue as Guest' })}
             </AppText>
           </TouchableOpacity>

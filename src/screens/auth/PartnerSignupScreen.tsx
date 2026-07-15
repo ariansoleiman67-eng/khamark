@@ -1,5 +1,5 @@
 /* eslint-disable react-native/no-inline-styles, react-native/no-color-literals */
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
+  I18nManager,
 } from 'react-native';
 import AppText from '../../components/AppText';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,6 +18,7 @@ import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../../components/ThemeProvider';
 import { isPhoneRegistered } from '../../services/auth';
 import { RootStackParamList } from '../../types';
 import PhoneInput from '../../components/PhoneInput';
@@ -48,7 +50,11 @@ const RADIUS = { input: 18, button: 18, back: 22 };
 const PartnerSignupScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const insets = useSafeAreaInsets();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const { theme, isDark } = useTheme();
+  const colors = theme.colors as any;
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
+  const styles = useMemo(() => createStyles(colors, isDark, isRTL), [colors, isDark, isRTL]);
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -96,7 +102,7 @@ const PartnerSignupScreen: React.FC = () => {
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 12 }]} keyboardShouldPersistTaps="handled">
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="chevron-back" size={22} color={LUX.heading} />
+          <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={22} color={colors.text} />
         </TouchableOpacity>
 
         <View style={styles.iconBadge}>
@@ -112,7 +118,7 @@ const PartnerSignupScreen: React.FC = () => {
           value={name}
           onChangeText={(v) => { setName(v); setErrorMessage(''); }}
           placeholder={t('auth.partnerSetup.namePlaceholder', { defaultValue: 'Partner / shop name' })}
-          placeholderTextColor={LUX.placeholder}
+          placeholderTextColor={colors.placeholder}
           style={styles.input}
           autoCapitalize="words"
         />
@@ -137,16 +143,16 @@ const PartnerSignupScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: LUX.bg },
+const createStyles = (colors: any, isDark: boolean, isRTL: boolean) => StyleSheet.create({
+  flex: { flex: 1, backgroundColor: colors.background },
   scroll: { flexGrow: 1, paddingHorizontal: SPACING.lg, paddingBottom: SPACING.xl },
-  backBtn: { width: RADIUS.back * 2, height: RADIUS.back * 2, borderRadius: RADIUS.back, alignItems: 'center', justifyContent: 'center', backgroundColor: LUX.surface, borderWidth: 1, borderColor: LUX.border },
-  iconBadge: { width: 60, height: 60, borderRadius: 18, backgroundColor: '#8B5CF615', alignItems: 'center', justifyContent: 'center', marginTop: SPACING.lg },
-  title: { fontSize: 26, fontWeight: '800', color: LUX.heading, marginTop: SPACING.md },
-  subtitle: { fontSize: 14, color: LUX.muted, marginTop: SPACING.xs, lineHeight: 20 },
-  label: { fontSize: 13, fontWeight: '700', color: LUX.body, marginTop: SPACING.lg, marginBottom: SPACING.xs },
-  input: { backgroundColor: LUX.inputBg, borderRadius: RADIUS.input, paddingHorizontal: SPACING.md, height: 54, fontSize: 15, color: LUX.heading, borderWidth: 1, borderColor: LUX.border },
-  error: { color: LUX.error, fontSize: 13, marginTop: SPACING.md, fontWeight: '600' },
+  backBtn: { width: RADIUS.back * 2, height: RADIUS.back * 2, borderRadius: RADIUS.back, alignItems: 'center', justifyContent: 'center', alignSelf: isRTL ? 'flex-end' : 'flex-start', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  iconBadge: { width: 60, height: 60, borderRadius: 18, backgroundColor: isDark ? 'rgba(139,92,246,0.20)' : '#8B5CF615', alignItems: 'center', justifyContent: 'center', marginTop: SPACING.lg },
+  title: { fontSize: 26, fontWeight: '800', color: colors.text, marginTop: SPACING.md, textAlign: isRTL ? 'right' : 'left' },
+  subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: SPACING.xs, lineHeight: 20, textAlign: isRTL ? 'right' : 'left' },
+  label: { fontSize: 13, fontWeight: '700', color: colors.text, marginTop: SPACING.lg, marginBottom: SPACING.xs, textAlign: isRTL ? 'right' : 'left' },
+  input: { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : LUX.inputBg, borderRadius: RADIUS.input, paddingHorizontal: SPACING.md, height: 54, fontSize: 15, color: colors.text, borderWidth: 1, borderColor: colors.border, textAlign: isRTL ? 'right' : 'left' },
+  error: { color: colors.error, fontSize: 13, marginTop: SPACING.md, fontWeight: '600', textAlign: isRTL ? 'right' : 'left' },
   button: { backgroundColor: LUX.accent, borderRadius: RADIUS.button, height: 56, alignItems: 'center', justifyContent: 'center', marginTop: SPACING.xl },
   buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
 });

@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTranslation } from 'react-i18next';
+import { useTheme } from '../../components/ThemeProvider';
 
 // NOTE (Asankary clone): the original OnboardingScreen was removed during the
 // Phase 0 purge before the first commit and its content could not be recovered. This is a
@@ -23,8 +24,11 @@ interface OnboardingScreenProps {
 const ACCENT = '#F5A00A'; // Amber Retail accent (Phase 3 palette)
 
 const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
-  const { t } = useTranslation();
-  const isRTL = I18nManager.isRTL;
+  const { t, i18n } = useTranslation();
+  const { theme } = useTheme();
+  const colors = theme.colors as any;
+  const isRTL =
+    I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const textAlign = isRTL ? 'right' : 'left';
 
   const finish = useCallback(async () => {
@@ -43,20 +47,20 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.logoBadge}>
+        <View style={[styles.logoBadge, { backgroundColor: colors.primary }]}>
           <Text style={styles.logoText}>A</Text>
         </View>
 
-        <Text style={[styles.title, { textAlign }]}>
+        <Text style={[styles.title, { textAlign, color: colors.text }]}>
           {t('onboarding.welcome', { defaultValue: 'Welcome to Asankary' })}
         </Text>
-        <Text style={[styles.subtitle, { textAlign }]}>
+        <Text style={[styles.subtitle, { textAlign, color: colors.textSecondary }]}>
           {t('onboarding.subtitle', {
             defaultValue: 'Your online store for the products you love.',
           })}
@@ -68,8 +72,8 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
               key={p.key}
               style={[styles.pointRow, isRTL && styles.pointRowRTL]}
             >
-              <View style={styles.dot} />
-              <Text style={[styles.pointText, { textAlign }]}>
+              <View style={[styles.dot, { backgroundColor: colors.primary }]} />
+              <Text style={[styles.pointText, { textAlign, color: colors.text }]}>
                 {t(p.key, { defaultValue: p.fallback })}
               </Text>
             </View>
@@ -79,7 +83,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
 
       <View style={styles.footer}>
         <TouchableOpacity
-          style={styles.cta}
+          style={[styles.cta, { backgroundColor: colors.primary }]}
           activeOpacity={0.85}
           onPress={finish}
           accessibilityRole="button"

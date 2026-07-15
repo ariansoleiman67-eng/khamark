@@ -6,6 +6,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   TouchableOpacity,
+  I18nManager,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -15,6 +16,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import AppText from '../../components/AppText';
 import Button from '../../components/Button';
+import { useTranslation } from 'react-i18next';
 
 /**
  * LoginGateScreen - Intent-Based Authentication Gate
@@ -84,6 +86,8 @@ const getReasonContent = (reason?: LoginGateReason) => {
 
 const LoginGateScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
+  const { t, i18n } = useTranslation();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<{ params: LoginGateParams }, 'params'>>();
   const insets = useSafeAreaInsets();
@@ -134,12 +138,12 @@ const LoginGateScreen: React.FC = () => {
             bounces={Platform.OS === 'ios'}
           >
             {/* Back Button */}
-            <TouchableOpacity 
-              style={styles.backButton}
+            <TouchableOpacity
+              style={[styles.backButton, { alignSelf: isRTL ? 'flex-end' : 'flex-start' }]}
               onPress={handleBackToBrowsing}
               activeOpacity={0.7}
             >
-              <Ionicons name="arrow-back" size={24} color="#fff" />
+              <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color="#fff" />
             </TouchableOpacity>
 
             {/* Icon */}
@@ -155,19 +159,19 @@ const LoginGateScreen: React.FC = () => {
 
             {/* Title */}
             <AppText style={styles.title}>
-              {content.title}
+              {t(`loginGate.reason.${reason ?? 'default'}.title`, { defaultValue: content.title })}
             </AppText>
 
             {/* Description */}
             <AppText style={styles.description}>
-              {content.description}
+              {t(`loginGate.reason.${reason ?? 'default'}.description`, { defaultValue: content.description })}
             </AppText>
 
             {/* Action Container */}
             <View style={[styles.actionContainer, { backgroundColor: theme.colors.surface }]}>
               {/* Primary: Sign In */}
               <Button
-                title="Sign In"
+                title={t('auth.signIn', { defaultValue: 'Sign In' })}
                 onPress={handleSignIn}
                 fullWidth
                 style={styles.primaryButton}
@@ -175,7 +179,7 @@ const LoginGateScreen: React.FC = () => {
 
               {/* Secondary: Create Account */}
               <Button
-                title="Create Account"
+                title={t('auth.createAccount', { defaultValue: 'Create Account' })}
                 onPress={handleCreateAccount}
                 fullWidth
                 style={styles.secondaryButton}
@@ -192,7 +196,7 @@ const LoginGateScreen: React.FC = () => {
                   numberOfLines={1}
                   adjustsFontSizeToFit
                 >
-                  Back to Browsing
+                  {t('loginGate.backToBrowsing', { defaultValue: 'Back to Browsing' })}
                 </AppText>
               </TouchableOpacity>
             </View>
@@ -200,24 +204,24 @@ const LoginGateScreen: React.FC = () => {
             {/* Benefits */}
             <View style={styles.benefitsContainer}>
               <AppText style={styles.benefitsTitle}>
-                Why create an account?
+                {t('loginGate.whyCreate', { defaultValue: 'Why create an account?' })}
               </AppText>
-              <View style={styles.benefitRow}>
+              <View style={[styles.benefitRow, isRTL && { flexDirection: 'row-reverse' }]}>
                 <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
-                <AppText style={styles.benefitText}>
-                  Track your orders in real-time
+                <AppText style={[styles.benefitText, { textAlign: isRTL ? 'right' : 'left' }]}>
+                  {t('loginGate.benefitTrackOrders', { defaultValue: 'Track your orders in real-time' })}
                 </AppText>
               </View>
-              <View style={styles.benefitRow}>
+              <View style={[styles.benefitRow, isRTL && { flexDirection: 'row-reverse' }]}>
                 <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
-                <AppText style={styles.benefitText}>
-                  Save addresses for faster checkout
+                <AppText style={[styles.benefitText, { textAlign: isRTL ? 'right' : 'left' }]}>
+                  {t('loginGate.benefitSaveAddresses', { defaultValue: 'Save addresses for faster checkout' })}
                 </AppText>
               </View>
-              <View style={styles.benefitRow}>
+              <View style={[styles.benefitRow, isRTL && { flexDirection: 'row-reverse' }]}>
                 <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
-                <AppText style={styles.benefitText}>
-                  Access exclusive deals and offers
+                <AppText style={[styles.benefitText, { textAlign: isRTL ? 'right' : 'left' }]}>
+                  {t('loginGate.benefitExclusiveDeals', { defaultValue: 'Access exclusive deals and offers' })}
                 </AppText>
               </View>
             </View>

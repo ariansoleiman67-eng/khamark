@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../components/ThemeProvider';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -41,6 +42,7 @@ const RegisterSuccessScreen: React.FC = () => {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { refreshUser } = useAuth();
+  const { theme } = useTheme();
 
   const showVerifyEmail = route.params?.method === 'email';
 
@@ -91,7 +93,7 @@ const RegisterSuccessScreen: React.FC = () => {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <View style={styles.content}>
         {/* ── Checkmark Circle ── */}
         <Animated.View style={[styles.checkCircle, { transform: [{ scale: checkScale }] }]}>
@@ -100,11 +102,11 @@ const RegisterSuccessScreen: React.FC = () => {
 
         {/* ── Text ── */}
         <Animated.View style={{ opacity: fadeIn, alignItems: 'center' }}>
-          <AppText style={styles.title}>
+          <AppText style={[styles.title, { color: theme.colors.text }]}>
             {t('auth.accountCreated', { defaultValue: 'Account created' })}
           </AppText>
           {showVerifyEmail && (
-            <AppText style={styles.subtitle}>
+            <AppText style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
               {t('auth.checkEmail', {
                 defaultValue: 'Please check your email to verify your account.',
               })}
@@ -115,11 +117,11 @@ const RegisterSuccessScreen: React.FC = () => {
         {/* ── Continue Button ── */}
         <Animated.View style={{ opacity: buttonFade, width: '100%' }}>
           <TouchableOpacity
-            style={styles.primaryButton}
+            style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
             onPress={handleContinue}
             activeOpacity={0.85}
           >
-            <AppText style={styles.primaryButtonText}>
+            <AppText style={[styles.primaryButtonText, { color: theme.colors.textOnPrimary }]}>
               {t('auth.continue', { defaultValue: 'Continue' })}
             </AppText>
           </TouchableOpacity>

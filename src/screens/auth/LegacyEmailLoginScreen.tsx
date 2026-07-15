@@ -10,6 +10,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  I18nManager,
 } from 'react-native';
 import AppText from '../../components/AppText';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,7 +26,8 @@ type NavigationProp = StackNavigationProp<RootStackParamList>;
 const LegacyEmailLoginScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const { theme } = useTheme();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -36,12 +38,12 @@ const LegacyEmailLoginScreen: React.FC = () => {
     try {
       // Validation
       if (!email.trim()) {
-        Alert.alert(t('auth.error'), 'Please enter your email');
+        Alert.alert(t('auth.error'), t('auth.enterEmail', { defaultValue: 'Please enter your email' }));
         return;
       }
 
       if (!password.trim()) {
-        Alert.alert(t('auth.error'), 'Please enter your password');
+        Alert.alert(t('auth.error'), t('auth.enterPassword', { defaultValue: 'Please enter your password' }));
         return;
       }
 
@@ -51,9 +53,9 @@ const LegacyEmailLoginScreen: React.FC = () => {
       await loginWithEmail(email, password);
 
       // Success - AuthContext will handle navigation
-      Alert.alert(t('auth.success'), 'Welcome back!');
+      Alert.alert(t('auth.success'), t('auth.welcomeBack', { defaultValue: 'Welcome back!' }));
     } catch (error: any) {
-      Alert.alert(t('auth.error'), error.message || 'Login failed');
+      Alert.alert(t('auth.error'), error.message || t('auth.loginFailed', { defaultValue: 'Login failed' }));
     } finally {
       setLoading(false);
     }
@@ -86,9 +88,9 @@ const LegacyEmailLoginScreen: React.FC = () => {
         </View>
 
         {/* Warning Box */}
-        <View style={[styles.warningBox, { backgroundColor: theme.colors.warning + '10' }]}>
+        <View style={[styles.warningBox, { backgroundColor: theme.colors.warning + '10', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <Ionicons name="warning-outline" size={20} color={theme.colors.warning} />
-          <AppText style={[styles.warningText, { color: theme.colors.warning }]}>
+          <AppText style={[styles.warningText, { color: theme.colors.warning, textAlign: isRTL ? 'right' : 'left' }]}>
             {t('auth.legacyLogin.warning', { 
               defaultValue: 'This login method is for legacy accounts only. New users should use phone login.' 
             })}
@@ -97,16 +99,17 @@ const LegacyEmailLoginScreen: React.FC = () => {
 
         {/* Email Input */}
         <View style={styles.inputContainer}>
-          <AppText style={[styles.label, { color: theme.colors.text }]}>
+          <AppText style={[styles.label, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
             {t('auth.email', { defaultValue: 'Email' })}
           </AppText>
-          <View style={[styles.inputWrapper, { 
+          <View style={[styles.inputWrapper, {
             backgroundColor: theme.colors.surface,
-            borderColor: theme.colors.border 
+            borderColor: theme.colors.border,
+            flexDirection: isRTL ? 'row-reverse' : 'row'
           }]}>
             <Ionicons name="mail-outline" size={20} color={theme.colors.textSecondary} />
             <TextInput allowFontScaling={false}
-              style={[styles.input, { color: theme.colors.text }]}
+              style={[styles.input, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left', marginLeft: isRTL ? 0 : 12, marginRight: isRTL ? 12 : 0 }]}
               placeholder={t('auth.enterEmail', { defaultValue: 'Enter email' })}
               placeholderTextColor={theme.colors.textSecondary}
               value={email}
@@ -120,16 +123,17 @@ const LegacyEmailLoginScreen: React.FC = () => {
 
         {/* Password Input */}
         <View style={styles.inputContainer}>
-          <AppText style={[styles.label, { color: theme.colors.text }]}>
+          <AppText style={[styles.label, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
             {t('auth.password', { defaultValue: 'Password' })}
           </AppText>
-          <View style={[styles.inputWrapper, { 
+          <View style={[styles.inputWrapper, {
             backgroundColor: theme.colors.surface,
-            borderColor: theme.colors.border 
+            borderColor: theme.colors.border,
+            flexDirection: isRTL ? 'row-reverse' : 'row'
           }]}>
             <Ionicons name="lock-closed-outline" size={20} color={theme.colors.textSecondary} />
             <TextInput allowFontScaling={false}
-              style={[styles.input, { color: theme.colors.text }]}
+              style={[styles.input, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left', marginLeft: isRTL ? 0 : 12, marginRight: isRTL ? 12 : 0 }]}
               placeholder={t('auth.enterPassword', { defaultValue: 'Enter password' })}
               placeholderTextColor={theme.colors.textSecondary}
               value={password}
@@ -164,8 +168,8 @@ const LegacyEmailLoginScreen: React.FC = () => {
         </TouchableOpacity>
 
         {/* Back to Phone Login */}
-        <TouchableOpacity onPress={handleBackToPhoneLogin} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={20} color={theme.colors.primary} />
+        <TouchableOpacity onPress={handleBackToPhoneLogin} style={[styles.backButton, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+          <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={20} color={theme.colors.primary} />
           <AppText style={[styles.backText, { color: theme.colors.primary }]}>
             {t('auth.backToPhoneLogin', { defaultValue: 'Back to Phone Login' })}
           </AppText>
