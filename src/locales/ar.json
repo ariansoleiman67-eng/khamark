@@ -465,7 +465,8 @@
     "requestNewCode": "يرجى طلب رمز جديد",
     "signInWithApple": "المتابعة باستخدام Apple",
     "signInWithFacebook": "المتابعة باستخدام Facebook",
-    "verifyFailed": "فشل التحقق. حاول مرة أخرى."
+    "verifyFailed": "فشل التحقق. حاول مرة أخرى.",
+    "invalidPhone": "يرجى إدخال رقم هاتف صالح"
   },
   "home": {
     "welcome": "مرحباً بك في Asankary",
@@ -1884,7 +1885,12 @@
     "outOfStock": "غير متوفر",
     "minOrderPiece": "أقل طلب: قطعة واحدة",
     "pn": "رقم القطعة",
-    "loginRequired": "تسجيل الدخول مطلوب"
+    "loginRequired": "تسجيل الدخول مطلوب",
+    "order": "طلب",
+    "trackOrder": "تتبع الطلب",
+    "addCaption": "أضف تعليقاً...",
+    "chat": "الدردشة",
+    "sellerSupport": "دعم البائع • رد سريع"
   },
   "share": {
     "sendTo": "إرسال إلى...",
@@ -1915,7 +1921,8 @@
     "invalidPhone": "يرجى إدخال رقم هاتف صحيح",
     "addDescription": "اختياري: للشحن إلى مكاتب خارجية",
     "addShippingOffice": "إضافة مكتب شحن",
-    "useShippingOffice": "الشحن إلى مكتب الشحن الخاص بي"
+    "useShippingOffice": "الشحن إلى مكتب الشحن الخاص بي",
+    "saveFailed": "فشل الحفظ"
   },
   "admin": {
     "categories": {
@@ -2468,7 +2475,9 @@
       "requiredFields": "يرجى ملء جميع الحقول المطلوبة (الاسم، العنوان، الهاتف، المدينة)",
       "useMyLocation": "استخدام موقعي الحالي",
       "locationAutoSet": "تم تعيين الموقع على إحداثيات GPS الحالية",
-      "noPermission": "ليس لديك صلاحية للقيام بذلك"
+      "noPermission": "ليس لديك صلاحية للقيام بذلك",
+      "mustBeLoggedIn": "يجب تسجيل الدخول لحفظ المواقع",
+      "openInMaps": "فتح في الخرائط"
     },
     "discounts": {
       "title": "الخصومات",
@@ -2529,7 +2538,11 @@
       "showLess": "عرض أقل",
       "specificProducts": "منتجات محددة",
       "allProducts": "جميع المنتجات",
-      "noProductsFound": "لم يتم العثور على منتجات"
+      "noProductsFound": "لم يتم العثور على منتجات",
+      "off": "خصم",
+      "for": "لـ",
+      "minOrder": "أقل طلب",
+      "minItems": "أقل عدد عناصر"
     },
     "analytics": {
       "reports": "التقارير",
@@ -2731,7 +2744,10 @@
       "infoNote": "ستظهر هذه التفاصيل في جميع الفواتير المطبوعة. اترك الحقول فارغة لاستخدام القيم الافتراضية.",
       "title": "إعدادات الفاتورة",
       "savedMessage": "تم حفظ إعدادات الفاتورة بنجاح!",
-      "uploadLogo": "اضغط لرفع الشعار"
+      "uploadLogo": "اضغط لرفع الشعار",
+      "uploadLogoError": "فشل رفع الشعار",
+      "pickImageError": "فشل اختيار الصورة",
+      "saveError": "فشل حفظ الإعدادات"
     },
     "products": {
       "title": "المنتجات",
@@ -3104,5 +3120,45 @@
   "sort": {
     "priceHigh": "السعر ↓",
     "priceLow": "السعر ↑"
+  },
+  "storeLocations": {
+    "loadError": "فشل تحميل مواقع المتاجر. يرجى المحاولة مرة أخرى.",
+    "open": "مفتوح",
+    "closed": "مغلق",
+    "call": "اتصال",
+    "whatsapp": "واتساب",
+    "view": "عرض",
+    "directions": "الاتجاهات",
+    "mapUnavailable": "الخريطة غير متاحة",
+    "mapUnavailableHint": "تعذّر تحميل الخريطة. يرجى استخدام عرض القائمة بدلاً من ذلك.",
+    "switchToList": "التبديل إلى عرض القائمة",
+    "loading": "جاري تحميل مواقع المتاجر...",
+    "emptyTitle": "لم يتم العثور على مواقع متاجر",
+    "emptyHint": "يرجى المحاولة لاحقاً أو التواصل مع الدعم.",
+    "list": "قائمة",
+    "map": "خريطة"
+  },
+  "loginGate": {
+    "backToBrowsing": "العودة إلى التصفح",
+    "whyCreate": "لماذا تنشئ حساباً؟",
+    "benefitTrackOrders": "تتبّع طلباتك لحظة بلحظة",
+    "benefitSaveAddresses": "احفظ العناوين لدفع أسرع",
+    "benefitExclusiveDeals": "احصل على عروض وصفقات حصرية"
+  },
+  "confirmIdentity": {
+    "enterPasswordError": "يرجى إدخال كلمة المرور",
+    "noAccount": "لم يتم العثور على حساب",
+    "incorrectPassword": "كلمة المرور غير صحيحة",
+    "authFailed": "فشلت المصادقة",
+    "title": "تأكيد الهوية",
+    "subtitle": "من أجل أمانك، أكّد هويتك للمتابعة.",
+    "passwordLabel": "كلمة المرور",
+    "passwordPlaceholder": "أدخل كلمة المرور",
+    "continueButton": "المتابعة بكلمة المرور"
+  },
+  "privacyPolicy": {
+    "title": "سياسة الخصوصية",
+    "quickSummary": "ملخّص سريع للخصوصية",
+    "contactHeading": "أسئلة حول خصوصيتك؟"
   }
 }

@@ -465,7 +465,8 @@
     "requestNewCode": "Please request a new code",
     "signInWithApple": "Continue with Apple",
     "signInWithFacebook": "Continue with Facebook",
-    "verifyFailed": "Verification failed. Try again."
+    "verifyFailed": "Verification failed. Try again.",
+    "invalidPhone": "Please enter a valid phone number"
   },
   "home": {
     "welcome": "Welcome to Asankary",
@@ -1917,7 +1918,12 @@
     "messages": "Messages",
     "searchPlaceholder": "Search conversations...",
     "archived": "Archived",
-    "loginRequired": "Login Required"
+    "loginRequired": "Login Required",
+    "order": "Order",
+    "trackOrder": "Track Order",
+    "addCaption": "Add a caption...",
+    "chat": "Chat",
+    "sellerSupport": "Seller Support • Fast reply"
   },
   "adminSettings": {
     "businessSettings": "Business Settings",
@@ -1970,7 +1976,8 @@
     "invalidPhone": "Please enter a valid phone number",
     "addShippingOffice": "Add Shipping Office",
     "addDescription": "Optional: For shipping to external offices",
-    "useShippingOffice": "Ship to my shipping office"
+    "useShippingOffice": "Ship to my shipping office",
+    "saveFailed": "Failed to save"
   },
   "admin": {
     "categories": {
@@ -2317,7 +2324,11 @@
       "showLess": "Show less",
       "specificProducts": "specific products",
       "allProducts": "All products",
-      "noProductsFound": "No products found. Add products first."
+      "noProductsFound": "No products found. Add products first.",
+      "off": "OFF",
+      "for": "for",
+      "minOrder": "Min Order",
+      "minItems": "Min Items"
     },
     "storeProfile": {
       "title": "Store Profile",
@@ -2410,7 +2421,9 @@
       "requiredFields": "Please fill in all required fields (Name, Address, Phone, City)",
       "useMyLocation": "Use My Current Location",
       "locationAutoSet": "Location has been set to your current GPS coordinates",
-      "noPermission": "You don't have permission to do this"
+      "noPermission": "You don't have permission to do this",
+      "mustBeLoggedIn": "You must be logged in to save locations",
+      "openInMaps": "Open in Maps"
     },
     "analytics": {
       "title": "Analytics & Reports",
@@ -2928,7 +2941,10 @@
       "taxId": "Tax ID / Registration Number",
       "infoNote": "These details will appear on all printed invoices. Leave fields empty to use default values.",
       "savedMessage": "Invoice settings saved successfully!",
-      "uploadLogo": "Tap to upload logo"
+      "uploadLogo": "Tap to upload logo",
+      "uploadLogoError": "Failed to upload logo",
+      "pickImageError": "Failed to pick image",
+      "saveError": "Failed to save settings"
     },
     "tabs": {
       "dashboard": "Dashboard",
@@ -3104,5 +3120,45 @@
   "sort": {
     "priceHigh": "Price ↓",
     "priceLow": "Price ↑"
+  },
+  "storeLocations": {
+    "loadError": "Failed to load store locations. Please try again.",
+    "open": "Open",
+    "closed": "Closed",
+    "call": "Call",
+    "whatsapp": "WhatsApp",
+    "view": "View",
+    "directions": "Directions",
+    "mapUnavailable": "Map Unavailable",
+    "mapUnavailableHint": "Unable to load map. Please try the list view instead.",
+    "switchToList": "Switch to List View",
+    "loading": "Loading store locations...",
+    "emptyTitle": "No Store Locations Found",
+    "emptyHint": "Please check back later or contact support.",
+    "list": "List",
+    "map": "Map"
+  },
+  "loginGate": {
+    "backToBrowsing": "Back to Browsing",
+    "whyCreate": "Why create an account?",
+    "benefitTrackOrders": "Track your orders in real-time",
+    "benefitSaveAddresses": "Save addresses for faster checkout",
+    "benefitExclusiveDeals": "Access exclusive deals and offers"
+  },
+  "confirmIdentity": {
+    "enterPasswordError": "Please enter your password",
+    "noAccount": "No account found",
+    "incorrectPassword": "Incorrect password",
+    "authFailed": "Authentication failed",
+    "title": "Confirm identity",
+    "subtitle": "For your security, confirm your identity to continue.",
+    "passwordLabel": "YOUR PASSWORD",
+    "passwordPlaceholder": "Enter password",
+    "continueButton": "Continue with password"
+  },
+  "privacyPolicy": {
+    "title": "Privacy Policy",
+    "quickSummary": "Privacy Quick Summary",
+    "contactHeading": "Questions About Your Privacy?"
   }
 }
