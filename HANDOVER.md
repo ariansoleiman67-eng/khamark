@@ -16,11 +16,15 @@ New work built on top of the white-label clone (all commits local, tsc-clean, em
 - **Logo uploads** work offline in demo (mock mode uses the picked local image URI; real mode uploads to Supabase Storage via `ImageService`). Brand/category stores are AsyncStorage-backed so admin edits persist across reloads.
 - **Auth redesign** — `SignInScreen` + `RegisterScreen` restyled premium (amber gradient hero + brand coin, Phone|Email segmented pill, +964 Iraq input, gradient CTA, social sign-in, guest). All auth logic/handlers/navigation preserved.
 - **Polish**: dark-mode/theme fixes (Cart total was invisible on dark; Orders button/count; Notifications filter → brand amber), Profile currency i18n, and the Volvo `hero-truck.jpg` cover replaced with a branded amber banner (Profile + 2 admin screens).
+- **Full RTL + dark-mode + i18n sweep (both sides)** across ~20 screens — customer (Cart, Profile, Orders, Favorites, Search, OrderConfirmation, Checkout, OrderDetail, Chatbot, EditProfile, MyAddress, AddEditAddress, HelpSupport) and admin (Dashboard, Settings, Orders, Customers, Analytics, Banner, StoreProfile, BusinessInfo, StockReport, SendNotification, CreateOrder, Products). Fixed real dark-mode bugs (invisible white inputs/buttons), added per-component RTL to headers + key rows, moved hardcoded English to `t()`.
+- **117 new UI strings translated** to Arabic + Kurdish (locales 2677 → 2794 keys, en/ar/ku parity identical) — no more English fallbacks in ar/ku. Verified on device: full Arabic RTL renders correctly (Home header flip, section headers, "أضف إلى السلة", tab bar, Profile settings).
+- Removed unused Haryad image files (`logo.jpg`, `header-logo.jpg`, `splash-icon.jpg`). `banner-1..4.jpg` + `hero-truck.jpg` are now amber banners.
+- Verified end-to-end on the Android emulator: **LTR + Arabic RTL, light + dark**, both customer and (code-verified) admin.
 
 **Notes for you:**
 - Brand/category default logos are clean amber letter tiles (external logo CDNs like Clearbit are blocked in this build env) — upload real logos via the admin managers.
 - The mock stores (`brandService`, `categoryStore`, `mockData`) auto-disable once a real `EXPO_PUBLIC_SUPABASE_URL` is set. For the live backend, port brand storage to a Supabase `brands` table (category storage already maps to the existing `categories` table via `tenantAdminService`).
-- Remaining un-debranded bundled images may exist (`assets/logo.jpg`, `banner-*.jpg`, `splash-icon.jpg`) — swap when the real logo/artwork arrives.
+- Icons/banners are amber placeholders (letter "A" / gradient) — swap for the real logo + artwork when it arrives (`assets/icon.png`, `adaptive-icon.png`, `splash-icon.png`, `assets/images/asankarylogo.png`, `assets/banner-1..4.jpg`, `assets/hero-truck.jpg`).
 
 ## What changed, per phase
 
