@@ -173,7 +173,9 @@
     "noResults": "لم يتم العثور على منتجات",
     "noSelection": "لا يوجد تحديد",
     "order": "طلب",
-    "tryDifferentSearch": "جرّب مصطلح بحث مختلف"
+    "tryDifferentSearch": "جرّب مصطلح بحث مختلف",
+    "pullToRefresh": "اسحب للأسفل للتحديث",
+    "somethingWentWrong": "حدث خطأ ما"
   },
   "product": {
     "lowStock": "متبقي {{count}} فقط",
@@ -227,7 +229,18 @@
     "warranty": "الضمان",
     "whatsappMsg": "مرحباً، لدي سؤال حول هذا المنتج.",
     "comingSoon": "قريباً",
-    "onTheWay": "في الطريق"
+    "onTheWay": "في الطريق",
+    "addToCart": "أضف إلى السلة",
+    "authentic": "أصلي",
+    "authenticValue": "أصلي 100%",
+    "cashOnDelivery": "الدفع عند الاستلام",
+    "manufacturerCode": "رمز الشركة المصنّعة",
+    "noOverview": "لا توجد تفاصيل إضافية.",
+    "notAvailable": "غير متوفر",
+    "overview": "نظرة عامة على المنتج",
+    "paymentMethods": "طرق الدفع",
+    "save": "وفّر",
+    "sku": "SKU"
   },
   "auth": {
     "accountBlocked": "الحساب محظور",
@@ -446,7 +459,13 @@
       "phoneExists": "هذا الرقم مسجل بالفعل",
       "sendCode": "إرسال الرمز"
     },
-    "signInWithGoogle": "تسجيل الدخول باستخدام Google"
+    "signInWithGoogle": "تسجيل الدخول باستخدام Google",
+    "continueWithApple": "المتابعة باستخدام Apple",
+    "continueWithGoogle": "المتابعة باستخدام Google",
+    "requestNewCode": "يرجى طلب رمز جديد",
+    "signInWithApple": "المتابعة باستخدام Apple",
+    "signInWithFacebook": "المتابعة باستخدام Facebook",
+    "verifyFailed": "فشل التحقق. حاول مرة أخرى."
   },
   "home": {
     "welcome": "مرحباً بك في Asankary",
@@ -654,7 +673,14 @@
     "invalidAmount": "مبلغ غير صحيح",
     "locationSaved": "تم حفظ الموقع",
     "orderFailedMessage": "تعذّر تقديم الطلب. يرجى المحاولة مرة أخرى.",
-    "paymentGatewayComingSoon": "سيتم توجيهك إلى صفحة دفع آمنة"
+    "paymentGatewayComingSoon": "سيتم توجيهك إلى صفحة دفع آمنة",
+    "addAddressToContinue": "يرجى إضافة عنوان توصيل أولاً لمتابعة طلبك.",
+    "addressRequiredTitle": "العنوان مطلوب",
+    "checkingDiscounts": "جاري التحقق من الخصومات...",
+    "noDeliveryAddressFound": "لم يتم العثور على عنوان توصيل",
+    "noLocationSet": "لم يتم تحديد موقع",
+    "selectAddressToContinue": "يرجى اختيار عنوان توصيل لمتابعة طلبك.",
+    "youAreSaving": "أنت توفّر {{amount}}!"
   },
   "qiCard": {
     "title": "دفع بطاقة كي",
@@ -899,7 +925,9 @@
     "confirmCancel": "هل أنت متأكد من أنك تريد إلغاء هذا الطلب؟",
     "cancelled": "تم إلغاء الطلب",
     "noAddress": "لا يوجد عنوان",
-    "addAddressFirst": "الرجاء إضافة عنوان توصيل أولاً."
+    "addAddressFirst": "الرجاء إضافة عنوان توصيل أولاً.",
+    "countSummary": "{{filtered}} من {{total}} طلب",
+    "pendingSummary": " • {{count}} قيد الانتظار"
   },
   "order": {
     "color": "اللون",
@@ -1187,9 +1215,24 @@
       "title": "تحقق من بريدك الإلكتروني",
       "subtitle": "تحقق من صندوق الوارد للحصول على رابط التحقق",
       "resend": "إعادة الإرسال",
-      "sent": "تم إرسال بريد التحقق!"
+      "sent": "تم إرسال بريد التحقق!",
+      "noEmail": "لم يتم العثور على بريد إلكتروني. يرجى إضافة بريدك الإلكتروني في تعديل الملف الشخصي أولاً."
     },
-    "phoneLocked": "لا يمكن تغيير رقم الهاتف"
+    "phoneLocked": "لا يمكن تغيير رقم الهاتف",
+    "contactUs": {
+      "businessHours": "ساعات العمل:",
+      "email": "البريد الإلكتروني:",
+      "fridayClosed": "الجمعة: مغلق",
+      "hoursSatThu": "السبت-الخميس: 8:00 صباحاً - 6:00 مساءً",
+      "storeLocation": "موقع المتجر:",
+      "title": "تواصل مع {{name}}",
+      "whatsapp": "واتساب:"
+    },
+    "currencyIqd": "الدينار العراقي (IQD)",
+    "currencyUsd": "الدولار الأمريكي ($)",
+    "memberSince": "عضو منذ {{year}}",
+    "updateName": "تحديث الاسم",
+    "yourName": "اسمك"
   },
   "notifications": {
     "title": "الإشعارات",
@@ -1391,7 +1434,9 @@
     "addToCart": "تعذّر الإضافة إلى السلة",
     "loadProfileFailed": "المتجر غير موجود",
     "loadingData": "تعذّر تحميل البيانات",
-    "overnightNotSupported": "يجب أن يكون وقت الإغلاق بعد وقت الفتح"
+    "overnightNotSupported": "يجب أن يكون وقت الإغلاق بعد وقت الفتح",
+    "authenticationError": "خطأ في المصادقة",
+    "loginAgainToOrder": "يرجى تسجيل الخروج ثم تسجيل الدخول مرة أخرى لتقديم الطلبات."
   },
   "addresses": {
     "myAddresses": "عناويني",
@@ -1480,7 +1525,15 @@
     "searchPlaceholder": "ابحث عن عنوان...",
     "selectDeliveryLocation": "اختر موقع التسليم",
     "selectingAddress": "جاري الحصول على العنوان...",
-    "unknownAddress": "عنوان غير معروف"
+    "unknownAddress": "عنوان غير معروف",
+    "addAddressesHint": "أضف عناوين التوصيل لإتمام الطلب بشكل أسرع",
+    "citiesIn": "المدن في {{name}}:",
+    "gpsCoordinates": "إحداثيات GPS:",
+    "invalidCountry": "الدولة المختارة غير صالحة (جرّب \"Iraq\")",
+    "mapUnavailable": "الخريطة غير متاحة",
+    "noLocationSet": "لم يتم تحديد موقع",
+    "selectCountryFirst": "اختر الدولة أولاً",
+    "suggestionsTapToSelect": "اقتراحات (انقر للاختيار):"
   },
   "store": {
     "home": "الرئيسية",
@@ -1650,7 +1703,8 @@
       "title": "لا تزال بحاجة إلى مساعدة؟",
       "description": "فريق الدعم متاح من السبت إلى الخميس، 8:00 ص - 6:00 م",
       "chatButton": "تحدث مع الدعم"
-    }
+    },
+    "whatsappMessage": "مرحباً، أحتاج إلى مساعدة بخصوص سؤالي غير المذكور في الأسئلة الشائعة"
   },
   "theme": {
     "title": "تخصيص المظهر",
@@ -1717,7 +1771,12 @@
       "contactStore": "كيف يمكنني الاتصال بالمتجر مباشرة؟",
       "recommend": "ما هي أكثر المنتجات مبيعاً أو شعبية لديكم؟",
       "categories": "ما هي فئات المنتجات المتوفرة لديكم؟"
-    }
+    },
+    "micPermission": "إذن الميكروفون مطلوب لإرسال الرسائل الصوتية",
+    "recordFailed": "فشل بدء التسجيل",
+    "recording": "جاري التسجيل...",
+    "sendingVoice": "جاري إرسال الرسالة الصوتية...",
+    "voiceMessage": "رسالة صوتية"
   },
   "chat": {
     "inbox": "الرسائل",
@@ -2013,7 +2072,9 @@
       "enterAdminPassword": "أدخل كلمة مرور المسؤول",
       "verifyAndProceed": "تحقق ومتابعة",
       "add": "إضافة",
-      "yes": "نعم"
+      "yes": "نعم",
+      "continue": "متابعة",
+      "ok": "موافق"
     },
     "dashboard": {
       "administrator": "مسؤول",
@@ -2147,7 +2208,12 @@
       "pending": "قيد الانتظار",
       "iqdAmount": "المبلغ (د.ع)",
       "usdAmount": "المبلغ (دولار)",
-      "exchangeRateApplied": "سعر الصرف"
+      "exchangeRateApplied": "سعر الصرف",
+      "call": "اتصال",
+      "chat": "محادثة",
+      "gpsTrackingPreview": "معاينة تتبع GPS",
+      "saveTrackingUrl": "حفظ رابط التتبع",
+      "trackingUrlLabel": "رابط التتبع (GPSOPS)"
     },
     "order": {
       "color": "اللون",
@@ -2235,7 +2301,10 @@
       "setupFailed": "تعذّر إعداد المتجر",
       "setupSuccess": "تم إعداد متجرك. يمكنك الآن إضافة المنتجات وإدارة الخصومات والمزيد!",
       "storeSetupRequired": "إعداد المتجر مطلوب",
-      "storeSetupRequiredSubtitle": "اضغط لإكمال إعداد متجرك"
+      "storeSetupRequiredSubtitle": "اضغط لإكمال إعداد متجرك",
+      "exportData": "تصدير كل البيانات",
+      "exportDataSubtitle": "تصدير المنتجات والطلبات والعملاء إلى JSON",
+      "exportingData": "جاري تصدير البيانات..."
     },
     "stockReport": {
       "title": "تقرير المخزون",
@@ -2303,7 +2372,10 @@
       "addSuccess": "تمت إضافة البانر بنجاح",
       "addFailed": "فشل في إضافة البانر",
       "deleteTitle": "حذف البانر",
-      "deleteConfirm": "هل أنت متأكد أنك تريد حذف هذا البانر؟"
+      "deleteConfirm": "هل أنت متأكد أنك تريد حذف هذا البانر؟",
+      "deleteFailed": "فشل حذف البانر",
+      "loadFailed": "فشل تحميل البانرات",
+      "uploadFailed": "فشل رفع الصورة"
     },
     "storeProfile": {
       "saveSuccess": "تم حفظ ملف المتجر بنجاح",
@@ -2348,7 +2420,10 @@
       "maxImages": "الحد الأقصى لصور الغلاف 10",
       "logoUploaded": "تم رفع الشعار بنجاح",
       "coverUploaded": "تم رفع الصورة بنجاح",
-      "confirmRemoveImage": "حذف هذه الصورة؟"
+      "confirmRemoveImage": "حذف هذه الصورة؟",
+      "customTimezone": "(مخصص)",
+      "deviceDefaultTimezone": "(افتراضي الجهاز)",
+      "mainImage": "الرئيسية"
     },
     "storeLocations": {
       "title": "مواقع المتجر",
@@ -2477,7 +2552,9 @@
       "totalCollected": "المُحصّل (نقداً)",
       "totalCollectedIQD": "المُحصّل (دينار)",
       "noData": "لا توجد بيانات لهذه الفترة",
-      "invalidRange": "يجب أن يكون تاريخ البداية قبل تاريخ النهاية."
+      "invalidRange": "يجب أن يكون تاريخ البداية قبل تاريخ النهاية.",
+      "from": "من",
+      "to": "إلى"
     },
     "changePassword": {
       "title": "تغيير كلمة المرور",
@@ -2628,7 +2705,9 @@
       "address": "العنوان",
       "openInMaps": "فتح في الخرائط",
       "assignProducts": "تعيين المنتجات",
-      "partnerProducts": "منتجات الشريك"
+      "partnerProducts": "منتجات الشريك",
+      "mapFailedToLoad": "فشل تحميل الخريطة",
+      "mapUnavailable": "الخريطة غير متاحة"
     },
     "invoiceSettings": {
       "logo": "شعار الفاتورة",
@@ -2799,7 +2878,23 @@
         "featured": "مميّز (تثبيت بالأعلى)",
         "featuredHint": "إظهار هذه القطعة في صف المنتجات المميّزة للعملاء.",
         "defaultShippingHint": "يطبق على أي منطقة غير مدرجة أدناه",
-        "free": "مجاني"
+        "free": "مجاني",
+        "edit": "تعديل",
+        "productCreatedVideoFailed": "تم إنشاء المنتج، لكن فشل رفع الفيديو.",
+        "productCreatedVideoFailedErr": "تم إنشاء المنتج، لكن فشل رفع الفيديو: {{error}}",
+        "productCreatedVideoUploaded": "تم إنشاء المنتج ورفع الفيديو بنجاح!",
+        "removeVideoMessage": "هل أنت متأكد أنك تريد إزالة الفيديو؟",
+        "removeVideoTitle": "إزالة الفيديو؟",
+        "replace": "استبدال",
+        "replaceVideoMessage": "يوجد فيديو بالفعل. هل تريد استبداله؟",
+        "replaceVideoTitle": "استبدال الفيديو؟",
+        "videoRemoved": "تمت إزالة الفيديو!",
+        "videoRemoveFailed": "فشل إزالة الفيديو من الخادم.",
+        "videoSelectedMessage": "تم اختيار الفيديو! سيتم رفعه عند حفظ المنتج.",
+        "videoUploadedClickSave": "تم رفع الفيديو! اضغط حفظ للتثبيت.",
+        "videoUploadedSaved": "تم رفع الفيديو وحفظه!",
+        "videoUploadFailed": "فشل رفع الفيديو",
+        "videoValidationFailed": "فشل التحقق من الفيديو"
       },
       "noSearchResults": "لم يتم العثور على منتجات مطابقة",
       "loadingTenant": "جارٍ تحميل بيانات المتجر...",
@@ -2876,8 +2971,32 @@
       "notePlaceholder": "أضف ملاحظة (اختياري)…",
       "pickVariation": "اختر النوع",
       "pickVariationHint": "اضغط على نوع لإضافته إلى السلة",
-      "options": "خيارات"
-    }
+      "options": "خيارات",
+      "createFailed": "فشل إنشاء عملية البيع"
+    },
+    "active": "نشط",
+    "brands": {
+      "add": "إضافة علامة تجارية",
+      "deleteTitle": "حذف العلامة التجارية؟",
+      "edit": "تعديل العلامة التجارية",
+      "empty": "لا توجد علامات تجارية بعد. اضغط + لإضافة واحدة.",
+      "name": "اسم العلامة التجارية",
+      "nameRequired": "اسم العلامة التجارية مطلوب",
+      "pickLogo": "إضافة شعار",
+      "subtitle": "إدارة العلامات التجارية والشعارات",
+      "title": "العلامات التجارية"
+    },
+    "categoryMgr": {
+      "add": "إضافة تصنيف",
+      "deleteTitle": "حذف التصنيف؟",
+      "edit": "تعديل التصنيف",
+      "empty": "لا توجد تصنيفات بعد. اضغط + لإضافة واحد.",
+      "name": "اسم التصنيف",
+      "nameRequired": "اسم التصنيف مطلوب",
+      "pickLogo": "إضافة شعار",
+      "title": "التصنيفات"
+    },
+    "hidden": "مخفي"
   },
   "onboarding": {
     "welcomeTitle": "مرحبًا بكم في",
@@ -2913,7 +3032,9 @@
     "iqd": "دينار عراقي",
     "chooseRegion": "اختر منطقتك",
     "chooseRegionSub": "اختر بلدك للشحن والتوصيل",
-    "chooseCity": "اختر مدينتك"
+    "chooseCity": "اختر مدينتك",
+    "subtitle": "متجرك الإلكتروني للمنتجات التي تحبها.",
+    "welcome": "مرحباً بك في Asankary"
   },
   "adminSettings": {
     "account": "الحساب",
@@ -2979,5 +3100,9 @@
     "browseStores": "تصفح المتاجر",
     "discoverStores": "اكتشف البائعين الموثوقين",
     "noStores": "لا توجد متاجر متاحة حتى الآن"
+  },
+  "sort": {
+    "priceHigh": "السعر ↓",
+    "priceLow": "السعر ↑"
   }
 }

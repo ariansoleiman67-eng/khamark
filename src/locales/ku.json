@@ -173,7 +173,9 @@
     "noResults": "هیچ بەرهەمێک نەدۆزرایەوە",
     "noSelection": "هیچ هەڵبژاردنێک نییە",
     "order": "داواکاری",
-    "tryDifferentSearch": "وشەیەکی گەڕانی جیاواز تاقیبکەرەوە"
+    "tryDifferentSearch": "وشەیەکی گەڕانی جیاواز تاقیبکەرەوە",
+    "pullToRefresh": "بۆ نوێکردنەوە بەرەو خوارەوە ڕایبکێشە",
+    "somethingWentWrong": "شتێک هەڵە بوو"
   },
   "auth": {
     "accountBlocked": "هەژمار بلۆککراوە",
@@ -392,7 +394,13 @@
       "requiredPhone": "تکایە ژمارەی مۆبایل بنووسە",
       "phoneExists": "ئەم ژمارەیە پێشتر تۆمارکراوە",
       "sendCode": "ناردنی کۆد"
-    }
+    },
+    "continueWithApple": "بەردەوامبوون بە Apple",
+    "continueWithGoogle": "بەردەوامبوون بە Google",
+    "requestNewCode": "تکایە کۆدێکی نوێ داوا بکە",
+    "signInWithApple": "بەردەوامبوون بە Apple",
+    "signInWithFacebook": "بەردەوامبوون بە Facebook",
+    "verifyFailed": "پشتڕاستکردنەوە سەرکەوتوو نەبوو. دووبارە هەوڵ بدە."
   },
   "home": {
     "welcome": "بەخێربێیت بۆ Asankary",
@@ -528,7 +536,18 @@
     "warranty": "گەرەنتی",
     "whatsappMsg": "سڵاو، پرسیارێکم هەیە دەربارەی ئەم بەرهەمە.",
     "comingSoon": "بەمزووانە",
-    "onTheWay": "لە ڕێگادایە"
+    "onTheWay": "لە ڕێگادایە",
+    "addToCart": "زیادکردن بۆ سەبەتە",
+    "authentic": "ڕەسەن",
+    "authenticValue": "100% ڕەسەن",
+    "cashOnDelivery": "پارەدان لە کاتی وەرگرتن",
+    "manufacturerCode": "کۆدی بەرهەمهێنەر",
+    "noOverview": "هیچ وردەکاریەکی زیادە بەردەست نییە.",
+    "notAvailable": "بەردەست نییە",
+    "overview": "پوختەی بەرهەم",
+    "paymentMethods": "شێوازەکانی پارەدان",
+    "save": "پاشەکەوت",
+    "sku": "SKU"
   },
   "cart": {
     "title": "سەبەتەی کڕین",
@@ -654,7 +673,14 @@
     "invalidAmount": "بڕی نادروست",
     "locationSaved": "شوێن پاشەکەوتکرا",
     "orderFailedMessage": "نەتوانرا داواکاری بکرێت. تکایە دووبارە هەوڵ بدە.",
-    "paymentGatewayComingSoon": "ئاڕاستە دەکرێیت بۆ پەڕەیەکی پارەدانی پارێزراو"
+    "paymentGatewayComingSoon": "ئاڕاستە دەکرێیت بۆ پەڕەیەکی پارەدانی پارێزراو",
+    "addAddressToContinue": "تکایە سەرەتا ناونیشانی گەیاندنێک زیاد بکە بۆ بەردەوامبوون لە داواکاریەکەت.",
+    "addressRequiredTitle": "ناونیشان پێویستە",
+    "checkingDiscounts": "پشکنینی داشکاندنەکان...",
+    "noDeliveryAddressFound": "هیچ ناونیشانی گەیاندنێک نەدۆزرایەوە",
+    "noLocationSet": "هیچ شوێنێک دیاری نەکراوە",
+    "selectAddressToContinue": "تکایە ناونیشانی گەیاندنێک هەڵبژێرە بۆ بەردەوامبوون لە داواکاریەکەت.",
+    "youAreSaving": "تۆ {{amount}} پاشەکەوت دەکەیت!"
   },
   "qiCard": {
     "title": "پارەدانی کارتی کی",
@@ -899,7 +925,9 @@
     "trackingUrlError": "نەتوانرا بەستەری بەدواداچوون بکرێتەوە",
     "pending": "چاوەڕوان",
     "itemsLabel": "بڕگەکان",
-    "viewOrder": "بینینی داواکاری"
+    "viewOrder": "بینینی داواکاری",
+    "countSummary": "{{filtered}} لە {{total}} داواکاری",
+    "pendingSummary": " • {{count}} چاوەڕوانکراو"
   },
   "order": {
     "color": "ڕەنگ",
@@ -1187,9 +1215,24 @@
       "resend": "دووبارە ناردن",
       "sent": "ئیمەیڵی پشتڕاستکردنەوە نێردرا!",
       "subtitle": "سندوقی هاتووەکەت بپشکنە بۆ بەستەری پشتڕاستکردنەوە",
-      "title": "ئیمەیڵەکەت پشتڕاست بکەرەوە"
+      "title": "ئیمەیڵەکەت پشتڕاست بکەرەوە",
+      "noEmail": "هیچ ئیمەیڵێک نەدۆزرایەوە. تکایە سەرەتا ئیمەیڵەکەت لە پرۆفایل بگۆڕە زیاد بکە."
     },
-    "phoneLocked": "ژمارەی تەلەفۆن ناگۆڕدرێت"
+    "phoneLocked": "ژمارەی تەلەفۆن ناگۆڕدرێت",
+    "contactUs": {
+      "businessHours": "کاتژمێرەکانی کار:",
+      "email": "ئیمەیڵ:",
+      "fridayClosed": "هەینی: داخراوە",
+      "hoursSatThu": "شەممە-پێنجشەممە: 8:00 بەیانی - 6:00 ئێوارە",
+      "storeLocation": "شوێنی کۆگا:",
+      "title": "پەیوەندی بە {{name}}",
+      "whatsapp": "واتساپ:"
+    },
+    "currencyIqd": "دیناری عێراقی (IQD)",
+    "currencyUsd": "دۆلاری ئەمریکی ($)",
+    "memberSince": "ئەندام لە {{year}}ەوە",
+    "updateName": "نوێکردنەوەی ناو",
+    "yourName": "ناوت"
   },
   "notifications": {
     "title": "ئاگادارکردنەوەکان",
@@ -1391,7 +1434,9 @@
     "failedToLoadProduct": "نەتوانرا بەرهەم بار بکرێت",
     "loadProfileFailed": "فرۆشگا نەدۆزرایەوە",
     "loadingData": "نەتوانرا داتا بار بکرێت",
-    "overnightNotSupported": "کاتی داخستن دەبێت دوای کاتی کردنەوە بێت"
+    "overnightNotSupported": "کاتی داخستن دەبێت دوای کاتی کردنەوە بێت",
+    "authenticationError": "هەڵەی ڕاستکردنەوەی ناسنامە",
+    "loginAgainToOrder": "تکایە بچووە دەرەوە و دووبارە بچووە ژوورەوە بۆ تۆمارکردنی داواکاری."
   },
   "addresses": {
     "myAddresses": "ناونیشانەکانم",
@@ -1480,7 +1525,15 @@
     "searchPlaceholder": "بۆ ناونیشانی بگەڕە...",
     "selectDeliveryLocation": "شوێنی گەیاندن هەڵبژێرە",
     "selectingAddress": "بەدەستخیستنی ناونیشان...",
-    "unknownAddress": "ناونیشانی نەناسراو"
+    "unknownAddress": "ناونیشانی نەناسراو",
+    "addAddressesHint": "ناونیشانی گەیاندن زیاد بکە بۆ تەواوکردنی خێراتری داواکاری",
+    "citiesIn": "شارەکانی {{name}}:",
+    "gpsCoordinates": "کۆردیناتەکانی GPS:",
+    "invalidCountry": "وڵاتی هەڵبژێردراو نادروستە (\"Iraq\" تاقی بکەرەوە)",
+    "mapUnavailable": "نەخشە بەردەست نییە",
+    "noLocationSet": "هیچ شوێنێک دیاری نەکراوە",
+    "selectCountryFirst": "سەرەتا وڵاتێک هەڵبژێرە",
+    "suggestionsTapToSelect": "پێشنیارەکان (بۆ هەڵبژاردن دەست لێبدە):"
   },
   "chat": {
     "inbox": "پەیامەکان",
@@ -1768,7 +1821,8 @@
       "title": "هێشتا پێویستت بە یارمەتیە؟",
       "description": "تیمی پشتگیریمان له شهممهوه تا پێنجشهممه، ۸:۰۰ ب.ن - ۶:۰۰ د.ن بهردهسته",
       "chatButton": "گفتوگۆ لەگەڵ پشتگیری"
-    }
+    },
+    "whatsappMessage": "سڵاو، پێویستم بە یارمەتییە بۆ پرسیارەکەم کە لە پرسیارە باوەکاندا نییە"
   },
   "theme": {
     "title": "خۆشخوازیی ڕووکار",
@@ -1835,7 +1889,12 @@
       "contactStore": "چۆن دەتوانم ڕاستەوخۆ پەیوەندی بە دوکانەوە بکەم؟",
       "recommend": "باشترین و ناسراوترین بەرهەمەکانتان چین؟",
       "categories": "چ جۆرە بەرهەمێکتان بەردەستە؟"
-    }
+    },
+    "micPermission": "بۆ ناردنی پەیامی دەنگی مۆڵەتی مایکرۆفۆن پێویستە",
+    "recordFailed": "دەستپێکردنی تۆمارکردن سەرکەوتوو نەبوو",
+    "recording": "تۆمارکردن...",
+    "sendingVoice": "ناردنی پەیامی دەنگی...",
+    "voiceMessage": "پەیامی دەنگی"
   },
   "shippingInfo": {
     "title": "زانیاری ئۆفیسی گواستنەوە",
@@ -2013,7 +2072,9 @@
       "verifyAndProceed": "پشتڕاستکردنەوە و بەردەوامبوون",
       "add": "زیادکردن",
       "yes": "بەڵێ",
-      "storeLabel": "فرۆشگا"
+      "storeLabel": "فرۆشگا",
+      "continue": "بەردەوامبوون",
+      "ok": "باشە"
     },
     "dashboard": {
       "administrator": "بەڕێوەبەر",
@@ -2147,7 +2208,12 @@
       "pending": "چاوەڕوان",
       "iqdAmount": "بڕ (د.ع)",
       "usdAmount": "بڕ (دۆلار)",
-      "exchangeRateApplied": "نرخی ئاڵوگۆڕ"
+      "exchangeRateApplied": "نرخی ئاڵوگۆڕ",
+      "call": "پەیوەندی",
+      "chat": "گفتوگۆ",
+      "gpsTrackingPreview": "پێشبینینی شوێنپێهەڵگرتنی GPS",
+      "saveTrackingUrl": "خەزنکردنی بەستەری شوێنپێهەڵگرتن",
+      "trackingUrlLabel": "بەستەری شوێنپێهەڵگرتن (GPSOPS)"
     },
     "order": {
       "color": "ڕەنگ",
@@ -2235,7 +2301,10 @@
       "setupFailed": "نەتوانرا فرۆشگا ڕێکبخرێت",
       "setupSuccess": "فرۆشگاکەت ڕێکخرا. ئێستا دەتوانیت بەرهەم زیاد بکەیت، داشکاندن بەڕێوەببەیت، و زیاتر!",
       "storeSetupRequired": "ڕێکخستنی فرۆشگا پێویستە",
-      "storeSetupRequiredSubtitle": "دابگرە بۆ تەواوکردنی ڕێکخستنی فرۆشگاکەت"
+      "storeSetupRequiredSubtitle": "دابگرە بۆ تەواوکردنی ڕێکخستنی فرۆشگاکەت",
+      "exportData": "هەناردەکردنی هەموو داتاکان",
+      "exportDataSubtitle": "هەناردەکردنی بەرهەم، داواکاری و کڕیارەکان بۆ JSON",
+      "exportingData": "هەناردەکردنی داتا..."
     },
     "stockReport": {
       "title": "ڕاپۆرتی کۆگا",
@@ -2303,7 +2372,10 @@
       "addSuccess": "بانەرەکە بە سەرکەوتوویی زیادکرا",
       "addFailed": "شکستی هێنا لە زیادکردنی بانەر",
       "deleteTitle": "سڕینەوەی بانەر",
-      "deleteConfirm": "دڵنیایت لە سڕینەوەی ئەم بانەرە؟"
+      "deleteConfirm": "دڵنیایت لە سڕینەوەی ئەم بانەرە؟",
+      "deleteFailed": "سڕینەوەی بانەر سەرکەوتوو نەبوو",
+      "loadFailed": "بارکردنی بانەرەکان سەرکەوتوو نەبوو",
+      "uploadFailed": "بارکردنی وێنە سەرکەوتوو نەبوو"
     },
     "storeProfile": {
       "saveSuccess": "پرۆفایلی کۆگا بە سەرکەوتوویی خەزنکرا",
@@ -2348,7 +2420,10 @@
       "maxImages": "زۆرترین ژمارەی وێنەی بەرگ 10 ـیە",
       "logoUploaded": "لۆگۆ بە سەرکەوتوویی بارکرا",
       "coverUploaded": "وێنە بە سەرکەوتوویی بارکرا",
-      "confirmRemoveImage": "ئەم وێنەیە دەسڕیتەوە؟"
+      "confirmRemoveImage": "ئەم وێنەیە دەسڕیتەوە؟",
+      "customTimezone": "(تایبەت)",
+      "deviceDefaultTimezone": "(بنەڕەتی ئامێر)",
+      "mainImage": "سەرەکی"
     },
     "storeLocations": {
       "title": "شوێنەکانی فرۆشگا",
@@ -2477,7 +2552,9 @@
       "topProducts": "بەرهەمە پڕفرۆشەکان",
       "ordersByStatus": "داواکاری بەپێی دۆخ",
       "noData": "هیچ داتایەک نیە بۆ ئەم ماوەیە",
-      "invalidRange": "بەرواری دەستپێک دەبێت پێش بەرواری کۆتایی بێت."
+      "invalidRange": "بەرواری دەستپێک دەبێت پێش بەرواری کۆتایی بێت.",
+      "from": "لە",
+      "to": "بۆ"
     },
     "changePassword": {
       "title": "گۆڕینی وشەی تێپەڕ",
@@ -2628,7 +2705,9 @@
       "address": "ناونیشان",
       "openInMaps": "کردنەوە لە نەخشەدا",
       "assignProducts": "دیاریکردنی بەرهەمەکان",
-      "partnerProducts": "بەرهەمەکانی هاوبەش"
+      "partnerProducts": "بەرهەمەکانی هاوبەش",
+      "mapFailedToLoad": "بارکردنی نەخشە سەرکەوتوو نەبوو",
+      "mapUnavailable": "نەخشە بەردەست نییە"
     },
     "invoiceSettings": {
       "title": "ڕێکخستنەکانی پسووڵە",
@@ -2799,7 +2878,23 @@
         "featured": "تایبەت (لەسەرەوە دابنێ)",
         "featuredHint": "ئەم پارچەیە لە ڕیزی تایبەتدا پیشان بدە بۆ کڕیاران.",
         "defaultShippingHint": "جێبەجێ دەکرێت بۆ هەر ناوچەیەک کە لە خوارەوە دیاری نەکراوە",
-        "free": "بێبەرامبەر"
+        "free": "بێبەرامبەر",
+        "edit": "دەستکاری",
+        "productCreatedVideoFailed": "بەرهەم دروستکرا، بەڵام بارکردنی ڤیدیۆ سەرکەوتوو نەبوو.",
+        "productCreatedVideoFailedErr": "بەرهەم دروستکرا، بەڵام بارکردنی ڤیدیۆ سەرکەوتوو نەبوو: {{error}}",
+        "productCreatedVideoUploaded": "بەرهەم دروستکرا و ڤیدیۆ بە سەرکەوتوویی بارکرا!",
+        "removeVideoMessage": "دڵنیایت دەتەوێت ڤیدیۆکە لاببەیت؟",
+        "removeVideoTitle": "ڤیدیۆ لاببرێت؟",
+        "replace": "جێگۆڕکێ",
+        "replaceVideoMessage": "پێشتر ڤیدیۆیەک هەیە. دەتەوێت جێگۆڕکێی پێبکەیت؟",
+        "replaceVideoTitle": "ڤیدیۆ جێگۆڕکێ بکرێت؟",
+        "videoRemoved": "ڤیدیۆ لابرا!",
+        "videoRemoveFailed": "لابردنی ڤیدیۆ لە سێرڤەرەوە سەرکەوتوو نەبوو.",
+        "videoSelectedMessage": "ڤیدیۆ هەڵبژێردرا! کاتێک بەرهەمەکە خەزن دەکەیت بار دەکرێت.",
+        "videoUploadedClickSave": "ڤیدیۆ بارکرا! بۆ پاراستن کلیک لە خەزنکردن بکە.",
+        "videoUploadedSaved": "ڤیدیۆ بارکرا و خەزنکرا!",
+        "videoUploadFailed": "بارکردنی ڤیدیۆ سەرکەوتوو نەبوو",
+        "videoValidationFailed": "پشتڕاستکردنەوەی ڤیدیۆ سەرکەوتوو نەبوو"
       },
       "noSearchResults": "هیچ بەرهەمێکی لەو جۆرە نەدۆزرایەوە",
       "loadingTenant": "بارکردنی زانیاری بازرگانی...",
@@ -2876,8 +2971,32 @@
       "notePlaceholder": "تێبینییەک زیادبکە (ئارەزوومەندانە)…",
       "pickVariation": "جۆرێک هەڵبژێرە",
       "pickVariationHint": "بکرتە لەسەر جۆرێک بۆ زیادکردنی بۆ سەبەتە",
-      "options": "بژاردەکان"
-    }
+      "options": "بژاردەکان",
+      "createFailed": "دروستکردنی فرۆشتن سەرکەوتوو نەبوو"
+    },
+    "active": "چالاک",
+    "brands": {
+      "add": "زیادکردنی براند",
+      "deleteTitle": "براند بسڕدرێتەوە؟",
+      "edit": "دەستکاریکردنی براند",
+      "empty": "هێشتا هیچ براندێک نییە. + لێبدە بۆ زیادکردنی یەکێک.",
+      "name": "ناوی براند",
+      "nameRequired": "ناوی براند پێویستە",
+      "pickLogo": "زیادکردنی لۆگۆ",
+      "subtitle": "بەڕێوەبردنی براند و لۆگۆکان",
+      "title": "براندەکان"
+    },
+    "categoryMgr": {
+      "add": "زیادکردنی پۆل",
+      "deleteTitle": "پۆل بسڕدرێتەوە؟",
+      "edit": "دەستکاریکردنی پۆل",
+      "empty": "هێشتا هیچ پۆلێک نییە. + لێبدە بۆ زیادکردنی یەکێک.",
+      "name": "ناوی پۆل",
+      "nameRequired": "ناوی پۆل پێویستە",
+      "pickLogo": "زیادکردنی لۆگۆ",
+      "title": "پۆلەکان"
+    },
+    "hidden": "شاردراوە"
   },
   "onboarding": {
     "welcomeTitle": "بەخێربێیت بۆ",
@@ -2913,7 +3032,9 @@
     "iqd": "دیناری عێراقی",
     "chooseRegion": "ناوچەکەت هەڵبژێرە",
     "chooseRegionSub": "وڵاتەکەت هەڵبژێرە بۆ گواستنەوە و گەیاندن",
-    "chooseCity": "شارەکەت هەڵبژێرە"
+    "chooseCity": "شارەکەت هەڵبژێرە",
+    "subtitle": "کۆگای ئۆنڵاینت بۆ ئەو بەرهەمانەی خۆشتدەوێت.",
+    "welcome": "بەخێربێیت بۆ Asankary"
   },
   "adminSettings": {
     "account": "هەژمار",
@@ -2979,5 +3100,9 @@
     "browseStores": "گەڕان لە فرۆشگاکاندا",
     "discoverStores": "فرۆشیاری متمانەپێکراو دۆزن",
     "noStores": "هیچ فرۆشگایەک بەردەست نیە"
+  },
+  "sort": {
+    "priceHigh": "نرخ ↓",
+    "priceLow": "نرخ ↑"
   }
 }

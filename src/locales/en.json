@@ -173,7 +173,9 @@
     "noResults": "No products found",
     "noSelection": "No Selection",
     "order": "Order",
-    "tryDifferentSearch": "Try a different search term"
+    "tryDifferentSearch": "Try a different search term",
+    "pullToRefresh": "Pull down to refresh",
+    "somethingWentWrong": "Something went wrong"
   },
   "product": {
     "lowStock": "Only {{count}} left",
@@ -227,7 +229,18 @@
     "warranty": "Warranty",
     "whatsappMsg": "Hello, I have a question about this product.",
     "comingSoon": "Coming soon",
-    "onTheWay": "On the way"
+    "onTheWay": "On the way",
+    "addToCart": "Add to Cart",
+    "authentic": "Authentic",
+    "authenticValue": "100% Authentic",
+    "cashOnDelivery": "Cash on Delivery",
+    "manufacturerCode": "Manufacturer Code",
+    "noOverview": "No additional details available.",
+    "notAvailable": "Not Available",
+    "overview": "Product Overview",
+    "paymentMethods": "Payment Methods",
+    "save": "Save",
+    "sku": "Sku"
   },
   "auth": {
     "accountBlocked": "Account Blocked",
@@ -446,7 +459,13 @@
       "phoneExists": "This phone is already registered",
       "sendCode": "Send code"
     },
-    "signInWithGoogle": "Sign in with Google"
+    "signInWithGoogle": "Sign in with Google",
+    "continueWithApple": "Continue with Apple",
+    "continueWithGoogle": "Continue with Google",
+    "requestNewCode": "Please request a new code",
+    "signInWithApple": "Continue with Apple",
+    "signInWithFacebook": "Continue with Facebook",
+    "verifyFailed": "Verification failed. Try again."
   },
   "home": {
     "welcome": "Welcome to Asankary",
@@ -692,7 +711,14 @@
     "requiredField": "Required Field",
     "saveExchangerInfo": "Save for future use",
     "totalAmountPlaceholder": "Enter total amount",
-    "totalAmountRequired": "Please enter the total amount."
+    "totalAmountRequired": "Please enter the total amount.",
+    "addAddressToContinue": "Please add a delivery address first to continue with your order.",
+    "addressRequiredTitle": "Address Required",
+    "checkingDiscounts": "Checking for discounts...",
+    "noDeliveryAddressFound": "No Delivery Address Found",
+    "noLocationSet": "No location set",
+    "selectAddressToContinue": "Please select a delivery address to continue with your order.",
+    "youAreSaving": "You're saving {{amount}}!"
   },
   "qiCard": {
     "title": "QI Card Payment",
@@ -937,7 +963,9 @@
     "confirmCancel": "Are you sure you want to cancel this order?",
     "cancelled": "Order Cancelled",
     "noAddress": "No Address",
-    "addAddressFirst": "Please add a delivery address first."
+    "addAddressFirst": "Please add a delivery address first.",
+    "countSummary": "{{filtered}} of {{total}} orders",
+    "pendingSummary": " • {{count}} pending"
   },
   "order": {
     "order": "Order",
@@ -1225,9 +1253,24 @@
       "resend": "Resend",
       "sent": "Verification email sent!",
       "subtitle": "Check your inbox for verification link",
-      "title": "Verify your email"
+      "title": "Verify your email",
+      "noEmail": "No email address found. Please add your email in Edit Profile first."
     },
-    "phoneLocked": "Phone number cannot be changed"
+    "phoneLocked": "Phone number cannot be changed",
+    "contactUs": {
+      "businessHours": "Business Hours:",
+      "email": "Email:",
+      "fridayClosed": "Friday: Closed",
+      "hoursSatThu": "Sat-Thu: 8:00 AM - 6:00 PM",
+      "storeLocation": "Store Location:",
+      "title": "Contact {{name}}",
+      "whatsapp": "WhatsApp:"
+    },
+    "currencyIqd": "Iraqi Dinar (IQD)",
+    "currencyUsd": "US Dollar ($)",
+    "memberSince": "Member since {{year}}",
+    "updateName": "Update name",
+    "yourName": "Your Name"
   },
   "notifications": {
     "title": "Notifications",
@@ -1429,7 +1472,9 @@
     "failedToLoadProduct": "Failed to load product",
     "loadProfileFailed": "Store not found",
     "loadingData": "Failed to load data",
-    "overnightNotSupported": "Closing time must be after opening time"
+    "overnightNotSupported": "Closing time must be after opening time",
+    "authenticationError": "Authentication Error",
+    "loginAgainToOrder": "Please log out and log back in to place orders."
   },
   "addresses": {
     "myAddresses": "My Addresses",
@@ -1518,7 +1563,15 @@
     "errorConfirmingLocation": "Error confirming location",
     "locationOptionalNote": "Adding your location is optional but helps with accurate delivery",
     "locationSetMessage": "Location coordinates have been saved with your address",
-    "defaultTitle": "Shop"
+    "defaultTitle": "Shop",
+    "addAddressesHint": "Add delivery addresses for faster checkout",
+    "citiesIn": "Cities in {{name}}:",
+    "gpsCoordinates": "GPS Coordinates:",
+    "invalidCountry": "Invalid country selected (Try \"Iraq\")",
+    "mapUnavailable": "Map unavailable",
+    "noLocationSet": "No location set",
+    "selectCountryFirst": "Select a country first",
+    "suggestionsTapToSelect": "Suggestions (tap to select):"
   },
   "location": {
     "permissionRequired": "Location Permission Required",
@@ -1676,7 +1729,8 @@
       "title": "Still need help?",
       "description": "Our support team is available Saturday to Thursday, 8:00 AM - 6:00 PM",
       "chatButton": "Chat with Support"
-    }
+    },
+    "whatsappMessage": "Hi, I need help with my question that's not covered in the FAQ"
   },
   "navigation": {
     "home": "Home",
@@ -1750,7 +1804,12 @@
       "contactStore": "How can I contact the store directly?",
       "recommend": "What are your best selling or most popular products?",
       "categories": "What product categories do you have available?"
-    }
+    },
+    "micPermission": "Microphone permission is required to send voice messages",
+    "recordFailed": "Failed to start recording",
+    "recording": "Recording...",
+    "sendingVoice": "Sending voice message...",
+    "voiceMessage": "Voice Message"
   },
   "chat": {
     "inbox": "Messages",
@@ -2123,7 +2182,10 @@
       "makeVip": "Make VIP",
       "roleUpdatedCustomer": "Role updated to Customer",
       "roleUpdatedVip": "Role updated to VIP",
-      "failedUpdateRole": "Failed to update role"
+      "failedUpdateRole": "Failed to update role",
+      "exportData": "Export All Data",
+      "exportDataSubtitle": "Export products, orders, and customers to JSON",
+      "exportingData": "Exporting data..."
     },
     "stockReport": {
       "title": "Stock Report",
@@ -2191,7 +2253,10 @@
       "addSuccess": "Banner added successfully",
       "addFailed": "Failed to add banner",
       "deleteTitle": "Delete Banner",
-      "deleteConfirm": "Are you sure you want to delete this banner?"
+      "deleteConfirm": "Are you sure you want to delete this banner?",
+      "deleteFailed": "Failed to delete banner",
+      "loadFailed": "Failed to load banners",
+      "uploadFailed": "Image upload failed"
     },
     "discounts": {
       "title": "Discounts",
@@ -2297,7 +2362,10 @@
       "noLocations": "No locations added yet",
       "removeWechatQr": "Remove WeChat QR code?",
       "saveSuccess": "Store profile saved successfully",
-      "wechatUploaded": "WeChat QR code uploaded successfully"
+      "wechatUploaded": "WeChat QR code uploaded successfully",
+      "customTimezone": "(Custom)",
+      "deviceDefaultTimezone": "(Device Default)",
+      "mainImage": "MAIN"
     },
     "storeLocations": {
       "title": "Store Locations",
@@ -2365,7 +2433,9 @@
       "topProducts": "Top Products",
       "ordersByStatus": "Orders by Status",
       "noData": "No data available for selected period",
-      "invalidRange": "Start date must be before the end date."
+      "invalidRange": "Start date must be before the end date.",
+      "from": "From",
+      "to": "To"
     },
     "changePassword": {
       "title": "Change Password",
@@ -2399,7 +2469,9 @@
       "enterAdminPassword": "Enter admin password",
       "verifyAndProceed": "Verify & Proceed",
       "storeLabel": "Store",
-      "back": "Back"
+      "back": "Back",
+      "continue": "Continue",
+      "ok": "OK"
     },
     "days": {
       "sunday": "Sunday",
@@ -2610,7 +2682,12 @@
       "pending": "Pending",
       "iqdAmount": "Amount (IQD)",
       "usdAmount": "Amount (USD)",
-      "exchangeRateApplied": "Exchange Rate"
+      "exchangeRateApplied": "Exchange Rate",
+      "call": "Call",
+      "chat": "Chat",
+      "gpsTrackingPreview": "GPS Tracking Preview",
+      "saveTrackingUrl": "Save Tracking URL",
+      "trackingUrlLabel": "Tracking URL (GPSOPS)"
     },
     "order": {
       "color": "Color",
@@ -2758,7 +2835,23 @@
         "featuredHint": "Show this part in the featured row for customers.",
         "defaultShippingHint": "Applies to any region not listed below",
         "purchasePrice": "Purchase Price ($)",
-        "free": "Free"
+        "free": "Free",
+        "edit": "Edit",
+        "productCreatedVideoFailed": "Product created, but video upload failed.",
+        "productCreatedVideoFailedErr": "Product created, but video upload failed: {{error}}",
+        "productCreatedVideoUploaded": "Product created and video uploaded successfully!",
+        "removeVideoMessage": "Are you sure you want to remove the video?",
+        "removeVideoTitle": "Remove Video?",
+        "replace": "Replace",
+        "replaceVideoMessage": "A video already exists. Do you want to replace it?",
+        "replaceVideoTitle": "Replace Video?",
+        "videoRemoved": "Video removed!",
+        "videoRemoveFailed": "Failed to remove video from server.",
+        "videoSelectedMessage": "Video selected! It will be uploaded when you save the product.",
+        "videoUploadedClickSave": "Video uploaded! Click Save to persist.",
+        "videoUploadedSaved": "Video uploaded and saved!",
+        "videoUploadFailed": "Video upload failed",
+        "videoValidationFailed": "Video validation failed"
       },
       "invalidSizeValue": "Please enter a size",
       "duplicateSizeValue": "This size already exists",
@@ -2809,7 +2902,9 @@
       "failedUnblock": "Failed to unblock account",
       "userBadge": "USER",
       "assignProducts": "Assign Products",
-      "partnerProducts": "Partner Products"
+      "partnerProducts": "Partner Products",
+      "mapFailedToLoad": "Map failed to load",
+      "mapUnavailable": "Map unavailable"
     },
     "invoiceSettings": {
       "title": "Invoice Settings",
@@ -2931,8 +3026,32 @@
       "notePlaceholder": "Add a note (optional)…",
       "pickVariation": "Choose variant",
       "pickVariationHint": "Tap a variant to add it to the cart",
-      "options": "options"
-    }
+      "options": "options",
+      "createFailed": "Failed to create sale"
+    },
+    "active": "Active",
+    "brands": {
+      "add": "Add Brand",
+      "deleteTitle": "Delete brand?",
+      "edit": "Edit Brand",
+      "empty": "No brands yet. Tap + to add one.",
+      "name": "Brand name",
+      "nameRequired": "Brand name is required",
+      "pickLogo": "Add logo",
+      "subtitle": "Manage brands & logos",
+      "title": "Brands"
+    },
+    "categoryMgr": {
+      "add": "Add Category",
+      "deleteTitle": "Delete category?",
+      "edit": "Edit Category",
+      "empty": "No categories yet. Tap + to add one.",
+      "name": "Category name",
+      "nameRequired": "Category name is required",
+      "pickLogo": "Add logo",
+      "title": "Categories"
+    },
+    "hidden": "Hidden"
   },
   "onboarding": {
     "welcomeTitle": "Welcome to",
@@ -2968,7 +3087,9 @@
     "iqd": "Iraqi Dinar",
     "chooseRegion": "Choose Your Region",
     "chooseRegionSub": "Select your country for shipping & delivery",
-    "chooseCity": "Choose Your City"
+    "chooseCity": "Choose Your City",
+    "subtitle": "Your online store for the products you love.",
+    "welcome": "Welcome to Asankary"
   },
   "share": {
     "content": "Content",
@@ -2979,5 +3100,9 @@
     "sendTo": "Send to...",
     "sharing": "Sharing",
     "text": "Text"
+  },
+  "sort": {
+    "priceHigh": "Price ↓",
+    "priceLow": "Price ↑"
   }
 }

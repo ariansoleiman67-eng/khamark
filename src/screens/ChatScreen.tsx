@@ -453,7 +453,7 @@ const OrderBubble: React.FC<{
                 ${data.totalUSD}
             </Text>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                <Text allowFontScaling={false} style={{ color: theme.colors.textSecondary, fontSize: 12 }}>{t('orders.status', { defaultValue: 'Status' })}</Text>
+                <Text allowFontScaling={false} style={{ color: theme.colors.textSecondary, fontSize: 12 }}>{t('orders.status.label', { defaultValue: 'Status' })}</Text>
                 <Text allowFontScaling={false} style={{ color: theme.colors.text, fontSize: 12, fontWeight: '600', textTransform: 'capitalize' }}>
                     {data.status || t('orders.pending', { defaultValue: 'Pending' })}
                 </Text>
