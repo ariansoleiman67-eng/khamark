@@ -8,6 +8,7 @@ import {
   Alert,
   RefreshControl,
   ActivityIndicator,
+  I18nManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -25,8 +26,9 @@ import { Discount } from '../../types';
 const AdminDiscountsScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
   const navigation = useNavigation<any>();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { tenantId, isLoading: tenantLoading } = useTenant();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   
   const [discounts, setDiscounts] = useState<Discount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -128,11 +130,11 @@ const AdminDiscountsScreen: React.FC = () => {
   const formatDiscountValue = (discount: Discount): string => {
     switch (discount.type) {
       case 'percentage':
-        return `${discount.value}% OFF`;
+        return `${discount.value}% ${t('admin.discounts.off', { defaultValue: 'OFF' })}`;
       case 'fixed':
-        return `$${discount.value} OFF`;
+        return `$${discount.value} ${t('admin.discounts.off', { defaultValue: 'OFF' })}`;
       case 'bundle':
-        return `${discount.bundleQuantity} for $${discount.bundlePrice}`;
+        return `${discount.bundleQuantity} ${t('admin.discounts.for', { defaultValue: 'for' })} $${discount.bundlePrice}`;
       default:
         return '';
     }
@@ -171,6 +173,7 @@ const AdminDiscountsScreen: React.FC = () => {
     const status = getDiscountStatus(discount);
     const statusColor = getStatusColor(status);
     const valueDisplay = formatDiscountValue(discount);
+    const rowStyle = [styles.detailRow, isRTL && { flexDirection: 'row-reverse' as const }];
 
     return (
       <Animated.View
@@ -183,7 +186,7 @@ const AdminDiscountsScreen: React.FC = () => {
           activeOpacity={0.7}
         >
           {/* Header */}
-          <View style={styles.cardHeader}>
+          <View style={[styles.cardHeader, isRTL && { flexDirection: 'row-reverse' as const }]}>
             <View style={styles.discountInfo}>
               <Text allowFontScaling={false} style={[styles.discountName, { color: theme.colors.text }]}>
                 {discount.name}
@@ -204,42 +207,42 @@ const AdminDiscountsScreen: React.FC = () => {
 
           {/* Details */}
           <View style={styles.cardDetails}>
-            <View style={styles.detailRow}>
+            <View style={rowStyle}>
               <Ionicons name="calendar-outline" size={16} color={theme.colors.textSecondary} />
-              <Text allowFontScaling={false} style={[styles.detailText, { color: theme.colors.textSecondary }]}>
+              <Text allowFontScaling={false} style={[styles.detailText, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
                 {discount.startDate ? new Date(discount.startDate as any).toLocaleDateString() : ''} - {discount.endDate ? new Date(discount.endDate as any).toLocaleDateString() : ''}
               </Text>
             </View>
             
             {discount.minPurchase && (
-              <View style={styles.detailRow}>
+              <View style={rowStyle}>
                 <Ionicons name="wallet-outline" size={16} color={theme.colors.textSecondary} />
-                <Text allowFontScaling={false} style={[styles.detailText, { color: theme.colors.textSecondary }]}>
-                  Min Order: ${discount.minPurchase}
+                <Text allowFontScaling={false} style={[styles.detailText, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
+                  {t('admin.discounts.minOrder', { defaultValue: 'Min Order' })}: ${discount.minPurchase}
                 </Text>
               </View>
             )}
 
             {discount.minQuantity && (
-              <View style={styles.detailRow}>
+              <View style={rowStyle}>
                 <Ionicons name="basket-outline" size={16} color={theme.colors.textSecondary} />
-                <Text allowFontScaling={false} style={[styles.detailText, { color: theme.colors.textSecondary }]}>
-                  Min Items: {discount.minQuantity}
+                <Text allowFontScaling={false} style={[styles.detailText, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
+                  {t('admin.discounts.minItems', { defaultValue: 'Min Items' })}: {discount.minQuantity}
                 </Text>
               </View>
             )}
 
-            <View style={styles.detailRow}>
+            <View style={rowStyle}>
               <Ionicons name="stats-chart-outline" size={16} color={theme.colors.textSecondary} />
-              <Text allowFontScaling={false} style={[styles.detailText, { color: theme.colors.textSecondary }]}>
+              <Text allowFontScaling={false} style={[styles.detailText, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
                 {t('admin.discounts.used')}: {discount.usageCount}
                 {discount.usageLimit ? ` / ${discount.usageLimit}` : ''}
               </Text>
             </View>
 
-            <View style={styles.detailRow}>
+            <View style={rowStyle}>
               <Ionicons name="cube-outline" size={16} color={theme.colors.textSecondary} />
-              <Text allowFontScaling={false} style={[styles.detailText, { color: theme.colors.textSecondary }]}>
+              <Text allowFontScaling={false} style={[styles.detailText, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
                 {discount.productIds && discount.productIds.length > 0 
                   ? `${discount.productIds.length} ${t('admin.discounts.specificProducts')}`
                   : t('admin.discounts.allProducts')
@@ -249,7 +252,7 @@ const AdminDiscountsScreen: React.FC = () => {
           </View>
 
           {/* Actions */}
-          <View style={styles.cardActions}>
+          <View style={[styles.cardActions, { borderTopColor: theme.colors.border }, isRTL && { justifyContent: 'flex-start' as const }]}>
             <TouchableOpacity
               style={[styles.actionButton, { backgroundColor: theme.colors.primary + '20' }]}
               onPress={() => handleToggleStatus(discount)}
@@ -269,10 +272,10 @@ const AdminDiscountsScreen: React.FC = () => {
             </TouchableOpacity>
             
             <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: '#F44336' + '20' }]}
+              style={[styles.actionButton, { backgroundColor: theme.colors.error + '20' }]}
               onPress={() => handleDelete(discount)}
             >
-              <Ionicons name="trash-outline" size={18} color="#F44336" />
+              <Ionicons name="trash-outline" size={18} color={theme.colors.error} />
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -303,9 +306,9 @@ const AdminDiscountsScreen: React.FC = () => {
         >
           <TouchableOpacity
             onPress={() => navigation.goBack()}
-            style={styles.backButton}
+            style={[styles.backButton, isRTL ? { right: SPACING.md } : { left: SPACING.md }]}
           >
-            <Ionicons name="arrow-back" size={24} color="#fff" />
+            <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color="#fff" />
           </TouchableOpacity>
           
           <View style={styles.headerContent}>
@@ -366,7 +369,6 @@ const styles = StyleSheet.create({
     width: 36,
   },
   backButton: {
-    left: SPACING.md,
     position: 'absolute',
     top: SPACING.md,
     zIndex: 1,

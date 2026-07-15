@@ -10,6 +10,7 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
+  I18nManager,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -20,6 +21,7 @@ import { registerWithPhone, registerWithEmail } from '../../services/auth';
 import { RootStackParamList } from '../../types';
 import { useTenant } from '../../contexts/TenantContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../components/ThemeProvider';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -49,7 +51,11 @@ const AdminSecurityScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const { theme, isDark } = useTheme();
+  const colors = theme.colors;
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
+  const styles = useMemo(() => createStyles(colors, isRTL, isDark), [colors, isRTL, isDark]);
   const { createAdminAccount } = useTenant();
   const { refreshUser } = useAuth();
 
@@ -74,13 +80,13 @@ const AdminSecurityScreen: React.FC = () => {
   }, [password, t]);
 
   const strengthColor = useMemo(() => {
-    if (!password || password.length < 8) return LUX.muted;
+    if (!password || password.length < 8) return colors.textSecondary;
     const hasNumber = /\d/.test(password);
     const hasLetter = /[a-zA-Z]/.test(password);
-    if (!hasNumber || !hasLetter) return LUX.muted;
-    if (password.length >= 12) return LUX.success;
+    if (!hasNumber || !hasLetter) return colors.textSecondary;
+    if (password.length >= 12) return colors.success;
     return LUX.accent;
-  }, [password]);
+  }, [password, colors]);
 
   const handleCreateAccount = async () => {
     setErrorMessage('');
@@ -138,7 +144,7 @@ const AdminSecurityScreen: React.FC = () => {
         >
           {/* ── Back ── */}
           <TouchableOpacity style={styles.backButton} onPress={handleBack} activeOpacity={0.7}>
-            <Ionicons name="chevron-back" size={20} color={LUX.body} />
+            <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={20} color={colors.text} />
           </TouchableOpacity>
 
           {/* ── Headline ── */}
@@ -149,11 +155,11 @@ const AdminSecurityScreen: React.FC = () => {
           <View style={styles.inputGroup}>
             <Text allowFontScaling={false} style={styles.label}>{t('auth.password', { defaultValue: 'Password' })}</Text>
             <View style={styles.inputWrapper}>
-              <Ionicons name="lock-closed-outline" size={18} color={LUX.placeholder} style={{ marginRight: 12 }} />
+              <Ionicons name="lock-closed-outline" size={18} color={colors.placeholder} style={{ marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }} />
               <TextInput allowFontScaling={false}
                 style={styles.input}
                 placeholder={t('auth.adminSetup.enterPassword', { defaultValue: 'Enter password' })}
-                placeholderTextColor={LUX.placeholder}
+                placeholderTextColor={colors.placeholder}
                 value={password}
                 onChangeText={(text) => { setPassword(text); setErrorMessage(''); }}
                 secureTextEntry={!showPassword}
@@ -161,7 +167,7 @@ const AdminSecurityScreen: React.FC = () => {
                 autoCorrect={false}
               />
               <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton} activeOpacity={0.6}>
-                <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={18} color={LUX.muted} />
+                <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={18} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
             {!!strengthHint && (
@@ -173,11 +179,11 @@ const AdminSecurityScreen: React.FC = () => {
           <View style={styles.inputGroup}>
             <Text allowFontScaling={false} style={styles.label}>{t('auth.adminSetup.confirmPasswordLabel', { defaultValue: 'Confirm Password' })}</Text>
             <View style={styles.inputWrapper}>
-              <Ionicons name="lock-closed-outline" size={18} color={LUX.placeholder} style={{ marginRight: 12 }} />
+              <Ionicons name="lock-closed-outline" size={18} color={colors.placeholder} style={{ marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }} />
               <TextInput allowFontScaling={false}
                 style={styles.input}
                 placeholder={t('auth.adminSetup.confirmPasswordPlaceholder', { defaultValue: 'Confirm password' })}
-                placeholderTextColor={LUX.placeholder}
+                placeholderTextColor={colors.placeholder}
                 value={confirmPassword}
                 onChangeText={(text) => { setConfirmPassword(text); setErrorMessage(''); }}
                 secureTextEntry={!showConfirmPassword}
@@ -185,7 +191,7 @@ const AdminSecurityScreen: React.FC = () => {
                 autoCorrect={false}
               />
               <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeButton} activeOpacity={0.6}>
-                <Ionicons name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'} size={18} color={LUX.muted} />
+                <Ionicons name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'} size={18} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
           </View>
@@ -201,7 +207,7 @@ const AdminSecurityScreen: React.FC = () => {
             activeOpacity={0.85}
           >
             {loading ? (
-              <ActivityIndicator color={LUX.surface} />
+              <ActivityIndicator color={colors.textOnPrimary} />
             ) : (
               <Text allowFontScaling={false} style={styles.primaryButtonText}>{t('auth.adminSetup.createAccount')}</Text>
             )}
@@ -212,11 +218,12 @@ const AdminSecurityScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any, isRTL: boolean, isDark: boolean) => StyleSheet.create({
   backButton: {
     alignItems: 'center',
-    backgroundColor: LUX.surface,
-    borderColor: LUX.border,
+    alignSelf: isRTL ? 'flex-end' : 'flex-start',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
     borderRadius: RADIUS.back,
     borderWidth: 1,
     height: 44,
@@ -225,26 +232,28 @@ const styles = StyleSheet.create({
     width: 44,
   },
   container: {
-    backgroundColor: LUX.bg,
+    backgroundColor: colors.background,
     flex: 1,
   },
   errorText: {
-    color: LUX.error,
+    color: colors.error,
     fontSize: 13,
     fontWeight: '500',
     marginBottom: SPACING.md,
     marginTop: -SPACING.sm,
+    textAlign: isRTL ? 'right' : 'left',
   },
   eyeButton: {
     padding: 6,
   },
   input: {
-    color: LUX.body,
+    color: colors.text,
     flex: 1,
     fontSize: 16,
     height: 40,
     includeFontPadding: false,
     paddingVertical: 0,
+    textAlign: isRTL ? 'right' : 'left',
     textAlignVertical: 'center',
   },
   inputGroup: {
@@ -252,20 +261,21 @@ const styles = StyleSheet.create({
   },
   inputWrapper: {
     alignItems: 'center',
-    backgroundColor: LUX.inputBg,
-    borderColor: LUX.border,
+    backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : LUX.inputBg,
+    borderColor: colors.border,
     borderRadius: RADIUS.input,
     borderWidth: 1,
-    flexDirection: 'row',
+    flexDirection: isRTL ? 'row-reverse' : 'row',
     height: 54,
     paddingHorizontal: SPACING.md,
   },
   label: {
-    color: LUX.muted,
+    color: colors.textSecondary,
     fontSize: 13,
     fontWeight: '500',
     letterSpacing: 0.3,
     marginBottom: SPACING.xs,
+    textAlign: isRTL ? 'right' : 'left',
     textTransform: 'uppercase',
   },
   primaryButton: {
@@ -280,7 +290,7 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   primaryButtonText: {
-    color: LUX.surface,
+    color: colors.textOnPrimary,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -292,19 +302,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
     marginTop: 6,
+    textAlign: isRTL ? 'right' : 'left',
   },
   subtitle: {
-    color: LUX.muted,
+    color: colors.textSecondary,
     fontSize: 15,
     lineHeight: 22,
     marginBottom: SPACING.xl,
+    textAlign: isRTL ? 'right' : 'left',
   },
   title: {
-    color: LUX.heading,
+    color: colors.text,
     fontSize: 30,
     fontWeight: '700',
     letterSpacing: -0.5,
     marginBottom: SPACING.xs,
+    textAlign: isRTL ? 'right' : 'left',
   },
 });
 

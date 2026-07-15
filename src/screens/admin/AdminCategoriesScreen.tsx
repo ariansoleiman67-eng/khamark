@@ -186,7 +186,7 @@ export default function AdminCategoriesScreen() {
                   <Text allowFontScaling={false} style={{ color: theme.colors.text, fontWeight: '600' }}>{t('common.cancel', 'Cancel')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.btn, { backgroundColor: theme.colors.primary }]} onPress={save} disabled={saving}>
-                  {saving ? <ActivityIndicator color="#fff" /> : <Text allowFontScaling={false} style={{ color: '#fff', fontWeight: '700' }}>{t('common.save', 'Save')}</Text>}
+                  {saving ? <ActivityIndicator color={theme.colors.textOnPrimary} /> : <Text allowFontScaling={false} style={{ color: theme.colors.textOnPrimary, fontWeight: '700' }}>{t('common.save', 'Save')}</Text>}
                 </TouchableOpacity>
               </View>
             </ScrollView>

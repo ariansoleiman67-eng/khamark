@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
   Platform,
+  I18nManager,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -77,13 +78,13 @@ const toMillis = (ts: any): number => {
   }
 };
 
-const formatTimeAgo = (ts: any): string => {
+const formatTimeAgo = (ts: any, t?: any): string => {
   const ms = toMillis(ts);
   if (!ms) return '';
   const now = Date.now();
   const diff = now - ms;
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'Just now';
+  if (mins < 1) return t ? t('chat.justNow', 'Just now') : 'Just now';
   if (mins < 60) return `${mins}m`;
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h`;
@@ -117,6 +118,7 @@ const ConversationCard = React.memo(({
 }) => {
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   const translateY = React.useRef(new Animated.Value(20)).current;
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
 
   React.useEffect(() => {
     Animated.parallel([
@@ -149,7 +151,7 @@ const ConversationCard = React.memo(({
   
   const lastText = chatLastMessagePreview(item.lastMessage?.text, lastMsgType, t, productTitle);
 
-  const timeText = formatTimeAgo(item.lastMessage?.createdAt || item.updatedAt);
+  const timeText = formatTimeAgo(item.lastMessage?.createdAt || item.updatedAt, t);
   const unread = item.unread?.admin || 0;
   const customerName = item.userSnapshot?.name || t('chat.customer', 'Customer');
   const customerPhone = item.userSnapshot?.phone || '';
@@ -179,9 +181,9 @@ const ConversationCard = React.memo(({
           <View style={styles.unreadAccent} />
         )}
 
-        <View style={styles.rowInner}>
+        <View style={[styles.rowInner, isRTL && { flexDirection: 'row-reverse' }]}>
           {/* Avatar Section */}
-          <View style={styles.avatarWrapper}>
+          <View style={[styles.avatarWrapper, isRTL && { marginRight: 0, marginLeft: 12 }]}>
             {avatarUrl ? (
               <Image
                 source={{ uri: avatarUrl }}
@@ -206,12 +208,12 @@ const ConversationCard = React.memo(({
                 colors={['#FF6A00', '#FF9A44']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.orderMiniWrapper}
+                style={[styles.orderMiniWrapper, isDark && { borderColor: theme.colors.surface }]}
               >
                 <Ionicons name="cube" size={11} color="#fff" />
               </LinearGradient>
             ) : thumb ? (
-              <View style={styles.productMiniWrapper}>
+              <View style={[styles.productMiniWrapper, isDark && { borderColor: theme.colors.surface, backgroundColor: theme.colors.surface }]}>
                 <Image
                   source={{ uri: thumb }}
                   style={styles.productMini}
@@ -226,14 +228,16 @@ const ConversationCard = React.memo(({
           {/* Content */}
           <View style={styles.content}>
             {/* Top row: Name + Time */}
-            <View style={styles.topRow}>
+            <View style={[styles.topRow, isRTL && { flexDirection: 'row-reverse' }]}>
               <Text allowFontScaling={false}
                 style={[
                   styles.customerName,
                   {
                     color: theme.colors.text,
                     fontWeight: unread > 0 ? '900' : '700',
+                    textAlign: isRTL ? 'right' : 'left',
                   },
+                  isRTL && { marginRight: 0, marginLeft: 8 },
                 ]}
                 numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}
               >
@@ -254,7 +258,7 @@ const ConversationCard = React.memo(({
             {/* Phone */}
             {!!customerPhone && (
               <Text allowFontScaling={false}
-                style={[styles.phoneText, { color: theme.colors.textSecondary }]}
+                style={[styles.phoneText, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}
                 numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}
               >
                 {customerPhone}
@@ -269,6 +273,7 @@ const ConversationCard = React.memo(({
                   {
                     color: unread > 0 ? theme.colors.text : theme.colors.textSecondary,
                     fontWeight: unread > 0 ? '700' : '500',
+                    textAlign: isRTL ? 'right' : 'left',
                   },
                 ]}
                 numberOfLines={1}
@@ -283,7 +288,7 @@ const ConversationCard = React.memo(({
           </View>
 
           {/* Right side: Badge + Delete */}
-          <View style={styles.rightSection}>
+          <View style={[styles.rightSection, isRTL && { marginLeft: 0, marginRight: 10 }]}>
             {unread > 0 && (
               <LinearGradient
                 colors={['#FF6A00', '#FF8C33']}
@@ -319,6 +324,7 @@ const AdminInboxScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
 
   const adminUid = user?.uid || '';
 
@@ -386,7 +392,7 @@ const AdminInboxScreen: React.FC = () => {
             try {
               await softDeleteConversation(conversationId, 'admin');
             } catch (err: any) {
-              Alert.alert('Error', err.message);
+              Alert.alert(t('common.error', 'Error'), err.message);
             }
           },
         },
@@ -477,7 +483,7 @@ const AdminInboxScreen: React.FC = () => {
                   colors={['#FF6A0015', '#FF6A0008']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
-                  style={styles.headerPill}
+                  style={[styles.headerPill, isRTL && { flexDirection: 'row-reverse', alignSelf: 'flex-end' }]}
                 >
                   <Ionicons name={showUnreadOnly ? 'mail-open-outline' : 'mail-unread-outline'} size={14} color="#FF6A00" />
                   <Text allowFontScaling={false} style={styles.headerPillText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>

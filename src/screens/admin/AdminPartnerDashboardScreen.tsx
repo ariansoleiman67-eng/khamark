@@ -12,6 +12,7 @@ import {
   Modal,
   TextInput,
   ScrollView,
+  I18nManager,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -36,6 +37,7 @@ export default function AdminPartnerDashboardScreen() {
   const { theme, isDark } = useTheme();
   const { user, signOut } = useAuth();
   const { t, i18n } = useTranslation();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
@@ -334,26 +336,26 @@ export default function AdminPartnerDashboardScreen() {
       <Animated.View entering={FadeInUp.duration(220)}>
         <View style={[styles.card, { backgroundColor: theme.colors.surface, shadowColor: isDark ? '#000' : ACCENT }]}>
           {/* Header: image + name + part number + category/brand */}
-          <View style={styles.cardHeader}>
+          <View style={[styles.cardHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             {item.imageUrls && item.imageUrls.length > 0 ? (
-              <Image source={{ uri: item.imageUrls[0] }} style={styles.productImage} />
+              <Image source={{ uri: item.imageUrls[0] }} style={[styles.productImage, isRTL && { marginRight: 0, marginLeft: SPACING.md }]} />
             ) : (
-              <View style={[styles.placeholderImage, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(139,92,246,0.1)' }]}>
+              <View style={[styles.placeholderImage, isRTL && { marginRight: 0, marginLeft: SPACING.md }, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(139,92,246,0.1)' }]}>
                 <Ionicons name="image-outline" size={32} color={theme.colors.textSecondary} />
               </View>
             )}
             <View style={styles.headerText}>
-              <Text allowFontScaling={false} style={[styles.productName, { color: theme.colors.text }]} numberOfLines={2}>
+              <Text allowFontScaling={false} style={[styles.productName, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={2}>
                 {item.name}
               </Text>
-              <View style={[styles.badge, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#F3F4F6' }]}>
+              <View style={[styles.badge, isRTL && { alignSelf: 'flex-end' }, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#F3F4F6' }]}>
                 <Ionicons name="barcode-outline" size={14} color={theme.colors.textSecondary} style={{ marginRight: 4 }} />
                 <Text allowFontScaling={false} style={[styles.partNumber, { color: theme.colors.textSecondary }]}>
                   {item.partNumber || 'N/A'}
                 </Text>
               </View>
               {!!(p.category || p.brand) && (
-                <Text allowFontScaling={false} style={[styles.metaLine, { color: theme.colors.textSecondary }]} numberOfLines={1}>
+                <Text allowFontScaling={false} style={[styles.metaLine, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
                   {[p.brand, p.category].filter(Boolean).join(' · ')}
                 </Text>
               )}
@@ -458,12 +460,12 @@ export default function AdminPartnerDashboardScreen() {
       <StatusBar style={isDark ? 'light' : 'dark'} />
 
       {/* Premium Header */}
-      <View style={[styles.header, { paddingTop: insets.top + SPACING.sm, backgroundColor: theme.colors.surface }]}>
+      <View style={[styles.header, { paddingTop: insets.top + SPACING.sm, backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.border, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         {/* For the owner (reached from Partner Management) this goes back; for a partner —
             whose dashboard IS their root screen — there's nothing behind it, so it logs out
             (avoids the "GO_BACK was not handled" error). */}
         <TouchableOpacity style={styles.backButton} onPress={() => { navigation.canGoBack() ? navigation.goBack() : signOut(); }}>
-          <Ionicons name={navigation.canGoBack() ? 'chevron-back' : 'log-out-outline'} size={26} color={theme.colors.text} />
+          <Ionicons name={navigation.canGoBack() ? (isRTL ? 'chevron-forward' : 'chevron-back') : 'log-out-outline'} size={26} color={theme.colors.text} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
           <Text allowFontScaling={false} style={[styles.headerTitle, { color: theme.colors.text }]} numberOfLines={1}>{viewName || t('admin.partnerDashboard.title', { defaultValue: 'Partner Dashboard' })}</Text>
@@ -527,8 +529,8 @@ export default function AdminPartnerDashboardScreen() {
               Stays visible even with 0 products so the owner can reconcile after returning the last item. */}
           {(isOwnerViewing || ledger.length > 0) && (
           <View style={[styles.moneyCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-            <View style={styles.moneyHeader}>
-              <Text allowFontScaling={false} style={[styles.moneyTitle, { color: theme.colors.text }]}>{t('admin.partnerDashboard.moneyAccount', { defaultValue: 'Money Account' })}</Text>
+            <View style={[styles.moneyHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <Text allowFontScaling={false} style={[styles.moneyTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{t('admin.partnerDashboard.moneyAccount', { defaultValue: 'Money Account' })}</Text>
               {isOwnerViewing && (
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <TouchableOpacity onPress={() => setItemPickerOpen(true)} style={[styles.moneyItemBtn, { borderColor: ACCENT }]} activeOpacity={0.85}>
@@ -542,14 +544,14 @@ export default function AdminPartnerDashboardScreen() {
                 </View>
               )}
             </View>
-            <View style={styles.moneyStatsRow}>
+            <View style={[styles.moneyStatsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <View style={styles.moneyStat}>
-                <Text allowFontScaling={false} style={[styles.moneyStatLabel, { color: theme.colors.textSecondary }]}>{t('admin.partnerDashboard.paidIn', { defaultValue: 'Partner paid in' })}</Text>
-                <Text allowFontScaling={false} style={[styles.moneyStatValue, { color: PROFIT }]}>{money(ledgerIn)}</Text>
+                <Text allowFontScaling={false} style={[styles.moneyStatLabel, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>{t('admin.partnerDashboard.paidIn', { defaultValue: 'Partner paid in' })}</Text>
+                <Text allowFontScaling={false} style={[styles.moneyStatValue, { color: PROFIT, textAlign: isRTL ? 'right' : 'left' }]}>{money(ledgerIn)}</Text>
               </View>
               <View style={styles.moneyStat}>
-                <Text allowFontScaling={false} style={[styles.moneyStatLabel, { color: theme.colors.textSecondary }]}>{t('admin.partnerDashboard.paidOut', { defaultValue: 'You paid out' })}</Text>
-                <Text allowFontScaling={false} style={[styles.moneyStatValue, { color: '#EF4444' }]}>{money(ledgerOut)}</Text>
+                <Text allowFontScaling={false} style={[styles.moneyStatLabel, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>{t('admin.partnerDashboard.paidOut', { defaultValue: 'You paid out' })}</Text>
+                <Text allowFontScaling={false} style={[styles.moneyStatValue, { color: '#EF4444', textAlign: isRTL ? 'right' : 'left' }]}>{money(ledgerOut)}</Text>
               </View>
             </View>
             {ledger.length === 0 ? (
@@ -565,17 +567,17 @@ export default function AdminPartnerDashboardScreen() {
                 : t('admin.partnerDashboard.returnedItem', { defaultValue: 'Returned item' });
               const label = e.note || (isIn ? t('admin.partnerDashboard.depositLabel', { defaultValue: 'Deposit' }) : isItem ? kindLabel : t('admin.partnerDashboard.payoutLabel', { defaultValue: 'Payout' }));
               return (
-                <View key={e.id} style={[styles.moneyEntry, { borderTopColor: theme.colors.border }]}>
+                <View key={e.id} style={[styles.moneyEntry, { borderTopColor: theme.colors.border, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                   <View style={[styles.moneyDot, { backgroundColor: color + '22' }]}>
                     <Ionicons name={icon as any} size={13} color={color} />
                   </View>
                   <View style={{ flex: 1, minWidth: 0, marginHorizontal: 8 }}>
-                    <Text allowFontScaling={false} style={{ color: theme.colors.text, fontWeight: '700', fontSize: 13 }} numberOfLines={1}>{label}</Text>
-                    <Text allowFontScaling={false} style={{ color: theme.colors.textSecondary, fontSize: 11 }}>{isItem ? `${kindLabel} · ` : ''}{new Date(e.at).toLocaleDateString()}</Text>
+                    <Text allowFontScaling={false} style={{ color: theme.colors.text, fontWeight: '700', fontSize: 13, textAlign: isRTL ? 'right' : 'left' }} numberOfLines={1}>{label}</Text>
+                    <Text allowFontScaling={false} style={{ color: theme.colors.textSecondary, fontSize: 11, textAlign: isRTL ? 'right' : 'left' }}>{isItem ? `${kindLabel} · ` : ''}{new Date(e.at).toLocaleDateString()}</Text>
                   </View>
                   <Text allowFontScaling={false} style={{ color, fontWeight: '800', fontSize: 14 }}>{isIn ? '+' : '−'}{money(e.amount)}</Text>
                   {isOwnerViewing && (
-                    <TouchableOpacity onPress={() => handleDeleteMoney(e)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginLeft: 10 }}>
+                    <TouchableOpacity onPress={() => handleDeleteMoney(e)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={isRTL ? { marginRight: 10 } : { marginLeft: 10 }}>
                       <Ionicons name="trash-outline" size={16} color="#EF4444" />
                     </TouchableOpacity>
                   )}

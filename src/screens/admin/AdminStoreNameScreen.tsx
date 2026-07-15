@@ -1,5 +1,5 @@
 /* eslint-disable react-native/no-inline-styles, react-native/no-color-literals */
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,12 +9,14 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  I18nManager,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../../components/ThemeProvider';
 import { RootStackParamList } from '../../types';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
@@ -45,7 +47,13 @@ const AdminStoreNameScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const { theme, isDark } = useTheme();
+
+  const colors = theme.colors as any;
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
+  const inputBg = isDark ? 'rgba(255,255,255,0.06)' : LUX.inputBg;
+  const styles = useMemo(() => createStyles(colors, isRTL, inputBg), [colors, isRTL, inputBg]);
 
   const { method, phone, email } = route.params || {};
 
@@ -81,7 +89,7 @@ const AdminStoreNameScreen: React.FC = () => {
         >
           {/* ── Back ── */}
           <TouchableOpacity style={styles.backButton} onPress={handleBack} activeOpacity={0.7}>
-            <Ionicons name="chevron-back" size={20} color={LUX.body} />
+            <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={20} color={colors.text} />
           </TouchableOpacity>
 
           {/* ── Headline ── */}
@@ -94,11 +102,11 @@ const AdminStoreNameScreen: React.FC = () => {
           <View style={styles.inputGroup}>
             <Text allowFontScaling={false} style={styles.label}>{t('auth.adminSetup.storeNameLabel', { defaultValue: 'Store Name' })}</Text>
             <View style={styles.inputWrapper}>
-              <Ionicons name="storefront-outline" size={18} color={LUX.placeholder} style={{ marginRight: 12 }} />
+              <Ionicons name="storefront-outline" size={18} color={colors.placeholder} style={{ marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }} />
               <TextInput allowFontScaling={false}
                 style={styles.input}
                 placeholder={t('auth.adminSetup.storeNamePlaceholder', { defaultValue: 'My Awesome Store' })}
-                placeholderTextColor={LUX.placeholder}
+                placeholderTextColor={colors.placeholder}
                 value={storeName}
                 onChangeText={(text) => { setStoreName(text); setErrorMessage(''); }}
                 autoCapitalize="words"
@@ -136,11 +144,12 @@ const AdminStoreNameScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any, isRTL: boolean, inputBg: string) => StyleSheet.create({
   backButton: {
     alignItems: 'center',
-    backgroundColor: LUX.surface,
-    borderColor: LUX.border,
+    alignSelf: isRTL ? 'flex-end' : 'flex-start',
+    backgroundColor: colors.card,
+    borderColor: colors.border,
     borderRadius: RADIUS.back,
     borderWidth: 1,
     height: 44,
@@ -149,22 +158,24 @@ const styles = StyleSheet.create({
     width: 44,
   },
   container: {
-    backgroundColor: LUX.bg,
+    backgroundColor: colors.background,
     flex: 1,
   },
   errorText: {
-    color: LUX.error,
+    color: colors.error,
     fontSize: 13,
     fontWeight: '500',
     marginBottom: SPACING.md,
+    textAlign: isRTL ? 'right' : 'left',
   },
   input: {
-    color: LUX.body,
+    color: colors.text,
     flex: 1,
     fontSize: 16,
     height: 40,
     includeFontPadding: false,
     paddingVertical: 0,
+    textAlign: isRTL ? 'right' : 'left',
     textAlignVertical: 'center',
   },
   inputGroup: {
@@ -172,26 +183,27 @@ const styles = StyleSheet.create({
   },
   inputWrapper: {
     alignItems: 'center',
-    backgroundColor: LUX.inputBg,
-    borderColor: LUX.border,
+    backgroundColor: inputBg,
+    borderColor: colors.border,
     borderRadius: RADIUS.input,
     borderWidth: 1,
-    flexDirection: 'row',
+    flexDirection: isRTL ? 'row-reverse' : 'row',
     height: 54,
     paddingHorizontal: SPACING.md,
   },
   label: {
-    color: LUX.muted,
+    color: colors.textSecondary,
     fontSize: 13,
     fontWeight: '500',
     letterSpacing: 0.3,
     marginBottom: SPACING.xs,
+    textAlign: isRTL ? 'right' : 'left',
     textTransform: 'uppercase',
   },
   previewCard: {
     alignItems: 'center',
-    backgroundColor: LUX.surface,
-    borderColor: LUX.border,
+    backgroundColor: colors.card,
+    borderColor: colors.border,
     borderRadius: RADIUS.card,
     borderWidth: 1,
     marginBottom: SPACING.xl,
@@ -199,7 +211,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.xl,
   },
   previewHint: {
-    color: LUX.placeholder,
+    color: colors.textSecondary,
     fontSize: 12,
     fontWeight: '500',
     marginTop: 4,
@@ -215,7 +227,7 @@ const styles = StyleSheet.create({
     width: 48,
   },
   previewName: {
-    color: LUX.heading,
+    color: colors.text,
     fontSize: 20,
     fontWeight: '700',
   },
@@ -227,7 +239,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   primaryButtonText: {
-    color: LUX.surface,
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -236,17 +248,19 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.md,
   },
   subtitle: {
-    color: LUX.muted,
+    color: colors.textSecondary,
     fontSize: 15,
     lineHeight: 22,
     marginBottom: SPACING.xl,
+    textAlign: isRTL ? 'right' : 'left',
   },
   title: {
-    color: LUX.heading,
+    color: colors.text,
     fontSize: 30,
     fontWeight: '700',
     letterSpacing: -0.5,
     marginBottom: SPACING.xs,
+    textAlign: isRTL ? 'right' : 'left',
   },
 });
 

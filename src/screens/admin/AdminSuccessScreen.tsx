@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../components/ThemeProvider';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -40,6 +41,7 @@ const AdminSuccessScreen: React.FC = () => {
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
   const { refreshUser } = useAuth();
+  const { theme } = useTheme();
   const { t } = useTranslation();
 
   const storeName = route.params?.storeName || t('auth.adminSetup.yourStore', { defaultValue: 'Your Store' });
@@ -84,7 +86,7 @@ const AdminSuccessScreen: React.FC = () => {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <View style={styles.content}>
         {/* ── Checkmark ── */}
         <Animated.View style={[styles.checkCircle, { transform: [{ scale: checkScale }] }]}>
@@ -93,9 +95,9 @@ const AdminSuccessScreen: React.FC = () => {
 
         {/* ── Text ── */}
         <Animated.View style={{ opacity: fadeIn, alignItems: 'center' }}>
-          <Text allowFontScaling={false} style={styles.title}>{t('auth.adminSetup.storeCreated', { defaultValue: 'Store created' })}</Text>
-          <Text allowFontScaling={false} style={styles.storeName}>{storeName}</Text>
-          <Text allowFontScaling={false} style={styles.subtitle}>
+          <Text allowFontScaling={false} style={[styles.title, { color: theme.colors.text }]}>{t('auth.adminSetup.storeCreated', { defaultValue: 'Store created' })}</Text>
+          <Text allowFontScaling={false} style={[styles.storeName, { color: theme.colors.primary }]}>{storeName}</Text>
+          <Text allowFontScaling={false} style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
             {t('auth.adminSetup.successSubtitle', { defaultValue: 'Your admin account is ready. You can manage your store from the dashboard.' })}
           </Text>
         </Animated.View>
@@ -103,7 +105,7 @@ const AdminSuccessScreen: React.FC = () => {
         {/* ── Enter Dashboard ── */}
         <Animated.View style={{ opacity: buttonFade, width: '100%' }}>
           <TouchableOpacity
-            style={styles.primaryButton}
+            style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
             onPress={handleEnterDashboard}
             activeOpacity={0.85}
           >

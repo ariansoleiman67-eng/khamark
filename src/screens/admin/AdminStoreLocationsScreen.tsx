@@ -8,6 +8,7 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
+  I18nManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,7 +30,8 @@ const COLORS = {
 const AdminStoreLocationsScreen = () => {
   const navigation = useNavigation<any>();
   const { theme } = useTheme();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const { user } = useAuth(); // OWNERSHIP: Get current admin
   const currentAdminId = user?.uid || '';
   
@@ -94,11 +96,11 @@ const AdminStoreLocationsScreen = () => {
       style={[styles.locationCard, { backgroundColor: theme.colors.surface }]}
       onPress={() => navigation.navigate('AdminEditStoreLocation', { locationId: item.id })}
     >
-      <View style={styles.locationHeader}>
+      <View style={[styles.locationHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <View style={[styles.typeIndicator, { backgroundColor: locationService.getStoreTypeColor(item.type) }]} />
-        <View style={styles.locationInfo}>
-          <Text allowFontScaling={false} style={[styles.locationName, { color: theme.colors.text }]}>{item.name}</Text>
-          <Text allowFontScaling={false} style={[styles.locationType, { color: theme.colors.textSecondary }]}>
+        <View style={[styles.locationInfo, isRTL && { marginLeft: 0, marginRight: SPACING.md }]}>
+          <Text allowFontScaling={false} style={[styles.locationName, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{item.name}</Text>
+          <Text allowFontScaling={false} style={[styles.locationType, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
             {item.type.toUpperCase()} • {item.city}
           </Text>
         </View>
@@ -111,21 +113,21 @@ const AdminStoreLocationsScreen = () => {
       </View>
 
       <View style={styles.locationDetails}>
-        <View style={styles.detailRow}>
+        <View style={[styles.detailRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <Ionicons name="location-outline" size={16} color={theme.colors.textSecondary} />
-          <Text allowFontScaling={false} style={[styles.detailText, { color: theme.colors.textSecondary }]} numberOfLines={1}>
+          <Text allowFontScaling={false} style={[styles.detailText, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }, isRTL && { marginLeft: 0, marginRight: 8 }]} numberOfLines={1}>
             {item.address}
           </Text>
         </View>
-        <View style={styles.detailRow}>
+        <View style={[styles.detailRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <Ionicons name="call-outline" size={16} color={theme.colors.textSecondary} />
-          <Text allowFontScaling={false} style={[styles.detailText, { color: theme.colors.textSecondary }]}>
+          <Text allowFontScaling={false} style={[styles.detailText, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }, isRTL && { marginLeft: 0, marginRight: 8 }]}>
             {item.phone}
           </Text>
         </View>
       </View>
 
-      <View style={styles.actionRow}>
+      <View style={[styles.actionRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <TouchableOpacity
           style={[styles.actionButton, { backgroundColor: theme.colors.primary + '20' }]}
           onPress={() => navigation.navigate('AdminEditStoreLocation', { locationId: item.id })}
@@ -155,9 +157,9 @@ const AdminStoreLocationsScreen = () => {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
       {/* Header */}
-      <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
+      <View style={[styles.header, { borderBottomColor: theme.colors.border, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+          <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color={theme.colors.text} />
         </TouchableOpacity>
         <Text allowFontScaling={false} style={[styles.headerTitle, { color: theme.colors.text }]}>{t('admin.storeLocations.title')}</Text>
         <TouchableOpacity

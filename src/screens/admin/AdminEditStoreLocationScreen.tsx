@@ -14,6 +14,7 @@ import {
   Platform,
   Linking,
   Image as RNImage,
+  I18nManager,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -55,7 +56,8 @@ const AdminEditStoreLocationScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'AdminEditStoreLocation'>>();
   const { theme } = useTheme();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const { user } = useAuth(); // OWNERSHIP: Get current admin
   const currentAdminId = user?.uid || '';
   const locationId = route.params?.locationId;
@@ -212,7 +214,7 @@ const AdminEditStoreLocationScreen = () => {
     }
 
     if (!currentAdminId) {
-      Alert.alert(t('admin.common.error'), 'You must be logged in to save locations');
+      Alert.alert(t('admin.common.error'), t('admin.storeLocations.mustBeLoggedIn', { defaultValue: 'You must be logged in to save locations' }));
       return;
     }
 
@@ -299,14 +301,15 @@ const AdminEditStoreLocationScreen = () => {
 
   const renderInput = (label: string, value: string, onChangeText: (text: string) => void, placeholder?: string, keyboardType?: any) => (
     <View style={styles.inputContainer}>
-      <Text allowFontScaling={false} style={[styles.label, { color: theme.colors.text }]}>{label}</Text>
+      <Text allowFontScaling={false} style={[styles.label, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{label}</Text>
       <TextInput allowFontScaling={false}
         style={[
-          styles.input, 
-          { 
-            backgroundColor: theme.colors.surface, 
-            color: theme.colors.text, 
+          styles.input,
+          {
+            backgroundColor: theme.colors.surface,
+            color: theme.colors.text,
             borderColor: theme.colors.border,
+            textAlign: isRTL ? 'right' : 'left',
           }
         ]}
         value={value}
@@ -329,9 +332,9 @@ const AdminEditStoreLocationScreen = () => {
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
+      <View style={[styles.header, { borderBottomColor: theme.colors.border, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+          <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color={theme.colors.text} />
         </TouchableOpacity>
         <Text allowFontScaling={false} style={[styles.headerTitle, { color: theme.colors.text }]}>
           {isEditing ? t('admin.storeLocations.editLocation') : t('admin.storeLocations.addLocation')}
@@ -443,7 +446,7 @@ const AdminEditStoreLocationScreen = () => {
                   />
                   <View style={{ position: 'absolute', bottom: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                     <Ionicons name="open-outline" size={14} color="#fff" />
-                    <Text allowFontScaling={false} style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>Open in Maps</Text>
+                    <Text allowFontScaling={false} style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>{t('admin.storeLocations.openInMaps', { defaultValue: 'Open in Maps' })}</Text>
                   </View>
                 </TouchableOpacity>
               ) : (
@@ -475,10 +478,10 @@ const AdminEditStoreLocationScreen = () => {
 
           {/* Active Status */}
           <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
-            <View style={styles.switchRow}>
+            <View style={[styles.switchRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <View>
-                <Text allowFontScaling={false} style={[styles.switchLabel, { color: theme.colors.text }]}>{t('admin.storeLocations.activeStatus')}</Text>
-                <Text allowFontScaling={false} style={[styles.switchHint, { color: theme.colors.textSecondary }]}>
+                <Text allowFontScaling={false} style={[styles.switchLabel, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{t('admin.storeLocations.activeStatus')}</Text>
+                <Text allowFontScaling={false} style={[styles.switchHint, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
                   {t('admin.storeLocations.visibleToCustomers')}
                 </Text>
               </View>
@@ -520,10 +523,12 @@ const AdminEditStoreLocationScreen = () => {
               <View style={[styles.timePickerContainer, { backgroundColor: theme.colors.surface }]}>
                 <View style={styles.timePickerHeader}>
                   <Text allowFontScaling={false} style={[styles.timePickerTitle, { color: theme.colors.text }]}>
-                    Select {activeTimeField.field === 'open' ? 'Opening' : 'Closing'} Time
+                    {activeTimeField.field === 'open'
+                      ? t('admin.storeLocations.selectOpeningTime', { defaultValue: 'Select Opening Time' })
+                      : t('admin.storeLocations.selectClosingTime', { defaultValue: 'Select Closing Time' })}
                   </Text>
                   <TouchableOpacity onPress={closeTimePicker}>
-                    <Text allowFontScaling={false} style={[styles.timePickerDone, { color: theme.colors.primary }]}>Done</Text>
+                    <Text allowFontScaling={false} style={[styles.timePickerDone, { color: theme.colors.primary }]}>{t('common.done', { defaultValue: 'Done' })}</Text>
                   </TouchableOpacity>
                 </View>
                 <DateTimePicker

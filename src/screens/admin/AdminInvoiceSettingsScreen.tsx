@@ -11,6 +11,7 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
+  I18nManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -31,7 +32,8 @@ const AdminInvoiceSettingsScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
   const { tenantId } = useTenant();
   const navigation = useNavigation<any>();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -105,10 +107,10 @@ const AdminInvoiceSettingsScreen: React.FC = () => {
       if (result.success && result.url) {
         setLogoUrl(result.url);
       } else {
-        Alert.alert(t('common.error'), 'Failed to upload logo');
+        Alert.alert(t('common.error'), t('admin.invoiceSettings.uploadLogoError', { defaultValue: 'Failed to upload logo' }));
       }
     } catch (err) {
-      Alert.alert(t('common.error'), 'Failed to pick image');
+      Alert.alert(t('common.error'), t('admin.invoiceSettings.pickImageError', { defaultValue: 'Failed to pick image' }));
     } finally {
       setUploadingLogo(false);
     }
@@ -143,7 +145,7 @@ const AdminInvoiceSettingsScreen: React.FC = () => {
         t('admin.invoiceSettings.savedMessage', { defaultValue: 'Invoice settings saved successfully!' })
       );
     } catch (err) {
-      Alert.alert(t('common.error'), 'Failed to save settings');
+      Alert.alert(t('common.error'), t('admin.invoiceSettings.saveError', { defaultValue: 'Failed to save settings' }));
     } finally {
       setSaving(false);
     }
@@ -201,11 +203,11 @@ const AdminInvoiceSettingsScreen: React.FC = () => {
       <StatusBar style={isDark ? 'light' : 'dark'} />
 
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
+      <View style={[styles.header, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+          <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color={theme.colors.text} />
         </TouchableOpacity>
-        <Text allowFontScaling={false} style={[styles.headerTitle, { color: theme.colors.text }]}>
+        <Text allowFontScaling={false} style={[styles.headerTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left', marginLeft: isRTL ? 0 : SPACING.sm, marginRight: isRTL ? SPACING.sm : 0 }]}>
           {t('admin.invoiceSettings.title', { defaultValue: 'Invoice Settings' })}
         </Text>
         <TouchableOpacity onPress={handleSave} disabled={saving} style={styles.saveButton}>
@@ -258,7 +260,7 @@ const AdminInvoiceSettingsScreen: React.FC = () => {
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.logoActionButton, { backgroundColor: '#EF4444' }]}
+                      style={[styles.logoActionButton, { backgroundColor: theme.colors.error || '#EF4444' }]}
                       onPress={handleRemoveLogo}
                     >
                       <Ionicons name="trash" size={18} color="#fff" />

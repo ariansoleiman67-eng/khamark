@@ -1,6 +1,6 @@
 /* eslint-disable react-native/no-inline-styles, react-native/no-color-literals */
 import { supabase } from '../../services/supabase';
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,12 +13,14 @@ import {
   ActivityIndicator,
   NativeSyntheticEvent,
   TextInputKeyPressEventData,
+  I18nManager,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../../components/ThemeProvider';
 import { RootStackParamList } from '../../types';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
@@ -49,7 +51,11 @@ const AdminVerifyEmailScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const { theme, isDark } = useTheme();
+  const colors = theme.colors as any;
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
+  const styles = useMemo(() => createStyles(colors, isRTL, isDark), [colors, isRTL, isDark]);
 
   const email = route.params?.email || '';
 
@@ -185,12 +191,12 @@ const AdminVerifyEmailScreen: React.FC = () => {
         >
           {/* ── Back ── */}
           <TouchableOpacity style={styles.backButton} onPress={handleBack} activeOpacity={0.7}>
-            <Ionicons name="chevron-back" size={20} color={LUX.body} />
+            <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={20} color={colors.text} />
           </TouchableOpacity>
 
           {/* ── Badge ── */}
           <View style={styles.badge}>
-            <Ionicons name="shield-checkmark" size={16} color={LUX.accent} />
+            <Ionicons name="shield-checkmark" size={16} color={colors.primary} />
             <Text allowFontScaling={false} style={styles.badgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{t('auth.adminSetup.badge')}</Text>
           </View>
 
@@ -234,7 +240,7 @@ const AdminVerifyEmailScreen: React.FC = () => {
             activeOpacity={0.85}
           >
             {loading ? (
-              <ActivityIndicator color={LUX.surface} />
+              <ActivityIndicator color={colors.textOnPrimary} />
             ) : (
               <Text allowFontScaling={false} style={styles.primaryButtonText}>{t('auth.adminSetup.confirm')}</Text>
             )}
@@ -247,9 +253,9 @@ const AdminVerifyEmailScreen: React.FC = () => {
             activeOpacity={0.6}
           >
             {resending ? (
-              <ActivityIndicator size="small" color={LUX.accent} />
+              <ActivityIndicator size="small" color={colors.primary} />
             ) : (
-              <Text allowFontScaling={false} style={[styles.resendText, cooldown > 0 && { color: LUX.placeholder }]}>
+              <Text allowFontScaling={false} style={[styles.resendText, cooldown > 0 && { color: colors.placeholder }]}>
                 {cooldown > 0
                   ? t('auth.adminSetup.resendIn', { seconds: String(cooldown).padStart(2, '0') })
                   : t('auth.adminSetup.resend')}
@@ -267,11 +273,16 @@ const AdminVerifyEmailScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any, isRTL: boolean, isDark: boolean) => {
+  const inputBg = isDark ? 'rgba(255,255,255,0.06)' : LUX.inputBg;
+  const badgeBg = isDark ? 'rgba(255,118,34,0.18)' : '#FF762212';
+  const filledBg = isDark ? 'rgba(255,118,34,0.16)' : '#FF762208';
+
+  return StyleSheet.create({
   backButton: {
     alignItems: 'center',
-    backgroundColor: LUX.surface,
-    borderColor: LUX.border,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
     borderRadius: RADIUS.back,
     borderWidth: 1,
     height: 44,
@@ -281,37 +292,37 @@ const styles = StyleSheet.create({
   },
   badge: {
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: '#FF762212',
+    alignSelf: isRTL ? 'flex-end' : 'flex-start',
+    backgroundColor: badgeBg,
     borderRadius: 20,
-    flexDirection: 'row',
+    flexDirection: isRTL ? 'row-reverse' : 'row',
     gap: 6,
     marginBottom: SPACING.md,
     paddingHorizontal: 14,
     paddingVertical: 6,
   },
   badgeText: {
-    color: LUX.accent,
+    color: colors.primary,
     fontSize: 13,
     fontWeight: '600',
   },
   container: {
-    backgroundColor: LUX.bg,
+    backgroundColor: colors.background,
     flex: 1,
   },
   errorText: {
-    color: LUX.error,
+    color: colors.error,
     fontSize: 13,
     fontWeight: '500',
     marginBottom: SPACING.md,
     textAlign: 'center',
   },
   otpBox: {
-    backgroundColor: LUX.inputBg,
-    borderColor: LUX.border,
+    backgroundColor: inputBg,
+    borderColor: colors.border,
     borderRadius: RADIUS.input,
     borderWidth: 1,
-    color: LUX.heading,
+    color: colors.text,
     fontSize: 22,
     fontWeight: '700',
     height: 56,
@@ -319,8 +330,8 @@ const styles = StyleSheet.create({
     width: 48,
   },
   otpBoxFilled: {
-    backgroundColor: '#FF762208',
-    borderColor: LUX.accent,
+    backgroundColor: filledBg,
+    borderColor: colors.primary,
   },
   otpContainer: {
     flexDirection: 'row',
@@ -331,7 +342,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: LUX.accent,
+    backgroundColor: colors.primary,
     borderRadius: RADIUS.button,
     height: 52,
     justifyContent: 'center',
@@ -341,7 +352,7 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   primaryButtonText: {
-    color: LUX.surface,
+    color: colors.textOnPrimary,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -350,7 +361,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.xs,
   },
   quietLink: {
-    color: LUX.muted,
+    color: colors.textSecondary,
     fontSize: 14,
     fontWeight: '500',
   },
@@ -360,7 +371,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.xs,
   },
   resendText: {
-    color: LUX.accent,
+    color: colors.primary,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -369,18 +380,21 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.md,
   },
   subtitle: {
-    color: LUX.muted,
+    color: colors.textSecondary,
     fontSize: 15,
     lineHeight: 22,
     marginBottom: SPACING.xl,
+    textAlign: isRTL ? 'right' : 'left',
   },
   title: {
-    color: LUX.heading,
+    color: colors.text,
     fontSize: 30,
     fontWeight: '700',
     letterSpacing: -0.5,
     marginBottom: SPACING.xs,
+    textAlign: isRTL ? 'right' : 'left',
   },
-});
+  });
+};
 
 export default AdminVerifyEmailScreen;

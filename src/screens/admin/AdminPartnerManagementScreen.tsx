@@ -10,6 +10,7 @@ import {
   Modal,
   TextInput,
   Platform,
+  I18nManager,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -50,9 +51,10 @@ export default function AdminPartnerManagementScreen() {
   const { theme, isDark } = useTheme();
   const { tenantId } = useTenant();
   const { isOwner } = useAuth();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
 
   const [partners, setPartners] = useState<PartnerWithStats[]>([]);
   const [loading, setLoading] = useState(true);
@@ -230,9 +232,9 @@ export default function AdminPartnerManagementScreen() {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <StatusBar style={isDark ? 'light' : 'dark'} />
-        <View style={[styles.header, { paddingTop: insets.top + SPACING.sm, backgroundColor: theme.colors.surface }]}>
+        <View style={[styles.header, { paddingTop: insets.top + SPACING.sm, backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.border, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Ionicons name="chevron-back" size={28} color={theme.colors.text} />
+            <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={28} color={theme.colors.text} />
           </TouchableOpacity>
           <View style={styles.headerTitleContainer}>
             <Text allowFontScaling={false} style={[styles.headerTitle, { color: theme.colors.text }]}>{t('admin.partners.title', { defaultValue: 'Partner Management' })}</Text>
@@ -252,16 +254,16 @@ export default function AdminPartnerManagementScreen() {
   const renderPartner = ({ item }: { item: PartnerWithStats }) => (
     <Animated.View entering={FadeInUp.duration(250)}>
       <View style={[styles.card, { backgroundColor: theme.colors.surface, shadowColor: isDark ? '#000' : ACCENT }]}>
-        <View style={styles.cardTop}>
+        <View style={[styles.cardTop, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <View style={[styles.avatar, { backgroundColor: isDark ? 'rgba(139,92,246,0.18)' : 'rgba(139,92,246,0.12)' }]}>
             <Text allowFontScaling={false} style={[styles.avatarText, { color: ACCENT }]}>{monogram(item.name)}</Text>
           </View>
-          <View style={{ flex: 1, marginLeft: SPACING.md }}>
-            <Text allowFontScaling={false} style={[styles.partnerName, { color: theme.colors.text }]} numberOfLines={1}>
+          <View style={{ flex: 1, marginLeft: isRTL ? 0 : SPACING.md, marginRight: isRTL ? SPACING.md : 0 }}>
+            <Text allowFontScaling={false} style={[styles.partnerName, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
               {item.name || t('admin.partners.unnamed', { defaultValue: 'Partner' })}
             </Text>
             {!!item.phone && (
-              <View style={styles.phoneRow}>
+              <View style={[styles.phoneRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <Ionicons name="call-outline" size={13} color={theme.colors.textSecondary} />
                 <Text allowFontScaling={false} style={[styles.phoneText, { color: theme.colors.textSecondary }]} numberOfLines={1}>{item.phone}</Text>
               </View>
@@ -406,7 +408,7 @@ export default function AdminPartnerManagementScreen() {
                 contentContainerStyle={{ paddingBottom: SPACING.md }}
                 renderItem={({ item }) => (
                   <TouchableOpacity
-                    style={[styles.userRow, { borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }]}
+                    style={[styles.userRow, { borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                     onPress={() => confirmAdd(item)}
                     disabled={adding}
                     activeOpacity={0.7}
@@ -414,11 +416,11 @@ export default function AdminPartnerManagementScreen() {
                     <View style={[styles.userAvatar, { backgroundColor: isDark ? 'rgba(139,92,246,0.18)' : 'rgba(139,92,246,0.12)' }]}>
                       <Text allowFontScaling={false} style={[styles.avatarText, { color: ACCENT, fontSize: 15 }]}>{monogram(item.displayName || item.phone || '?')}</Text>
                     </View>
-                    <View style={{ flex: 1, marginLeft: SPACING.md }}>
-                      <Text allowFontScaling={false} style={[styles.userName, { color: theme.colors.text }]} numberOfLines={1}>
+                    <View style={{ flex: 1, marginLeft: isRTL ? 0 : SPACING.md, marginRight: isRTL ? SPACING.md : 0 }}>
+                      <Text allowFontScaling={false} style={[styles.userName, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
                         {item.displayName || t('admin.partners.unnamed', { defaultValue: 'Partner' })}
                       </Text>
-                      <Text allowFontScaling={false} style={[styles.userMeta, { color: theme.colors.textSecondary }]} numberOfLines={1}>
+                      <Text allowFontScaling={false} style={[styles.userMeta, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
                         {item.phone || item.email || '—'}
                       </Text>
                     </View>
@@ -427,7 +429,7 @@ export default function AdminPartnerManagementScreen() {
                         <Text allowFontScaling={false} style={[styles.adminBadgeText, { color: ACCENT }]}>{t('admin.partners.adminBadge', { defaultValue: 'Admin' })}</Text>
                       </View>
                     ) : (
-                      <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+                      <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={18} color={theme.colors.textSecondary} />
                     )}
                   </TouchableOpacity>
                 )}

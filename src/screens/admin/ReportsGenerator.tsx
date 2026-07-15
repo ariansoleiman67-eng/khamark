@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, FlatList, Dimensions, Platform, Image, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, FlatList, Dimensions, Platform, Image, ScrollView, I18nManager } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../components/ThemeProvider';
@@ -80,6 +80,7 @@ export const ReportsGenerator = () => {
   const { theme, isDark } = useTheme();
   const { tenantId } = useTenant();
   const navigation = useNavigation<any>();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
 
   const [loadingType, setLoadingType] = useState<string | null>(null);
   const [unpaidModalVisible, setUnpaidModalVisible] = useState(false);
@@ -831,7 +832,7 @@ export const ReportsGenerator = () => {
       
       <View style={styles.cardsRow}>
         <TouchableOpacity 
-          style={[styles.reportCard, { backgroundColor: '#ECFDF5', borderColor: '#D1FAE5' }]}
+          style={[styles.reportCard, { backgroundColor: isDark ? theme.colors.surface : '#ECFDF5', borderColor: isDark ? theme.colors.border : '#D1FAE5' }]}
           onPress={handleRevenueReport}
           disabled={loadingType !== null}
         >
@@ -843,14 +844,14 @@ export const ReportsGenerator = () => {
                 <Ionicons name="cash-outline" size={22} color="#059669" />
               </View>
               <View style={styles.cardText}>
-                <Text allowFontScaling={false} style={[styles.cardTitle, { color: '#065F46' }]}>{t('admin.stockReport.revenueReport', { defaultValue: 'Revenue Report' })}</Text>
+                <Text allowFontScaling={false} style={[styles.cardTitle, { color: isDark ? '#6EE7B7' : '#065F46' }]}>{t('admin.stockReport.revenueReport', { defaultValue: 'Revenue Report' })}</Text>
               </View>
             </>
           )}
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.reportCard, { backgroundColor: '#F0F9FF', borderColor: '#BAE6FD' }]}
+          style={[styles.reportCard, { backgroundColor: isDark ? theme.colors.surface : '#F0F9FF', borderColor: isDark ? theme.colors.border : '#BAE6FD' }]}
           onPress={() => handleUnpaidOrders(true)}
           disabled={loadingType !== null}
         >
@@ -862,7 +863,7 @@ export const ReportsGenerator = () => {
                 <Ionicons name="time-outline" size={22} color="#0284C7" />
               </View>
               <View style={styles.cardText}>
-                <Text allowFontScaling={false} style={[styles.cardTitle, { color: '#075985' }]}>{t('admin.stockReport.unpaidOrders', { defaultValue: 'Unpaid Orders' })}</Text>
+                <Text allowFontScaling={false} style={[styles.cardTitle, { color: isDark ? '#7DD3FC' : '#075985' }]}>{t('admin.stockReport.unpaidOrders', { defaultValue: 'Unpaid Orders' })}</Text>
               </View>
             </>
           )}
@@ -872,7 +873,7 @@ export const ReportsGenerator = () => {
       <Modal visible={unpaidModalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: isDark ? theme.colors.background : '#F5F5F7' }]}>
-            <View style={[styles.modalHeader, { backgroundColor: isDark ? theme.colors.surface : '#FFFFFF' }]}>
+            <View style={[styles.modalHeader, { backgroundColor: isDark ? theme.colors.surface : '#FFFFFF', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <TouchableOpacity onPress={() => setUnpaidModalVisible(false)}>
                 <Ionicons name="close" size={24} color={theme.colors.text} />
               </TouchableOpacity>
@@ -910,38 +911,38 @@ export const ReportsGenerator = () => {
               renderItem={({ item }) => {
                 return (
                   <TouchableOpacity 
-                    style={[styles.unpaidCard, { backgroundColor: isDark ? theme.colors.surface : '#FFFFFF', alignItems: 'center' }]}
+                    style={[styles.unpaidCard, { backgroundColor: isDark ? theme.colors.surface : '#FFFFFF', alignItems: 'center', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                     onPress={() => {
                       const userOrders = unpaidOrders.filter(o => (o.userId || o.shippingAddress?.fullName || 'Unknown') === item.id);
                       setSelectedUnpaidUser({ ...item, orders: userOrders });
                     }}
                   >
                     {item.profileImageUrl ? (
-                      <Image 
-                        source={{ uri: item.profileImageUrl }} 
-                        style={{width: 48, height: 48, borderRadius: 24, marginRight: 14}}
+                      <Image
+                        source={{ uri: item.profileImageUrl }}
+                        style={{width: 48, height: 48, borderRadius: 24, marginRight: isRTL ? 0 : 14, marginLeft: isRTL ? 14 : 0}}
                       />
                     ) : (
-                      <View style={{width: 48, height: 48, borderRadius: 24, backgroundColor: '#EAB308', justifyContent: 'center', alignItems: 'center', marginRight: 14, shadowColor: '#EAB308', shadowOpacity: 0.3, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }}}>
+                      <View style={{width: 48, height: 48, borderRadius: 24, backgroundColor: '#EAB308', justifyContent: 'center', alignItems: 'center', marginRight: isRTL ? 0 : 14, marginLeft: isRTL ? 14 : 0, shadowColor: '#EAB308', shadowOpacity: 0.3, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }}}>
                         <Text allowFontScaling={false} style={{color: 'white', fontWeight: 'bold', fontSize: 20}}>{item.name.charAt(0).toUpperCase()}</Text>
                       </View>
                     )}
                     
                     <View style={{flex: 1, justifyContent: 'center'}}>
-                      <Text allowFontScaling={false} style={{ fontWeight: 'bold', color: theme.colors.text, fontSize: 16, textAlign: 'left' }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{item.name}</Text>
+                      <Text allowFontScaling={false} style={{ fontWeight: 'bold', color: theme.colors.text, fontSize: 16, textAlign: isRTL ? 'right' : 'left' }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{item.name}</Text>
                       
                       {item.recipientName ? (
-                        <Text allowFontScaling={false} style={{ color: theme.colors.primary, fontSize: 13, marginTop: 2, fontWeight: '600', textAlign: 'left' }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>🏢 {item.recipientName}</Text>
+                        <Text allowFontScaling={false} style={{ color: theme.colors.primary, fontSize: 13, marginTop: 2, fontWeight: '600', textAlign: isRTL ? 'right' : 'left' }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>🏢 {item.recipientName}</Text>
                       ) : null}
 
                       {item.phone ? (
-                        <Text allowFontScaling={false} style={{ color: theme.colors.textSecondary, fontSize: 13, marginTop: 2, fontWeight: '500', textAlign: 'left' }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{item.phone}</Text>
+                        <Text allowFontScaling={false} style={{ color: theme.colors.textSecondary, fontSize: 13, marginTop: 2, fontWeight: '500', textAlign: isRTL ? 'right' : 'left' }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{item.phone}</Text>
                       ) : null}
 
-                      <Text allowFontScaling={false} style={{ color: '#EF4444', fontWeight: '900', fontSize: 16, marginTop: 6, textAlign: 'left' }}>${formatCurrency(item.remaining)} USD</Text>
+                      <Text allowFontScaling={false} style={{ color: '#EF4444', fontWeight: '900', fontSize: 16, marginTop: 6, textAlign: isRTL ? 'right' : 'left' }}>${formatCurrency(item.remaining)} USD</Text>
                     </View>
 
-                    <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} style={{ opacity: 0.5 }} />
+                    <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={20} color={theme.colors.textSecondary} style={{ opacity: 0.5 }} />
                   </TouchableOpacity>
                 );
               }}
