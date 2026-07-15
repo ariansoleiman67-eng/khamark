@@ -22,7 +22,7 @@ import { useTheme } from '../../components/ThemeProvider';
 import { useTenant } from '../../contexts/TenantContext';
 import MasonryProductCard from '../../components/MasonryProductCard';
 import SectionHeader from '../../components/home/SectionHeader';
-import BrandTile from '../../components/home/BrandTile';
+import BrandRailCard from '../../components/home/BrandRailCard';
 import { brandService, Brand } from '../../services/brandService';
 import AppNumber from '../../components/AppNumber';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -47,12 +47,13 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BOTTOM_NAV_HEIGHT = 80;
 const PAGE_SIZE = 20;
 
-// "Our Brands" 2-column grid metrics (client-side derived tiles).
+// "Our Brands" rail edge padding (aligns with section headers).
 const BRAND_GRID_PADDING = 16;
-const BRAND_GRID_GAP = 12;
-const BRAND_TILE_WIDTH = (SCREEN_WIDTH - BRAND_GRID_PADDING * 2 - BRAND_GRID_GAP) / 2;
 // How many brand-spotlight carousels to surface at the top of the feed.
 const MAX_SPOTLIGHTS = 4;
+
+// Spacer between "Our Brands" rail cards.
+const renderBrandSeparator = () => <View style={styles.brandSep} />;
 
 interface Banner {
   id: string;
@@ -389,21 +390,25 @@ const HomeScreen: React.FC = () => {
           <BannerCarousel images={bannerImages} />
         )}
 
-        {/* b. Our Brands — admin-managed brands (name + logo); falls back to derived */}
+        {/* b. Our Brands — horizontal monogram rail (shows admin logo when uploaded) */}
         {brandTiles.length > 0 && (
           <View>
             <SectionHeader title={t('home.ourBrands')} onSeeAll={handleBrandsSeeAll} />
-            <View style={[styles.brandsGrid, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              {brandTiles.map((b) => (
-                <BrandTile
-                  key={b.key}
+            <FlatList
+              data={isRTL ? [...brandTiles].reverse() : brandTiles}
+              keyExtractor={(b) => b.key}
+              renderItem={({ item: b }) => (
+                <BrandRailCard
                   label={b.label}
                   imageUrl={b.logoUrl}
-                  width={BRAND_TILE_WIDTH}
                   onPress={() => (navigation as any).navigate('CategoryProducts', { brand: b.label, title: b.label })}
                 />
-              ))}
-            </View>
+              )}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.brandRail}
+              ItemSeparatorComponent={renderBrandSeparator}
+            />
           </View>
         )}
 
@@ -742,11 +747,13 @@ const styles = StyleSheet.create({
     textAlign: 'right', // RTL-safe (Samsung fix)
     textAlignVertical: 'center',
   },
-  // "Our Brands" 2-column grid (static wrap, no nested scroll).
-  brandsGrid: {
-    flexWrap: 'wrap',
+  // "Our Brands" horizontal monogram rail.
+  brandRail: {
     paddingHorizontal: BRAND_GRID_PADDING,
-    gap: BRAND_GRID_GAP,
+    paddingVertical: 4,
+  },
+  brandSep: {
+    width: 12,
   },
   // Brand-spotlight horizontal carousel padding (aligns first card to the grid).
   spotlightList: {
