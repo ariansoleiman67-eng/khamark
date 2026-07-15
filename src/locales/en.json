@@ -404,7 +404,8 @@
     "legacyLogin": {
       "title": "Legacy Email Login",
       "subtitle": "For existing admin accounts only",
-      "warning": "This login method is for legacy accounts only. New users should use phone login."
+      "warning": "This login method is for legacy accounts only. New users should use phone login.",
+      "loginSuccess": "Welcome back!"
     },
     "passwordRequirements": "Password Requirements:",
     "continueAsGuest": "Continue as Guest",

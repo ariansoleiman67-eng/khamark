@@ -53,7 +53,7 @@ const LegacyEmailLoginScreen: React.FC = () => {
       await loginWithEmail(email, password);
 
       // Success - AuthContext will handle navigation
-      Alert.alert(t('auth.success'), t('auth.welcomeBack', { defaultValue: 'Welcome back!' }));
+      Alert.alert(t('auth.success'), t('auth.legacyLogin.loginSuccess', { defaultValue: 'Welcome back!' }));
     } catch (error: any) {
       Alert.alert(t('auth.error'), error.message || t('auth.loginFailed', { defaultValue: 'Login failed' }));
     } finally {
