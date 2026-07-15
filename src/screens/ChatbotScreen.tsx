@@ -236,7 +236,7 @@ const ChatbotScreen: React.FC = () => {
       const permission = await requestRecordingPermissionsAsync();
       if (!permission.granted) {
         setIsRecording(false);
-        Alert.alert(t('common.error') || 'Error', 'Microphone permission is required to send voice messages');
+        Alert.alert(t('common.error') || 'Error', t('chatbot.micPermission', { defaultValue: 'Microphone permission is required to send voice messages' }));
         isRecordingIntentRef.current = false;
         return;
       }
@@ -275,7 +275,7 @@ const ChatbotScreen: React.FC = () => {
     } catch (err) {
       console.error('Failed to start recording', err);
       setIsRecording(false);
-      Alert.alert(t('common.error') || 'Error', 'Failed to start recording');
+      Alert.alert(t('common.error') || 'Error', t('chatbot.recordFailed', { defaultValue: 'Failed to start recording' }));
       isRecordingIntentRef.current = false;
     }
   };
@@ -343,7 +343,7 @@ const ChatbotScreen: React.FC = () => {
       const userMessage: ChatMessage = {
         id: tempId,
         role: 'user',
-        content: `🎤 Voice Message (${formatDuration(audioDuration)})`,
+        content: `🎤 ${t('chatbot.voiceMessage', { defaultValue: 'Voice Message' })} (${formatDuration(audioDuration)})`,
         timestamp: new Date(),
         type: 'voice',
         // Note: For full playback, you'd integrate the actual download URL here 
@@ -628,7 +628,7 @@ const ChatbotScreen: React.FC = () => {
             <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
               <ActivityIndicator size="small" color={theme.colors.primary} />
               <Text allowFontScaling={false} style={{ color: theme.colors.textSecondary, fontSize: 14, fontWeight: '500' }}>
-                Sending voice message...
+                {t('chatbot.sendingVoice', { defaultValue: 'Sending voice message...' })}
               </Text>
             </View>
           ) : (
@@ -665,7 +665,7 @@ const ChatbotScreen: React.FC = () => {
                   {Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, '0')}
                 </Text>
                 <Text allowFontScaling={false} style={{ fontSize: 13, color: theme.colors.textSecondary, marginLeft: 4 }}>
-                  Recording...
+                  {t('chatbot.recording', { defaultValue: 'Recording...' })}
                 </Text>
               </Animated.View>
 
@@ -786,7 +786,7 @@ const ChatbotScreen: React.FC = () => {
         {/* Header */}
         <View
           style={{
-            flexDirection: 'row',
+            flexDirection: isRTL ? 'row-reverse' : 'row',
             alignItems: 'center',
             padding: SPACING.md,
             borderBottomWidth: 1,
@@ -794,17 +794,17 @@ const ChatbotScreen: React.FC = () => {
             backgroundColor: theme.colors.surface,
           }}
         >
-          <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginRight: SPACING.md }}>
-            <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+          <TouchableOpacity onPress={() => navigation.goBack()} style={isRTL ? { marginLeft: SPACING.md } : { marginRight: SPACING.md }}>
+            <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color={theme.colors.text} />
           </TouchableOpacity>
 
           {/* AI Logo */}
-          <View style={{ 
-            width: 44, 
-            height: 44, 
-            borderRadius: 22, 
+          <View style={{
+            width: 44,
+            height: 44,
+            borderRadius: 22,
             overflow: 'hidden',
-            marginRight: SPACING.sm,
+            ...(isRTL ? { marginLeft: SPACING.sm } : { marginRight: SPACING.sm }),
           }}>
             <Image
               source={require('../../assets/images/ai-logo.png')}
@@ -814,10 +814,10 @@ const ChatbotScreen: React.FC = () => {
           </View>
 
           <View style={{ flex: 1 }}>
-            <Text allowFontScaling={false} style={{ fontSize: 17, fontWeight: '600', color: theme.colors.text }}>{t('chatbot.title')}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#4CD964', marginRight: 6 }} />
-              <Text allowFontScaling={false} style={{ fontSize: 12, color: theme.colors.textSecondary }}>{t('chatbot.subtitle')}</Text>
+            <Text allowFontScaling={false} style={{ fontSize: 17, fontWeight: '600', color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }}>{t('chatbot.title')}</Text>
+            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center' }}>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#4CD964', ...(isRTL ? { marginLeft: 6 } : { marginRight: 6 }) }} />
+              <Text allowFontScaling={false} style={{ fontSize: 12, color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }}>{t('chatbot.subtitle')}</Text>
             </View>
           </View>
 

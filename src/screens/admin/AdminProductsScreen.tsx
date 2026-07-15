@@ -393,7 +393,7 @@ const AdminProductsScreen: React.FC = () => {
     const sizeText = newSize.trim();
     if (!sizeText) return;
     if (variations.some(v => v.variationId !== variationId && v.sizeValue === sizeText)) {
-      Alert.alert('Duplicate Size', `Size ${sizeText} already exists`);
+      Alert.alert(t('admin.common.error'), t('admin.products.duplicateSizeValue', { defaultValue: 'This size already exists' }));
       return;
     }
     setVariations(variations.map(v =>
@@ -593,12 +593,12 @@ const AdminProductsScreen: React.FC = () => {
             if (result.success && result.videoUrl) {
               // Update product with video URL
               await service.updateProduct(newProductId, { videoUrl: result.videoUrl });
-              Alert.alert(t('admin.common.success'), 'Product created and video uploaded successfully!');
+              Alert.alert(t('admin.common.success'), t('admin.products.form.productCreatedVideoUploaded', { defaultValue: 'Product created and video uploaded successfully!' }));
             } else {
-              Alert.alert(t('admin.common.success'), 'Product created, but video upload failed: ' + (result.error || 'Unknown error'));
+              Alert.alert(t('admin.common.success'), t('admin.products.form.productCreatedVideoFailedErr', { error: result.error || 'Unknown error', defaultValue: 'Product created, but video upload failed: {{error}}' }));
             }
           } catch (videoError) {
-            Alert.alert(t('admin.common.success'), 'Product created, but video upload failed.');
+            Alert.alert(t('admin.common.success'), t('admin.products.form.productCreatedVideoFailed', { defaultValue: 'Product created, but video upload failed.' }));
           } finally {
             setUploadingVideo(false);
             setVideoUploadProgress(0);
@@ -692,11 +692,11 @@ const AdminProductsScreen: React.FC = () => {
   const handleAddVideo = async () => {
     if (videoUrl || videoUri) {
       Alert.alert(
-        'Replace Video?',
-        'A video already exists. Do you want to replace it?',
+        t('admin.products.form.replaceVideoTitle', { defaultValue: 'Replace Video?' }),
+        t('admin.products.form.replaceVideoMessage', { defaultValue: 'A video already exists. Do you want to replace it?' }),
         [
           { text: t('admin.common.cancel'), style: 'cancel' },
-          { text: 'Replace', onPress: () => pickAndUploadVideo() },
+          { text: t('admin.products.form.replace', { defaultValue: 'Replace' }), onPress: () => pickAndUploadVideo() },
         ]
       );
       return;
@@ -719,7 +719,7 @@ const AdminProductsScreen: React.FC = () => {
       // Validate size on client
       const validation = await VideoService.validateVideo(video.uri);
       if (!validation.valid) {
-        Alert.alert(t('admin.common.error'), validation.error || 'Video validation failed');
+        Alert.alert(t('admin.common.error'), validation.error || t('admin.products.form.videoValidationFailed', { defaultValue: 'Video validation failed' }));
         setUploadingVideo(false);
         return;
       }
@@ -731,8 +731,8 @@ const AdminProductsScreen: React.FC = () => {
       if (!editingProduct) {
         Alert.alert(
           t('admin.common.success'),
-          'Video selected! It will be uploaded when you save the product.',
-          [{ text: 'OK' }]
+          t('admin.products.form.videoSelectedMessage', { defaultValue: 'Video selected! It will be uploaded when you save the product.' }),
+          [{ text: t('admin.common.ok', { defaultValue: 'OK' }) }]
         );
         setUploadingVideo(false);
         setVideoUploadProgress(0);
@@ -754,17 +754,17 @@ const AdminProductsScreen: React.FC = () => {
         try {
           const service = createTenantAdminService(tenantId!);
           await service.updateProduct(editingProduct.id, { videoUrl: result.videoUrl });
-          Alert.alert(t('admin.common.success'), 'Video uploaded and saved!');
+          Alert.alert(t('admin.common.success'), t('admin.products.form.videoUploadedSaved', { defaultValue: 'Video uploaded and saved!' }));
         } catch (saveError) {
           console.error('Failed to save video URL:', saveError);
-          Alert.alert(t('admin.common.success'), 'Video uploaded! Click Save to persist.');
+          Alert.alert(t('admin.common.success'), t('admin.products.form.videoUploadedClickSave', { defaultValue: 'Video uploaded! Click Save to persist.' }));
         }
       } else {
-        Alert.alert(t('admin.common.error'), result.error || 'Video upload failed');
+        Alert.alert(t('admin.common.error'), result.error || t('admin.products.form.videoUploadFailed', { defaultValue: 'Video upload failed' }));
         setVideoUri(null);
       }
     } catch (error) {
-      Alert.alert(t('admin.common.error'), 'Failed to upload video');
+      Alert.alert(t('admin.common.error'), t('admin.products.form.videoUploadFailed', { defaultValue: 'Failed to upload video' }));
       setVideoUri(null);
     } finally {
       setUploadingVideo(false);
@@ -774,8 +774,8 @@ const AdminProductsScreen: React.FC = () => {
 
   const handleRemoveVideo = () => {
     Alert.alert(
-      'Remove Video?',
-      'Are you sure you want to remove the video?',
+      t('admin.products.form.removeVideoTitle', { defaultValue: 'Remove Video?' }),
+      t('admin.products.form.removeVideoMessage', { defaultValue: 'Are you sure you want to remove the video?' }),
       [
         { text: t('admin.common.cancel'), style: 'cancel' },
         {
@@ -790,10 +790,10 @@ const AdminProductsScreen: React.FC = () => {
               try {
                 const service = createTenantAdminService(tenantId);
                 await service.updateProduct(editingProduct.id, { videoUrl: '' });
-                Alert.alert(t('admin.common.success'), 'Video removed!');
+                Alert.alert(t('admin.common.success'), t('admin.products.form.videoRemoved', { defaultValue: 'Video removed!' }));
               } catch (error) {
                 console.error('Failed to remove video:', error);
-                Alert.alert(t('admin.common.error'), 'Failed to remove video from server.');
+                Alert.alert(t('admin.common.error'), t('admin.products.form.videoRemoveFailed', { defaultValue: 'Failed to remove video from server.' }));
               }
             }
           },
@@ -1526,7 +1526,7 @@ const AdminProductsScreen: React.FC = () => {
               shadowOpacity: isDark ? 0 : 0.06, shadowRadius: 8, elevation: 2,
             }]}>
               <Ionicons name="search" size={20} color={isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)'} />
-              <TextInput allowFontScaling={false}                style={[styles.searchInput, { color: theme.colors.text }]}
+              <TextInput allowFontScaling={false}                style={[styles.searchInput, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}
                 placeholder={t('admin.products.searchPlaceholder')}
                 placeholderTextColor={isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)'}
                 value={searchQuery}

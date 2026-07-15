@@ -10,6 +10,7 @@ import {
   RefreshControl,
   Modal,
   FlatList,
+  I18nManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -47,7 +48,8 @@ const AdminStockReportScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
   const { tenantId, isLoading: tenantLoading } = useTenant();
   const navigation = useNavigation<any>();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -1114,9 +1116,9 @@ const AdminStockReportScreen: React.FC = () => {
       <StatusBar style={isDark ? 'light' : 'dark'} />
 
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
+      <View style={[styles.header, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+          <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color={theme.colors.text} />
         </TouchableOpacity>
         <Text allowFontScaling={false} style={[styles.headerTitle, { color: theme.colors.text }]}>
           {t('admin.stockReport.title', { defaultValue: 'Stock Report' })}
@@ -1226,7 +1228,7 @@ const AdminStockReportScreen: React.FC = () => {
           return (
             <TouchableOpacity
               key={card.filter}
-              style={[styles.reportCard, { backgroundColor: theme.colors.surface }]}
+              style={[styles.reportCard, { backgroundColor: theme.colors.surface, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
               onPress={() => handleGenerateReport(card.filter)}
               activeOpacity={0.7}
               disabled={generating}
@@ -1234,9 +1236,9 @@ const AdminStockReportScreen: React.FC = () => {
               <View style={[styles.reportCardIcon, { backgroundColor: card.bgColor }]}>
                 <Ionicons name={card.icon} size={28} color={card.color} />
               </View>
-              <View style={styles.reportCardContent}>
-                <Text allowFontScaling={false} style={[styles.reportCardTitle, { color: theme.colors.text }]}>{card.title}</Text>
-                <Text allowFontScaling={false} style={[styles.reportCardSubtitle, { color: theme.colors.textSecondary }]}>{card.subtitle}</Text>
+              <View style={[styles.reportCardContent, isRTL && { marginLeft: 0, marginRight: SPACING.md }]}>
+                <Text allowFontScaling={false} style={[styles.reportCardTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{card.title}</Text>
+                <Text allowFontScaling={false} style={[styles.reportCardSubtitle, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>{card.subtitle}</Text>
               </View>
               <View style={styles.reportCardRight}>
                 <View style={[styles.countBadge, { backgroundColor: card.bgColor }]}>

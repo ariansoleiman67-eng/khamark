@@ -14,6 +14,7 @@ import {
   TextInput,
   Switch,
   Dimensions,
+  I18nManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -29,8 +30,9 @@ const BANNER_PASSWORD = '1990';
 
 const AdminBannerScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigation = useNavigation<any>();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
 
   // Password gate
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -48,7 +50,7 @@ const AdminBannerScreen: React.FC = () => {
       const result = await bannerService.getBanners(false); // Get all (active + inactive)
       setBanners(result);
     } catch (error) {
-      Alert.alert(t('common.error'), 'Failed to load banners');
+      Alert.alert(t('common.error'), t('admin.banner.loadFailed', { defaultValue: 'Failed to load banners' }));
     } finally {
       setLoading(false);
     }
@@ -97,10 +99,10 @@ const AdminBannerScreen: React.FC = () => {
           Alert.alert(t('common.error'), t('admin.banner.addFailed', { defaultValue: 'Failed to add banner' }));
         }
       } else {
-        Alert.alert(t('common.error'), 'Image upload failed');
+        Alert.alert(t('common.error'), t('admin.banner.uploadFailed', { defaultValue: 'Image upload failed' }));
       }
     } catch (error) {
-      Alert.alert(t('common.error'), 'Something went wrong');
+      Alert.alert(t('common.error'), t('common.somethingWentWrong', { defaultValue: 'Something went wrong' }));
     } finally {
       setUploading(false);
     }
@@ -133,7 +135,7 @@ const AdminBannerScreen: React.FC = () => {
             if (success) {
               await loadBanners();
             } else {
-              Alert.alert(t('common.error'), 'Failed to delete banner');
+              Alert.alert(t('common.error'), t('admin.banner.deleteFailed', { defaultValue: 'Failed to delete banner' }));
             }
           },
         },
@@ -164,9 +166,9 @@ const AdminBannerScreen: React.FC = () => {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top', 'left', 'right']}>
         {/* Header */}
-        <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
+        <View style={[styles.header, { backgroundColor: theme.colors.surface, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+            <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color={theme.colors.text} />
           </TouchableOpacity>
           <Text allowFontScaling={false} style={[styles.headerTitle, { color: theme.colors.text }]}>
             {t('admin.banner.title', { defaultValue: 'Banner Management' })}
@@ -238,9 +240,9 @@ const AdminBannerScreen: React.FC = () => {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top', 'left', 'right']}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
+      <View style={[styles.header, { backgroundColor: theme.colors.surface, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+          <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color={theme.colors.text} />
         </TouchableOpacity>
         <Text allowFontScaling={false} style={[styles.headerTitle, { color: theme.colors.text }]}>
           {t('admin.banner.title', { defaultValue: 'Banner Management' })}
@@ -339,7 +341,7 @@ const AdminBannerScreen: React.FC = () => {
               </View>
 
               {/* Banner Controls */}
-              <View style={styles.bannerControls}>
+              <View style={[styles.bannerControls, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 {/* Reorder Buttons */}
                 <View style={styles.reorderButtons}>
                   <TouchableOpacity

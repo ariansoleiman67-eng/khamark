@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Dimensions,
   Platform,
+  I18nManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -35,7 +36,8 @@ const { width } = Dimensions.get('window');
 
 const MyAddressScreen: React.FC = () => {
   const { theme } = useTheme();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const navigation = useNavigation<any>();
   const { user } = useAuth();
 
@@ -162,12 +164,12 @@ const MyAddressScreen: React.FC = () => {
     >
       {/* Header */}
       <View style={{
-        flexDirection: 'row',
+        flexDirection: isRTL ? 'row-reverse' : 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         marginBottom: SPACING.md,
       }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', flex: 1 }}>
           <View style={{
             width: 40,
             height: 40,
@@ -175,7 +177,8 @@ const MyAddressScreen: React.FC = () => {
             backgroundColor: theme.colors.primary + '20',
             justifyContent: 'center',
             alignItems: 'center',
-            marginRight: SPACING.md,
+            marginRight: isRTL ? 0 : SPACING.md,
+            marginLeft: isRTL ? SPACING.md : 0,
           }}>
             <Ionicons
               name="location"
@@ -185,12 +188,14 @@ const MyAddressScreen: React.FC = () => {
           </View>
 
           <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center' }}>
               <Text allowFontScaling={false} style={{
                 fontSize: 18,
                 fontWeight: '600',
                 color: theme.colors.text,
-                marginRight: SPACING.sm,
+                marginRight: isRTL ? 0 : SPACING.sm,
+                marginLeft: isRTL ? SPACING.sm : 0,
+                textAlign: isRTL ? 'right' : 'left',
               }}>
                 {address.title}
               </Text>
@@ -215,6 +220,7 @@ const MyAddressScreen: React.FC = () => {
               fontSize: 14,
               color: theme.colors.textSecondary,
               marginTop: 2,
+              textAlign: isRTL ? 'right' : 'left',
             }}>
               {address.fullName} • {address.phone}
             </Text>
@@ -265,12 +271,14 @@ const MyAddressScreen: React.FC = () => {
           color: theme.colors.text,
           lineHeight: 22,
           marginBottom: SPACING.sm,
+          textAlign: isRTL ? 'right' : 'left',
         }}>
           {address.address}
         </Text>
         <Text allowFontScaling={false} style={{
           fontSize: 14,
           color: theme.colors.textSecondary,
+          textAlign: isRTL ? 'right' : 'left',
         }}>
           {address.city}, {address.region}
         </Text>
@@ -322,7 +330,7 @@ const MyAddressScreen: React.FC = () => {
                     {address.coordinates.latitude.toFixed(4)}, {address.coordinates.longitude.toFixed(4)}
                   </Text>
                   <Text allowFontScaling={false} style={{ color: theme.colors.textSecondary, fontSize: 10, marginTop: 4 }}>
-                    Map unavailable
+                    {t('addresses.mapUnavailable', { defaultValue: 'Map unavailable' })}
                   </Text>
                 </View>
               }
@@ -379,7 +387,7 @@ const MyAddressScreen: React.FC = () => {
               color: theme.colors.warning,
               marginLeft: 4,
             }}>
-              No location set
+              {t('addresses.noLocationSet', { defaultValue: 'No location set' })}
             </Text>
           </View>
         )}
@@ -441,14 +449,14 @@ const MyAddressScreen: React.FC = () => {
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
         <View style={{
-          flexDirection: 'row',
+          flexDirection: isRTL ? 'row-reverse' : 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: SPACING.md,
           borderBottomWidth: 1,
           borderBottomColor: theme.colors.border,
         }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center' }}>
             <TouchableOpacity onPress={() => {
               try {
                 if (navigation.canGoBack()) {
@@ -460,13 +468,14 @@ const MyAddressScreen: React.FC = () => {
                 console.error('Navigation error:', error);
               }
             }}>
-              <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+              <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color={theme.colors.text} />
             </TouchableOpacity>
             <Text allowFontScaling={false} style={{
               fontSize: 18,
               fontWeight: '600',
               color: theme.colors.text,
-              marginLeft: SPACING.md,
+              marginLeft: isRTL ? 0 : SPACING.md,
+              marginRight: isRTL ? SPACING.md : 0,
               includeFontPadding: false,
               textAlignVertical: 'center',
               paddingVertical: 2, // Added small padding to prevent vertical clipping
@@ -624,7 +633,7 @@ const MyAddressScreen: React.FC = () => {
                   marginTop: SPACING.xs,
                   textAlign: 'center',
                 }}>
-                  Add delivery addresses for faster checkout
+                  {t('addresses.addAddressesHint', { defaultValue: 'Add delivery addresses for faster checkout' })}
                 </Text>
               </TouchableOpacity>
             </>

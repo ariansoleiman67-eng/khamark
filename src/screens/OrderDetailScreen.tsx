@@ -6,9 +6,10 @@ import {
   TouchableOpacity, 
   StyleSheet, 
   ScrollView, 
-  Alert, 
-  Linking, 
-  Share 
+  Alert,
+  Linking,
+  Share,
+  I18nManager
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -114,6 +115,7 @@ const OrderDetailScreen: React.FC = () => {
   const { refreshCart } = useCart();
   const { currency, exchangeRateIQD } = useCurrency();
   const { t, i18n } = useTranslation();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   // const insets = useSafeAreaInsets();
 
   const { orderId } = route.params;
@@ -193,7 +195,7 @@ const OrderDetailScreen: React.FC = () => {
     const url = `whatsapp://send?phone=${whatsappNumber}&text=${encodeURIComponent(message)}`;
     
     Linking.openURL(url).catch(() => {
-      Alert.alert('Error', t('orders.support.whatsappError', { defaultValue: 'WhatsApp is not installed on this device' }));
+      Alert.alert(t('common.error'), t('orders.support.whatsappError', { defaultValue: 'WhatsApp is not installed on this device' }));
     });
   };
 
@@ -420,9 +422,9 @@ ${t('orders.messagePrompt', { defaultValue: 'Hi, I have a question about this or
     
     return (
       <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-        <View style={styles.header}>
+        <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-            <Feather name="arrow-left" size={24} color={theme.colors.text} />
+            <Feather name={isRTL ? 'arrow-right' : 'arrow-left'} size={24} color={theme.colors.text} />
           </TouchableOpacity>
           <Text allowFontScaling={false} style={styles.title}>{t('orders.orderDetails')}</Text>
           <View style={styles.headerSpacer} />
@@ -468,9 +470,9 @@ ${t('orders.messagePrompt', { defaultValue: 'Hi, I have a question about this or
   if (error || !order) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
+        <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Feather name="arrow-left" size={24} color={theme.colors.text} />
+            <Feather name={isRTL ? 'arrow-right' : 'arrow-left'} size={24} color={theme.colors.text} />
           </TouchableOpacity>
           <Text allowFontScaling={false} style={styles.title}>{t('orders.orderDetails')}</Text>
           <View style={styles.headerSpacer} />
@@ -497,9 +499,9 @@ ${t('orders.messagePrompt', { defaultValue: 'Hi, I have a question about this or
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Feather name="arrow-left" size={24} color={theme.colors.text} />
+          <Feather name={isRTL ? 'arrow-right' : 'arrow-left'} size={24} color={theme.colors.text} />
         </TouchableOpacity>
         <Text allowFontScaling={false} style={styles.title}>{t('orders.orderDetails')}</Text>
         <TouchableOpacity style={styles.shareButton} onPress={handleShareOrder}>
@@ -588,14 +590,14 @@ ${t('orders.messagePrompt', { defaultValue: 'Hi, I have a question about this or
               : 0;
             
             return (
-              <View key={`${item.productId}-${index}`} style={styles.orderItem}>
+              <View key={`${item.productId}-${index}`} style={[styles.orderItem, isRTL && { flexDirection: 'row-reverse' }]}>
                 <Image
                   source={{ uri: getProductImageUrl({ imageUrl: item.imageUrl, category: item.productName }) }}
-                  style={styles.itemImage}
+                  style={[styles.itemImage, isRTL && { marginRight: 0, marginLeft: SPACING.sm }]}
                   contentFit="cover"
                 />
                 <View style={styles.itemDetails}>
-                  <Text allowFontScaling={false} style={styles.itemName} numberOfLines={2}>
+                  <Text allowFontScaling={false} style={[styles.itemName, { textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={2}>
                     {" "}{i18n.language === 'ar' && ((item as any).productNameAr || (item as any).productSnapshot?.nameAr) ? ((item as any).productNameAr || (item as any).productSnapshot?.nameAr) : i18n.language === 'ku' && ((item as any).productNameKu || (item as any).productSnapshot?.nameKu) ? ((item as any).productNameKu || (item as any).productSnapshot?.nameKu) : item.productName}{" "}
                   </Text>
                   {item.partNumber && (
@@ -1015,8 +1017,8 @@ ${t('orders.messagePrompt', { defaultValue: 'Hi, I have a question about this or
               onPress={handleReorder}
               activeOpacity={0.8}
             >
-              <Ionicons name="refresh-outline" size={20} color="#ffffff" />
-              <Text allowFontScaling={false} style={styles.primaryButtonText}>
+              <Ionicons name="refresh-outline" size={20} color={theme.colors.background} />
+              <Text allowFontScaling={false} style={[styles.primaryButtonText, { color: theme.colors.background }]}>
                 {t('orders.reorder.button', { defaultValue: 'Reorder Items' })}
               </Text>
             </TouchableOpacity>
@@ -1180,8 +1182,8 @@ const createStyles = (theme: Theme, isDark: boolean) => StyleSheet.create({
   },
   actionButton: {
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderColor: '#e0e0e0',
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border,
     borderRadius: 12,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1191,16 +1193,16 @@ const createStyles = (theme: Theme, isDark: boolean) => StyleSheet.create({
     padding: 12,
   },
   actionButtonText: {
-    color: '#333',
+    color: theme.colors.text,
     fontSize: 16,
     fontWeight: '600',
   },
   cancelButton: {
-    backgroundColor: '#fff',
-    borderColor: '#EF4444',
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.error,
   },
   cancelButtonText: {
-    color: '#EF4444',
+    color: theme.colors.error,
   },
   metaText: {
     color: theme.colors.textSecondary,

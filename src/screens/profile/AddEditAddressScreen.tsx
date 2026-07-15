@@ -9,6 +9,7 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  I18nManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -61,6 +62,7 @@ type AddEditAddressRouteProp = RouteProp<{
 const AddEditAddressScreen: React.FC = () => {
   const { theme } = useTheme();
   const { t, i18n } = useTranslation();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const navigation = useNavigation();
   const route = useRoute<AddEditAddressRouteProp>();
   const { user } = useAuth();
@@ -549,7 +551,7 @@ const AddEditAddressScreen: React.FC = () => {
       
       // Validate country existence
       if (!getCountryByCode(addressInput.countryCode)) {
-         validationErrors.countryCode = 'Invalid country selected (Try "Iraq")';
+         validationErrors.countryCode = t('addresses.invalidCountry', { defaultValue: 'Invalid country selected (Try "Iraq")' });
       }
       
       // Phone validation with resolved country
@@ -619,7 +621,7 @@ const AddEditAddressScreen: React.FC = () => {
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
         <View style={{
-          flexDirection: 'row',
+          flexDirection: isRTL ? 'row-reverse' : 'row',
           alignItems: 'center',
           padding: SPACING.md,
           borderBottomWidth: 1,
@@ -636,13 +638,14 @@ const AddEditAddressScreen: React.FC = () => {
               console.error('Navigation error:', error);
             }
           }}>
-            <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+            <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color={theme.colors.text} />
           </TouchableOpacity>
           <Text allowFontScaling={false} style={{
             fontSize: 18,
             fontWeight: '600',
             color: theme.colors.text,
-            marginLeft: SPACING.md,
+            marginLeft: isRTL ? 0 : SPACING.md,
+            marginRight: isRTL ? SPACING.md : 0,
           }}>
             {isEditing ? t('addresses.editAddress') : t('addresses.addNewAddress')}
           </Text>
@@ -716,6 +719,7 @@ const AddEditAddressScreen: React.FC = () => {
                     color: theme.colors.text,
                     backgroundColor: theme.colors.surface,
                     includeFontPadding: false,
+                    textAlign: isRTL ? 'right' : 'left',
                     textAlignVertical: 'center',
                     height: 48,
                   }}
@@ -753,6 +757,7 @@ const AddEditAddressScreen: React.FC = () => {
                     color: theme.colors.text,
                     backgroundColor: theme.colors.surface,
                     includeFontPadding: false,
+                    textAlign: isRTL ? 'right' : 'left',
                     textAlignVertical: 'center',
                     height: 48,
                   }}
@@ -791,6 +796,7 @@ const AddEditAddressScreen: React.FC = () => {
                     color: theme.colors.text,
                     backgroundColor: theme.colors.surface,
                     minHeight: 80,
+                    textAlign: isRTL ? 'right' : 'left',
                     textAlignVertical: 'top',
                     includeFontPadding: false,
                   }}
@@ -829,6 +835,7 @@ const AddEditAddressScreen: React.FC = () => {
                     color: theme.colors.text,
                     backgroundColor: theme.colors.surface,
                     includeFontPadding: false,
+                    textAlign: isRTL ? 'right' : 'left',
                     textAlignVertical: 'center',
                     height: 48,
                   }}
@@ -861,7 +868,7 @@ const AddEditAddressScreen: React.FC = () => {
                     return (
                       <View style={{ marginTop: 4 }}>
                         <Text allowFontScaling={false} style={{ fontSize: 12, color: theme.colors.textSecondary, marginBottom: 4 }}>
-                          Suggestions (tap to select):
+                          {t('addresses.suggestionsTapToSelect', { defaultValue: 'Suggestions (tap to select):' })}
                         </Text>
                         {matches.map((country) => (
                           <TouchableOpacity
@@ -920,6 +927,7 @@ const AddEditAddressScreen: React.FC = () => {
                     color: theme.colors.text,
                     backgroundColor: theme.colors.surface,
                     includeFontPadding: false,
+                    textAlign: isRTL ? 'right' : 'left',
                     textAlignVertical: 'center',
                     height: 48,
                   }}
@@ -941,7 +949,7 @@ const AddEditAddressScreen: React.FC = () => {
                   if (!countryMatch) {
                     return (
                       <Text allowFontScaling={false} style={{ fontSize: 12, color: theme.colors.warning, marginTop: 4 }}>
-                        Select a country first
+                        {t('addresses.selectCountryFirst', { defaultValue: 'Select a country first' })}
                       </Text>
                     );
                   }
@@ -969,7 +977,7 @@ const AddEditAddressScreen: React.FC = () => {
                     return (
                       <View style={{ marginTop: 4 }}>
                         <Text allowFontScaling={false} style={{ fontSize: 12, color: theme.colors.textSecondary, marginBottom: 4 }}>
-                          Cities in {countryMatch.name}:
+                          {t('addresses.citiesIn', { name: countryMatch.name, defaultValue: 'Cities in {{name}}:' })}
                         </Text>
                         {matches.map((city) => (
                           <TouchableOpacity
@@ -1051,7 +1059,7 @@ const AddEditAddressScreen: React.FC = () => {
                         color: theme.colors.textSecondary,
                         marginBottom: 4,
                       }}>
-                        GPS Coordinates:
+                        {t('addresses.gpsCoordinates', { defaultValue: 'GPS Coordinates:' })}
                       </Text>
                       <Text allowFontScaling={false} style={{
                         fontSize: 14,

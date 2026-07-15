@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef, useDeferredValue } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList,
-  ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, Modal, BackHandler,
+  ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, Modal, BackHandler, I18nManager,
 } from 'react-native';
 // expo-image (memory+disk cached) instead of RN Image — RN Image re-decodes the
 // thumbnail on every re-render, which is the intermittent jank on add/increase.
@@ -287,7 +287,7 @@ const ProductGridCard = React.memo(function ProductGridCard({
             <Text allowFontScaling={false} style={styles.prodCardBadgeText} numberOfLines={1}>{badgeLabel}</Text>
           </View>
         ) : (
-          <View style={[styles.prodCardAdd, inCart ? { backgroundColor: C.primary } : { backgroundColor: '#fff', borderWidth: 1.5, borderColor: C.primary + '55' }]}>
+          <View style={[styles.prodCardAdd, inCart ? { backgroundColor: C.primary } : { backgroundColor: C.surface, borderWidth: 1.5, borderColor: C.primary + '55' }]}>
             {inCart ? <Text allowFontScaling={false} style={styles.prodCardAddQty}>{inCart}</Text> : <Ionicons name="add" size={20} color={C.primary} />}
           </View>
         )}
@@ -313,6 +313,7 @@ const AdminCreateOrderScreen: React.FC = () => {
   // (the partner can see it, and it's tagged on the owner's books). Optional.
   const partner: { uid: string; name: string } | undefined = route.params?.partner;
   const { t, i18n } = useTranslation();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const { theme, isDark } = useTheme();
   const { tenantId } = useTenant();
   const { exchangeRateIQD } = useCurrency();
@@ -645,7 +646,7 @@ const AdminCreateOrderScreen: React.FC = () => {
       resetSale();
       navigation.replace('AdminInStoreOrders', { source: 'in-store', orderId });
     } catch (e: any) {
-      Alert.alert(t('common.error', { defaultValue: 'Error' }), e.message || 'Failed to create sale');
+      Alert.alert(t('common.error', { defaultValue: 'Error' }), e.message || t('admin.inStore.createFailed', { defaultValue: 'Failed to create sale' }));
     } finally {
       setCreating(false);
     }
@@ -676,7 +677,7 @@ const AdminCreateOrderScreen: React.FC = () => {
   const renderBrowse = () => (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       {/* Search */}
-      <View style={[styles.searchBar, { backgroundColor: C.surface, borderColor: C.border }]}>
+      <View style={[styles.searchBar, { backgroundColor: C.surface, borderColor: C.border }, isRTL && { flexDirection: 'row-reverse' }]}>
         <Ionicons name="search" size={18} color={C.textSecondary} />
         <TextInput allowFontScaling={false}
           value={search} onChangeText={setSearch}
@@ -691,7 +692,7 @@ const AdminCreateOrderScreen: React.FC = () => {
           importantForAutofill="no"
           placeholder={t('admin.inStore.searchProducts', { defaultValue: 'Search parts to add…' })}
           placeholderTextColor={C.placeholder}
-          style={[styles.searchInput, { color: C.text }]}
+          style={[styles.searchInput, { color: C.text, textAlign: isRTL ? 'right' : 'left' }]}
         />
         {search ? (
           <TouchableOpacity onPress={() => setSearch('')}><Ionicons name="close-circle" size={18} color={C.textSecondary} /></TouchableOpacity>
@@ -1138,21 +1139,21 @@ const AdminCreateOrderScreen: React.FC = () => {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: isDark ? C.background : '#F5F5F7' }]} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, isRTL && { flexDirection: 'row-reverse' }]}>
         <TouchableOpacity
           onPress={handleBack}
-          style={[styles.backBtn, { backgroundColor: C.surface }]}
+          style={[styles.backBtn, { backgroundColor: C.surface }, isRTL && { marginRight: 0, marginLeft: SPACING.md }]}
           activeOpacity={0.7}
         >
-          <Ionicons name="arrow-back" size={22} color={C.text} />
+          <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={22} color={C.text} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text allowFontScaling={false} style={[styles.title, { color: C.text }]} numberOfLines={1}>
+          <Text allowFontScaling={false} style={[styles.title, { color: C.text, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
             {step === 'review'
               ? t('admin.inStore.reviewTitle', { defaultValue: 'Review Cart' })
               : t('admin.inStore.newSale', { defaultValue: 'New Sale' })}
           </Text>
-          <Text allowFontScaling={false} style={[styles.subtitle, { color: C.textSecondary }]} numberOfLines={1}>
+          <Text allowFontScaling={false} style={[styles.subtitle, { color: C.textSecondary, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
             {step === 'review'
               ? t('admin.inStore.reviewSubtitle', { defaultValue: 'Confirm items, customer & payment' })
               : t('admin.inStore.subtitle', { defaultValue: 'Tap parts to add them to the cart' })}

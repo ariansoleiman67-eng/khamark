@@ -15,6 +15,7 @@ import {
   Animated as RNAnimated,
   Pressable,
   KeyboardAvoidingView,
+  I18nManager,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -142,7 +143,8 @@ type VehicleFormData = z.infer<typeof vehicleSchema>;
 // ========================
 const EditProfileScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const navigation = useNavigation();
   const { user, refreshUser } = useAuth();
 
@@ -311,14 +313,14 @@ const EditProfileScreen: React.FC = () => {
       <SafeAreaView style={{ flex: 1 }}>
 
         {/* Header */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14 }}>
+        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14 }}>
           <TouchableOpacity
             onPress={() => navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Profile' as never)}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <Ionicons name="chevron-back" size={26} color={theme.colors.text} />
+            <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={26} color={theme.colors.text} />
           </TouchableOpacity>
-          <Text allowFontScaling={false} style={{ fontSize: 17, fontWeight: '600', color: theme.colors.text, marginLeft: 8 }}>
+          <Text allowFontScaling={false} style={{ fontSize: 17, fontWeight: '600', color: theme.colors.text, marginLeft: isRTL ? 0 : 8, marginRight: isRTL ? 8 : 0 }}>
             {t('profile.editProfile') || 'Profile'}
           </Text>
         </View>
@@ -359,11 +361,11 @@ const EditProfileScreen: React.FC = () => {
             </TouchableOpacity>
 
             <Text allowFontScaling={false} style={{ fontSize: 26, fontWeight: '700', color: theme.colors.text, letterSpacing: -0.3, textAlign: 'center' }}>
-              {fullName || 'Your Name'}
+              {fullName || t('profile.yourName', { defaultValue: 'Your Name' })}
             </Text>
             {user?.createdAt && (
               <Text allowFontScaling={false} style={{ fontSize: 13, color: labelColor, marginTop: 4 }}>
-                Member since {new Date(user.createdAt).getFullYear()}
+                {t('profile.memberSince', { defaultValue: 'Member since {{year}}', year: new Date(user.createdAt).getFullYear() })}
               </Text>
             )}
           </Animated.View>
@@ -374,12 +376,12 @@ const EditProfileScreen: React.FC = () => {
             {/* Name */}
             <Animated.View entering={FadeInDown.delay(180).duration(400)}>
               <TouchableOpacity onPress={() => openSheet('name')} activeOpacity={0.7} style={cardStyle}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <View style={{ flex: 1 }}>
-                    <Text allowFontScaling={false} style={{ fontSize: 13, fontWeight: '500', color: labelColor, marginBottom: 6, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                    <Text allowFontScaling={false} style={{ fontSize: 13, fontWeight: '500', color: labelColor, marginBottom: 6, letterSpacing: 0.5, textTransform: 'uppercase', textAlign: isRTL ? 'right' : 'left' }}>
                       {t('profile.fullName') || 'Full Name'}
                     </Text>
-                    <Text allowFontScaling={false} style={{ fontSize: 17, fontWeight: '600', color: theme.colors.text }}>
+                    <Text allowFontScaling={false} style={{ fontSize: 17, fontWeight: '600', color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }}>
                       {fullName || '—'}
                     </Text>
                   </View>
@@ -396,11 +398,11 @@ const EditProfileScreen: React.FC = () => {
       {/* ======================== BOTTOM SHEET ======================== */}
       <LuxurySheet visible={sheetMode !== null} onClose={closeSheet} isDark={isDark} surfaceColor={surfaceSheet}>
         <View style={{ paddingHorizontal: 24 }}>
-          <Text allowFontScaling={false} style={{ fontSize: 20, fontWeight: '700', color: theme.colors.text, marginBottom: 4 }}>
-            Update name
+          <Text allowFontScaling={false} style={{ fontSize: 20, fontWeight: '700', color: theme.colors.text, marginBottom: 4, textAlign: isRTL ? 'right' : 'left' }}>
+            {t('profile.updateName', { defaultValue: 'Update name' })}
           </Text>
-          <Text allowFontScaling={false} style={{ fontSize: 14, color: labelColor, marginBottom: 24 }}>
-            Enter your full name
+          <Text allowFontScaling={false} style={{ fontSize: 14, color: labelColor, marginBottom: 24, textAlign: isRTL ? 'right' : 'left' }}>
+            {t('profile.enterFullName') || 'Enter your full name'}
           </Text>
 
           <Controller
@@ -411,14 +413,15 @@ const EditProfileScreen: React.FC = () => {
                 value={value}
                 onChangeText={onChange}
                 onBlur={onBlur}
-                placeholder='Full name'
+                placeholder={t('profile.fullName', { defaultValue: 'Full name' })}
                 placeholderTextColor={labelColor}
                 keyboardType='default'
                 autoCapitalize='words'
                 autoFocus
                 scrollEnabled={false}
+                textAlign={isRTL ? 'right' : 'left'}
                 style={{
-                  borderWidth: 1, borderColor: (nameErrors.fullName ? '#F44336' : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)')),
+                  borderWidth: 1, borderColor: (nameErrors.fullName ? theme.colors.error : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)')),
                   borderRadius: 14, paddingHorizontal: 18, paddingVertical: 0,
                   fontSize: 17, color: theme.colors.text,
                   backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
@@ -430,7 +433,7 @@ const EditProfileScreen: React.FC = () => {
             )}
           />
           {nameErrors.fullName && (
-            <Text allowFontScaling={false} style={{ color: '#F44336', fontSize: 13, marginTop: 6, marginLeft: 4 }}>
+            <Text allowFontScaling={false} style={{ color: theme.colors.error, fontSize: 13, marginTop: 6, marginLeft: 4, textAlign: isRTL ? 'right' : 'left' }}>
               {nameErrors.fullName.message}
             </Text>
           )}
@@ -447,7 +450,7 @@ const EditProfileScreen: React.FC = () => {
             }}>
             {saving ? <ActivityIndicator color="white" /> : (
               <Text allowFontScaling={false} style={{ fontSize: 17, fontWeight: '600', color: 'white' }}>
-                Save
+                {t('common.save') || 'Save'}
               </Text>
             )}
           </TouchableOpacity>

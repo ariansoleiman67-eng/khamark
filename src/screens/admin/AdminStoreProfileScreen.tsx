@@ -499,9 +499,9 @@ const AdminStoreProfileScreen: React.FC = () => {
         style={styles.flex}
       >
         {/* Header */}
-        <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
+        <View style={[styles.header, { borderBottomColor: theme.colors.border, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
-            <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+            <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color={theme.colors.text} />
           </TouchableOpacity>
           <AppText style={[styles.headerTitle, { color: theme.colors.text }]}>
             {t('admin.storeProfile.title', { defaultValue: 'Store Profile' })}
@@ -649,7 +649,7 @@ const AdminStoreProfileScreen: React.FC = () => {
                         paddingHorizontal: 6,
                         paddingVertical: 2
                       }}>
-                        <AppText style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>MAIN</AppText>
+                        <AppText style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>{t('admin.storeProfile.mainImage', { defaultValue: 'MAIN' })}</AppText>
                       </View>
                     )}
                   </View>
@@ -822,7 +822,7 @@ const AdminStoreProfileScreen: React.FC = () => {
                         );
                       }}
                     >
-                      <Ionicons name="close-circle" size={24} color="#FF6B6B" />
+                      <Ionicons name="close-circle" size={24} color={theme.colors.error} />
                     </TouchableOpacity>
                   </View>
                 ) : (
@@ -1054,7 +1054,7 @@ const AdminStoreProfileScreen: React.FC = () => {
              <View style={{ marginTop: 24, padding: 12, backgroundColor: theme.colors.background, borderRadius: 8 }}>
                 <AppText style={{ color: theme.colors.textSecondary, fontSize: 12 }}>{t('common.timezone', 'Timezone')}:</AppText>
                 <AppText style={{ color: theme.colors.text, fontFamily: 'monospace' }}>
-                  {profile.timeZone || DateTime.local().zoneName} {profile.timeZone ? '(Custom)' : '(Device Default)'} 
+                  {profile.timeZone || DateTime.local().zoneName} {profile.timeZone ? t('admin.storeProfile.customTimezone', { defaultValue: '(Custom)' }) : t('admin.storeProfile.deviceDefaultTimezone', { defaultValue: '(Device Default)' })}
                 </AppText>
              </View>
 

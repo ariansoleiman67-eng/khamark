@@ -14,6 +14,7 @@ import {
   TextInput,
   Platform,
   KeyboardAvoidingView,
+  I18nManager,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
@@ -113,6 +114,7 @@ const CheckoutScreen: React.FC = () => {
   const { currency, exchangeRateIQD } = useCurrency();
   const { theme, isDark } = useTheme();
   const { t, i18n } = useTranslation();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
 
   const PAYMENT_METHODS: PaymentMethodOption[] = [
     {
@@ -474,11 +476,11 @@ const CheckoutScreen: React.FC = () => {
     }
     
     Alert.alert(
-      'Address Required', 
-      'Please select a delivery address to continue with your order.'
+      t('checkout.addressRequiredTitle', { defaultValue: 'Address Required' }),
+      t('checkout.selectAddressToContinue', { defaultValue: 'Please select a delivery address to continue with your order.' })
     );
     return false;
-  }, [selectedAddress]);
+  }, [selectedAddress, t]);
 
   const validatePayment = useCallback((): boolean => {
     if (!selectedPaymentMethod) {
@@ -555,7 +557,10 @@ const CheckoutScreen: React.FC = () => {
     if (!user?.uid) {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) {
-        Alert.alert('Authentication Error', 'Please log out and log back in to place orders.');
+        Alert.alert(
+          t('errors.authenticationError', { defaultValue: 'Authentication Error' }),
+          t('errors.loginAgainToOrder', { defaultValue: 'Please log out and log back in to place orders.' })
+        );
         isSubmittingRef.current = false;
         return;
       }
@@ -850,7 +855,7 @@ const CheckoutScreen: React.FC = () => {
       <SafeAreaView style={[styles.container, { backgroundColor: isDark ? theme.colors.background : '#FFFbf0' }]} edges={['top', 'left', 'right']}>
         <View style={[styles.header, { backgroundColor: isDark ? theme.colors.background : '#FFFbf0', borderBottomColor: theme.colors.border }]}>
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Feather name="arrow-left" size={24} color={theme.colors.text} />
+            <Feather name={isRTL ? 'arrow-right' : 'arrow-left'} size={24} color={theme.colors.text} />
           </TouchableOpacity>
           <Text allowFontScaling={false} style={[styles.title, { color: theme.colors.text }]}>{t('checkout.title')}</Text>
           <View style={styles.headerSpacer} />
@@ -900,7 +905,7 @@ const CheckoutScreen: React.FC = () => {
           {/* Header - Inside ScrollView */}
           <View style={[styles.header, { backgroundColor: isDark ? theme.colors.background : '#FFFbf0', borderBottomColor: theme.colors.border }]}>
             <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-              <Feather name="arrow-left" size={24} color={theme.colors.text} />
+              <Feather name={isRTL ? 'arrow-right' : 'arrow-left'} size={24} color={theme.colors.text} />
             </TouchableOpacity>
             <Text allowFontScaling={false} style={[styles.title, { color: theme.colors.text }]}>{t('checkout.title')}</Text>
             <View style={styles.headerSpacer} />
@@ -1052,7 +1057,7 @@ const CheckoutScreen: React.FC = () => {
                             <View style={[styles.noLocationBadge, { backgroundColor: theme.colors.warning + '1A' }]}>
                               <Ionicons name="location-outline" size={10} color={theme.colors.warning} />
                               <Text allowFontScaling={false} style={[styles.noLocationText, { color: theme.colors.warning }]}>
-                                No location set
+                                {t('checkout.noLocationSet', { defaultValue: 'No location set' })}
                               </Text>
                             </View>
                           )}
@@ -1076,10 +1081,10 @@ const CheckoutScreen: React.FC = () => {
                   <View style={[styles.noAddressContainer, { backgroundColor: theme.colors.surface, borderColor: theme.colors.primary }]}>
                     <Ionicons name="location-outline" size={48} color={theme.colors.primary} />
                     <Text allowFontScaling={false} style={[styles.noAddressTitle, { color: theme.colors.text }]}>
-                      No Delivery Address Found
+                      {t('checkout.noDeliveryAddressFound', { defaultValue: 'No Delivery Address Found' })}
                     </Text>
                     <Text allowFontScaling={false} style={[styles.noAddressSubtitle, { color: theme.colors.textSecondary }]}>
-                      Please add a delivery address first to continue with your order.
+                      {t('checkout.addAddressToContinue', { defaultValue: 'Please add a delivery address first to continue with your order.' })}
                     </Text>
                     <TouchableOpacity
                       onPress={() => navigation.navigate('AddEditAddress')}
@@ -1088,7 +1093,7 @@ const CheckoutScreen: React.FC = () => {
                     >
                       <Ionicons name="add" size={20} color="white" />
                       <Text allowFontScaling={false} style={styles.addAddressText}>
-                        Add Delivery Address
+                        {t('startOrder.addAddress', { defaultValue: 'Add Delivery Address' })}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -1307,9 +1312,9 @@ const CheckoutScreen: React.FC = () => {
                     )}
                     
                     {exchangerSaved && (
-                      <View style={[styles.exchangerSavedBadge, { backgroundColor: '#E8F5E9' }]}>
-                        <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
-                        <Text allowFontScaling={false} style={[styles.exchangerSavedText, { color: '#4CAF50' }]}>
+                      <View style={[styles.exchangerSavedBadge, { backgroundColor: theme.colors.success + '1A' }]}>
+                        <Ionicons name="checkmark-circle" size={18} color={theme.colors.success} />
+                        <Text allowFontScaling={false} style={[styles.exchangerSavedText, { color: theme.colors.success }]}>
                           {t('checkout.exchangerInfoSaved', { defaultValue: 'Saved ✓ Auto-filled from your saved info' })}
                         </Text>
                       </View>
@@ -1484,7 +1489,7 @@ const CheckoutScreen: React.FC = () => {
             
             {/* GOLDEN TEMPLATE: Order Items with Selected Options (read-only) */}
             {cart.items.map((item, index) => (
-              <View key={`${item.productId}-${item.selectedOptions?.color || ''}-${item.selectedOptions?.size || ''}`} style={styles.orderItem}>
+              <View key={`${item.productId}-${item.selectedOptions?.color || ''}-${item.selectedOptions?.size || ''}`} style={[styles.orderItem, { borderBottomColor: theme.colors.border }]}>
                 {/* Product Image */}
                 <View style={[styles.productThumbContainer, { backgroundColor: PRODUCT_BG_COLORS[index % PRODUCT_BG_COLORS.length] }]}>
                   <Image 
@@ -1649,7 +1654,7 @@ const CheckoutScreen: React.FC = () => {
               <View style={styles.discountLoadingRow}>
                 <ActivityIndicator size="small" color={theme.colors.primary} />
                 <Text allowFontScaling={false} style={[styles.discountLoadingText, { color: theme.colors.textSecondary }]}>
-                  Checking for discounts...
+                  {t('checkout.checkingDiscounts', { defaultValue: 'Checking for discounts...' })}
                 </Text>
               </View>
             )}
@@ -1739,7 +1744,7 @@ const CheckoutScreen: React.FC = () => {
               <View style={[styles.savingsBanner, { backgroundColor: theme.colors.success + '1A' }]}>
                 <Feather name="check-circle" size={16} color={theme.colors.success} />
                 <Text allowFontScaling={false} style={[styles.savingsText, { color: theme.colors.success }]}>
-                  You&apos;re saving {formatPrice(appliedDiscount.savedAmount, currency, exchangeRateIQD)}!
+                  {t('checkout.youAreSaving', { amount: formatPrice(appliedDiscount.savedAmount, currency, exchangeRateIQD), defaultValue: "You're saving {{amount}}!" })}
                 </Text>
               </View>
             )}

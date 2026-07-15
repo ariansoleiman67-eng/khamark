@@ -131,20 +131,21 @@ const HelpSupportScreen: React.FC = () => {
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
         <View style={{
-          flexDirection: 'row',
+          flexDirection: isRTL ? 'row-reverse' : 'row',
           alignItems: 'center',
           padding: SPACING.md,
           borderBottomWidth: 1,
           borderBottomColor: theme.colors.border,
         }}>
           <TouchableOpacity onPress={() => navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Profile' as never)}>
-            <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+            <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color={theme.colors.text} />
           </TouchableOpacity>
           <Text allowFontScaling={false} style={{
             fontSize: 18,
             fontWeight: '600',
             color: theme.colors.text,
-            marginLeft: SPACING.md,
+            marginLeft: isRTL ? 0 : SPACING.md,
+            marginRight: isRTL ? SPACING.md : 0,
             textAlign: isRTL ? 'right' : 'left',
           }}>
             {t('helpSupport.title')}
@@ -246,7 +247,7 @@ const HelpSupportScreen: React.FC = () => {
                   onPress={() => toggleFAQ(faq.id)}
                   style={{
                     padding: SPACING.md,
-                    flexDirection: 'row',
+                    flexDirection: isRTL ? 'row-reverse' : 'row',
                     justifyContent: 'space-between',
                     alignItems: 'center',
                   }}
@@ -256,7 +257,9 @@ const HelpSupportScreen: React.FC = () => {
                     fontWeight: '500',
                     color: theme.colors.text,
                     flex: 1,
-                    marginRight: SPACING.sm,
+                    marginLeft: isRTL ? SPACING.sm : 0,
+                    marginRight: isRTL ? 0 : SPACING.sm,
+                    textAlign: isRTL ? 'right' : 'left',
                   }}>
                     {faq.question}
                   </Text>
@@ -279,6 +282,7 @@ const HelpSupportScreen: React.FC = () => {
                       color: theme.colors.textSecondary,
                       lineHeight: 20,
                       marginTop: SPACING.sm,
+                      textAlign: isRTL ? 'right' : 'left',
                     }}>
                       {faq.answer}
                     </Text>
@@ -318,7 +322,7 @@ const HelpSupportScreen: React.FC = () => {
               </Text>
               <TouchableOpacity
                 onPress={() => {
-                  openWhatsApp(BRAND.contactPhone, "Hi, I need help with my question that's not covered in the FAQ");
+                  openWhatsApp(BRAND.contactPhone, t('helpSupport.whatsappMessage', { defaultValue: "Hi, I need help with my question that's not covered in the FAQ" }));
                 }}
                 style={{
                   backgroundColor: theme.colors.primary,

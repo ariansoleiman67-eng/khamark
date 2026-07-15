@@ -9,6 +9,7 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  I18nManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -29,7 +30,8 @@ import { getAllCountries, CountryInfo, CountryCode } from '../../utils/phoneUtil
 const AdminBusinessInfoScreen = () => {
   const { theme, isDark } = useTheme();
   const navigation = useNavigation();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const { tenantId } = useTenant();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -214,11 +216,11 @@ const AdminBusinessInfoScreen = () => {
         <StatusBar style={isDark ? 'light' : 'dark'} />
         
         {/* Header */}
-        <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
-        <Ionicons 
-          name="arrow-back" 
-          size={24} 
-          color={theme.colors.text} 
+        <View style={[styles.header, { borderBottomColor: theme.colors.border, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        <Ionicons
+          name={isRTL ? 'arrow-forward' : 'arrow-back'}
+          size={24}
+          color={theme.colors.text}
           onPress={() => navigation.goBack()}
         />
         <Text allowFontScaling={false} style={[styles.headerTitle, { color: theme.colors.text }]}>{t('admin.businessInfo.title')}</Text>

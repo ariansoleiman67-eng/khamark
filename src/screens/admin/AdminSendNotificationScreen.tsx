@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  I18nManager,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -54,7 +55,8 @@ const AdminSendNotificationScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
   const { tenantId, isLoading: tenantLoading } = useTenant();
   const navigation = useNavigation();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const insets = useSafeAreaInsets();
   const [sending, setSending] = useState(false);
   
@@ -83,9 +85,9 @@ const AdminSendNotificationScreen: React.FC = () => {
   }, [tenantId]);
 
   const notificationTypes: { key: NotificationType; label: string; icon: keyof typeof Ionicons.glyphMap; color: string }[] = [
-    { key: 'general', label: 'General', icon: 'megaphone', color: theme.colors.primary },
-    { key: 'promotion', label: 'Promotion', icon: 'pricetag', color: '#FF9800' },
-    { key: 'order', label: 'Order', icon: 'receipt', color: '#4CAF50' },
+    { key: 'general', label: t('admin.sendNotification.general', { defaultValue: 'General' }), icon: 'megaphone', color: theme.colors.primary },
+    { key: 'promotion', label: t('admin.sendNotification.promotion', { defaultValue: 'Promotion' }), icon: 'pricetag', color: '#FF9800' },
+    { key: 'order', label: t('admin.sendNotification.order', { defaultValue: 'Order' }), icon: 'receipt', color: '#4CAF50' },
   ];
 
   const handleSend = async () => {
@@ -184,13 +186,13 @@ const AdminSendNotificationScreen: React.FC = () => {
           keyboardDismissMode="on-drag"
         >
           {/* Header - Inside scroll per Golden Template */}
-          <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
-            <TouchableOpacity 
+          <View style={[styles.header, { backgroundColor: theme.colors.surface, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <TouchableOpacity
               style={styles.backButton}
               onPress={() => navigation.goBack()}
               activeOpacity={0.7}
             >
-              <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+              <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color={theme.colors.text} />
             </TouchableOpacity>
             <Text allowFontScaling={false} style={[styles.headerTitle, { color: theme.colors.text }]}>
               {t('admin.sendNotification.title')}
@@ -339,7 +341,7 @@ const AdminSendNotificationScreen: React.FC = () => {
         </ScrollView>
 
         {/* GOLDEN TEMPLATE: Sticky CTA Bar OUTSIDE ScrollView */}
-        <View style={[styles.stickyCtaBar, { backgroundColor: theme.colors.surface, paddingBottom: insets.bottom || SPACING.md }]}>
+        <View style={[styles.stickyCtaBar, { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.border, paddingBottom: insets.bottom || SPACING.md }]}>
           <TouchableOpacity
             style={[
               styles.sendButton, 
