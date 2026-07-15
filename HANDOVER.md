@@ -6,6 +6,21 @@ Asankary is an independent white-label clone of the Haryad Autoparts app (React 
 
 ---
 
+## Session 3 — production-hardening campaign (autonomous)
+
+Full-app polish + QA pass built with parallel-agent workflows, each wave gated by `tsc --noEmit` and committed separately (all local, no remote push):
+
+- **Wave 1** (`28a29ad`) — dark-mode + RTL + i18n polish across the remaining customer / profile / store screens (~19).
+- **Wave 2** (`872b3ec`) — same conservative presentation-only pass across the remaining admin screens (~15 changed of 23 audited).
+- **Wave 3** (`e3d3f48`) — remaining auth screens (LegacyEmailLogin, LoginGate, PartnerSignup, PhoneLogin, RegisterSuccess, Onboarding) brought up to the premium SignIn/Register standard. Key fixes: theme-aware inputs/cards (white inputs + invisible text in dark), per-component `isRTL` flips + mirrored arrows, hardcoded Alert/CTA strings → `t()`.
+- **i18n completion** (`4e11744`) — swept all 1023 `t(key,{defaultValue})` usages against the locale files; found 48 keys missing everywhere (rendered English in ar/ku). Added native Iraqi Arabic + Sorani Kurdish for all 48. Locale parity 2794 → 2843, en/ar/ku identical.
+- **Adversarial review** (`faabead`) — 36-screen regression review (one skeptic agent per changed screen + a verify pass). Result: **35/36 clean**. One confirmed regression fixed — LegacyEmailLogin's post-login success Alert reused `auth.welcomeBack` (an existing "Please sign in…" subtitle), so a just-logged-in user was told to sign in; added dedicated `auth.legacyLogin.loginSuccess`. Also re-branded the `ErrorBoundary` crash-fallback accent to amber (it sits above `ThemeProvider`, so it can't use the theme hook — hardcoded amber is correct).
+- Confirmed the RTL idiom is the correct `i18n.language === 'ku'` form everywhere (108 uses) — no `=== 'ar' || 'ku'` always-true bug.
+
+**Runtime-verified on the Android emulator** — all four quadrants on representative screens: LTR-light (Home, ProductDetails), Arabic-RTL-light (Home, Profile), Arabic-RTL-dark (Profile, Home, SignIn). ProductDetails pagination badge ("1/3") no longer clipped; dark inputs readable (not white-on-white); header/rows mirror correctly in RTL; prices stay LTR. App restored to English + Light default.
+
+---
+
 ## Session 2 — features & polish (autonomous)
 
 New work built on top of the white-label clone (all commits local, tsc-clean, emulator-verified where noted):
