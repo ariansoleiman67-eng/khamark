@@ -22,6 +22,7 @@ import {
   useCodeScanner,
 } from 'react-native-vision-camera';
 import ErrorBoundary from '../components/ErrorBoundary';
+import { useTheme } from '../components/ThemeProvider';
 
 
 const SCAN_COOLDOWN_MS = 1500; // Prevents rapid-fire scans
@@ -37,6 +38,7 @@ const BarcodeScannerScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const isFocused = useIsFocused();
   const { t } = useTranslation();
+  const { theme } = useTheme();
   const device = useCameraDevice('back');
   const { hasPermission, requestPermission } = useCameraPermission();
 
@@ -129,12 +131,12 @@ const BarcodeScannerScreen: React.FC = () => {
   // Permission denied state
   if (!hasPermission) {
     return (
-      <View style={styles.permissionContainer}>
-        <Ionicons name="camera-outline" size={72} color="#94a3b8" />
-        <Text allowFontScaling={false} style={styles.permissionTitle}>{t('scanner.permissionDenied')}</Text>
-        <Text allowFontScaling={false} style={styles.permissionMessage}>{t('scanner.permissionMessage')}</Text>
+      <View style={[styles.permissionContainer, { backgroundColor: theme.colors.background }]}>
+        <Ionicons name="camera-outline" size={72} color={theme.colors.textSecondary} />
+        <Text allowFontScaling={false} style={[styles.permissionTitle, { color: theme.colors.text }]}>{t('scanner.permissionDenied')}</Text>
+        <Text allowFontScaling={false} style={[styles.permissionMessage, { color: theme.colors.textSecondary }]}>{t('scanner.permissionMessage')}</Text>
         <Pressable
-          style={styles.permissionButton}
+          style={[styles.permissionButton, { backgroundColor: theme.colors.primary }]}
           onPress={() => {
             if (Platform.OS === 'ios') {
               Linking.openURL('app-settings:');
@@ -143,10 +145,10 @@ const BarcodeScannerScreen: React.FC = () => {
             }
           }}
         >
-          <Text allowFontScaling={false} style={styles.permissionButtonText}>{t('scanner.openSettings')}</Text>
+          <Text allowFontScaling={false} style={[styles.permissionButtonText, { color: theme.colors.textOnPrimary }]}>{t('scanner.openSettings')}</Text>
         </Pressable>
         <Pressable style={styles.backLink} onPress={() => navigation.goBack()}>
-          <Text allowFontScaling={false} style={styles.backLinkText}>{t('common.goBack')}</Text>
+          <Text allowFontScaling={false} style={[styles.backLinkText, { color: theme.colors.textSecondary }]}>{t('common.goBack')}</Text>
         </Pressable>
       </View>
     );
@@ -155,13 +157,13 @@ const BarcodeScannerScreen: React.FC = () => {
   // No camera device OR not yet mounted (iOS transition guard)
   if (!device || !isMounted) {
     return (
-      <View style={styles.permissionContainer}>
-        <ActivityIndicator size="large" color="#3b82f6" />
-        <Text allowFontScaling={false} style={[styles.permissionTitle, { marginTop: 20 }]}>
+      <View style={[styles.permissionContainer, { backgroundColor: theme.colors.background }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text allowFontScaling={false} style={[styles.permissionTitle, { marginTop: 20, color: theme.colors.text }]}>
           {!isMounted ? t('scanner.initializing', 'Initializing camera...') : t('scanner.noCamera')}
         </Text>
         <Pressable style={styles.backLink} onPress={() => navigation.goBack()}>
-          <Text allowFontScaling={false} style={styles.backLinkText}>{t('common.goBack')}</Text>
+          <Text allowFontScaling={false} style={[styles.backLinkText, { color: theme.colors.textSecondary }]}>{t('common.goBack')}</Text>
         </Pressable>
       </View>
     );

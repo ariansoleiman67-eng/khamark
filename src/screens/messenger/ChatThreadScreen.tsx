@@ -47,7 +47,7 @@ export default function ChatThreadScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { user } = useAuth();
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const isRTL = getDirection(i18n.language) === 'rtl';
 
   const conversationId: string = route.params?.conversationId;
@@ -122,7 +122,7 @@ export default function ChatThreadScreen() {
   const title =
     (conv as any)?.adminSnapshot?.name ||
     route.params?.title ||
-    'Chat';
+    t('chat.chat', { defaultValue: 'Chat' });
 
   const onSend = async () => {
     const trimmed = text.trim();
@@ -194,25 +194,25 @@ export default function ChatThreadScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
       {/* Header (Alibaba style) */}
-      <View style={[styles.header, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.border }]}>
+      <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.border }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBtn}>
           <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={24} color={theme.colors.text} />
         </TouchableOpacity>
 
         <View style={{ flex: 1 }}>
-          <Text allowFontScaling={false} 
-            numberOfLines={1} 
+          <Text allowFontScaling={false}
+            numberOfLines={1}
             adjustsFontSizeToFit
-            style={{ color: theme.colors.text, fontSize: 16, fontWeight: '900' }}
+            style={{ color: theme.colors.text, fontSize: 16, fontWeight: '900', textAlign: isRTL ? 'right' : 'left' }}
           >
             {title}
           </Text>
-          <Text allowFontScaling={false} 
-            style={{ color: theme.colors.textSecondary, fontSize: 12, marginTop: 2 }}
+          <Text allowFontScaling={false}
+            style={{ color: theme.colors.textSecondary, fontSize: 12, marginTop: 2, textAlign: isRTL ? 'right' : 'left' }}
             adjustsFontSizeToFit
             numberOfLines={1}
           >
-            Seller Support • Fast reply
+            {t('chat.sellerSupport', { defaultValue: 'Seller Support • Fast reply' })}
           </Text>
         </View>
 
@@ -259,7 +259,7 @@ export default function ChatThreadScreen() {
             ]}
             onLayout={(e) => setComposerH(e.nativeEvent.layout.height)}
           >
-            <View style={styles.composerRow}>
+            <View style={[styles.composerRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <TouchableOpacity style={styles.iconBtn} activeOpacity={0.8}>
                 <Ionicons name="add-circle-outline" size={24} color={theme.colors.textSecondary} />
               </TouchableOpacity>
@@ -273,7 +273,7 @@ export default function ChatThreadScreen() {
                 <TextInput allowFontScaling={false}
                   value={text}
                   onChangeText={setText}
-                  placeholder="Type a message…"
+                  placeholder={t('chat.typeMessage', { defaultValue: 'Type a message…' })}
                   placeholderTextColor={theme.colors.textSecondary}
                   style={{
                     flex: 1,

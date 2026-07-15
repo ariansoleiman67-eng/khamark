@@ -10,6 +10,7 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  I18nManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -35,7 +36,8 @@ interface FormErrors {
 
 const ShippingInfoScreen: React.FC = () => {
   const { theme } = useTheme();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const navigation = useNavigation();
   const { user } = useAuth();
 
@@ -143,7 +145,7 @@ const ShippingInfoScreen: React.FC = () => {
         [{ text: t('common.ok'), onPress: () => navigation.goBack() }]
       );
     } catch (error: any) {
-      Alert.alert(t('common.error'), error.message || 'Failed to save');
+      Alert.alert(t('common.error'), error.message || t('shippingInfo.saveFailed', { defaultValue: 'Failed to save' }));
     } finally {
       setSaving(false);
     }
@@ -156,20 +158,21 @@ const ShippingInfoScreen: React.FC = () => {
         <StatusBar style={theme.dark ? 'light' : 'dark'} />
         <SafeAreaView style={{ flex: 1 }}>
           <View style={{
-            flexDirection: 'row',
+            flexDirection: isRTL ? 'row-reverse' : 'row',
             alignItems: 'center',
             padding: SPACING.md,
             borderBottomWidth: 1,
             borderBottomColor: theme.colors.border,
           }}>
             <TouchableOpacity onPress={() => navigation.goBack()}>
-              <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+              <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color={theme.colors.text} />
             </TouchableOpacity>
             <Text allowFontScaling={false} style={{
               fontSize: 18,
               fontWeight: '600',
               color: theme.colors.text,
-              marginLeft: SPACING.md,
+              marginLeft: isRTL ? 0 : SPACING.md,
+              marginRight: isRTL ? SPACING.md : 0,
             }}>
               {t('shippingInfo.title')}
             </Text>
@@ -189,21 +192,23 @@ const ShippingInfoScreen: React.FC = () => {
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
         <View style={{
-          flexDirection: 'row',
+          flexDirection: isRTL ? 'row-reverse' : 'row',
           alignItems: 'center',
           padding: SPACING.md,
           borderBottomWidth: 1,
           borderBottomColor: theme.colors.border,
         }}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+            <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color={theme.colors.text} />
           </TouchableOpacity>
           <Text allowFontScaling={false} style={{
             fontSize: 18,
             fontWeight: '600',
             color: theme.colors.text,
-            marginLeft: SPACING.md,
+            marginLeft: isRTL ? 0 : SPACING.md,
+            marginRight: isRTL ? SPACING.md : 0,
             flex: 1,
+            textAlign: isRTL ? 'right' : 'left',
           }}>
             {t('shippingInfo.title')}
           </Text>
@@ -228,19 +233,24 @@ const ShippingInfoScreen: React.FC = () => {
                 borderWidth: 1,
                 borderColor: theme.colors.primary + '20',
               }}>
-                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'flex-start' }}>
                   <Ionicons
                     name="cube-outline"
                     size={24}
                     color={theme.colors.primary}
                     style={{ marginTop: 2 }}
                   />
-                  <View style={{ flex: 1, marginLeft: SPACING.sm }}>
+                  <View style={{
+                    flex: 1,
+                    marginLeft: isRTL ? 0 : SPACING.sm,
+                    marginRight: isRTL ? SPACING.sm : 0,
+                  }}>
                     <Text allowFontScaling={false} style={{
                       fontSize: 16,
                       fontWeight: '600',
                       color: theme.colors.primary,
                       marginBottom: SPACING.xs,
+                      textAlign: isRTL ? 'right' : 'left',
                     }}>
                       {t('shippingInfo.subtitle')}
                     </Text>
@@ -248,6 +258,7 @@ const ShippingInfoScreen: React.FC = () => {
                       fontSize: 14,
                       color: theme.colors.primary,
                       lineHeight: 20,
+                      textAlign: isRTL ? 'right' : 'left',
                     }}>
                       {t('shippingInfo.description', { defaultValue: 'Enter the details of the shipping office where your orders will be delivered.' })}
                     </Text>
@@ -262,6 +273,7 @@ const ShippingInfoScreen: React.FC = () => {
                   fontWeight: '500',
                   color: theme.colors.text,
                   marginBottom: SPACING.xs,
+                  textAlign: isRTL ? 'right' : 'left',
                 }}>
                   {t('shippingInfo.recipientName')} *
                 </Text>
@@ -282,11 +294,12 @@ const ShippingInfoScreen: React.FC = () => {
                     includeFontPadding: false,
                     textAlignVertical: 'center',
                     height: 48,
+                    textAlign: isRTL ? 'right' : 'left',
                   }}
                   placeholderTextColor={theme.colors.textSecondary}
                 />
                 {errors.recipientName && (
-                  <Text allowFontScaling={false} style={{ color: theme.colors.error, fontSize: 14, marginTop: 4 }}>
+                  <Text allowFontScaling={false} style={{ color: theme.colors.error, fontSize: 14, marginTop: 4, textAlign: isRTL ? 'right' : 'left' }}>
                     {errors.recipientName}
                   </Text>
                 )}
@@ -299,6 +312,7 @@ const ShippingInfoScreen: React.FC = () => {
                   fontWeight: '500',
                   color: theme.colors.text,
                   marginBottom: SPACING.xs,
+                  textAlign: isRTL ? 'right' : 'left',
                 }}>
                   {t('shippingInfo.mobileNumber')} *
                 </Text>
@@ -320,11 +334,12 @@ const ShippingInfoScreen: React.FC = () => {
                     includeFontPadding: false,
                     textAlignVertical: 'center',
                     height: 48,
+                    textAlign: isRTL ? 'right' : 'left',
                   }}
                   placeholderTextColor={theme.colors.textSecondary}
                 />
                 {errors.mobileNumber && (
-                  <Text allowFontScaling={false} style={{ color: theme.colors.error, fontSize: 14, marginTop: 4 }}>
+                  <Text allowFontScaling={false} style={{ color: theme.colors.error, fontSize: 14, marginTop: 4, textAlign: isRTL ? 'right' : 'left' }}>
                     {errors.mobileNumber}
                   </Text>
                 )}
@@ -337,6 +352,7 @@ const ShippingInfoScreen: React.FC = () => {
                   fontWeight: '500',
                   color: theme.colors.text,
                   marginBottom: SPACING.xs,
+                  textAlign: isRTL ? 'right' : 'left',
                 }}>
                   {t('shippingInfo.officeName')} *
                 </Text>
@@ -357,11 +373,12 @@ const ShippingInfoScreen: React.FC = () => {
                     includeFontPadding: false,
                     textAlignVertical: 'center',
                     height: 48,
+                    textAlign: isRTL ? 'right' : 'left',
                   }}
                   placeholderTextColor={theme.colors.textSecondary}
                 />
                 {errors.officeName && (
-                  <Text allowFontScaling={false} style={{ color: theme.colors.error, fontSize: 14, marginTop: 4 }}>
+                  <Text allowFontScaling={false} style={{ color: theme.colors.error, fontSize: 14, marginTop: 4, textAlign: isRTL ? 'right' : 'left' }}>
                     {errors.officeName}
                   </Text>
                 )}
@@ -374,6 +391,7 @@ const ShippingInfoScreen: React.FC = () => {
                   fontWeight: '500',
                   color: theme.colors.text,
                   marginBottom: SPACING.xs,
+                  textAlign: isRTL ? 'right' : 'left',
                 }}>
                   {t('shippingInfo.officePhone')} *
                 </Text>
@@ -395,11 +413,12 @@ const ShippingInfoScreen: React.FC = () => {
                     includeFontPadding: false,
                     textAlignVertical: 'center',
                     height: 48,
+                    textAlign: isRTL ? 'right' : 'left',
                   }}
                   placeholderTextColor={theme.colors.textSecondary}
                 />
                 {errors.officePhone && (
-                  <Text allowFontScaling={false} style={{ color: theme.colors.error, fontSize: 14, marginTop: 4 }}>
+                  <Text allowFontScaling={false} style={{ color: theme.colors.error, fontSize: 14, marginTop: 4, textAlign: isRTL ? 'right' : 'left' }}>
                     {errors.officePhone}
                   </Text>
                 )}

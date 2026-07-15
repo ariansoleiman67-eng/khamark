@@ -11,6 +11,7 @@ import {
   Platform,
   ActivityIndicator,
   TextInput,
+  I18nManager,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { ImageService } from '../../services/imageService';
@@ -64,7 +65,7 @@ const SPACING = { xs: 8, sm: 12, md: 16, lg: 24, xl: 28 };
 const RADIUS = { card: 20, chip: 10, back: 22, button: 18 };
 
 // ─── Chip Component ─────────────────────────────────────
-const Chip = ({ label, variant, isDark, theme }: { label: string; variant: 'green' | 'orange' | 'gray'; isDark?: boolean; theme?: any }) => {
+const Chip = ({ label, variant, isDark, theme, isRTL }: { label: string; variant: 'green' | 'orange' | 'gray'; isDark?: boolean; theme?: any; isRTL?: boolean }) => {
   let bg: string, color: string;
   if (isDark && theme) {
     bg = variant === 'green' ? 'rgba(46,204,113,0.15)' : variant === 'orange' ? theme.colors.primary + '20' : 'rgba(255,255,255,0.08)';
@@ -74,7 +75,7 @@ const Chip = ({ label, variant, isDark, theme }: { label: string; variant: 'gree
     color = variant === 'green' ? LUX.chipGreenText : variant === 'orange' ? LUX.chipOrangeText : LUX.chipGrayText;
   }
   return (
-    <View style={[styles.chip, { backgroundColor: bg }]}>
+    <View style={[styles.chip, { backgroundColor: bg }, isRTL && { marginLeft: 0, marginRight: SPACING.xs }]}>
       <Text allowFontScaling={false} style={[styles.chipText, { color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{label}</Text>
     </View>
   );
@@ -92,6 +93,7 @@ const RowItem = ({
   loading,
   isDark,
   theme,
+  isRTL,
 }: {
   icon: string;
   label: string;
@@ -103,16 +105,17 @@ const RowItem = ({
   loading?: boolean;
   isDark?: boolean;
   theme?: any;
+  isRTL?: boolean;
 }) => (
-  <View style={styles.row}>
+  <View style={[styles.row, isRTL && { flexDirection: 'row-reverse' }]}>
     <View style={styles.rowIcon}>
       <Ionicons name={icon as any} size={20} color={isDark && theme ? theme.colors.textSecondary : LUX.muted} />
     </View>
-    <View style={styles.rowContent}>
-      <Text allowFontScaling={false} style={[styles.rowLabel, isDark && theme && { color: theme.colors.text }]}>{label}</Text>
-      <View style={styles.rowValueRow}>
-        <Text allowFontScaling={false} style={[styles.rowValue, isDark && theme && { color: theme.colors.textSecondary }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{value}</Text>
-        {chip && <Chip label={chip} variant={chipVariant} isDark={isDark} theme={theme} />}
+    <View style={[styles.rowContent, isRTL && { marginLeft: 0, marginRight: SPACING.sm }]}>
+      <Text allowFontScaling={false} style={[styles.rowLabel, { textAlign: isRTL ? 'right' : 'left' }, isDark && theme && { color: theme.colors.text }]}>{label}</Text>
+      <View style={[styles.rowValueRow, isRTL && { flexDirection: 'row-reverse' }]}>
+        <Text allowFontScaling={false} style={[styles.rowValue, { textAlign: isRTL ? 'right' : 'left' }, isDark && theme && { color: theme.colors.textSecondary }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{value}</Text>
+        {chip && <Chip label={chip} variant={chipVariant} isDark={isDark} theme={theme} isRTL={isRTL} />}
       </View>
     </View>
     {actionLabel && onAction && (
@@ -157,7 +160,8 @@ const AccountSecurityScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const insets = useSafeAreaInsets();
   const { user, refreshUser } = useAuth();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const { theme, isDark } = useTheme();
   const reauthRef = useRef<ReauthModalHandle>(null);
 
@@ -268,7 +272,7 @@ const AccountSecurityScreen: React.FC = () => {
         t('profile.accountSecurity.verifyEmailSentMessage', { defaultValue: 'Check your inbox and tap the link to verify your email.' }),
       );
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to send verification email.');
+      Alert.alert(t('common.error'), e?.message || 'Failed to send verification email.');
     } finally {
       setVerifyLoading(false);
     }
@@ -375,7 +379,7 @@ const AccountSecurityScreen: React.FC = () => {
       >
         {/* ── Back ── */}
         <TouchableOpacity style={[styles.backButton, isDark && { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]} onPress={handleBack} activeOpacity={0.7}>
-          <Ionicons name="chevron-back" size={20} color={isDark ? theme.colors.text : LUX.body} />
+          <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={20} color={isDark ? theme.colors.text : LUX.body} />
         </TouchableOpacity>
 
         {/* ── Hero: photo + name (edit inline) ── */}
@@ -388,7 +392,7 @@ const AccountSecurityScreen: React.FC = () => {
                 <Text allowFontScaling={false} style={styles.avatarMono}>{getMonogram(fullName)}</Text>
               </View>
             )}
-            <View style={[styles.camBadge, { backgroundColor: theme.colors.primary }]}>
+            <View style={[styles.camBadge, { backgroundColor: theme.colors.primary, borderColor: isDark ? theme.colors.background : '#fff' }]}>
               {uploadingImage ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="camera" size={15} color="#fff" />}
             </View>
           </TouchableOpacity>
@@ -412,7 +416,7 @@ const AccountSecurityScreen: React.FC = () => {
         {/* ════════════════════════════════════════════════════
             CONTACT SECTION
         ════════════════════════════════════════════════════ */}
-        <Text allowFontScaling={false} style={[styles.sectionLabel, isDark && { color: theme.colors.textSecondary }]}>{t('profile.accountSecurity.contact', { defaultValue: 'CONTACT' })}</Text>
+        <Text allowFontScaling={false} style={[styles.sectionLabel, { textAlign: isRTL ? 'right' : 'left' }, isDark && { color: theme.colors.textSecondary }]}>{t('profile.accountSecurity.contact', { defaultValue: 'CONTACT' })}</Text>
         <View style={[styles.card, isDark && { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
           {/* Email */}
           <RowItem
@@ -434,9 +438,10 @@ const AccountSecurityScreen: React.FC = () => {
             loading={verifyLoading}
             isDark={isDark}
             theme={theme}
+            isRTL={isRTL}
           />
 
-          <View style={[styles.divider, isDark && { backgroundColor: theme.colors.border }]} />
+          <View style={[styles.divider, isRTL && { marginLeft: 0, marginRight: 56 }, isDark && { backgroundColor: theme.colors.border }]} />
 
           {/* Phone */}
           <RowItem
@@ -449,13 +454,14 @@ const AccountSecurityScreen: React.FC = () => {
             onAction={handleUpdatePhone}
             isDark={isDark}
             theme={theme}
+            isRTL={isRTL}
           />
         </View>
 
         {/* ════════════════════════════════════════════════════
             SIGN-IN METHODS SECTION
         ════════════════════════════════════════════════════ */}
-        <Text allowFontScaling={false} style={[styles.sectionLabel, isDark && { color: theme.colors.textSecondary }]}>{t('profile.accountSecurity.signInMethods', { defaultValue: 'SIGN-IN METHODS' })}</Text>
+        <Text allowFontScaling={false} style={[styles.sectionLabel, { textAlign: isRTL ? 'right' : 'left' }, isDark && { color: theme.colors.textSecondary }]}>{t('profile.accountSecurity.signInMethods', { defaultValue: 'SIGN-IN METHODS' })}</Text>
         <View style={[styles.card, isDark && { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
           {/* Password */}
           <RowItem
@@ -468,12 +474,13 @@ const AccountSecurityScreen: React.FC = () => {
             onAction={handleChangePassword}
             isDark={isDark}
             theme={theme}
+            isRTL={isRTL}
           />
 
           {/* Apple */}
           {(Platform.OS === 'ios' || appleAvailable) && (
             <>
-              <View style={[styles.divider, isDark && { backgroundColor: theme.colors.border }]} />
+              <View style={[styles.divider, isRTL && { marginLeft: 0, marginRight: 56 }, isDark && { backgroundColor: theme.colors.border }]} />
               <RowItem
                 icon="logo-apple"
                 label="Apple"
@@ -485,6 +492,7 @@ const AccountSecurityScreen: React.FC = () => {
                 loading={appleLoading}
                 isDark={isDark}
                 theme={theme}
+                isRTL={isRTL}
               />
             </>
           )}
@@ -492,7 +500,7 @@ const AccountSecurityScreen: React.FC = () => {
           {/* Google */}
           {googleAvailable && (
             <>
-              <View style={[styles.divider, isDark && { backgroundColor: theme.colors.border }]} />
+              <View style={[styles.divider, isRTL && { marginLeft: 0, marginRight: 56 }, isDark && { backgroundColor: theme.colors.border }]} />
               <RowItem
                 icon="logo-google"
                 label="Google"
@@ -504,6 +512,7 @@ const AccountSecurityScreen: React.FC = () => {
                 loading={googleLoading}
                 isDark={isDark}
                 theme={theme}
+                isRTL={isRTL}
               />
             </>
           )}

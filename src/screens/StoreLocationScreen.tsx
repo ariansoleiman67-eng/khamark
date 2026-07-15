@@ -12,6 +12,7 @@ import {
   FlatList,
   Platform,
   Image,
+  I18nManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -43,7 +44,8 @@ export const StoreLocationScreen: React.FC = () => {
   const { theme } = useTheme();
   const { t, i18n } = useTranslation();
   const navigation = useNavigation();
-  
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
+
   const [locations, setLocations] = useState<StoreLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedLocation, setSelectedLocation] = useState<StoreLocation | null>(null);
@@ -78,7 +80,10 @@ export const StoreLocationScreen: React.FC = () => {
       }
     } catch (error) {
       console.error('Error loading locations:', error);
-      Alert.alert('Error', 'Failed to load store locations. Please try again.');
+      Alert.alert(
+        t('common.error', { defaultValue: 'Error' }),
+        t('storeLocations.loadError', { defaultValue: 'Failed to load store locations. Please try again.' })
+      );
     } finally {
       setLoading(false);
     }
@@ -130,30 +135,33 @@ export const StoreLocationScreen: React.FC = () => {
         ]}
       >
         {/* Header */}
-        <View style={styles.storeHeader}>
+        <View style={[styles.storeHeader, isRTL && { flexDirection: 'row-reverse' }]}>
           <View style={[
             styles.storeTypeIcon,
-            { backgroundColor: locationService.getStoreTypeColor(storeLocation.type) + '20' }
+            { backgroundColor: locationService.getStoreTypeColor(storeLocation.type) + '20' },
+            isRTL ? { marginRight: 0, marginLeft: SPACING.md } : null,
           ]}>
-            <Ionicons 
-              name={locationService.getStoreTypeIcon(storeLocation.type) as any} 
-              size={24} 
-              color={locationService.getStoreTypeColor(storeLocation.type)} 
+            <Ionicons
+              name={locationService.getStoreTypeIcon(storeLocation.type) as any}
+              size={24}
+              color={locationService.getStoreTypeColor(storeLocation.type)}
             />
           </View>
           <View style={{ flex: 1 }}>
-            <Text allowFontScaling={false} style={[styles.storeName, { color: theme.colors.text }]}>
+            <Text allowFontScaling={false} style={[styles.storeName, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
               {locationService.getLocalizedName(storeLocation, i18n.language)}
             </Text>
-            <View style={styles.statusRow}>
-              <Text allowFontScaling={false} style={[styles.storeType, { color: theme.colors.textSecondary }]}>
+            <View style={[styles.statusRow, isRTL && { flexDirection: 'row-reverse' }]}>
+              <Text allowFontScaling={false} style={[styles.storeType, { color: theme.colors.textSecondary }, isRTL ? { marginRight: 0, marginLeft: SPACING.sm } : null]}>
                 {storeLocation.type.toUpperCase()}
               </Text>
               <Text allowFontScaling={false} style={[
                 styles.storeStatus,
                 { color: locationService.isStoreOpen(storeLocation) ? '#4CAF50' : '#FF5722' }
               ]}>
-                {locationService.isStoreOpen(storeLocation) ? '🟢 Open' : '🔴 Closed'}
+                {locationService.isStoreOpen(storeLocation)
+                  ? `🟢 ${t('storeLocations.open', { defaultValue: 'Open' })}`
+                  : `🔴 ${t('storeLocations.closed', { defaultValue: 'Closed' })}`}
               </Text>
             </View>
           </View>
@@ -161,22 +169,22 @@ export const StoreLocationScreen: React.FC = () => {
 
         {/* Info */}
         <View style={styles.storeInfo}>
-          <View style={styles.infoRow}>
+          <View style={[styles.infoRow, isRTL && { flexDirection: 'row-reverse' }]}>
             <Ionicons name="location" size={16} color={theme.colors.textSecondary} />
-            <Text allowFontScaling={false} style={[styles.infoText, { color: theme.colors.textSecondary }]}>
+            <Text allowFontScaling={false} style={[styles.infoText, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }, isRTL ? { marginLeft: 0, marginRight: SPACING.sm } : null]}>
               {locationService.getLocalizedAddress(storeLocation, i18n.language)}
             </Text>
           </View>
-          <View style={styles.infoRow}>
+          <View style={[styles.infoRow, isRTL && { flexDirection: 'row-reverse' }]}>
             <Ionicons name="call" size={16} color={theme.colors.textSecondary} />
-            <Text allowFontScaling={false} style={[styles.infoText, { color: theme.colors.textSecondary }]}>
+            <Text allowFontScaling={false} style={[styles.infoText, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }, isRTL ? { marginLeft: 0, marginRight: SPACING.sm } : null]}>
               {storeLocation.phone}
             </Text>
           </View>
           {storeLocation.email && (
-            <View style={styles.infoRow}>
+            <View style={[styles.infoRow, isRTL && { flexDirection: 'row-reverse' }]}>
               <Ionicons name="mail" size={16} color={theme.colors.textSecondary} />
-              <Text allowFontScaling={false} style={[styles.infoText, { color: theme.colors.textSecondary }]}>
+              <Text allowFontScaling={false} style={[styles.infoText, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }, isRTL ? { marginLeft: 0, marginRight: SPACING.sm } : null]}>
                 {storeLocation.email}
               </Text>
             </View>
@@ -190,31 +198,31 @@ export const StoreLocationScreen: React.FC = () => {
             onPress={() => callStore(storeLocation.phone)}
           >
             <Ionicons name="call" size={16} color="white" />
-            <Text allowFontScaling={false} style={styles.actionButtonText}>Call</Text>
+            <Text allowFontScaling={false} style={styles.actionButtonText}>{t('storeLocations.call', { defaultValue: 'Call' })}</Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={[styles.actionButton, { backgroundColor: '#25D366' }]}
             onPress={() => openWhatsApp(storeLocation)}
           >
             <Ionicons name="logo-whatsapp" size={16} color="white" />
-            <Text allowFontScaling={false} style={styles.actionButtonText}>WhatsApp</Text>
+            <Text allowFontScaling={false} style={styles.actionButtonText}>{t('storeLocations.whatsapp', { defaultValue: 'WhatsApp' })}</Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={[styles.actionButton, { backgroundColor: theme.colors.accent }]}
             onPress={() => focusOnLocation(storeLocation)}
           >
             <Ionicons name="map" size={16} color="white" />
-            <Text allowFontScaling={false} style={styles.actionButtonText}>View</Text>
+            <Text allowFontScaling={false} style={styles.actionButtonText}>{t('storeLocations.view', { defaultValue: 'View' })}</Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={[styles.actionButton, { backgroundColor: theme.colors.secondary }]}
             onPress={() => openDirections(storeLocation)}
           >
             <Ionicons name="navigate" size={16} color="white" />
-            <Text allowFontScaling={false} style={styles.actionButtonText}>Directions</Text>
+            <Text allowFontScaling={false} style={styles.actionButtonText}>{t('storeLocations.directions', { defaultValue: 'Directions' })}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -243,7 +251,7 @@ export const StoreLocationScreen: React.FC = () => {
                     <Image source={{ uri: staticMapUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
                     <View style={{ position: 'absolute', bottom: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                       <Ionicons name="navigate" size={12} color="#fff" />
-                      <Text allowFontScaling={false} style={{ color: '#fff', fontSize: 11, fontWeight: '600' }}>Directions</Text>
+                      <Text allowFontScaling={false} style={{ color: '#fff', fontSize: 11, fontWeight: '600' }}>{t('storeLocations.directions', { defaultValue: 'Directions' })}</Text>
                     </View>
                   </TouchableOpacity>
                 )}
@@ -302,7 +310,9 @@ export const StoreLocationScreen: React.FC = () => {
                 {locationService.getLocalizedName(selectedLocation, i18n.language)}
               </Text>
               <Text allowFontScaling={false} style={[styles.locationSubtitle, { color: theme.colors.textSecondary }]}>
-                {selectedLocation.type.toUpperCase()} • {locationService.isStoreOpen(selectedLocation) ? '🟢 Open' : '🔴 Closed'}
+                {selectedLocation.type.toUpperCase()} • {locationService.isStoreOpen(selectedLocation)
+                  ? `🟢 ${t('storeLocations.open', { defaultValue: 'Open' })}`
+                  : `🔴 ${t('storeLocations.closed', { defaultValue: 'Closed' })}`}
               </Text>
             </View>
             <TouchableOpacity
@@ -310,7 +320,7 @@ export const StoreLocationScreen: React.FC = () => {
               onPress={() => openDirections(selectedLocation)}
             >
               <Ionicons name="navigate" size={16} color="white" />
-              <Text allowFontScaling={false} style={styles.directionsButtonText}>Directions</Text>
+              <Text allowFontScaling={false} style={styles.directionsButtonText}>{t('storeLocations.directions', { defaultValue: 'Directions' })}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -323,10 +333,10 @@ export const StoreLocationScreen: React.FC = () => {
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background }}>
           <Ionicons name="map-outline" size={64} color={theme.colors.textSecondary} />
           <Text allowFontScaling={false} style={{ color: theme.colors.text, marginTop: 16, fontSize: 18, fontWeight: '600' }}>
-            Map Unavailable
+            {t('storeLocations.mapUnavailable', { defaultValue: 'Map Unavailable' })}
           </Text>
           <Text allowFontScaling={false} style={{ color: theme.colors.textSecondary, marginTop: 8, textAlign: 'center', paddingHorizontal: 32 }}>
-            Unable to load map. Please try the list view instead.
+            {t('storeLocations.mapUnavailableHint', { defaultValue: 'Unable to load map. Please try the list view instead.' })}
           </Text>
           <TouchableOpacity
             onPress={() => setViewMode('list')}
@@ -338,7 +348,7 @@ export const StoreLocationScreen: React.FC = () => {
               borderRadius: 8,
             }}
           >
-            <Text allowFontScaling={false} style={{ color: 'white', fontWeight: '600' }}>Switch to List View</Text>
+            <Text allowFontScaling={false} style={{ color: 'white', fontWeight: '600' }}>{t('storeLocations.switchToList', { defaultValue: 'Switch to List View' })}</Text>
           </TouchableOpacity>
         </View>
       );
@@ -362,12 +372,12 @@ export const StoreLocationScreen: React.FC = () => {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
+      <View style={[styles.header, { backgroundColor: theme.colors.surface }, isRTL && { flexDirection: 'row-reverse' }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
-          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+          <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color={theme.colors.text} />
         </TouchableOpacity>
         <Text allowFontScaling={false} style={[styles.headerTitle, { color: theme.colors.text }]}>
           {t('profile.menu.storeLocations')}
@@ -379,17 +389,17 @@ export const StoreLocationScreen: React.FC = () => {
         <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
           <Text allowFontScaling={false} style={[styles.loadingText, { color: theme.colors.text }]}>
-            Loading store locations...
+            {t('storeLocations.loading', { defaultValue: 'Loading store locations...' })}
           </Text>
         </View>
       ) : locations.length === 0 ? (
         <View style={[styles.emptyContainer, { backgroundColor: theme.colors.background }]}>
           <Ionicons name="location-outline" size={64} color={theme.colors.textSecondary} />
           <Text allowFontScaling={false} style={[styles.emptyTitle, { color: theme.colors.text }]}>
-            No Store Locations Found
+            {t('storeLocations.emptyTitle', { defaultValue: 'No Store Locations Found' })}
           </Text>
           <Text allowFontScaling={false} style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
-            Please check back later or contact support.
+            {t('storeLocations.emptyHint', { defaultValue: 'Please check back later or contact support.' })}
           </Text>
         </View>
       ) : (
@@ -411,7 +421,7 @@ export const StoreLocationScreen: React.FC = () => {
               <Text allowFontScaling={false} style={[
                 styles.toggleText,
                 { color: viewMode === 'list' ? 'white' : theme.colors.textSecondary }
-              ]}>List</Text>
+              ]}>{t('storeLocations.list', { defaultValue: 'List' })}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[
@@ -428,7 +438,7 @@ export const StoreLocationScreen: React.FC = () => {
               <Text allowFontScaling={false} style={[
                 styles.toggleText,
                 { color: viewMode === 'map' ? 'white' : theme.colors.textSecondary }
-              ]}>Map</Text>
+              ]}>{t('storeLocations.map', { defaultValue: 'Map' })}</Text>
             </TouchableOpacity>
           </View>
 

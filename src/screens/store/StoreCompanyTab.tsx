@@ -259,7 +259,7 @@ const StoreCompanyTab: React.FC<StoreCompanyTabProps> = ({ profile }) => {
             </View>
             {/* Address below map */}
             <View style={[styles.mapAddressRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <Ionicons name="location" size={16} color={NAVY} />
+              <Ionicons name="location" size={16} color={isDark ? theme.colors.textSecondary : NAVY} />
               <Text allowFontScaling={false} 
                 style={[styles.mapAddressText, { color: theme.colors.textSecondary, marginLeft: isRTL ? 0 : 6, marginRight: isRTL ? 6 : 0 }]}
                 numberOfLines={2}

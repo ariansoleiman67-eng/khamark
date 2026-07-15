@@ -444,7 +444,7 @@ const OrderBubble: React.FC<{
         }}>
              <Ionicons name="receipt-outline" size={16} color="#3B82F6" style={{ marginRight: 6 }} />
              <Text allowFontScaling={false} style={{ fontSize: 13, color: '#3B82F6', fontWeight: 'bold' }}>
-                Order #{data.orderNumber}
+                {t('chat.order', { defaultValue: 'Order' })} #{data.orderNumber}
              </Text>
         </View>
 
@@ -635,6 +635,7 @@ const Bubble = React.memo<{
   localUri?: string;
   status?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
 }>(({ mine, text, attachmentUrl, type, fileMetadata, time, theme, onImagePress, isAdmin, localUri, status }) => {
+  const { t } = useTranslation();
   // A product payload can arrive as an explicit 'product' type OR as JSON embedded
   // in a 'text' message. Detect robustly by parsing any JSON-looking text — do NOT
   // rely on an exact "{\"id\":" prefix (key order / a missing id broke that and
@@ -785,7 +786,7 @@ const Bubble = React.memo<{
               >
                 <Ionicons name="map-outline" size={16} color="#FFF" style={{ marginRight: 6 }} />
                 <Text allowFontScaling={false} style={{ color: '#FFF', fontWeight: '600', fontSize: 13 }}>
-                  Track Order
+                  {t('chat.trackOrder', { defaultValue: 'Track Order' })}
                 </Text>
               </TouchableOpacity>
             )}
@@ -1917,9 +1918,9 @@ const ChatScreen = (props: any) => {
         },
       ]}
     >
-      <View style={styles.headerRow}>
+      <View style={[styles.headerRow, { flexDirection: isRTLLang ? 'row-reverse' : 'row' }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerIconBtn} activeOpacity={0.85}>
-          <Ionicons name="arrow-back" size={22} color={theme.colors.text} />
+          <Ionicons name={isRTLLang ? 'arrow-forward' : 'arrow-back'} size={22} color={theme.colors.text} />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -1934,7 +1935,7 @@ const ChatScreen = (props: any) => {
           }}
           disabled={!isAdminView && !resolvedTenantId}
         >
-          <View style={styles.storeLine}>
+          <View style={[styles.storeLine, { flexDirection: isRTLLang ? 'row-reverse' : 'row' }]}>
             {displayImage ? (
               <Image source={{ uri: displayImage }} style={styles.storeAvatar} contentFit="cover" transition={0} cachePolicy="memory-disk" />
             ) : (
@@ -1947,7 +1948,7 @@ const ChatScreen = (props: any) => {
 
             <View style={{ flex: 1 }}>
               <Text allowFontScaling={false} 
-                style={[styles.storeTitle, { color: theme.colors.text }]} 
+                style={[styles.storeTitle, { color: theme.colors.text, textAlign: isRTLLang ? 'right' : 'left' }]} 
                 numberOfLines={1}
                 adjustsFontSizeToFit
               >
@@ -2302,7 +2303,7 @@ const ChatScreen = (props: any) => {
               styles.composerWrap,
               {
                 paddingBottom: keyboardOpen ? 8 : insets.bottom + 8,
-                borderTopColor: '#EEFAF8',
+                borderTopColor: theme.colors.border + '35',
                 backgroundColor: isDark ? theme.colors.background : '#FFF',
               },
             ]}
@@ -2329,7 +2330,7 @@ const ChatScreen = (props: any) => {
             styles.composerWrap,
             {
                paddingBottom: keyboardOpen ? 8 : insets.bottom + 8,
-               borderTopColor: '#EEFAF8',
+               borderTopColor: theme.colors.border + '35',
                backgroundColor: isDark ? theme.colors.background : '#FFF',
             },
           ]}
@@ -2649,7 +2650,7 @@ const ChatScreen = (props: any) => {
                 <TextInput allowFontScaling={false}
                   value={previewCaption}
                   onChangeText={setPreviewCaption}
-                  placeholder="Add a caption..."
+                  placeholder={t('chat.addCaption', { defaultValue: 'Add a caption...' })}
                   placeholderTextColor="rgba(255,255,255,0.5)"
                   style={{
                     flex: 1,

@@ -1,5 +1,5 @@
 /* eslint-disable react-native/no-inline-styles, react-native/no-color-literals */
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { isSyntheticEmail } from '../../utils/hashUtils';
 import {
   View,
@@ -12,6 +12,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  I18nManager,
   NativeSyntheticEvent,
   TextInputKeyPressEventData,
 } from 'react-native';
@@ -32,6 +33,7 @@ import {
   reloadUser 
 } from '../../services/auth';
 import ReauthModal, { ReauthModalHandle } from '../../components/ReauthModal';
+import { useTheme } from '../../components/ThemeProvider';
 
 // ─── Luxury Design Tokens ───────────────────────────────
 const LUX = {
@@ -65,8 +67,12 @@ type Step = 'change' | 'choose' | 'otp' | 'newPass' | 'emailSent';
 const ChangePasswordScreen = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user, refreshUser } = useAuth();
+  const { theme, isDark } = useTheme();
+  const colors = theme.colors as any;
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
+  const styles = useMemo(() => createStyles(colors, isRTL, isDark), [colors, isRTL, isDark]);
   const reauthRef = useRef<ReauthModalHandle>(null);
 
   // ─── Step state ────────────────────────────────────────
@@ -402,11 +408,11 @@ const ChangePasswordScreen = () => {
     <View style={styles.inputGroup}>
       <Text allowFontScaling={false} style={styles.label}>{label}</Text>
       <View style={styles.inputWrapper}>
-        <Ionicons name="lock-closed-outline" size={18} color={LUX.placeholder} style={{ marginRight: 12 }} />
+        <Ionicons name="lock-closed-outline" size={18} color={colors.textSecondary} style={isRTL ? { marginLeft: 12 } : { marginRight: 12 }} />
         <TextInput allowFontScaling={false}
-          style={styles.input}
+          style={[styles.input, { textAlign: isRTL ? 'right' : 'left' }]}
           placeholder={placeholder}
-          placeholderTextColor={LUX.placeholder}
+          placeholderTextColor={colors.placeholder}
           value={value}
           onChangeText={(text) => { setValue(text); setErrorMessage(''); }}
           secureTextEntry={!show}
@@ -415,7 +421,7 @@ const ChangePasswordScreen = () => {
           autoFocus={autoFocus}
         />
         <TouchableOpacity onPress={() => setShow(!show)} style={styles.eyeButton} activeOpacity={0.6}>
-          <Ionicons name={show ? 'eye-off-outline' : 'eye-outline'} size={18} color={LUX.muted} />
+          <Ionicons name={show ? 'eye-off-outline' : 'eye-outline'} size={18} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
     </View>
@@ -428,7 +434,7 @@ const ChangePasswordScreen = () => {
       <View style={styles.strengthContainer}>
         <View style={styles.strengthBars}>
           {[1, 2, 3, 4].map(i => (
-            <View key={i} style={[styles.strengthBar, { backgroundColor: i <= s.level ? s.color : LUX.border }]} />
+            <View key={i} style={[styles.strengthBar, { backgroundColor: i <= s.level ? s.color : colors.border }]} />
           ))}
         </View>
         <Text allowFontScaling={false} style={[styles.strengthLabel, { color: s.color }]}>{s.label}</Text>
@@ -450,7 +456,7 @@ const ChangePasswordScreen = () => {
         >
           {/* ── Back ── */}
           <TouchableOpacity style={styles.backButton} onPress={handleBack} activeOpacity={0.7}>
-            <Ionicons name="chevron-back" size={20} color={LUX.body} />
+            <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={20} color={colors.text} />
           </TouchableOpacity>
 
           {/* ════════════════════════════════════════════════
@@ -486,7 +492,7 @@ const ChangePasswordScreen = () => {
                 disabled={loading}
                 activeOpacity={0.85}
               >
-                {loading ? <ActivityIndicator color={LUX.surface} /> : <Text allowFontScaling={false} style={styles.primaryButtonText}>{isSetPasswordFlow ? t('profile.passwordScreen.setPassword') : t('profile.passwordScreen.updatePassword')}</Text>}
+                {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text allowFontScaling={false} style={styles.primaryButtonText}>{isSetPasswordFlow ? t('profile.passwordScreen.setPassword') : t('profile.passwordScreen.updatePassword')}</Text>}
               </TouchableOpacity>
 
               <View style={styles.noteCard}>
@@ -522,7 +528,7 @@ const ChangePasswordScreen = () => {
                     <Text allowFontScaling={false} style={styles.methodTitle}>{t('profile.passwordScreen.sendCodeToPhone')}</Text>
                     <Text allowFontScaling={false} style={styles.methodValue}>{maskPhone(userPhone)}</Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={18} color={LUX.placeholder} />
+                  <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={18} color={colors.textSecondary} />
                 </TouchableOpacity>
               )}
 
@@ -541,7 +547,7 @@ const ChangePasswordScreen = () => {
                     <Text allowFontScaling={false} style={styles.methodTitle}>{t('profile.passwordScreen.sendLinkToEmail')}</Text>
                     <Text allowFontScaling={false} style={styles.methodValue}>{maskEmail(userEmail)}</Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={18} color={LUX.placeholder} />
+                  <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={18} color={colors.textSecondary} />
                 </TouchableOpacity>
               )}
 
@@ -585,11 +591,11 @@ const ChangePasswordScreen = () => {
                 disabled={loading}
                 activeOpacity={0.85}
               >
-                {loading ? <ActivityIndicator color={LUX.surface} /> : <Text allowFontScaling={false} style={styles.primaryButtonText}>{t('profile.passwordScreen.confirm')}</Text>}
+                {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text allowFontScaling={false} style={styles.primaryButtonText}>{t('profile.passwordScreen.confirm')}</Text>}
               </TouchableOpacity>
 
               <TouchableOpacity onPress={handleResendOTP} disabled={cooldown > 0} style={styles.resendButton} activeOpacity={0.6}>
-                <Text allowFontScaling={false} style={[styles.resendText, cooldown > 0 && { color: LUX.placeholder }]}>
+                <Text allowFontScaling={false} style={[styles.resendText, cooldown > 0 && { color: colors.textSecondary }]}>
                   {cooldown > 0 ? t('profile.passwordScreen.resendCodeIn', { seconds: String(cooldown).padStart(2, '0') }) : t('profile.passwordScreen.resendCode')}
                 </Text>
               </TouchableOpacity>
@@ -620,7 +626,7 @@ const ChangePasswordScreen = () => {
                 disabled={loading}
                 activeOpacity={0.85}
               >
-                {loading ? <ActivityIndicator color={LUX.surface} /> : <Text allowFontScaling={false} style={styles.primaryButtonText}>{t('profile.passwordScreen.updatePassword')}</Text>}
+                {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text allowFontScaling={false} style={styles.primaryButtonText}>{t('profile.passwordScreen.updatePassword')}</Text>}
               </TouchableOpacity>
             </>
           )}
@@ -636,7 +642,7 @@ const ChangePasswordScreen = () => {
               <Text allowFontScaling={false} style={[styles.title, { textAlign: 'center' }]}>{t('profile.passwordScreen.checkInbox')}</Text>
               <Text allowFontScaling={false} style={[styles.subtitle, { textAlign: 'center' }]}>
                 {t('profile.passwordScreen.resetLinkSent')}{'\n'}
-                <Text allowFontScaling={false} style={{ fontWeight: '600', color: LUX.body }}>{maskEmail(userEmail)}</Text>
+                <Text allowFontScaling={false} style={{ fontWeight: '600', color: colors.text }}>{maskEmail(userEmail)}</Text>
               </Text>
               <Text allowFontScaling={false} style={[styles.hintText, { textAlign: 'center' }]}>
                 {t('profile.passwordScreen.clickLink')}
@@ -655,11 +661,14 @@ const ChangePasswordScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any, isRTL: boolean, isDark: boolean) => {
+  const inputBg = isDark ? 'rgba(255,255,255,0.06)' : LUX.inputBg;
+
+  return StyleSheet.create({
   backButton: {
     alignItems: 'center',
-    backgroundColor: LUX.surface,
-    borderColor: LUX.border,
+    backgroundColor: colors.card,
+    borderColor: colors.border,
     borderRadius: RADIUS.back,
     borderWidth: 1,
     height: 44,
@@ -671,21 +680,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   container: {
-    backgroundColor: LUX.bg,
+    backgroundColor: colors.background,
     flex: 1,
   },
   errorText: {
-    color: LUX.error,
+    color: colors.error,
     fontSize: 13,
     fontWeight: '500',
     marginBottom: SPACING.md,
     marginTop: -SPACING.sm,
+    textAlign: isRTL ? 'right' : 'left',
   },
   eyeButton: {
     padding: 6,
   },
   forgotButton: {
-    alignSelf: 'flex-end',
+    alignSelf: isRTL ? 'flex-start' : 'flex-end',
     marginBottom: SPACING.lg,
     marginTop: -SPACING.sm,
     paddingVertical: 4,
@@ -696,7 +706,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   hintText: {
-    color: LUX.placeholder,
+    color: colors.textSecondary,
     fontSize: 14,
     lineHeight: 20,
     marginBottom: SPACING.xl,
@@ -706,7 +716,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   input: {
-    color: LUX.body,
+    color: colors.text,
     flex: 1,
     fontSize: 16,
     includeFontPadding: false,
@@ -719,35 +729,36 @@ const styles = StyleSheet.create({
   },
   inputWrapper: {
     alignItems: 'center',
-    backgroundColor: LUX.inputBg,
-    borderColor: LUX.border,
+    backgroundColor: inputBg,
+    borderColor: colors.border,
     borderRadius: RADIUS.input,
     borderWidth: 1,
-    flexDirection: 'row',
+    flexDirection: isRTL ? 'row-reverse' : 'row',
     height: 54,
     paddingHorizontal: SPACING.md,
   },
   label: {
-    color: LUX.muted,
+    color: colors.textSecondary,
     fontSize: 12,
     fontWeight: '600',
     letterSpacing: 0.8,
     marginBottom: SPACING.xs,
+    textAlign: isRTL ? 'right' : 'left',
   },
   methodCard: {
     alignItems: 'center',
-    backgroundColor: LUX.surface,
-    borderColor: LUX.border,
+    backgroundColor: colors.card,
+    borderColor: colors.border,
     borderRadius: 18,
     borderWidth: 1,
-    flexDirection: 'row',
+    flexDirection: isRTL ? 'row-reverse' : 'row',
     marginBottom: SPACING.sm,
     paddingHorizontal: SPACING.md,
     paddingVertical: 16,
   },
   methodContent: {
     flex: 1,
-    marginLeft: SPACING.sm,
+    marginHorizontal: SPACING.sm,
   },
   methodIcon: {
     alignItems: 'center',
@@ -758,36 +769,39 @@ const styles = StyleSheet.create({
     width: 44,
   },
   methodTitle: {
-    color: LUX.body,
+    color: colors.text,
     fontSize: 15,
     fontWeight: '600',
     marginBottom: 2,
+    textAlign: isRTL ? 'right' : 'left',
   },
   methodValue: {
-    color: LUX.muted,
+    color: colors.textSecondary,
     fontSize: 13,
+    textAlign: isRTL ? 'right' : 'left',
   },
   noteCard: {
     alignItems: 'flex-start',
     backgroundColor: '#FF762210',
     borderRadius: 14,
-    flexDirection: 'row',
+    flexDirection: isRTL ? 'row-reverse' : 'row',
     gap: SPACING.sm,
     marginTop: SPACING.md,
     padding: SPACING.md,
   },
   noteText: {
-    color: LUX.muted,
+    color: colors.textSecondary,
     flex: 1,
     fontSize: 13,
     lineHeight: 18,
+    textAlign: isRTL ? 'right' : 'left',
   },
   otpBox: {
-    backgroundColor: LUX.inputBg,
-    borderColor: LUX.border,
+    backgroundColor: inputBg,
+    borderColor: colors.border,
     borderRadius: 14,
     borderWidth: 1,
-    color: LUX.heading,
+    color: colors.text,
     fontSize: 22,
     fontWeight: '700',
     height: 56,
@@ -819,7 +833,7 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   primaryButtonText: {
-    color: LUX.surface,
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -859,18 +873,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   subtitle: {
-    color: LUX.muted,
+    color: colors.textSecondary,
     fontSize: 15,
     lineHeight: 22,
     marginBottom: SPACING.xl,
+    textAlign: isRTL ? 'right' : 'left',
   },
   title: {
-    color: LUX.heading,
+    color: colors.text,
     fontSize: 28,
     fontWeight: '700',
     letterSpacing: -0.5,
     marginBottom: SPACING.xs,
+    textAlign: isRTL ? 'right' : 'left',
   },
-});
+  });
+};
 
 export default ChangePasswordScreen;

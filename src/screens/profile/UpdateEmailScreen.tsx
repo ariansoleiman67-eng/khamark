@@ -11,6 +11,7 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
+  I18nManager,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -19,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { requestEmailChange, reloadUser } from '../../services/auth';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../components/ThemeProvider';
 import ReauthModal, { ReauthModalHandle } from '../../components/ReauthModal';
 import { RootStackParamList } from '../../types';
 
@@ -50,7 +52,9 @@ const UpdateEmailScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const insets = useSafeAreaInsets();
   const { user, updateUserProfile, refreshUser } = useAuth();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const { theme } = useTheme();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const reauthRef = useRef<ReauthModalHandle>(null);
 
   const currentEmail = user?.email || '';
@@ -127,22 +131,22 @@ const UpdateEmailScreen: React.FC = () => {
   // ── Success state ──
   if (sent) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top }]}>
+      <View style={[styles.container, { paddingTop: insets.top, backgroundColor: theme.colors.background }]}>
         <ScrollView contentContainerStyle={[styles.scrollContent, styles.centered, { paddingBottom: 40 + insets.bottom }]}>
           <View style={styles.successIcon}>
-            <Ionicons name={isPhoneUserSave ? 'checkmark-circle-outline' : 'mail-open-outline'} size={48} color={LUX.accent} />
+            <Ionicons name={isPhoneUserSave ? 'checkmark-circle-outline' : 'mail-open-outline'} size={48} color={theme.colors.primary} />
           </View>
-          <Text allowFontScaling={false} style={[styles.title, { textAlign: 'center' }]}>
+          <Text allowFontScaling={false} style={[styles.title, { textAlign: 'center', color: theme.colors.text }]}>
             {isPhoneUserSave ? t('updateEmail.success.emailSavedTitle') : t('updateEmail.success.checkInboxTitle')}
           </Text>
-          <Text allowFontScaling={false} style={[styles.subtitle, { textAlign: 'center' }]}>
+          <Text allowFontScaling={false} style={[styles.subtitle, { textAlign: 'center', color: theme.colors.textSecondary }]}>
             {isPhoneUserSave
               ? t('updateEmail.success.emailSavedSubtitle')
-              : <>{t('updateEmail.success.checkInboxSubtitle')} {'\n'}<Text allowFontScaling={false} style={{ fontWeight: '600', color: LUX.body }}>{newEmail.trim()}</Text></>
+              : <>{t('updateEmail.success.checkInboxSubtitle')} {'\n'}<Text allowFontScaling={false} style={{ fontWeight: '600', color: theme.colors.text }}>{newEmail.trim()}</Text></>
             }
           </Text>
           {!isPhoneUserSave && (
-            <Text allowFontScaling={false} style={[styles.hintText, { textAlign: 'center' }]}>
+            <Text allowFontScaling={false} style={[styles.hintText, { textAlign: 'center', color: theme.colors.textSecondary }]}>
               {t('updateEmail.success.checkInboxHint')}
             </Text>
           )}
@@ -155,7 +159,7 @@ const UpdateEmailScreen: React.FC = () => {
   }
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: theme.colors.background }]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -166,13 +170,13 @@ const UpdateEmailScreen: React.FC = () => {
           showsVerticalScrollIndicator={false}
         >
           {/* ── Back ── */}
-          <TouchableOpacity style={styles.backButton} onPress={handleBack} activeOpacity={0.7}>
-            <Ionicons name="chevron-back" size={20} color={LUX.body} />
+          <TouchableOpacity style={[styles.backButton, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, alignSelf: isRTL ? 'flex-end' : 'flex-start' }]} onPress={handleBack} activeOpacity={0.7}>
+            <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={20} color={theme.colors.text} />
           </TouchableOpacity>
 
           {/* ── Headline ── */}
-          <Text allowFontScaling={false} style={styles.title}>{isInternalEmail ? t('updateEmail.addTitle') : t('updateEmail.updateTitle')}</Text>
-          <Text allowFontScaling={false} style={styles.subtitle}>
+          <Text allowFontScaling={false} style={[styles.title, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{isInternalEmail ? t('updateEmail.addTitle') : t('updateEmail.updateTitle')}</Text>
+          <Text allowFontScaling={false} style={[styles.subtitle, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
             {isInternalEmail
               ? t('updateEmail.addSubtitle')
               : t('updateEmail.updateSubtitle')}
@@ -180,13 +184,13 @@ const UpdateEmailScreen: React.FC = () => {
 
           {/* ── Input ── */}
           <View style={styles.inputGroup}>
-            <Text allowFontScaling={false} style={styles.label}>{t('updateEmail.newEmailLabel')}</Text>
-            <View style={styles.inputWrapper}>
-              <Ionicons name="mail-outline" size={18} color={LUX.placeholder} style={{ marginRight: 12 }} />
+            <Text allowFontScaling={false} style={[styles.label, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>{t('updateEmail.newEmailLabel')}</Text>
+            <View style={[styles.inputWrapper, { backgroundColor: theme.colors.card, borderColor: theme.colors.border, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <Ionicons name="mail-outline" size={18} color={theme.colors.placeholder} style={isRTL ? { marginLeft: 12 } : { marginRight: 12 }} />
               <TextInput allowFontScaling={false}
-                style={styles.input}
+                style={[styles.input, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}
                 placeholder={t('updateEmail.emailPlaceholder')}
-                placeholderTextColor={LUX.placeholder}
+                placeholderTextColor={theme.colors.placeholder}
                 value={newEmail}
                 onChangeText={(text) => { setNewEmail(text); setErrorMessage(''); }}
                 keyboardType="email-address"
@@ -198,7 +202,7 @@ const UpdateEmailScreen: React.FC = () => {
           </View>
 
           {/* ── Error ── */}
-          {!!errorMessage && <Text allowFontScaling={false} style={styles.errorText}>{errorMessage}</Text>}
+          {!!errorMessage && <Text allowFontScaling={false} style={[styles.errorText, { color: theme.colors.error, textAlign: isRTL ? 'right' : 'left' }]}>{errorMessage}</Text>}
 
           {/* ── Continue ── */}
           <TouchableOpacity

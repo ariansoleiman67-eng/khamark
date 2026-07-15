@@ -87,9 +87,9 @@ const StoreHomeTab: React.FC<StoreHomeTabProps & { onSwitchTab?: (tabName: strin
       >
         {/* Product Image with gradient overlay */}
         <View style={styles.productImageWrapper}>
-          <Image 
-            source={{ uri: product.imageUrls?.[0] || 'https://via.placeholder.com/150' }} 
-            style={styles.productImage}
+          <Image
+            source={{ uri: product.imageUrls?.[0] || 'https://via.placeholder.com/150' }}
+            style={[styles.productImage, { backgroundColor: theme.colors.border }]}
             contentFit="cover"
             transition={200}
             cachePolicy="memory-disk"
@@ -152,11 +152,11 @@ const StoreHomeTab: React.FC<StoreHomeTabProps & { onSwitchTab?: (tabName: strin
         </Text>
       </View>
       {onViewAll && (
-        <TouchableOpacity 
-          style={[styles.viewAllButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}
+        <TouchableOpacity
+          style={[styles.viewAllButton, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}
           onPress={onViewAll}
         >
-          <Text allowFontScaling={false} style={[styles.viewAllText, { color: theme.colors.primary }]}>
+          <Text allowFontScaling={false} style={[styles.viewAllText, { color: theme.colors.primary, marginRight: isRTL ? 0 : 2, marginLeft: isRTL ? 2 : 0 }]}>
             {t('store.viewAll', 'View All')}
           </Text>
           <Ionicons 

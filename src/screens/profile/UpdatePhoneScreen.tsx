@@ -1,5 +1,5 @@
 /* eslint-disable react-native/no-inline-styles, react-native/no-color-literals */
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  I18nManager,
   NativeSyntheticEvent,
   TextInputKeyPressEventData,
 } from 'react-native';
@@ -19,6 +20,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../../components/ThemeProvider';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../services/supabase';
 import ReauthModal, { ReauthModalHandle } from '../../components/ReauthModal';
@@ -56,7 +58,12 @@ const UpdatePhoneScreen: React.FC = () => {
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
   const { updateUserProfile, refreshUser } = useAuth();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const { theme, isDark } = useTheme();
+  const colors = theme.colors as any;
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
+  const inputBg = isDark ? 'rgba(255,255,255,0.06)' : LUX.inputBg;
+  const styles = useMemo(() => createStyles(colors, isRTL, inputBg), [colors, isRTL, inputBg]);
 
   const hasExisting = route.params?.hasExisting ?? false;
 
@@ -234,7 +241,7 @@ const UpdatePhoneScreen: React.FC = () => {
         >
           {/* ── Back ── */}
           <TouchableOpacity style={styles.backButton} onPress={handleBack} activeOpacity={0.7}>
-            <Ionicons name="chevron-back" size={20} color={LUX.body} />
+            <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={20} color={colors.text} />
           </TouchableOpacity>
 
           {step === 'phone' ? (
@@ -250,11 +257,11 @@ const UpdatePhoneScreen: React.FC = () => {
               <View style={styles.inputGroup}>
                 <Text allowFontScaling={false} style={styles.label}>{t('updatePhone.phoneNumber')}</Text>
                 <View style={styles.inputWrapper}>
-                  <Ionicons name="call-outline" size={18} color={LUX.placeholder} style={{ marginRight: 12 }} />
+                  <Ionicons name="call-outline" size={18} color={colors.placeholder} style={{ marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }} />
                   <TextInput allowFontScaling={false}
                     style={styles.input}
                     placeholder="+964 / +1 / +44 …"
-                    placeholderTextColor={LUX.placeholder}
+                    placeholderTextColor={colors.placeholder}
                     value={phone}
                     onChangeText={(text) => { setPhone(text); setErrorMessage(''); }}
                     keyboardType="phone-pad"
@@ -272,7 +279,7 @@ const UpdatePhoneScreen: React.FC = () => {
                 activeOpacity={0.85}
               >
                 {loading ? (
-                  <ActivityIndicator color={LUX.surface} />
+                  <ActivityIndicator color={colors.textOnPrimary} />
                 ) : (
                   <Text allowFontScaling={false} style={styles.primaryButtonText}>{t('updatePhone.sendCode')}</Text>
                 )}
@@ -314,7 +321,7 @@ const UpdatePhoneScreen: React.FC = () => {
                 activeOpacity={0.85}
               >
                 {loading ? (
-                  <ActivityIndicator color={LUX.surface} />
+                  <ActivityIndicator color={colors.textOnPrimary} />
                 ) : (
                   <Text allowFontScaling={false} style={styles.primaryButtonText}>{t('updatePhone.confirm')}</Text>
                 )}
@@ -326,7 +333,7 @@ const UpdatePhoneScreen: React.FC = () => {
                 style={styles.resendButton}
                 activeOpacity={0.6}
               >
-                <Text allowFontScaling={false} style={[styles.resendText, cooldown > 0 && { color: LUX.placeholder }]}>
+                <Text allowFontScaling={false} style={[styles.resendText, cooldown > 0 && { color: colors.placeholder }]}>
                   {cooldown > 0
                     ? t('updatePhone.resendIn', { seconds: String(cooldown).padStart(2, '0') })
                     : t('updatePhone.resendCode')}
@@ -346,11 +353,11 @@ const UpdatePhoneScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any, isRTL: boolean, inputBg: string) => StyleSheet.create({
   backButton: {
     alignItems: 'center',
-    backgroundColor: LUX.surface,
-    borderColor: LUX.border,
+    backgroundColor: colors.card,
+    borderColor: colors.border,
     borderRadius: RADIUS.back,
     borderWidth: 1,
     height: 44,
@@ -359,23 +366,25 @@ const styles = StyleSheet.create({
     width: 44,
   },
   container: {
-    backgroundColor: LUX.bg,
+    backgroundColor: colors.background,
     flex: 1,
   },
   errorText: {
-    color: LUX.error,
+    color: colors.error,
     fontSize: 13,
     fontWeight: '500',
     marginBottom: SPACING.md,
     marginTop: -SPACING.sm,
+    textAlign: isRTL ? 'right' : 'left',
   },
   input: {
-    color: LUX.body,
+    color: colors.text,
     flex: 1,
     fontSize: 16,
     height: 40,
     includeFontPadding: false,
     paddingVertical: 0,
+    textAlign: isRTL ? 'right' : 'left',
     textAlignVertical: 'center',
   },
   inputGroup: {
@@ -383,27 +392,28 @@ const styles = StyleSheet.create({
   },
   inputWrapper: {
     alignItems: 'center',
-    backgroundColor: LUX.inputBg,
-    borderColor: LUX.border,
+    backgroundColor: inputBg,
+    borderColor: colors.border,
     borderRadius: RADIUS.input,
     borderWidth: 1,
-    flexDirection: 'row',
+    flexDirection: isRTL ? 'row-reverse' : 'row',
     height: 54,
     paddingHorizontal: SPACING.md,
   },
   label: {
-    color: LUX.muted,
+    color: colors.textSecondary,
     fontSize: 12,
     fontWeight: '600',
     letterSpacing: 0.8,
     marginBottom: SPACING.xs,
+    textAlign: isRTL ? 'right' : 'left',
   },
   otpBox: {
-    backgroundColor: LUX.inputBg,
-    borderColor: LUX.border,
+    backgroundColor: inputBg,
+    borderColor: colors.border,
     borderRadius: 14,
     borderWidth: 1,
-    color: LUX.heading,
+    color: colors.text,
     fontSize: 22,
     fontWeight: '700',
     height: 56,
@@ -436,7 +446,7 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   primaryButtonText: {
-    color: LUX.surface,
+    color: colors.textOnPrimary,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -445,7 +455,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.xs,
   },
   quietLink: {
-    color: LUX.muted,
+    color: colors.textSecondary,
     fontSize: 14,
     fontWeight: '500',
   },
@@ -464,17 +474,19 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.md,
   },
   subtitle: {
-    color: LUX.muted,
+    color: colors.textSecondary,
     fontSize: 15,
     lineHeight: 22,
     marginBottom: SPACING.xl,
+    textAlign: isRTL ? 'right' : 'left',
   },
   title: {
-    color: LUX.heading,
+    color: colors.text,
     fontSize: 28,
     fontWeight: '700',
     letterSpacing: -0.5,
     marginBottom: SPACING.xs,
+    textAlign: isRTL ? 'right' : 'left',
   },
 });
 

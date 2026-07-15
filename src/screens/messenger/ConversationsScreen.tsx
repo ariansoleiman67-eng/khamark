@@ -179,6 +179,7 @@ const ConversationItem = React.memo(({ item, index, isEditMode, isSelected, onTo
         style={[
           styles.conversationRow,
           {
+            flexDirection: isRTL ? 'row-reverse' : 'row',
             backgroundColor: isEditMode && isSelected
               ? COLORS.lightOrange
               : theme.colors.surface,
@@ -210,7 +211,7 @@ const ConversationItem = React.memo(({ item, index, isEditMode, isSelected, onTo
         {isEditMode && (
           <TouchableOpacity
             onPress={() => onToggleSelect?.(item.id)}
-            style={styles.checkboxContainer}
+            style={[styles.checkboxContainer, { marginRight: isRTL ? 0 : 10, marginLeft: isRTL ? 10 : 0 }]}
             activeOpacity={0.7}
           >
             <View style={[
@@ -225,7 +226,7 @@ const ConversationItem = React.memo(({ item, index, isEditMode, isSelected, onTo
         )}
         
         {/* Avatar with Online Status AND Unread Badge (Alibaba Style) */}
-        <View style={styles.avatarContainer}>
+        <View style={[styles.avatarContainer, { marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }]}>
           {logoUrl ? (
             <Image
               source={{ uri: logoUrl }}
@@ -591,12 +592,12 @@ export default function ConversationsScreen() {
     <View style={[styles.headerContainer, { backgroundColor: isDark ? theme.colors.surface : WHITE, borderBottomColor: isDark ? theme.colors.border : COLORS.border }]}>
       
       {/* 1. Top Bar: Title + Actions */}
-      <View style={styles.topBar}>
-        <Text allowFontScaling={false} style={[styles.headerTitle, { color: theme.colors.text }]}>
+      <View style={[styles.topBar, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        <Text allowFontScaling={false} style={[styles.headerTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
           {t('chat.messenger', 'Messenger')}
         </Text>
         <TouchableOpacity onPress={() => setIsEditMode(!isEditMode)}>
-          <Ionicons name="trash-outline" size={24} color={theme.colors.text} style={{ marginLeft: 20 }} />
+          <Ionicons name="trash-outline" size={24} color={theme.colors.text} style={{ marginLeft: isRTL ? 0 : 20, marginRight: isRTL ? 20 : 0 }} />
         </TouchableOpacity>
       </View>
 
@@ -973,7 +974,7 @@ export default function ConversationsScreen() {
 
       {/* Bulk Delete Bar */}
       {isEditMode && selectedIds.size > 0 && (
-        <View style={styles.bulkDeleteBar}>
+        <View style={[styles.bulkDeleteBar, { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.border }]}>
           <TouchableOpacity
             style={[styles.bulkDeleteButton, isDeleting && { opacity: 0.5 }]}
             onPress={handleBulkDelete}

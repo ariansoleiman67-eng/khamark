@@ -4,11 +4,13 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
+  I18nManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../components/ThemeProvider';
 import { SPACING } from '../../constants/theme';
 import { BRAND } from '../../constants/config';
@@ -16,6 +18,8 @@ import { BRAND } from '../../constants/config';
 const PrivacyPolicyScreen: React.FC = () => {
   const { theme } = useTheme();
   const navigation = useNavigation();
+  const { t, i18n } = useTranslation();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
 
   const privacyContent = [
     {
@@ -285,22 +289,24 @@ Policy Version: 2.1`
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
         <View style={{
-          flexDirection: 'row',
+          flexDirection: isRTL ? 'row-reverse' : 'row',
           alignItems: 'center',
           padding: SPACING.md,
           borderBottomWidth: 1,
           borderBottomColor: theme.colors.border,
         }}>
           <TouchableOpacity onPress={() => navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Profile' as never)}>
-            <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+            <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color={theme.colors.text} />
           </TouchableOpacity>
           <Text allowFontScaling={false} style={{
             fontSize: 18,
             fontWeight: '600',
             color: theme.colors.text,
-            marginLeft: SPACING.md,
+            marginLeft: isRTL ? 0 : SPACING.md,
+            marginRight: isRTL ? SPACING.md : 0,
+            textAlign: isRTL ? 'right' : 'left',
           }}>
-            Privacy Policy
+            {t('privacyPolicy.title', { defaultValue: 'Privacy Policy' })}
           </Text>
         </View>
 
@@ -312,15 +318,17 @@ Policy Version: 2.1`
             margin: SPACING.md,
             borderRadius: 12,
           }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.md }}>
+            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', marginBottom: SPACING.md }}>
               <Ionicons name="shield-checkmark" size={32} color="white" />
               <Text allowFontScaling={false} style={{
                 fontSize: 24,
                 fontWeight: 'bold',
                 color: 'white',
-                marginLeft: SPACING.md,
+                marginLeft: isRTL ? 0 : SPACING.md,
+                marginRight: isRTL ? SPACING.md : 0,
+                textAlign: isRTL ? 'right' : 'left',
               }}>
-                Privacy Policy
+                {t('privacyPolicy.title', { defaultValue: 'Privacy Policy' })}
               </Text>
             </View>
             <Text allowFontScaling={false} style={{
@@ -328,12 +336,14 @@ Policy Version: 2.1`
               color: 'rgba(255,255,255,0.9)',
               lineHeight: 24,
               marginBottom: SPACING.sm,
+              textAlign: isRTL ? 'right' : 'left',
             }}>
               Your privacy is our priority. This policy explains how we collect, use, and protect your personal information.
             </Text>
             <Text allowFontScaling={false} style={{
               fontSize: 14,
               color: 'rgba(255,255,255,0.8)',
+              textAlign: isRTL ? 'right' : 'left',
             }}>
               Effective Date: January 1, 2025 | Version 2.1
             </Text>
@@ -351,53 +361,62 @@ Policy Version: 2.1`
               fontWeight: '600',
               color: theme.colors.primary,
               marginBottom: SPACING.md,
+              textAlign: isRTL ? 'right' : 'left',
             }}>
-              Privacy Quick Summary
+              {t('privacyPolicy.quickSummary', { defaultValue: 'Privacy Quick Summary' })}
             </Text>
 
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: SPACING.sm }}>
+            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'flex-start', marginBottom: SPACING.sm }}>
               <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} style={{ marginTop: 2 }} />
               <Text allowFontScaling={false} style={{
                 fontSize: 14,
                 color: theme.colors.text,
-                marginLeft: SPACING.sm,
+                marginLeft: isRTL ? 0 : SPACING.sm,
+                marginRight: isRTL ? SPACING.sm : 0,
                 flex: 1,
+                textAlign: isRTL ? 'right' : 'left',
               }}>
                 We only collect information necessary for providing our services
               </Text>
             </View>
 
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: SPACING.sm }}>
+            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'flex-start', marginBottom: SPACING.sm }}>
               <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} style={{ marginTop: 2 }} />
               <Text allowFontScaling={false} style={{
                 fontSize: 14,
                 color: theme.colors.text,
-                marginLeft: SPACING.sm,
+                marginLeft: isRTL ? 0 : SPACING.sm,
+                marginRight: isRTL ? SPACING.sm : 0,
                 flex: 1,
+                textAlign: isRTL ? 'right' : 'left',
               }}>
                 Your data is encrypted and securely stored
               </Text>
             </View>
 
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: SPACING.sm }}>
+            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'flex-start', marginBottom: SPACING.sm }}>
               <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} style={{ marginTop: 2 }} />
               <Text allowFontScaling={false} style={{
                 fontSize: 14,
                 color: theme.colors.text,
-                marginLeft: SPACING.sm,
+                marginLeft: isRTL ? 0 : SPACING.sm,
+                marginRight: isRTL ? SPACING.sm : 0,
                 flex: 1,
+                textAlign: isRTL ? 'right' : 'left',
               }}>
                 We never sell your personal information to third parties
               </Text>
             </View>
 
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'flex-start' }}>
               <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} style={{ marginTop: 2 }} />
               <Text allowFontScaling={false} style={{
                 fontSize: 14,
                 color: theme.colors.text,
-                marginLeft: SPACING.sm,
+                marginLeft: isRTL ? 0 : SPACING.sm,
+                marginRight: isRTL ? SPACING.sm : 0,
                 flex: 1,
+                textAlign: isRTL ? 'right' : 'left',
               }}>
                 You have full control over your data and can delete it anytime
               </Text>
@@ -420,6 +439,7 @@ Policy Version: 2.1`
                   fontWeight: '600',
                   color: theme.colors.success,
                   marginBottom: SPACING.md,
+                  textAlign: isRTL ? 'right' : 'left',
                 }}>
                   {section.title}
                 </Text>
@@ -428,6 +448,7 @@ Policy Version: 2.1`
                   fontSize: 14,
                   color: theme.colors.text,
                   lineHeight: 22,
+                  textAlign: isRTL ? 'right' : 'left',
                 }}>
                   {section.content}
                 </Text>
@@ -451,7 +472,7 @@ Policy Version: 2.1`
                 marginBottom: SPACING.sm,
                 textAlign: 'center',
               }}>
-                Questions About Your Privacy?
+                {t('privacyPolicy.contactHeading', { defaultValue: 'Questions About Your Privacy?' })}
               </Text>
               <Text allowFontScaling={false} style={{
                 fontSize: 14,

@@ -67,8 +67,10 @@ const FilterChip = ({
   theme: any;
   isDark: boolean;
 }) => {
+  const { t } = useTranslation();
   const scale = useSharedValue(1);
-  
+  const label = t(item.labelKey, { defaultValue: item.defaultLabel });
+
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
@@ -88,7 +90,7 @@ const FilterChip = ({
           style={styles.chipGradient}
         >
           <Ionicons name={item.icon as any} size={14} color="#fff" style={styles.chipIcon} />
-          <Text allowFontScaling={false} style={styles.chipTextActive} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{item.defaultLabel}</Text>
+          <Text allowFontScaling={false} style={styles.chipTextActive} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{label}</Text>
         </LinearGradient>
       ) : (
         <View style={[
@@ -102,7 +104,7 @@ const FilterChip = ({
             style={styles.chipIcon} 
           />
           <Text allowFontScaling={false} style={[styles.chipTextInactive, { color: theme.colors.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
-            {item.defaultLabel}
+            {label}
           </Text>
         </View>
       )}
