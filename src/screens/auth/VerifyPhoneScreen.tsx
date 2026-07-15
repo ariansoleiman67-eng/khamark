@@ -1,8 +1,7 @@
 /* eslint-disable react-native/no-inline-styles, react-native/no-color-literals */
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
-  Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
@@ -12,44 +11,92 @@ import {
   ActivityIndicator,
   Alert,
   Keyboard,
+  Dimensions,
+  StatusBar,
+  I18nManager,
 } from 'react-native';
 import AppText from '../../components/AppText';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, {
+  FadeInUp,
+  FadeIn,
+  ZoomIn,
+  SlideInLeft,
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  withDelay,
+  withSequence,
+  Easing,
+} from 'react-native-reanimated';
 import { sendOTP, verifyOTP, resendOTP, validateOTPCode, linkPhone, mintSupabaseSessionFromFirebase } from '../../services/auth';
 import { AuthService } from '../../services/authService';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../components/ThemeProvider';
 import { RootStackParamList } from '../../types';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 type RouteParams = RouteProp<RootStackParamList, 'VerifyPhone'>;
 
-// ─── Luxury Design Tokens ───────────────────────────────
-const LUX = {
-  bg: '#FAFBFC',
-  surface: '#FFFFFF',
-  inputBg: '#F4F6F9',
-  accent: '#FF7622',
-  accentSoft: '#FF762215',
-  heading: '#1A1D26',
-  body: '#32343E',
-  muted: '#8F95A3',
-  placeholder: '#B0B5C3',
-  border: '#E8ECF0',
-  error: '#E84855',
-};
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+// ─── Static Design Tokens (theme colours come from useTheme) ─────────────
 const SPACING = { xs: 8, sm: 12, md: 16, lg: 24, xl: 32 };
+const RADIUS = { input: 14, button: 16, card: 26, back: 22, coin: 30 };
+
+const ASANKARY_LOGO = require('../../../assets/images/asankarylogo.png');
+
+// ─── Floating Particle (premium hero sparkle) ────────────────
+const FloatingParticle = ({
+  delay,
+  x,
+  size,
+  duration,
+}: { delay: number; x: number; size: number; duration: number }) => {
+  const translateY = useSharedValue(SCREEN_HEIGHT + 20);
+  const opacity = useSharedValue(0);
+
+  useEffect(() => {
+    translateY.value = withDelay(delay, withRepeat(withTiming(-50, { duration, easing: Easing.linear }), -1, false));
+    opacity.value = withDelay(delay, withRepeat(
+      withSequence(withTiming(0.55, { duration: duration * 0.3 }), withTiming(0.55, { duration: duration * 0.4 }), withTiming(0, { duration: duration * 0.3 })),
+      -1, false
+    ));
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+    opacity: opacity.value,
+  }));
+
+  return (
+    <Animated.View
+      style={[
+        { position: 'absolute', left: x, width: size, height: size, borderRadius: size / 2, backgroundColor: 'rgba(255,255,255,0.55)' },
+        animatedStyle,
+      ]}
+    />
+  );
+};
 
 const VerifyPhoneScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteParams>();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
   const { setRegistrationInProgress } = useAuth();
+  const { theme, isDark } = useTheme();
+
+  const colors = theme.colors as any;
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
+  const styles = useMemo(() => createStyles(colors, isRTL, isDark), [colors, isRTL, isDark]);
 
   const { mode, phone, name, storeName } = route.params || {};
 
@@ -295,8 +342,19 @@ const VerifyPhoneScreen: React.FC = () => {
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
+  // Particle data (confined to the amber hero)
+  const particles = [
+    { delay: 0, x: SCREEN_WIDTH * 0.12, size: 3, duration: 8500 },
+    { delay: 1800, x: SCREEN_WIDTH * 0.32, size: 2, duration: 10500 },
+    { delay: 900, x: SCREEN_WIDTH * 0.55, size: 3, duration: 9000 },
+    { delay: 3200, x: SCREEN_WIDTH * 0.74, size: 2, duration: 11000 },
+    { delay: 500, x: SCREEN_WIDTH * 0.88, size: 3, duration: 9500 },
+  ];
+
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={styles.container}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -306,239 +364,357 @@ const VerifyPhoneScreen: React.FC = () => {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* ── Back Button ── */}
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={handleBack}
-            activeOpacity={0.7}
+          {/* ── Amber Hero Band ── */}
+          <LinearGradient
+            colors={[colors.primaryVariant, colors.primary, colors.primaryDark]}
+            style={[styles.hero, { paddingTop: insets.top + SPACING.md }]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
           >
-            <Ionicons name="chevron-back" size={20} color={LUX.body} />
-          </TouchableOpacity>
+            {/* Floating sparkles (clipped to hero) */}
+            <View style={StyleSheet.absoluteFill} pointerEvents="none">
+              {particles.map((p, i) => (
+                <FloatingParticle key={i} {...p} />
+              ))}
+            </View>
 
-          {/* ── Headline ── */}
-          <AppText style={styles.title}>
-            {t('auth.verifyPhone.title', { defaultValue: 'Verify' })}
-          </AppText>
-          <AppText style={styles.subtitle}>
-            {t('auth.verifyPhone.subtitle', {
-              phone,
-              defaultValue: `Enter the 6-digit code sent to ${phone}`,
-            })}
-          </AppText>
+            {/* Back button (mirrored for RTL) */}
+            <Animated.View entering={FadeIn.duration(400)} style={styles.backRow}>
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={handleBack}
+                activeOpacity={0.7}
+              >
+                <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={22} color={colors.textOnPrimary} />
+              </TouchableOpacity>
+            </Animated.View>
 
-          {/* ── Luxury OTP Boxes ── */}
-          <View style={styles.otpContainer}>
-            {code.map((digit, index) => (
-              <TextInput allowFontScaling={false}
-                key={index}
-                ref={(ref) => { inputRefs.current[index] = ref; }}
-                style={[
-                  styles.otpBox,
-                  digit ? styles.otpBoxFilled : null,
-                  focusedIndex === index && styles.otpBoxFocused,
-                ]}
-                value={digit}
-                onChangeText={(text) => handleCodeChange(text, index)}
-                onKeyPress={(e) => handleKeyPress(e, index)}
-                onFocus={() => setFocusedIndex(index)}
-                keyboardType="number-pad"
-                maxLength={6}
-                textContentType="oneTimeCode"
-                autoComplete="sms-otp"
-                selectTextOnFocus
-                editable={!loading}
-                returnKeyType="done"
-              />
-            ))}
-          </View>
+            {/* Logo coin */}
+            <Animated.View
+              entering={ZoomIn.duration(800).springify().damping(12)}
+              style={styles.logoArea}
+            >
+              <View style={styles.logoCircle}>
+                <Image source={ASANKARY_LOGO} style={styles.logoImage} contentFit="contain" />
+              </View>
+            </Animated.View>
 
-          {/* ── Inline error (smooth, no popup) ── */}
-          {error ? <AppText style={styles.errorText}>{error}</AppText> : null}
+            {/* Title + subtitle */}
+            <Animated.Text
+              allowFontScaling={false}
+              entering={SlideInLeft.duration(600).delay(250)}
+              style={styles.title}
+            >
+              {t('auth.verifyPhone.title', { defaultValue: 'Verify' })}
+            </Animated.Text>
+            <Animated.Text
+              allowFontScaling={false}
+              entering={FadeIn.duration(600).delay(420)}
+              style={styles.subtitle}
+            >
+              {t('auth.verifyPhone.subtitle', {
+                phone,
+                defaultValue: `Enter the 6-digit code sent to ${phone}`,
+              })}
+            </Animated.Text>
+          </LinearGradient>
 
-          {/* ── Resend Row ── */}
-          <View style={styles.resendRow}>
-            {canResend ? (
-              <TouchableOpacity onPress={handleResendOTP} disabled={resending} activeOpacity={0.6}>
-                {resending ? (
-                  <ActivityIndicator size="small" color={LUX.accent} />
+          {/* ── Form Card (overlaps hero) ── */}
+          <Animated.View
+            entering={FadeInUp.duration(700).delay(300).springify().damping(14)}
+            style={styles.glassCard}
+          >
+            {/* ── OTP Boxes ── */}
+            <View style={styles.otpContainer}>
+              {code.map((digit, index) => (
+                <TextInput allowFontScaling={false}
+                  key={index}
+                  ref={(ref) => { inputRefs.current[index] = ref; }}
+                  style={[
+                    styles.otpBox,
+                    digit ? styles.otpBoxFilled : null,
+                    focusedIndex === index && styles.otpBoxFocused,
+                  ]}
+                  value={digit}
+                  onChangeText={(text) => handleCodeChange(text, index)}
+                  onKeyPress={(e) => handleKeyPress(e, index)}
+                  onFocus={() => setFocusedIndex(index)}
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  textContentType="oneTimeCode"
+                  autoComplete="sms-otp"
+                  selectTextOnFocus
+                  editable={!loading}
+                  returnKeyType="done"
+                  placeholderTextColor={colors.placeholder}
+                />
+              ))}
+            </View>
+
+            {/* ── Inline error (smooth, no popup) ── */}
+            {error ? <AppText style={styles.errorText}>{error}</AppText> : null}
+
+            {/* ── Resend Row ── */}
+            <View style={styles.resendRow}>
+              {canResend ? (
+                <TouchableOpacity onPress={handleResendOTP} disabled={resending} activeOpacity={0.6}>
+                  {resending ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <AppText style={styles.resendLink}>
+                      {t('auth.resendCode', { defaultValue: 'Resend code' })}
+                    </AppText>
+                  )}
+                </TouchableOpacity>
+              ) : (
+                <AppText style={styles.timerText}>
+                  {t('auth.resendIn', { defaultValue: 'Resend in' })}{' '}
+                  <AppText style={styles.timerAccent}>{formatTime(timer)}</AppText>
+                </AppText>
+              )}
+            </View>
+
+            {/* ── Confirm Button ── */}
+            <TouchableOpacity
+              style={[
+                styles.primaryButton,
+                (loading || code.some(d => !d)) && styles.primaryButtonDisabled,
+              ]}
+              onPress={() => handleVerifyOTP()}
+              disabled={loading || code.some(d => !d)}
+              activeOpacity={0.85}
+            >
+              <LinearGradient
+                colors={[colors.primary, colors.primaryDark]}
+                style={styles.primaryButtonGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                {loading ? (
+                  <ActivityIndicator color={colors.textOnPrimary} />
                 ) : (
-                  <AppText style={styles.resendLink}>
-                    {t('auth.resendCode', { defaultValue: 'Resend code' })}
+                  <AppText style={styles.primaryButtonText}>
+                    {t('auth.verify', { defaultValue: 'Confirm' })}
                   </AppText>
                 )}
-              </TouchableOpacity>
-            ) : (
-              <AppText style={styles.timerText}>
-                {t('auth.resendIn', { defaultValue: 'Resend in' })}{' '}
-                <AppText style={styles.timerAccent}>{formatTime(timer)}</AppText>
-              </AppText>
-            )}
-          </View>
-
-          {/* ── Confirm Button ── */}
-          <TouchableOpacity
-            style={[
-              styles.primaryButton,
-              (loading || code.some(d => !d)) && styles.primaryButtonDisabled,
-            ]}
-            onPress={() => handleVerifyOTP()}
-            disabled={loading || code.some(d => !d)}
-            activeOpacity={0.85}
-          >
-            {loading ? (
-              <ActivityIndicator color={LUX.surface} />
-            ) : (
-              <AppText style={styles.primaryButtonText}>
-                {t('auth.verify', { defaultValue: 'Confirm' })}
-              </AppText>
-            )}
-          </TouchableOpacity>
+              </LinearGradient>
+            </TouchableOpacity>
+          </Animated.View>
 
           {/* ── Use a different phone/email ── */}
-          <TouchableOpacity
-            onPress={() => navigation.navigate('SignIn' as any)}
-            style={styles.quietButton}
-            activeOpacity={0.6}
-          >
-            <AppText style={styles.quietLink}>
-              {t('auth.useDifferent', { defaultValue: 'Use a different phone/email' })}
-            </AppText>
-          </TouchableOpacity>
+          <Animated.View entering={FadeIn.duration(400).delay(600)}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('SignIn' as any)}
+              style={styles.quietButton}
+              activeOpacity={0.6}
+            >
+              <AppText style={styles.quietLink}>
+                {t('auth.useDifferent', { defaultValue: 'Use a different phone/email' })}
+              </AppText>
+            </TouchableOpacity>
+          </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: LUX.bg,
-    flex: 1,
-  },
+const createStyles = (colors: any, isRTL: boolean, isDark: boolean) => {
+  const inputBg = isDark ? 'rgba(255,255,255,0.06)' : '#F1F1F4';
+  const filledBg = isDark ? 'rgba(255,176,32,0.16)' : 'rgba(245,160,10,0.12)';
 
-  scrollContent: {
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.md,
-  },
+  return StyleSheet.create({
+    container: {
+      backgroundColor: colors.background,
+      flex: 1,
+    },
 
-  // ── Back ──
-  backButton: {
-    alignItems: 'center',
-    backgroundColor: LUX.surface,
-    borderColor: LUX.border,
-    borderRadius: 22,
-    borderWidth: 1,
-    height: 44,
-    justifyContent: 'center',
-    marginBottom: SPACING.xl,
-    width: 44,
-  },
+    scrollContent: {
+      flexGrow: 1,
+    },
 
-  // ── Typography ──
-  title: {
-    color: LUX.heading,
-    fontSize: 30,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-    marginBottom: SPACING.xs,
-  },
-  subtitle: {
-    color: LUX.muted,
-    fontSize: 15,
-    lineHeight: 22,
-    marginBottom: SPACING.xl,
-  },
+    // ── Hero ──
+    hero: {
+      alignItems: 'center',
+      borderBottomLeftRadius: 34,
+      borderBottomRightRadius: 34,
+      overflow: 'hidden',
+      paddingBottom: SPACING.xl + SPACING.lg,
+      paddingHorizontal: SPACING.lg,
+    },
+    backRow: {
+      flexDirection: isRTL ? 'row-reverse' : 'row',
+      marginBottom: SPACING.sm,
+      width: '100%',
+    },
+    backButton: {
+      alignItems: 'center',
+      backgroundColor: 'rgba(255,255,255,0.22)',
+      borderRadius: RADIUS.back,
+      height: 44,
+      justifyContent: 'center',
+      width: 44,
+    },
 
-  // ── OTP Boxes (luxury) ──
-  otpContainer: {
-    flexDirection: 'row',
-    gap: 10,
-    justifyContent: 'center',
-    marginBottom: SPACING.lg,
-  },
-  otpBox: {
-    backgroundColor: LUX.inputBg,
-    borderColor: LUX.border,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    color: LUX.heading,
-    fontSize: 22,
-    fontWeight: '700',
-    height: 56,
-    includeFontPadding: false,
-    paddingVertical: 0,
-    textAlign: 'center',
-    textAlignVertical: 'center',
-    width: 48,
-  },
-  otpBoxFilled: {
-    backgroundColor: LUX.accentSoft,
-    borderColor: LUX.accent,
-  },
-  otpBoxFocused: {
-    borderColor: LUX.accent,
-    shadowColor: LUX.accent,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-  },
+    // ── Logo ──
+    logoArea: {
+      alignItems: 'center',
+      marginBottom: SPACING.md,
+    },
+    logoCircle: {
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: RADIUS.coin + 18,
+      elevation: 8,
+      height: 96,
+      justifyContent: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.18,
+      shadowRadius: 12,
+      width: 96,
+    },
+    logoImage: {
+      height: 56,
+      width: 56,
+    },
 
-  // ── Inline error ──
-  errorText: {
-    color: LUX.error,
-    fontSize: 13,
-    fontWeight: '500',
-    marginBottom: SPACING.md,
-    textAlign: 'center',
-  },
+    // ── Typography ──
+    title: {
+      color: colors.textOnPrimary,
+      fontSize: 30,
+      fontWeight: '800',
+      letterSpacing: -0.5,
+      marginBottom: SPACING.xs,
+      textAlign: 'center',
+    },
+    subtitle: {
+      color: colors.textOnPrimary,
+      fontSize: 14.5,
+      lineHeight: 21,
+      maxWidth: 320,
+      opacity: 0.85,
+      textAlign: 'center',
+    },
 
-  // ── Resend ──
-  resendRow: {
-    alignItems: 'center',
-    marginBottom: SPACING.xl,
-  },
-  resendLink: {
-    color: LUX.accent,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  timerText: {
-    color: LUX.muted,
-    fontSize: 14,
-  },
-  timerAccent: {
-    color: LUX.accent,
-    fontWeight: '700',
-  },
+    // ── Form Card (overlaps hero) ──
+    glassCard: {
+      backgroundColor: colors.card,
+      borderColor: colors.border,
+      borderRadius: RADIUS.card,
+      borderWidth: StyleSheet.hairlineWidth,
+      elevation: 10,
+      marginHorizontal: SPACING.lg,
+      marginTop: -SPACING.xl,
+      padding: SPACING.lg,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: isDark ? 0.35 : 0.1,
+      shadowRadius: 20,
+    },
 
-  // ── Primary Button ──
-  primaryButton: {
-    alignItems: 'center',
-    backgroundColor: LUX.accent,
-    borderRadius: 16,
-    height: 52,
-    justifyContent: 'center',
-    marginBottom: SPACING.md,
-  },
-  primaryButtonDisabled: {
-    opacity: 0.45,
-  },
-  primaryButtonText: {
-    color: LUX.surface,
-    fontSize: 16,
-    fontWeight: '600',
-  },
+    // ── OTP Boxes ──
+    otpContainer: {
+      flexDirection: 'row',
+      gap: 10,
+      justifyContent: 'center',
+      marginBottom: SPACING.lg,
+      marginTop: SPACING.xs,
+    },
+    otpBox: {
+      backgroundColor: inputBg,
+      borderColor: colors.border,
+      borderRadius: RADIUS.input,
+      borderWidth: 1.5,
+      color: colors.text,
+      fontSize: 22,
+      fontWeight: '700',
+      height: 58,
+      includeFontPadding: false,
+      paddingVertical: 0,
+      textAlign: 'center',
+      textAlignVertical: 'center',
+      width: 46,
+    },
+    otpBoxFilled: {
+      backgroundColor: filledBg,
+      borderColor: colors.primary,
+    },
+    otpBoxFocused: {
+      borderColor: colors.primary,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.25,
+      shadowRadius: 10,
+    },
 
-  // ── Quiet Link ──
-  quietButton: {
-    alignItems: 'center',
-    paddingVertical: SPACING.sm,
-  },
-  quietLink: {
-    color: LUX.muted,
-    fontSize: 14,
-    fontWeight: '500',
-  },
-});
+    // ── Inline error ──
+    errorText: {
+      color: colors.error,
+      fontSize: 13,
+      fontWeight: '500',
+      lineHeight: 18,
+      marginBottom: SPACING.md,
+      textAlign: 'center',
+    },
+
+    // ── Resend ──
+    resendRow: {
+      alignItems: 'center',
+      marginBottom: SPACING.lg,
+    },
+    resendLink: {
+      color: colors.primary,
+      fontSize: 14,
+      fontWeight: '700',
+    },
+    timerText: {
+      color: colors.textSecondary,
+      fontSize: 14,
+    },
+    timerAccent: {
+      color: colors.primary,
+      fontWeight: '700',
+    },
+
+    // ── Primary Button ──
+    primaryButton: {
+      borderRadius: RADIUS.button,
+      elevation: 8,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.4,
+      shadowRadius: 14,
+    },
+    primaryButtonDisabled: {
+      opacity: 0.55,
+    },
+    primaryButtonGradient: {
+      alignItems: 'center',
+      borderRadius: RADIUS.button,
+      height: 56,
+      justifyContent: 'center',
+    },
+    primaryButtonText: {
+      color: colors.textOnPrimary,
+      fontSize: 16,
+      fontWeight: '700',
+      letterSpacing: 0.3,
+    },
+
+    // ── Quiet Link ──
+    quietButton: {
+      alignItems: 'center',
+      marginTop: SPACING.lg,
+      paddingVertical: SPACING.sm,
+    },
+    quietLink: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      fontWeight: '600',
+      textAlign: 'center',
+    },
+  });
+};
 
 export default VerifyPhoneScreen;

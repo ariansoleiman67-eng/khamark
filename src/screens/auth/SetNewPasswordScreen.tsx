@@ -11,17 +11,27 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  I18nManager,
 } from 'react-native';
 import AppText from '../../components/AppText';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, {
+  FadeInUp,
+  FadeIn,
+  ZoomIn,
+  SlideInLeft,
+} from 'react-native-reanimated';
 import { registerWithPhone, registerWithEmail, resetPasswordAfterOTP } from '../../services/auth';
 import { RootStackParamList } from '../../types';
 import { useTenant } from '../../contexts/TenantContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../components/ThemeProvider';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 type RouteParams = RouteProp<RootStackParamList, 'SetNewPassword'>;
@@ -42,7 +52,9 @@ const LUX = {
 };
 
 const SPACING = { xs: 8, sm: 12, md: 16, lg: 24, xl: 32 };
-const RADIUS = { input: 14, button: 16, back: 22, card: 16 };
+const RADIUS = { input: 16, button: 16, back: 22, card: 24, coin: 48 };
+
+const ASANKARY_LOGO = require('../../../assets/images/asankarylogo.png');
 
 /**
  * Screen D — Create/Reset Password
@@ -51,10 +63,15 @@ const RADIUS = { input: 14, button: 16, back: 22, card: 16 };
 const SetNewPasswordScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteParams>();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
   const { createAdminAccount, createPartnerAccount } = useTenant();
   const { setRegistrationInProgress, refreshUser } = useAuth();
+  const { theme, isDark } = useTheme();
+
+  const colors = theme.colors as any;
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
+  const styles = useMemo(() => createStyles(colors, isRTL, isDark), [colors, isRTL, isDark]);
 
   const { mode, phone, name, storeName } = route.params;
   // New flow params from AboutYouScreen
@@ -195,7 +212,7 @@ const SetNewPasswordScreen: React.FC = () => {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={styles.container}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -205,129 +222,176 @@ const SetNewPasswordScreen: React.FC = () => {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* ── Back Button ── */}
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={handleBack}
-            activeOpacity={0.7}
+          {/* ── Amber Hero Band ── */}
+          <LinearGradient
+            colors={[colors.primaryVariant, colors.primary, colors.primaryDark]}
+            style={[styles.hero, { paddingTop: insets.top + SPACING.sm }]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
           >
-            <Ionicons name="chevron-back" size={20} color={LUX.body} />
-          </TouchableOpacity>
-
-          {/* ── Headline ── */}
-          <AppText style={styles.title}>
-            {isRegister
-              ? t('auth.setPassword.title', { defaultValue: 'Secure your account' })
-              : t('auth.resetPassword.title', { defaultValue: 'Reset password' })}
-          </AppText>
-          <AppText style={styles.subtitle}>
-            {isRegister
-              ? t('auth.setPassword.subtitle', { defaultValue: 'Create a password for faster sign-ins.' })
-              : t('auth.resetPassword.subtitle', { defaultValue: 'Create a new password for your account.' })}
-          </AppText>
-
-          {/* ── New Password ── */}
-          <View style={styles.inputGroup}>
-            <AppText style={styles.label}>
-              {t('auth.newPassword', { defaultValue: 'New Password' })}
-            </AppText>
-            <View style={styles.inputWrapper}>
-              <Ionicons name="lock-closed-outline" size={18} color={LUX.placeholder} style={{ marginRight: 12 }} />
-              <TextInput allowFontScaling={false}
-                style={styles.input}
-                placeholder={t('auth.enterPassword', { defaultValue: 'Enter password' })}
-                placeholderTextColor={LUX.placeholder}
-                value={password}
-                onChangeText={(text) => { setPassword(text); setErrorMessage(''); }}
-                secureTextEntry={!showPassword}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
+            {/* Back button */}
+            <Animated.View entering={FadeIn.duration(400)} style={styles.backRow}>
               <TouchableOpacity
-                onPress={() => setShowPassword(!showPassword)}
-                style={styles.eyeButton}
-                activeOpacity={0.6}
+                style={styles.backButton}
+                onPress={handleBack}
+                activeOpacity={0.7}
               >
                 <Ionicons
-                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                  size={18}
-                  color={LUX.muted}
+                  name={isRTL ? 'chevron-forward' : 'chevron-back'}
+                  size={22}
+                  color={colors.textOnPrimary}
                 />
               </TouchableOpacity>
-            </View>
-            {/* Subtle strength hint (one line, not a meter) */}
-            {!!strengthHint && (
-              <AppText style={[styles.strengthHint, { color: strengthColor }]}>
-                {strengthHint}
-              </AppText>
-            )}
-          </View>
+            </Animated.View>
 
-          {/* ── Confirm Password ── */}
-          <View style={styles.inputGroup}>
-            <AppText style={styles.label}>
-              {t('auth.confirmPassword', { defaultValue: 'Confirm Password' })}
-            </AppText>
-            <View style={styles.inputWrapper}>
-              <Ionicons name="lock-closed-outline" size={18} color={LUX.placeholder} style={{ marginRight: 12 }} />
-              <TextInput allowFontScaling={false}
-                style={styles.input}
-                placeholder={t('auth.confirmPassword', { defaultValue: 'Confirm password' })}
-                placeholderTextColor={LUX.placeholder}
-                value={confirmPassword}
-                onChangeText={(text) => { setConfirmPassword(text); setErrorMessage(''); }}
-                secureTextEntry={!showConfirmPassword}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <TouchableOpacity
-                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                style={styles.eyeButton}
-                activeOpacity={0.6}
-              >
-                <Ionicons
-                  name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'}
-                  size={18}
-                  color={LUX.muted}
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
+            {/* Logo coin */}
+            <Animated.View
+              entering={ZoomIn.duration(700).springify().damping(12)}
+              style={styles.logoArea}
+            >
+              <View style={styles.logoCircle}>
+                <Image source={ASANKARY_LOGO} style={styles.logoImage} contentFit="contain" />
+              </View>
+            </Animated.View>
 
-          {/* ── Error ── */}
-          {!!errorMessage && (
-            <AppText style={styles.errorText}>{errorMessage}</AppText>
-          )}
+            {/* Headline */}
+            <Animated.Text
+              allowFontScaling={false}
+              entering={SlideInLeft.duration(500).delay(200)}
+              style={styles.title}
+            >
+              {isRegister
+                ? t('auth.setPassword.title', { defaultValue: 'Secure your account' })
+                : t('auth.resetPassword.title', { defaultValue: 'Reset password' })}
+            </Animated.Text>
+            <Animated.Text
+              allowFontScaling={false}
+              entering={FadeIn.duration(500).delay(320)}
+              style={styles.subtitle}
+            >
+              {isRegister
+                ? t('auth.setPassword.subtitle', { defaultValue: 'Create a password for faster sign-ins.' })
+                : t('auth.resetPassword.subtitle', { defaultValue: 'Create a new password for your account.' })}
+            </Animated.Text>
+          </LinearGradient>
 
-          {/* ── Create Password Button ── */}
-          <TouchableOpacity
-            style={[styles.primaryButton, loading && styles.primaryButtonDisabled]}
-            onPress={handleSubmit}
-            disabled={loading}
-            activeOpacity={0.85}
+          {/* ── Form Card (overlaps hero) ── */}
+          <Animated.View
+            entering={FadeInUp.duration(600).delay(250).springify().damping(14)}
+            style={styles.glassCard}
           >
-            {loading ? (
-              <ActivityIndicator color={LUX.surface} />
-            ) : (
-              <AppText style={styles.primaryButtonText}>
-                {isRegister
-                  ? t('auth.createPassword', { defaultValue: 'Create password' })
-                  : t('auth.resetPasswordLabel', { defaultValue: 'Reset password' })}
+            {/* ── New Password ── */}
+            <View style={styles.inputGroup}>
+              <AppText style={styles.label}>
+                {t('auth.newPassword', { defaultValue: 'New Password' })}
               </AppText>
+              <View style={styles.inputWrapper}>
+                <Ionicons name="lock-closed-outline" size={20} color={colors.placeholder} />
+                <TextInput allowFontScaling={false}
+                  style={styles.input}
+                  placeholder={t('auth.enterPassword', { defaultValue: 'Enter password' })}
+                  placeholderTextColor={colors.placeholder}
+                  value={password}
+                  onChangeText={(text) => { setPassword(text); setErrorMessage(''); }}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowPassword(!showPassword)}
+                  style={styles.eyeButton}
+                  activeOpacity={0.6}
+                >
+                  <Ionicons
+                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={18}
+                    color={colors.textSecondary}
+                  />
+                </TouchableOpacity>
+              </View>
+              {/* Subtle strength hint (one line, not a meter) */}
+              {!!strengthHint && (
+                <AppText style={[styles.strengthHint, { color: strengthColor }]}>
+                  {strengthHint}
+                </AppText>
+              )}
+            </View>
+
+            {/* ── Confirm Password ── */}
+            <View style={styles.inputGroup}>
+              <AppText style={styles.label}>
+                {t('auth.confirmPassword', { defaultValue: 'Confirm Password' })}
+              </AppText>
+              <View style={styles.inputWrapper}>
+                <Ionicons name="lock-closed-outline" size={20} color={colors.placeholder} />
+                <TextInput allowFontScaling={false}
+                  style={styles.input}
+                  placeholder={t('auth.confirmPassword', { defaultValue: 'Confirm password' })}
+                  placeholderTextColor={colors.placeholder}
+                  value={confirmPassword}
+                  onChangeText={(text) => { setConfirmPassword(text); setErrorMessage(''); }}
+                  secureTextEntry={!showConfirmPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                  style={styles.eyeButton}
+                  activeOpacity={0.6}
+                >
+                  <Ionicons
+                    name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={18}
+                    color={colors.textSecondary}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* ── Error ── */}
+            {!!errorMessage && (
+              <AppText style={styles.errorText}>{errorMessage}</AppText>
             )}
-          </TouchableOpacity>
+
+            {/* ── Create Password Button ── */}
+            <TouchableOpacity
+              style={[styles.primaryButton, loading && styles.primaryButtonDisabled]}
+              onPress={handleSubmit}
+              disabled={loading}
+              activeOpacity={0.85}
+            >
+              <LinearGradient
+                colors={[colors.primary, colors.primaryDark]}
+                style={styles.primaryButtonGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                {loading ? (
+                  <ActivityIndicator color={colors.textOnPrimary} />
+                ) : (
+                  <AppText style={styles.primaryButtonText}>
+                    {isRegister
+                      ? t('auth.createPassword', { defaultValue: 'Create password' })
+                      : t('auth.resetPasswordLabel', { defaultValue: 'Reset password' })}
+                  </AppText>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          </Animated.View>
 
           {/* ── "Not now" skip link (register only) ── */}
           {isRegister && mode !== 'partner-register' && (
-            <TouchableOpacity
-              onPress={handleSkip}
-              style={styles.quietButton}
-              activeOpacity={0.6}
-            >
-              <AppText style={styles.quietLink}>
-                {t('auth.notNow', { defaultValue: 'Not now' })}
-              </AppText>
-            </TouchableOpacity>
+            <Animated.View entering={FadeIn.duration(400).delay(500)}>
+              <TouchableOpacity
+                onPress={handleSkip}
+                style={styles.quietButton}
+                activeOpacity={0.6}
+              >
+                <AppText style={styles.quietLink}>
+                  {t('auth.notNow', { defaultValue: 'Not now' })}
+                </AppText>
+              </TouchableOpacity>
+            </Animated.View>
           )}
         </ScrollView>
       </KeyboardAvoidingView>
@@ -335,126 +399,195 @@ const SetNewPasswordScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: LUX.bg,
-    flex: 1,
-  },
+const createStyles = (colors: any, isRTL: boolean, isDark: boolean) => {
+  const inputBg = isDark ? 'rgba(255,255,255,0.06)' : '#F0F0F2';
 
-  scrollContent: {
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.md,
-  },
+  return StyleSheet.create({
+    container: {
+      backgroundColor: colors.background,
+      flex: 1,
+    },
 
-  // ── Back ──
-  backButton: {
-    alignItems: 'center',
-    backgroundColor: LUX.surface,
-    borderColor: LUX.border,
-    borderRadius: RADIUS.back,
-    borderWidth: 1,
-    height: 44,
-    justifyContent: 'center',
-    marginBottom: SPACING.xl,
-    width: 44,
-  },
+    scrollContent: {
+      flexGrow: 1,
+    },
 
-  // ── Typography ──
-  title: {
-    color: LUX.heading,
-    fontSize: 30,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-    marginBottom: SPACING.xs,
-  },
-  subtitle: {
-    color: LUX.muted,
-    fontSize: 15,
-    lineHeight: 22,
-    marginBottom: SPACING.xl,
-  },
+    // ── Hero ──
+    hero: {
+      alignItems: 'center',
+      borderBottomLeftRadius: 34,
+      borderBottomRightRadius: 34,
+      overflow: 'hidden',
+      paddingBottom: SPACING.xl + SPACING.lg,
+      paddingHorizontal: SPACING.lg,
+    },
 
-  // ── Input ──
-  inputGroup: {
-    marginBottom: SPACING.lg,
-  },
-  label: {
-    color: LUX.muted,
-    fontSize: 13,
-    fontWeight: '500',
-    letterSpacing: 0.3,
-    marginBottom: SPACING.xs,
-    textTransform: 'uppercase',
-  },
-  inputWrapper: {
-    alignItems: 'center',
-    backgroundColor: LUX.inputBg,
-    borderColor: LUX.border,
-    borderRadius: RADIUS.input,
-    borderWidth: 1,
-    flexDirection: 'row',
-    height: 56,
-    paddingHorizontal: SPACING.md,
-  },
-  input: {
-    color: LUX.body,
-    flex: 1,
-    fontSize: 16,
-    height: 40,
-    includeFontPadding: false,
-    paddingVertical: 0,
-    textAlignVertical: 'center',
-  },
-  eyeButton: {
-    padding: 6,
-  },
+    // ── Back ──
+    backRow: {
+      alignSelf: 'stretch',
+      flexDirection: isRTL ? 'row-reverse' : 'row',
+      marginBottom: SPACING.sm,
+    },
+    backButton: {
+      alignItems: 'center',
+      backgroundColor: 'rgba(255,255,255,0.22)',
+      borderRadius: RADIUS.back,
+      height: 44,
+      justifyContent: 'center',
+      width: 44,
+    },
 
-  // ── Strength Hint (subtle, one line) ──
-  strengthHint: {
-    fontSize: 12,
-    fontWeight: '500',
-    marginTop: 6,
-  },
+    // ── Logo ──
+    logoArea: {
+      alignItems: 'center',
+      marginBottom: SPACING.md,
+    },
+    logoCircle: {
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: RADIUS.coin,
+      elevation: 8,
+      height: 96,
+      justifyContent: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.18,
+      shadowRadius: 12,
+      width: 96,
+    },
+    logoImage: {
+      height: 56,
+      width: 56,
+    },
 
-  // ── Error ──
-  errorText: {
-    color: LUX.error,
-    fontSize: 13,
-    fontWeight: '500',
-    lineHeight: 18,
-    marginBottom: SPACING.md,
-    marginTop: -SPACING.sm,
-  },
+    // ── Typography ──
+    title: {
+      color: colors.textOnPrimary,
+      fontSize: 28,
+      fontWeight: '800',
+      letterSpacing: -0.4,
+      marginBottom: SPACING.xs,
+      textAlign: 'center',
+    },
+    subtitle: {
+      color: colors.textOnPrimary,
+      fontSize: 14.5,
+      lineHeight: 21,
+      maxWidth: 320,
+      opacity: 0.9,
+      textAlign: 'center',
+    },
 
-  // ── Primary Button ──
-  primaryButton: {
-    alignItems: 'center',
-    backgroundColor: LUX.accent,
-    borderRadius: RADIUS.button,
-    height: 52,
-    justifyContent: 'center',
-    marginBottom: SPACING.md,
-    marginTop: SPACING.xs,
-  },
-  primaryButtonDisabled: {
-    opacity: 0.55,
-  },
-  primaryButtonText: {
-    color: LUX.surface,
-    fontSize: 16,
-    fontWeight: '600',
-  },
+    // ── Form Card (overlaps hero) ──
+    glassCard: {
+      backgroundColor: colors.card,
+      borderColor: colors.border,
+      borderRadius: RADIUS.card,
+      borderWidth: StyleSheet.hairlineWidth,
+      elevation: 10,
+      marginHorizontal: SPACING.lg,
+      marginTop: -SPACING.xl,
+      padding: SPACING.lg,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: isDark ? 0.35 : 0.1,
+      shadowRadius: 20,
+    },
 
-  // ── Quiet Link ──
-  quietButton: {
-    alignItems: 'center',
-    paddingVertical: SPACING.sm,
-  },
-  quietLink: {
-    color: LUX.muted,
-    fontSize: 14,
-    fontWeight: '500',
-  },
-});
+    // ── Input ──
+    inputGroup: {
+      marginBottom: SPACING.lg,
+    },
+    label: {
+      color: colors.textSecondary,
+      fontSize: 12.5,
+      fontWeight: '600',
+      letterSpacing: 0.4,
+      marginBottom: SPACING.xs,
+      textAlign: isRTL ? 'right' : 'left',
+      textTransform: 'uppercase',
+    },
+    inputWrapper: {
+      alignItems: 'center',
+      backgroundColor: inputBg,
+      borderColor: colors.border,
+      borderRadius: RADIUS.input,
+      borderWidth: 1.5,
+      flexDirection: isRTL ? 'row-reverse' : 'row',
+      gap: 10,
+      height: 58,
+      paddingHorizontal: SPACING.md,
+    },
+    input: {
+      color: colors.text,
+      flex: 1,
+      fontSize: 16,
+      height: 40,
+      includeFontPadding: false,
+      paddingVertical: 0,
+      textAlign: isRTL ? 'right' : 'left',
+      textAlignVertical: 'center',
+    },
+    eyeButton: {
+      padding: 6,
+    },
+
+    // ── Strength Hint (subtle, one line) ──
+    strengthHint: {
+      fontSize: 12,
+      fontWeight: '500',
+      marginTop: 6,
+      textAlign: isRTL ? 'right' : 'left',
+    },
+
+    // ── Error ──
+    errorText: {
+      color: colors.error,
+      fontSize: 13,
+      fontWeight: '500',
+      lineHeight: 18,
+      marginBottom: SPACING.sm,
+      textAlign: isRTL ? 'right' : 'left',
+    },
+
+    // ── Primary Button ──
+    primaryButton: {
+      borderRadius: RADIUS.button,
+      elevation: 8,
+      marginTop: SPACING.xs,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.4,
+      shadowRadius: 14,
+    },
+    primaryButtonDisabled: {
+      opacity: 0.55,
+    },
+    primaryButtonGradient: {
+      alignItems: 'center',
+      borderRadius: RADIUS.button,
+      height: 56,
+      justifyContent: 'center',
+    },
+    primaryButtonText: {
+      color: colors.textOnPrimary,
+      fontSize: 16,
+      fontWeight: '700',
+      letterSpacing: 0.3,
+    },
+
+    // ── Quiet Link ──
+    quietButton: {
+      alignItems: 'center',
+      marginTop: SPACING.lg,
+      paddingVertical: SPACING.sm,
+    },
+    quietLink: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+  });
+};
 
 export default SetNewPasswordScreen;

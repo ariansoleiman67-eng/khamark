@@ -853,7 +853,7 @@ const CheckoutScreen: React.FC = () => {
   if (!cart || !cart.items || cart.items.length === 0) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: isDark ? theme.colors.background : '#FFFbf0' }]} edges={['top', 'left', 'right']}>
-        <View style={[styles.header, { backgroundColor: isDark ? theme.colors.background : '#FFFbf0', borderBottomColor: theme.colors.border }]}>
+        <View style={[styles.header, { backgroundColor: isDark ? theme.colors.background : '#FFFbf0', borderBottomColor: theme.colors.border, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
             <Feather name={isRTL ? 'arrow-right' : 'arrow-left'} size={24} color={theme.colors.text} />
           </TouchableOpacity>
@@ -903,7 +903,7 @@ const CheckoutScreen: React.FC = () => {
           }}
         >
           {/* Header - Inside ScrollView */}
-          <View style={[styles.header, { backgroundColor: isDark ? theme.colors.background : '#FFFbf0', borderBottomColor: theme.colors.border }]}>
+          <View style={[styles.header, { backgroundColor: isDark ? theme.colors.background : '#FFFbf0', borderBottomColor: theme.colors.border, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.7}>
               <Feather name={isRTL ? 'arrow-right' : 'arrow-left'} size={24} color={theme.colors.text} />
             </TouchableOpacity>

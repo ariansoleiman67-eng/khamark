@@ -1,8 +1,7 @@
 /* eslint-disable react-native/no-inline-styles, react-native/no-color-literals */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
-  Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
@@ -12,9 +11,12 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  StatusBar,
+  I18nManager,
 } from 'react-native';
 import AppText from '../../components/AppText';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useTranslation } from 'react-i18next';
@@ -25,6 +27,7 @@ import Animated, {
   FadeInUp,
   FadeIn,
   SlideInLeft,
+  ZoomIn,
   useSharedValue,
   useAnimatedStyle,
   withRepeat,
@@ -37,6 +40,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { loginWithPhone, loginWithEmail } from '../../services/auth';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../components/ThemeProvider';
 import { RootStackParamList } from '../../types';
 import { CredentialStorage } from '../../services/credentialStorage';
 
@@ -44,37 +48,29 @@ type NavigationProp = StackNavigationProp<RootStackParamList>;
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// ─── Luxury Dark Design Tokens ──────────────────────────
+// ─── Static Design Tokens (theme colours come from useTheme) ─────────────
 const LUX = {
-  gradientStart: '#0A0E27',
-  gradientMid: '#10143A',
-  gradientEnd: '#1A0B3E',
-  glass: 'rgba(255,255,255,0.07)',
-  glassBorder: 'rgba(255,255,255,0.12)',
-  inputBg: 'rgba(255,255,255,0.08)',
-  inputBorder: 'rgba(255,255,255,0.12)',
-  accent: '#FF7622',
-  gold: '#D4AF37',
-  goldSoft: 'rgba(212,175,55,0.15)',
-  heading: '#FFFFFF',
-  body: 'rgba(255,255,255,0.9)',
-  muted: 'rgba(255,255,255,0.5)',
-  placeholder: 'rgba(255,255,255,0.3)',
-  error: '#FF6B6B',
+  gold: 'rgba(255,255,255,0.55)',
 };
 
 const SPACING = { xs: 8, sm: 12, md: 16, lg: 24, xl: 32 };
-const RADIUS = { input: 14, button: 16, card: 24, back: 22 };
+const RADIUS = { input: 16, button: 16, card: 26, coin: 30, back: 22 };
 
-// ─── Floating Particle ────────────────────────────────────
-const FloatingParticle = ({ delay, x, size, duration }: { delay: number; x: number; size: number; duration: number }) => {
+// ─── Floating Particle Component ─────────────────────────
+const FloatingParticle = ({
+  delay,
+  x,
+  size,
+  duration,
+  color = LUX.gold,
+}: { delay: number; x: number; size: number; duration: number; color?: string }) => {
   const translateY = useSharedValue(SCREEN_HEIGHT + 20);
   const opacity = useSharedValue(0);
 
   useEffect(() => {
     translateY.value = withDelay(delay, withRepeat(withTiming(-50, { duration, easing: Easing.linear }), -1, false));
     opacity.value = withDelay(delay, withRepeat(
-      withSequence(withTiming(0.5, { duration: duration * 0.3 }), withTiming(0.5, { duration: duration * 0.4 }), withTiming(0, { duration: duration * 0.3 })),
+      withSequence(withTiming(0.6, { duration: duration * 0.3 }), withTiming(0.6, { duration: duration * 0.4 }), withTiming(0, { duration: duration * 0.3 })),
       -1, false
     ));
   }, []);
@@ -85,12 +81,17 @@ const FloatingParticle = ({ delay, x, size, duration }: { delay: number; x: numb
   }));
 
   return (
-    <Animated.View style={[{ position: 'absolute', left: x, width: size, height: size, borderRadius: size / 2, backgroundColor: LUX.gold }, animatedStyle]} />
+    <Animated.View style={[{ position: 'absolute', left: x, width: size, height: size, borderRadius: size / 2, backgroundColor: color }, animatedStyle]} />
   );
 };
 
-// ─── Animated Input Wrapper ──────────────────────────────
-const AnimatedInputWrapper = ({ children, isFocused }: { children: React.ReactNode; isFocused: boolean }) => {
+// ─── Animated Input Wrapper (premium focus glow, theme-aware) ─────────
+const AnimatedInputWrapper = ({
+  children,
+  isFocused,
+  colors,
+  fill,
+}: { children: React.ReactNode; isFocused: boolean; colors: any; fill: string }) => {
   const focusProgress = useSharedValue(0);
   const glowScale = useSharedValue(1);
   const glowOpacity = useSharedValue(0);
@@ -106,11 +107,11 @@ const AnimatedInputWrapper = ({ children, isFocused }: { children: React.ReactNo
   }));
 
   const glowBorderStyle = useAnimatedStyle(() => ({
-    borderColor: interpolateColor(focusProgress.value, [0, 1], ['rgba(255,255,255,0.12)', 'rgba(255,118,34,0.6)']),
+    borderColor: interpolateColor(focusProgress.value, [0, 1], [colors.border, colors.primary]),
     borderWidth: 1.5,
-    shadowColor: '#FF7622',
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: focusProgress.value * 0.4,
+    shadowOpacity: focusProgress.value * 0.35,
     shadowRadius: focusProgress.value * 12,
   }));
 
@@ -120,7 +121,8 @@ const AnimatedInputWrapper = ({ children, isFocused }: { children: React.ReactNo
 
   return (
     <Animated.View style={wrapperStyle}>
-      <Animated.View style={[{ borderRadius: 16, overflow: 'hidden' }, glowBorderStyle]}>
+      <Animated.View style={[{ borderRadius: RADIUS.input, overflow: 'hidden', backgroundColor: fill }, glowBorderStyle]}>
+        {/* Amber glow bar at top */}
         <Animated.View
           style={[
             {
@@ -129,7 +131,7 @@ const AnimatedInputWrapper = ({ children, isFocused }: { children: React.ReactNo
               left: '15%',
               right: '15%',
               height: 2,
-              backgroundColor: LUX.accent,
+              backgroundColor: colors.primary,
               borderRadius: 1,
               zIndex: 10,
             },
@@ -155,12 +157,21 @@ const maskIdentifier = (method: 'phone' | 'email', identifier: string): string =
   }
 };
 
+/**
+ * Password Screen — Premium Amber Retail
+ */
 const PasswordScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<any>();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
   const { refreshUser } = useAuth();
+  const { theme, isDark } = useTheme();
+
+  const colors = theme.colors as any;
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
+  const inputBg = isDark ? 'rgba(255,255,255,0.06)' : '#F1F1F4';
+  const styles = useMemo(() => createStyles(colors, isRTL, isDark), [colors, isRTL, isDark]);
 
   const { method, identifier, returnReason, requireAuth, rememberMe: rememberMeParam } = route.params || {};
 
@@ -285,64 +296,77 @@ const PasswordScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <LinearGradient
-        colors={[LUX.gradientStart, LUX.gradientMid, LUX.gradientEnd]}
-        style={StyleSheet.absoluteFill}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-      />
-
-      <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        {particles.map((p, i) => (
-          <FloatingParticle key={i} {...p} />
-        ))}
-      </View>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
-          contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 16, paddingBottom: 40 + insets.bottom }]}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: 40 + insets.bottom }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Back Button */}
-          <Animated.View entering={FadeIn.duration(400)}>
-            <TouchableOpacity style={styles.backButton} onPress={handleBack} activeOpacity={0.7}>
-              <Ionicons name="chevron-back" size={20} color={LUX.body} />
-            </TouchableOpacity>
-          </Animated.View>
-
-          {/* Lock icon */}
-          <Animated.View entering={FadeInDown.duration(600).delay(200)} style={styles.iconArea}>
-            <View style={styles.lockCircle}>
-              <Ionicons name="lock-closed" size={32} color={LUX.accent} />
+          {/* ── Amber Hero Band ── */}
+          <LinearGradient
+            colors={[colors.primaryVariant, colors.primary, colors.primaryDark]}
+            style={[styles.hero, { paddingTop: insets.top + SPACING.sm }]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            {/* Floating sparkles (clipped to hero) */}
+            <View style={StyleSheet.absoluteFill} pointerEvents="none">
+              {particles.map((p, i) => (
+                <FloatingParticle key={i} {...p} color="rgba(255,255,255,0.55)" />
+              ))}
             </View>
-          </Animated.View>
 
-          {/* Title */}
-          <Animated.Text allowFontScaling={false} entering={SlideInLeft.duration(500).delay(300)} style={styles.title}>
-            {t('auth.welcomeBack', { defaultValue: 'Welcome back' })}
-          </Animated.Text>
-          <Animated.Text allowFontScaling={false} entering={FadeIn.duration(500).delay(400)} style={styles.subtitle}>
-            {t('auth.signInAs', { defaultValue: 'Sign in as' })} {masked}
-          </Animated.Text>
+            {/* Back button */}
+            <Animated.View entering={FadeIn.duration(400)} style={styles.heroHeader}>
+              <TouchableOpacity style={styles.backButton} onPress={handleBack} activeOpacity={0.7}>
+                <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={22} color={colors.textOnPrimary} />
+              </TouchableOpacity>
+            </Animated.View>
 
-          {/* Glass Card */}
+            {/* Logo coin */}
+            <Animated.View entering={ZoomIn.duration(800).springify().damping(12)} style={styles.logoArea}>
+              <View style={styles.logoCircle}>
+                <Image
+                  source={require('../../../assets/images/asankarylogo.png')}
+                  style={styles.logoImage}
+                  contentFit="contain"
+                />
+              </View>
+            </Animated.View>
+
+            {/* Title */}
+            <Animated.Text allowFontScaling={false} entering={SlideInLeft.duration(500).delay(300)} style={styles.title}>
+              {t('auth.welcomeBack', { defaultValue: 'Welcome back' })}
+            </Animated.Text>
+            <Animated.Text allowFontScaling={false} entering={FadeIn.duration(500).delay(400)} style={styles.subtitle}>
+              {t('auth.signInAs', { defaultValue: 'Sign in as' })} {masked}
+            </Animated.Text>
+          </LinearGradient>
+
+          {/* ── Form Card (overlaps hero) ── */}
           <Animated.View entering={FadeInUp.duration(600).delay(400).springify().damping(14)} style={styles.glassCard}>
             {/* Password Input */}
             <View style={styles.inputGroup}>
               <AppText style={styles.label}>
                 {t('auth.password', { defaultValue: 'Password' })}
               </AppText>
-              <AnimatedInputWrapper isFocused={passwordFocused}>
+              <AnimatedInputWrapper isFocused={passwordFocused} colors={colors} fill={inputBg}>
                 <View style={styles.inputWrapper}>
-                  <Ionicons name="lock-closed-outline" size={18} color={passwordFocused ? LUX.accent : LUX.placeholder} style={{ marginRight: 12 }} />
+                  <Ionicons
+                    name="lock-closed-outline"
+                    size={20}
+                    color={passwordFocused ? colors.primary : colors.placeholder}
+                    style={{ marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }}
+                  />
                   <TextInput allowFontScaling={false}
                     style={styles.input}
                     placeholder="••••••••••"
-                    placeholderTextColor={LUX.placeholder}
+                    placeholderTextColor={colors.placeholder}
                     value={password}
                     onChangeText={(text) => { setPassword(text); setErrorMessage(''); }}
                     secureTextEntry={!showPassword}
@@ -353,7 +377,7 @@ const PasswordScreen: React.FC = () => {
                     onBlur={() => setPasswordFocused(false)}
                   />
                   <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton} activeOpacity={0.6}>
-                    <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={18} color={LUX.muted} />
+                    <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={colors.placeholder} />
                   </TouchableOpacity>
                 </View>
               </AnimatedInputWrapper>
@@ -366,7 +390,7 @@ const PasswordScreen: React.FC = () => {
             <View style={styles.rememberRow}>
               <TouchableOpacity style={styles.rememberMe} onPress={() => setRememberMe(!rememberMe)} activeOpacity={0.7}>
                 <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
-                  {rememberMe && <Ionicons name="checkmark" size={14} color="#fff" />}
+                  {rememberMe && <Ionicons name="checkmark" size={14} color={colors.textOnPrimary} />}
                 </View>
                 <AppText style={styles.rememberText}>
                   {t('auth.rememberMe', { defaultValue: 'Remember me' })}
@@ -387,13 +411,13 @@ const PasswordScreen: React.FC = () => {
               activeOpacity={0.85}
             >
               <LinearGradient
-                colors={['#FF8C3A', '#FF7622', '#FF5C00']}
+                colors={[colors.primary, colors.primaryDark]}
                 style={styles.primaryButtonGradient}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
               >
                 {loading ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color={colors.textOnPrimary} />
                 ) : (
                   <AppText style={styles.primaryButtonText}>
                     {t('auth.signInAction', { defaultValue: 'Sign in' })}
@@ -404,7 +428,7 @@ const PasswordScreen: React.FC = () => {
           </Animated.View>
 
           {/* Code link */}
-          <Animated.View entering={FadeIn.duration(400).delay(700)} style={styles.linksContainer}>
+          <Animated.View entering={FadeInDown.duration(400).delay(700)} style={styles.linksContainer}>
             {method === 'phone' && (
               <TouchableOpacity onPress={handleSignInWithCode} style={styles.quietButton} activeOpacity={0.6}>
                 <AppText style={styles.quietLink}>
@@ -419,156 +443,188 @@ const PasswordScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any, isRTL: boolean, isDark: boolean) => StyleSheet.create({
   container: {
-    backgroundColor: LUX.gradientStart,
+    backgroundColor: colors.background,
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: SPACING.lg,
+    flexGrow: 1,
   },
 
-  // Back
+  // ── Hero ──
+  hero: {
+    alignItems: 'center',
+    borderBottomLeftRadius: 34,
+    borderBottomRightRadius: 34,
+    overflow: 'hidden',
+    paddingBottom: SPACING.xl + SPACING.lg,
+    paddingHorizontal: SPACING.lg,
+  },
+  heroHeader: {
+    alignItems: 'flex-start',
+    flexDirection: isRTL ? 'row-reverse' : 'row',
+    marginBottom: SPACING.sm,
+    width: '100%',
+  },
   backButton: {
     alignItems: 'center',
-    backgroundColor: LUX.glass,
-    borderColor: LUX.glassBorder,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderColor: 'rgba(255,255,255,0.28)',
     borderRadius: RADIUS.back,
     borderWidth: 1,
     height: 44,
     justifyContent: 'center',
-    marginBottom: SPACING.xl,
     width: 44,
   },
 
-  // Icon
-  iconArea: {
+  // ── Logo ──
+  logoArea: {
     alignItems: 'center',
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.md,
   },
-  lockCircle: {
+  logoCircle: {
     alignItems: 'center',
-    backgroundColor: LUX.glass,
-    borderColor: LUX.glassBorder,
-    borderRadius: 40,
-    borderWidth: 1,
-    height: 80,
+    backgroundColor: colors.surface,
+    borderRadius: RADIUS.coin + 18,
+    elevation: 8,
+    height: 96,
     justifyContent: 'center',
-    width: 80,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    width: 96,
+  },
+  logoImage: {
+    height: 56,
+    width: 56,
   },
 
-  // Typography
+  // ── Typography ──
   title: {
-    color: LUX.heading,
+    color: colors.textOnPrimary,
     fontSize: 30,
     fontWeight: '800',
     letterSpacing: -0.5,
     marginBottom: SPACING.xs,
+    textAlign: 'center',
   },
   subtitle: {
-    color: LUX.muted,
-    fontSize: 15,
-    lineHeight: 22,
-    marginBottom: SPACING.lg,
+    color: colors.textOnPrimary,
+    fontSize: 14.5,
+    lineHeight: 21,
+    opacity: 0.85,
+    textAlign: 'center',
   },
 
-  // Glass Card
+  // ── Form Card (overlaps hero) ──
   glassCard: {
-    backgroundColor: LUX.glass,
-    borderColor: LUX.glassBorder,
+    backgroundColor: colors.card,
+    borderColor: colors.border,
     borderRadius: RADIUS.card,
-    borderWidth: 1,
-    marginBottom: SPACING.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    elevation: 10,
+    marginHorizontal: SPACING.lg,
+    marginTop: -SPACING.xl,
     padding: SPACING.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: isDark ? 0.35 : 0.1,
+    shadowRadius: 20,
   },
 
-  // Input
+  // ── Input ──
   inputGroup: {
     marginBottom: SPACING.sm,
   },
   label: {
-    color: LUX.muted,
-    fontSize: 13,
-    fontWeight: '500',
-    letterSpacing: 0.3,
+    color: colors.textSecondary,
+    fontSize: 12.5,
+    fontWeight: '600',
+    letterSpacing: 0.4,
     marginBottom: SPACING.xs,
+    textAlign: isRTL ? 'right' : 'left',
     textTransform: 'uppercase',
   },
   inputWrapper: {
     alignItems: 'center',
-    backgroundColor: LUX.inputBg,
-    borderColor: LUX.inputBorder,
-    borderRadius: RADIUS.input,
-    borderWidth: 1,
-    flexDirection: 'row',
-    height: 56,
+    flexDirection: isRTL ? 'row-reverse' : 'row',
+    height: 58,
     paddingHorizontal: SPACING.md,
   },
   input: {
-    color: LUX.body,
+    color: colors.text,
     flex: 1,
     fontSize: 16,
     height: 40,
     includeFontPadding: false,
     paddingVertical: 0,
+    textAlign: isRTL ? 'right' : 'left',
     textAlignVertical: 'center',
   },
   eyeButton: {
     padding: 6,
   },
 
-  // Error
+  // ── Error ──
   errorText: {
-    color: LUX.error,
+    color: colors.error,
     fontSize: 13,
     fontWeight: '500',
     lineHeight: 18,
     marginBottom: SPACING.sm,
+    textAlign: isRTL ? 'right' : 'left',
   },
 
-  // Remember Me
+  // ── Remember Me + Forgot ──
   rememberRow: {
     alignItems: 'center',
-    flexDirection: 'row',
+    flexDirection: isRTL ? 'row-reverse' : 'row',
     justifyContent: 'space-between',
     marginBottom: SPACING.md,
     marginTop: SPACING.xs,
   },
   rememberMe: {
     alignItems: 'center',
-    flexDirection: 'row',
+    flexDirection: isRTL ? 'row-reverse' : 'row',
     paddingVertical: 4,
   },
   checkbox: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderColor: LUX.glassBorder,
-    borderRadius: 6,
+    backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)',
+    borderColor: colors.border,
+    borderRadius: 7,
     borderWidth: 2,
     height: 24,
     justifyContent: 'center',
-    marginRight: 10,
+    marginLeft: isRTL ? 10 : 0,
+    marginRight: isRTL ? 0 : 10,
     width: 24,
   },
   checkboxChecked: {
-    backgroundColor: LUX.accent,
-    borderColor: LUX.accent,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   rememberText: {
-    color: LUX.body,
+    color: colors.text,
     fontSize: 14,
     fontWeight: '500',
   },
   forgotLink: {
-    color: LUX.accent,
+    color: colors.primary,
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
   },
 
-  // Primary Button
+  // ── Primary Button ──
   primaryButton: {
     borderRadius: RADIUS.button,
-    overflow: 'hidden',
+    elevation: 8,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 14,
   },
   primaryButtonDisabled: {
     opacity: 0.55,
@@ -576,28 +632,29 @@ const styles = StyleSheet.create({
   primaryButtonGradient: {
     alignItems: 'center',
     borderRadius: RADIUS.button,
-    height: 54,
+    height: 56,
     justifyContent: 'center',
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: colors.textOnPrimary,
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 0.3,
   },
 
-  // Links
+  // ── Links ──
   linksContainer: {
     alignItems: 'center',
     gap: SPACING.xs,
+    marginTop: SPACING.lg,
   },
   quietButton: {
     paddingVertical: SPACING.xs,
   },
   quietLink: {
-    color: LUX.muted,
+    color: colors.textSecondary,
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
   },
 });
 
