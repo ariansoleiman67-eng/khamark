@@ -47,10 +47,17 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BOTTOM_NAV_HEIGHT = 80;
 const PAGE_SIZE = 20;
 
-// "Our Brands" 2-column grid metrics.
+// "Our Brands" is a horizontal 2-row rail: cards sized so ~2 columns fill the
+// width, brands chunked into columns of 2 (top + bottom), swipe for more.
 const BRAND_GRID_PADDING = 16;
 const BRAND_GRID_GAP = 12;
 const BRAND_TILE_WIDTH = (SCREEN_WIDTH - BRAND_GRID_PADDING * 2 - BRAND_GRID_GAP) / 2;
+const chunkPairs = (arr: any[]): any[][] => {
+  const out: any[][] = [];
+  for (let i = 0; i < arr.length; i += 2) out.push(arr.slice(i, i + 2));
+  return out;
+};
+const renderBrandColSep = () => <View style={{ width: BRAND_GRID_GAP }} />;
 // How many brand-spotlight carousels to surface at the top of the feed.
 const MAX_SPOTLIGHTS = 4;
 
@@ -389,21 +396,31 @@ const HomeScreen: React.FC = () => {
           <BannerCarousel images={bannerImages} />
         )}
 
-        {/* b. Our Brands — clean 2-column grid (shows admin logo when uploaded) */}
+        {/* b. Our Brands — horizontal 2-row rail (shows admin logo when uploaded) */}
         {brandTiles.length > 0 && (
           <View>
             <SectionHeader title={t('home.ourBrands')} onSeeAll={handleBrandsSeeAll} />
-            <View style={[styles.brandsGrid, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              {brandTiles.map((b) => (
-                <BrandCard
-                  key={b.key}
-                  label={b.label}
-                  imageUrl={b.logoUrl}
-                  width={BRAND_TILE_WIDTH}
-                  onPress={() => (navigation as any).navigate('CategoryProducts', { brand: b.label, title: b.label })}
-                />
-              ))}
-            </View>
+            <FlatList
+              data={(() => { const cols = chunkPairs(brandTiles); return isRTL ? cols.reverse() : cols; })()}
+              keyExtractor={(_, i) => `brand-col-${i}`}
+              renderItem={({ item: col }) => (
+                <View style={[styles.brandCol, { width: BRAND_TILE_WIDTH }]}>
+                  {col.map((b: any) => (
+                    <BrandCard
+                      key={b.key}
+                      label={b.label}
+                      imageUrl={b.logoUrl}
+                      width={BRAND_TILE_WIDTH}
+                      onPress={() => (navigation as any).navigate('CategoryProducts', { brand: b.label, title: b.label })}
+                    />
+                  ))}
+                </View>
+              )}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.brandRow}
+              ItemSeparatorComponent={renderBrandColSep}
+            />
           </View>
         )}
 
@@ -742,11 +759,13 @@ const styles = StyleSheet.create({
     textAlign: 'right', // RTL-safe (Samsung fix)
     textAlignVertical: 'center',
   },
-  // "Our Brands" 2-column grid (static wrap, no nested scroll).
-  brandsGrid: {
-    flexWrap: 'wrap',
+  // "Our Brands" horizontal 2-row rail.
+  brandRow: {
     paddingHorizontal: BRAND_GRID_PADDING,
+  },
+  brandCol: {
     gap: BRAND_GRID_GAP,
+    justifyContent: 'flex-start',
   },
   // Brand-spotlight horizontal carousel padding (aligns first card to the grid).
   spotlightList: {
