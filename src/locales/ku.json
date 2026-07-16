@@ -684,7 +684,13 @@
     "noDeliveryAddressFound": "هیچ ناونیشانی گەیاندنێک نەدۆزرایەوە",
     "noLocationSet": "هیچ شوێنێک دیاری نەکراوە",
     "selectAddressToContinue": "تکایە ناونیشانی گەیاندنێک هەڵبژێرە بۆ بەردەوامبوون لە داواکاریەکەت.",
-    "youAreSaving": "تۆ {{amount}} پاشەکەوت دەکەیت!"
+    "youAreSaving": "تۆ {{amount}} پاشەکەوت دەکەیت!",
+    "promoInvalid": "کۆدی نادروست یان بەسەرچوو",
+    "promoNotEligible": "ئەم کۆدە بۆ سەبەتەکەت ناگونجێت",
+    "promoCodeLabel": "کۆد",
+    "promoRemove": "لابردن",
+    "promoPlaceholder": "کۆدی داشکاندن",
+    "promoApply": "جێبەجێکردن"
   },
   "qiCard": {
     "title": "پارەدانی کارتی کی",
@@ -1008,7 +1014,9 @@
       "categoryManager": "بەڕێوەبردنی هاوپۆلەکان",
       "categoryManagerSub": "هاوپۆل زیاد بکە و لۆگۆ باربکە (نمایش)",
       "previewVip": "پیشبینین وەک VIP",
-      "previewVipSub": "بینینی نرخە تایبەتەکانی VIP (نمایش)"
+      "previewVipSub": "بینینی نرخە تایبەتەکانی VIP (نمایش)",
+      "promoManager": "کۆدی داشکاندن",
+      "promoManagerSub": "کۆدی داشکاندن دروست بکە (نمایش)"
     },
     "currency": {
       "select": "دراو هەڵبژێرە",
@@ -3022,7 +3030,22 @@
       "pickLogo": "زیادکردنی لۆگۆ",
       "title": "پۆلەکان"
     },
-    "hidden": "شاردراوە"
+    "hidden": "شاردراوە",
+    "promos": {
+      "title": "کۆدەکانی داشکاندن",
+      "add": "زیادکردنی کۆد",
+      "edit": "دەستکاریکردنی کۆد",
+      "code": "کۆد",
+      "type": "جۆر",
+      "percentage": "ڕێژەی سەدی (٪)",
+      "fixed": "بڕی جێگیر ($)",
+      "percentOff": "ڕێژەی داشکاندن (٪)",
+      "amountOff": "بڕی داشکاندن ($)",
+      "minPurchase": "کەمترین بڕی کڕین ($)",
+      "empty": "هێشتا هیچ کۆدێکی داشکاندن نییە. + لێبدە بۆ زیادکردنی یەکێک.",
+      "codeRequired": "کۆد و بەها پێویستن",
+      "deleteTitle": "کۆدی داشکاندن بسڕدرێتەوە؟"
+    }
   },
   "onboarding": {
     "welcomeTitle": "بەخێربێیت بۆ",

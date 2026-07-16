@@ -626,6 +626,7 @@ export type RootStackParamList = {
   AdminBannerManagement: undefined;
   AdminBrandManagement: undefined;
   AdminCategoryManagement: undefined;
+  AdminPromoManagement: undefined;
   AdminChatScreen: { conversationId: string };
   
   // Chat Screens

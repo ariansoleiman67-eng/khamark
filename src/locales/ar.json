@@ -684,7 +684,13 @@
     "noDeliveryAddressFound": "لم يتم العثور على عنوان توصيل",
     "noLocationSet": "لم يتم تحديد موقع",
     "selectAddressToContinue": "يرجى اختيار عنوان توصيل لمتابعة طلبك.",
-    "youAreSaving": "أنت توفّر {{amount}}!"
+    "youAreSaving": "أنت توفّر {{amount}}!",
+    "promoInvalid": "رمز غير صالح أو منتهي",
+    "promoNotEligible": "هذا الرمز لا ينطبق على سلتك",
+    "promoCodeLabel": "رمز",
+    "promoRemove": "إزالة",
+    "promoPlaceholder": "رمز الخصم",
+    "promoApply": "تطبيق"
   },
   "qiCard": {
     "title": "دفع بطاقة كي",
@@ -1009,7 +1015,9 @@
       "categoryManager": "إدارة الفئات",
       "categoryManagerSub": "أضف الفئات وارفع الشعارات (تجريبي)",
       "previewVip": "معاينة كـ VIP",
-      "previewVipSub": "شاهد أسعار VIP الحصرية (تجريبي)"
+      "previewVipSub": "شاهد أسعار VIP الحصرية (تجريبي)",
+      "promoManager": "أكواد الخصم",
+      "promoManagerSub": "أنشئ أكواد خصم (تجريبي)"
     },
     "language": {
       "changeTitle": "تغيير اللغة",
@@ -3022,7 +3030,22 @@
       "pickLogo": "إضافة شعار",
       "title": "التصنيفات"
     },
-    "hidden": "مخفي"
+    "hidden": "مخفي",
+    "promos": {
+      "title": "أكواد الخصم",
+      "add": "إضافة كود",
+      "edit": "تعديل الكود",
+      "code": "الكود",
+      "type": "النوع",
+      "percentage": "نسبة مئوية (٪)",
+      "fixed": "مبلغ ثابت ($)",
+      "percentOff": "نسبة الخصم (٪)",
+      "amountOff": "مبلغ الخصم ($)",
+      "minPurchase": "الحد الأدنى للشراء ($)",
+      "empty": "لا توجد أكواد خصم بعد. اضغط + لإضافة واحد.",
+      "codeRequired": "الكود والقيمة مطلوبان",
+      "deleteTitle": "حذف كود الخصم؟"
+    }
   },
   "onboarding": {
     "welcomeTitle": "مرحبًا بكم في",

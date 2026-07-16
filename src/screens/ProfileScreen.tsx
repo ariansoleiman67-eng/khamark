@@ -569,6 +569,12 @@ export const ProfileScreen: React.FC = () => {
                     subtitle={t('profile.menu.categoryManagerSub', { defaultValue: 'Add categories & upload logos (demo)' })}
                     onPress={() => (navigation as any).navigate('AdminCategoryManagement')}
                     theme={theme} isDark={isDark} tintBg={tintBg} />
+                  <Divider isDark={isDark} />
+                  <LuxuryMenuItem icon="ticket-outline"
+                    title={t('profile.menu.promoManager', { defaultValue: 'Promo Codes' })}
+                    subtitle={t('profile.menu.promoManagerSub', { defaultValue: 'Create discount codes (demo)' })}
+                    onPress={() => (navigation as any).navigate('AdminPromoManagement')}
+                    theme={theme} isDark={isDark} tintBg={tintBg} />
                 </View>
               </Animated.View>
             )}

@@ -101,6 +101,7 @@ import AdminBannerScreen from '../screens/admin/AdminBannerScreen';
 import AdminBrandManagerScreen from '../screens/admin/AdminBrandManagerScreen';
 import { USE_MOCK_DATA } from '../services/mockData';
 import AdminCategoryManagerScreen from '../screens/admin/AdminCategoryManagerScreen';
+import AdminPromoManagerScreen from '../screens/admin/AdminPromoManagerScreen';
 import AdminCustomersScreen from '../screens/admin/AdminCustomersScreen';
 import AdminPartnerManagementScreen from '../screens/admin/AdminPartnerManagementScreen';
 import AdminPartnerAssignmentScreen from '../screens/admin/AdminPartnerAssignmentScreen';
@@ -397,6 +398,7 @@ const AppNavigator: React.FC = () => {
             <Stack.Screen name="AdminBannerManagement" component={AdminBannerScreen} />
             <Stack.Screen name="AdminBrandManagement" component={AdminBrandManagerScreen} />
             <Stack.Screen name="AdminCategoryManagement" component={AdminCategoryManagerScreen} />
+            <Stack.Screen name="AdminPromoManagement" component={AdminPromoManagerScreen} />
             <Stack.Screen name="AdminPartnerManagement" component={AdminPartnerManagementScreen} />
             <Stack.Screen name="AdminPartnerAssignment" component={AdminPartnerAssignmentScreen} />
             <Stack.Screen name="AdminPartnerDashboard" component={AdminPartnerDashboardScreen} />
@@ -483,6 +485,7 @@ const AppNavigator: React.FC = () => {
           <>
             <Stack.Screen name="AdminBrandManagement" component={AdminBrandManagerScreen} />
             <Stack.Screen name="AdminCategoryManagement" component={AdminCategoryManagerScreen} />
+            <Stack.Screen name="AdminPromoManagement" component={AdminPromoManagerScreen} />
           </>
         )}
         </Stack.Navigator>

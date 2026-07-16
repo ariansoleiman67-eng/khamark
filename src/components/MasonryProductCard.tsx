@@ -134,6 +134,9 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
   };
   const vipActive = isVip && typeof product.vipPriceUSD === "number" && product.vipPriceUSD > 0;
   const vipLocked = !isVip && typeof product.vipPriceUSD === "number" && hasVipPrice(product);
+  const shownPrice = getDisplayUnitPrice(product, isVip);
+  const hasDiscount = typeof product.compareAtPriceUSD === "number" && product.compareAtPriceUSD > shownPrice;
+  const savePct = hasDiscount ? Math.round((1 - shownPrice / (product.compareAtPriceUSD as number)) * 100) : 0;
 
   const effectiveStock =
     product.variations && product.variations.length > 0
@@ -286,6 +289,16 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
                 <AppText fontSize={9} style={{ color: theme.colors.textSecondary, fontWeight: "700" }}>
                   {formatPrice(product.vipPriceUSD as number, currency, exchangeRateIQD, { symbol: true })} VIP
                 </AppText>
+              </View>
+            )}
+            {hasDiscount && !vipActive && (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 2 }}>
+                <AppText fontSize={11} style={{ color: theme.colors.textSecondary, textDecorationLine: "line-through" }}>
+                  {formatPrice(product.compareAtPriceUSD as number, currency, exchangeRateIQD)}
+                </AppText>
+                <View style={{ backgroundColor: "#E53935", borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1 }}>
+                  <AppText fontSize={9} style={{ color: "#FFFFFF", fontWeight: "800" }}>-{savePct}%</AppText>
+                </View>
               </View>
             )}
           </View>

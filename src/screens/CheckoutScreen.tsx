@@ -49,6 +49,7 @@ import addressService from '../services/addressService';
 import { RootStackParamList } from '../types';
 import { getCountryByCode } from '../constants/countries';
 import discountService from '../services/discountService';
+import { promoService, computePromoDiscount } from '../services/promoService';
 import { QiCardPaymentService } from '../services/qiCardPaymentService';
 
 type CheckoutScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Checkout'>;
@@ -170,6 +171,12 @@ const CheckoutScreen: React.FC = () => {
   // Discount state
   const [appliedDiscount, setAppliedDiscount] = useState<AppliedDiscount | null>(null);
   const [discountLoading, setDiscountLoading] = useState(false);
+  // Promo code (manual) state. When a code is applied, manualPromoRef guards the
+  // auto-best-discount effect from clobbering it.
+  const [promoInput, setPromoInput] = useState('');
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const [promoApplying, setPromoApplying] = useState(false);
+  const manualPromoRef = useRef(false);
   
   // Shipping office state (for out-of-country customers)
   const [useShippingOffice, setUseShippingOffice] = useState(false);
@@ -448,8 +455,11 @@ const CheckoutScreen: React.FC = () => {
     const loadDiscount = async () => {
       if (!cart || cart.items.length === 0) {
         setAppliedDiscount(null);
+        manualPromoRef.current = false;
         return;
       }
+      // A manually-entered promo code wins over the auto-best-discount.
+      if (manualPromoRef.current) return;
 
       setDiscountLoading(true);
       try {
@@ -469,6 +479,45 @@ const CheckoutScreen: React.FC = () => {
 
     loadDiscount();
   }, [cart, isVip]);
+
+  // Apply a manually-entered promo code (resolves via promoService, then flows
+  // through the same appliedDiscount pipeline as the auto-discount).
+  const applyPromo = useCallback(async () => {
+    const code = promoInput.trim();
+    if (!code) return;
+    setPromoApplying(true);
+    setPromoError(null);
+    try {
+      const promo = await promoService.findByCode(code);
+      if (!promo) {
+        setPromoError(t('checkout.promoInvalid', { defaultValue: 'Invalid or expired code' }));
+        return;
+      }
+      const subtotal = cartSummary?.subtotal || 0;
+      const saved = computePromoDiscount(promo, subtotal);
+      if (saved <= 0) {
+        setPromoError(t('checkout.promoNotEligible', { defaultValue: "This code doesn't apply to your cart" }));
+        return;
+      }
+      manualPromoRef.current = true;
+      setAppliedDiscount({
+        discountId: promo.id,
+        discountName: `${t('checkout.promoCodeLabel', { defaultValue: 'Code' })} ${promo.code}`,
+        discountType: promo.type,
+        discountValue: promo.value,
+        savedAmount: saved,
+      });
+    } finally {
+      setPromoApplying(false);
+    }
+  }, [promoInput, cartSummary, t]);
+
+  const removePromo = useCallback(() => {
+    manualPromoRef.current = false;
+    setAppliedDiscount(null);
+    setPromoInput('');
+    setPromoError(null);
+  }, []);
 
   const validateShippingAddress = useCallback((): boolean => {
     if (selectedAddress) {
@@ -1634,8 +1683,65 @@ const CheckoutScreen: React.FC = () => {
               </View>
             )}
 
-            {/* Discount Row */}
-            {appliedDiscount && (
+            {/* Promo code */}
+            {appliedDiscount?.discountId?.startsWith('promo-') ? (
+              <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }}>
+                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
+                  <Feather name="check-circle" size={16} color={theme.colors.success} />
+                  <Text allowFontScaling={false} style={{ color: theme.colors.success, fontWeight: '700' }}>
+                    {appliedDiscount.discountName}
+                  </Text>
+                </View>
+                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 12 }}>
+                  <Text allowFontScaling={false} style={{ color: theme.colors.success, fontWeight: '700' }}>
+                    -{formatPrice(appliedDiscount.savedAmount, currency, exchangeRateIQD)}
+                  </Text>
+                  <TouchableOpacity onPress={removePromo} hitSlop={8}>
+                    <Text allowFontScaling={false} style={{ color: theme.colors.error, fontWeight: '600' }}>
+                      {t('checkout.promoRemove', { defaultValue: 'Remove' })}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <View style={{ paddingVertical: 8 }}>
+                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8 }}>
+                  <TextInput
+                    value={promoInput}
+                    onChangeText={(v) => { setPromoInput(v); if (promoError) setPromoError(null); }}
+                    placeholder={t('checkout.promoPlaceholder', { defaultValue: 'Promo code' })}
+                    placeholderTextColor={theme.colors.placeholder}
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    style={{
+                      flex: 1, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10,
+                      paddingHorizontal: 14, paddingVertical: 10, color: theme.colors.text,
+                      textAlign: isRTL ? 'right' : 'left', backgroundColor: theme.colors.surface,
+                    }}
+                  />
+                  <TouchableOpacity
+                    onPress={applyPromo}
+                    disabled={promoApplying || !promoInput.trim()}
+                    style={{
+                      backgroundColor: theme.colors.primary, borderRadius: 10,
+                      paddingHorizontal: 18, paddingVertical: 11, opacity: promoApplying || !promoInput.trim() ? 0.5 : 1,
+                    }}
+                  >
+                    {promoApplying
+                      ? <ActivityIndicator size="small" color={theme.colors.textOnPrimary} />
+                      : <Text allowFontScaling={false} style={{ color: theme.colors.textOnPrimary, fontWeight: '700' }}>{t('checkout.promoApply', { defaultValue: 'Apply' })}</Text>}
+                  </TouchableOpacity>
+                </View>
+                {promoError && (
+                  <Text allowFontScaling={false} style={{ color: theme.colors.error, fontSize: 12, marginTop: 6, textAlign: isRTL ? 'right' : 'left' }}>
+                    {promoError}
+                  </Text>
+                )}
+              </View>
+            )}
+
+            {/* Discount Row (auto-discounts only; promo codes render above) */}
+            {appliedDiscount && !appliedDiscount.discountId?.startsWith('promo-') && (
               <View style={styles.discountRow}>
                 <View style={styles.discountInfo}>
                   <Feather name="tag" size={16} color={theme.colors.success} />

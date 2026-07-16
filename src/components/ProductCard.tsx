@@ -151,6 +151,10 @@ const ProductCard: React.FC<ProductCardProps> = ({
   // normal users when the product has a VIP-only price.
   const vipActive = isVip && typeof product.vipPriceUSD === "number" && product.vipPriceUSD > 0;
   const vipLocked = !isVip && hasVipPrice(product) && typeof product.vipPriceUSD === "number";
+  // Item discount: "was" price + Save% when compareAtPriceUSD beats the shown price.
+  const shownPrice = getDisplayUnitPrice(product, isVip);
+  const hasDiscount = typeof product.compareAtPriceUSD === "number" && product.compareAtPriceUSD > shownPrice;
+  const savePct = hasDiscount ? Math.round((1 - shownPrice / (product.compareAtPriceUSD as number)) * 100) : 0;
 
   const getVariantStyles = () => {
     // Use minHeight instead of fixed height to allow content to grow
@@ -476,6 +480,17 @@ const ProductCard: React.FC<ProductCardProps> = ({
               </AppText>
             </View>
           )}
+          {hasDiscount && !vipActive && (
+            <View style={styles.saveRow}>
+              <AppNumber
+                value={formatPrice(product.compareAtPriceUSD as number, currency, exchangeRateIQD)}
+                style={[styles.wasPrice, { color: theme.colors.textSecondary }]}
+              />
+              <View style={styles.saveBadge}>
+                <AppText fontSize={9} style={styles.saveBadgeText}>-{savePct}%</AppText>
+              </View>
+            </View>
+          )}
         </View>
 
         {showAddToCart &&
@@ -653,6 +668,27 @@ const styles = StyleSheet.create({
   },
   vipLockText: {
     fontWeight: "700",
+  },
+  saveRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 2,
+  },
+  wasPrice: {
+    fontSize: 12,
+    textDecorationLine: "line-through",
+    fontWeight: "500",
+  },
+  saveBadge: {
+    backgroundColor: "#E53935",
+    borderRadius: 5,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  saveBadgeText: {
+    color: "#FFFFFF",
+    fontWeight: "800",
   },
   addToCartButton: {
     alignItems: "center",

@@ -722,7 +722,13 @@
     "noDeliveryAddressFound": "No Delivery Address Found",
     "noLocationSet": "No location set",
     "selectAddressToContinue": "Please select a delivery address to continue with your order.",
-    "youAreSaving": "You're saving {{amount}}!"
+    "youAreSaving": "You're saving {{amount}}!",
+    "promoInvalid": "Invalid or expired code",
+    "promoNotEligible": "This code doesn't apply to your cart",
+    "promoCodeLabel": "Code",
+    "promoRemove": "Remove",
+    "promoPlaceholder": "Promo code",
+    "promoApply": "Apply"
   },
   "qiCard": {
     "title": "QI Card Payment",
@@ -1063,7 +1069,9 @@
       "categoryManager": "Category Manager",
       "categoryManagerSub": "Add categories & upload logos (demo)",
       "previewVip": "Preview as VIP",
-      "previewVipSub": "See VIP-only prices (demo)"
+      "previewVipSub": "See VIP-only prices (demo)",
+      "promoManager": "Promo Codes",
+      "promoManagerSub": "Create discount codes (demo)"
     },
     "language": {
       "changeTitle": "Change Language",
@@ -3077,7 +3085,22 @@
       "pickLogo": "Add logo",
       "title": "Categories"
     },
-    "hidden": "Hidden"
+    "hidden": "Hidden",
+    "promos": {
+      "title": "Promo Codes",
+      "add": "Add Code",
+      "edit": "Edit Code",
+      "code": "Code",
+      "type": "Type",
+      "percentage": "Percentage (%)",
+      "fixed": "Fixed ($)",
+      "percentOff": "Percent off (%)",
+      "amountOff": "Amount off ($)",
+      "minPurchase": "Min purchase ($)",
+      "empty": "No promo codes yet. Tap + to add one.",
+      "codeRequired": "Code and a value are required",
+      "deleteTitle": "Delete promo code?"
+    }
   },
   "onboarding": {
     "welcomeTitle": "Welcome to",
