@@ -5,7 +5,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Cart, CartItem, Product } from '../types';
-import { calculateTieredPrice } from '../utils/pricingUtils';
+import { calculateTieredPrice, getEffectiveUnitPrice } from '../utils/pricingUtils';
 
 const CART_STORAGE_KEY = 'local_cart_';
 
@@ -386,7 +386,9 @@ export class LocalCartService {
    * Get applicable tiered price for a product quantity
    */
   static getTieredPrice(product: Product, quantity: number, isVip: boolean = false): number {
-    return calculateTieredPrice(quantity, product.priceUSD, product.priceTiers, isVip);
+    // Routes through getEffectiveUnitPrice so a flat VIP price (vipPriceUSD) is
+    // honoured for VIP users, falling back to the wholesale tiered price.
+    return getEffectiveUnitPrice(product, quantity, isVip);
   }
 
   /**

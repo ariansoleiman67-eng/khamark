@@ -133,7 +133,7 @@ export const ProductDetailsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { addToCart, addVariationsToCart, getCartItemCount } = useCart();
-  const { user } = useAuth();
+  const { user, isVip } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites(); // FIXED: Add missing hook
   const { currency: currentCurrency, exchangeRateIQD } = useCurrency();
 
@@ -160,6 +160,8 @@ export const ProductDetailsScreen: React.FC = () => {
   // GOLDEN TEMPLATE: Optional cosmetic selections (NOT variants)
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  // Storage/capacity selection (e.g. iPhone 256GB / 512GB / 1TB)
+  const [selectedStorageId, setSelectedStorageId] = useState<string | null>(null);
 
   // ALIBABA VARIATION: Per-size quantity selection (Map<variationId, quantity>)
   const [variationQuantities, setVariationQuantities] = useState<Record<string, number>>({});
@@ -623,15 +625,26 @@ export const ProductDetailsScreen: React.FC = () => {
       }
 
       // Build selectedOptions object (only include properties that have values)
-      const selectedOptions: { color?: string; size?: string } | undefined =
-        selectedColor || selectedSize
+      const storageLabel = storageOptions.find((s) => s.id === effectiveStorageId && s.priceDelta >= 0)?.label;
+      const selectedOptions: { color?: string; size?: string; storage?: string } | undefined =
+        selectedColor || selectedSize || (storageLabel && storageOptions.length > 0)
           ? {
               ...(selectedColor && { color: selectedColor }),
               ...(selectedSize && { size: selectedSize }),
+              ...(storageOptions.length > 0 && storageLabel && { storage: storageLabel }),
             }
           : undefined;
 
-      await addToCart(product.id, quantity, product, selectedOptions);
+      // Bake the storage price delta into the cart line so it's charged correctly.
+      const productForCart = storageDelta > 0
+        ? {
+            ...product,
+            priceUSD: product.priceUSD + storageDelta,
+            vipPriceUSD: typeof product.vipPriceUSD === 'number' ? product.vipPriceUSD + storageDelta : undefined,
+          }
+        : product;
+
+      await addToCart(product.id, quantity, productForCart, selectedOptions);
 
       // ALIBABA: Silent success - no confirmation dialog
       // Cart badge update provides sufficient feedback
@@ -935,8 +948,15 @@ export const ProductDetailsScreen: React.FC = () => {
 
   const isRTL = i18n?.language ? getDirection(i18n.language) === 'rtl' : false;
 
-  // Gallery images from product
-  const galleryImages = product.imageUrls || [];
+  // Gallery images from product. When a colour with its own image is selected,
+  // that image leads the gallery so the hero swaps to the chosen colour.
+  const selectedColorImg = selectedColor
+    ? product.colorVariations?.find((c) => c.colorValue === selectedColor)?.imageUrl
+    : undefined;
+  const baseGallery = product.imageUrls || [];
+  const galleryImages = selectedColorImg
+    ? [selectedColorImg, ...baseGallery.filter((u) => u !== selectedColorImg)]
+    : baseGallery;
 
   // Stock from product - SUM all potential stock sources
   // This addresses user report: "out of stock just out of stock happen when there is no any stock of color , size , main"
@@ -967,9 +987,17 @@ export const ProductDetailsScreen: React.FC = () => {
   // For unit price lookup, use at least 1 to show correct tier
   const pricingQty = activeQtyForPricing > 0 ? activeQtyForPricing : 1;
 
-  // Calculate the tiered unit price based on the total quantity (for wholesale pricing)
-  const isVip = user?.role === 'vip';
+  // Calculate the tiered unit price based on the total quantity (for wholesale pricing).
+  // isVip now comes from AuthContext (honours the demo "Preview as VIP" toggle).
   const tieredUnitPrice = LocalCartService.getTieredPrice(product, pricingQty, isVip);
+  // Hero "from" unit price (qty 1), VIP-aware; storage delta added in the render.
+  const heroUnitPrice = LocalCartService.getTieredPrice(product, 1, isVip);
+  const vipActive = isVip && typeof product.vipPriceUSD === 'number' && product.vipPriceUSD > 0;
+  const vipLocked = !isVip && typeof product.vipPriceUSD === 'number' && product.vipPriceUSD > 0 && product.vipPriceUSD < product.priceUSD;
+  // Storage options (capacity) — selection adds a price delta to the base price.
+  const storageOptions = product.storageOptions || [];
+  const effectiveStorageId = selectedStorageId ?? (storageOptions[0]?.id ?? null);
+  const storageDelta = storageOptions.find((s) => s.id === effectiveStorageId)?.priceDelta ?? 0;
 
   // Calculate total price:
   // - For simple products: tieredUnitPrice × quantity
@@ -1372,9 +1400,14 @@ export const ProductDetailsScreen: React.FC = () => {
                   <View style={{ flexShrink: 1 }}>
                     <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'flex-end', flexWrap: 'wrap' }}>
                       <AppNumber
-                        value={formatPrice(product.priceUSD, currentCurrency as any, exchangeRateIQD)}
-                        style={[styles.price, { color: theme.colors.primary }]}
+                        value={formatPrice(heroUnitPrice + storageDelta, currentCurrency as any, exchangeRateIQD)}
+                        style={[styles.price, { color: vipActive ? '#7C3AED' : theme.colors.primary }]}
                       />
+                      {vipActive && (
+                        <View style={{ backgroundColor: '#7C3AED', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, marginHorizontal: 8, marginBottom: 4 }}>
+                          <Text allowFontScaling={false} style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 11, letterSpacing: 0.5 }}>VIP</Text>
+                        </View>
+                      )}
                       {!!product.compareAtPriceUSD && product.compareAtPriceUSD > product.priceUSD && (
                         <AppNumber
                           value={formatPrice(product.compareAtPriceUSD, currentCurrency as any, exchangeRateIQD)}
@@ -1382,6 +1415,14 @@ export const ProductDetailsScreen: React.FC = () => {
                         />
                       )}
                     </View>
+                    {vipLocked && (
+                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 5, marginTop: 4, alignSelf: isRTL ? 'flex-end' : 'flex-start' }}>
+                        <Ionicons name="lock-closed" size={13} color={'#7C3AED'} />
+                        <Text allowFontScaling={false} style={{ color: '#7C3AED', fontWeight: '700', fontSize: 13 }}>
+                          {t('product.vipPrice', { defaultValue: 'VIP price' })}: {formatPrice(product.vipPriceUSD as number, currentCurrency as any, exchangeRateIQD)}
+                        </Text>
+                      </View>
+                    )}
                     {!!product.compareAtPriceUSD && product.compareAtPriceUSD > product.priceUSD && (
                       <View style={[styles.saveBadge, { alignSelf: isRTL ? 'flex-end' : 'flex-start' }]}>
                         <Text allowFontScaling={false} style={styles.saveBadgeText}>
@@ -1927,8 +1968,74 @@ export const ProductDetailsScreen: React.FC = () => {
                 </View>
               )}
 
+              {/* Consumer variant selector (phone-style): single-select colour + storage */}
+              {storageOptions.length > 0 && (
+                <View style={styles.section}>
+                  {product.colorVariations && product.colorVariations.length > 0 && (
+                    <>
+                      <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+                        {t('product.color', { defaultValue: 'Color' })}
+                        {selectedColor ? <Text style={{ color: theme.colors.textSecondary, fontWeight: '500' }}>{'  •  ' + selectedColor}</Text> : null}
+                      </Text>
+                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', flexWrap: 'wrap', gap: 12, marginTop: 10, marginBottom: 6 }}>
+                        {product.colorVariations.map((cv) => {
+                          const sel = selectedColor === cv.colorValue;
+                          const soldOut = (cv.stockQuantity ?? 0) <= 0;
+                          return (
+                            <TouchableOpacity
+                              key={cv.variationId}
+                              disabled={soldOut}
+                              onPress={() => setSelectedColor(sel ? null : cv.colorValue)}
+                              activeOpacity={0.8}
+                              style={{
+                                width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center',
+                                borderWidth: sel ? 2.5 : 1.5,
+                                borderColor: sel ? theme.colors.primary : theme.colors.border,
+                                opacity: soldOut ? 0.35 : 1,
+                              }}
+                            >
+                              <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: cv.colorHex || '#ccc', borderWidth: 1, borderColor: theme.colors.border }} />
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </>
+                  )}
+
+                  <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left', marginTop: 14 }]}>
+                    {t('product.storage', { defaultValue: 'Storage' })}
+                  </Text>
+                  <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', flexWrap: 'wrap', gap: 10, marginTop: 10 }}>
+                    {storageOptions.map((so) => {
+                      const sel = effectiveStorageId === so.id;
+                      return (
+                        <TouchableOpacity
+                          key={so.id}
+                          onPress={() => setSelectedStorageId(so.id)}
+                          activeOpacity={0.8}
+                          style={{
+                            paddingHorizontal: 18, paddingVertical: 12, borderRadius: 12,
+                            borderWidth: sel ? 2 : 1.5,
+                            borderColor: sel ? theme.colors.primary : theme.colors.border,
+                            backgroundColor: sel ? theme.colors.primary + '12' : 'transparent',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <Text allowFontScaling={false} style={{ color: sel ? theme.colors.primary : theme.colors.text, fontWeight: '700', fontSize: 15 }}>{so.label}</Text>
+                          {so.priceDelta > 0 && (
+                            <Text allowFontScaling={false} style={{ color: theme.colors.textSecondary, fontSize: 11, marginTop: 2 }}>
+                              +{formatPrice(so.priceDelta, currentCurrency as any, exchangeRateIQD)}
+                            </Text>
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+
               {/* ALIBABA VARIATION: Table-style color variation selector */}
-              {product.colorVariations && product.colorVariations.length > 0 ? (
+              {product.colorVariations && product.colorVariations.length > 0 && !(product.storageOptions && product.storageOptions.length > 0) ? (
                 <View style={styles.section}>
                   <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text, marginBottom: 0 }]}>

@@ -1,4 +1,4 @@
-import { PriceTier } from '../types';
+import { PriceTier, Product } from '../types';
 
 /**
  * Validates an array of price tiers.
@@ -77,4 +77,35 @@ export const calculateTieredPrice = (
 
   // Normal user, beneath wholesale minimums
   return basePrice;
+};
+
+// A product's per-unit price to CHARGE for a given user + quantity.
+// VIP precedence: a flat `vipPriceUSD` (if set) wins; otherwise the tiered
+// (wholesale) VIP price applies. Non-VIP always gets the normal tiered price.
+export const getEffectiveUnitPrice = (
+  product: Pick<Product, 'priceUSD' | 'vipPriceUSD' | 'priceTiers'>,
+  quantity: number = 1,
+  isVip: boolean = false
+): number => {
+  if (isVip && typeof product.vipPriceUSD === 'number' && product.vipPriceUSD > 0) {
+    return product.vipPriceUSD;
+  }
+  return calculateTieredPrice(quantity, product.priceUSD, product.priceTiers, isVip);
+};
+
+// The single "from" price to DISPLAY on cards / the hero for this user (qty 1).
+export const getDisplayUnitPrice = (
+  product: Pick<Product, 'priceUSD' | 'vipPriceUSD' | 'priceTiers'>,
+  isVip: boolean = false
+): number => getEffectiveUnitPrice(product, 1, isVip);
+
+// Whether a product has a VIP-only price that differs from what a non-VIP pays.
+export const hasVipPrice = (
+  product: Pick<Product, 'priceUSD' | 'vipPriceUSD' | 'priceTiers'>
+): boolean => {
+  if (typeof product.vipPriceUSD === 'number' && product.vipPriceUSD > 0 && product.vipPriceUSD < product.priceUSD) {
+    return true;
+  }
+  // Tiered wholesale also yields a VIP-only price below the first tier.
+  return !!(product.priceTiers && product.priceTiers.length > 0);
 };

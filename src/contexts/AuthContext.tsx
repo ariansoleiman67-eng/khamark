@@ -1,11 +1,15 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo, ReactNode } from 'react';
 import { AppState, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import i18next from 'i18next';
 import { User } from '../types';
 import { isOwnerUid } from '../constants/config';
 import { supabase, uniqueChannel } from '../services/supabase';
 import { AuthService } from '../services/authService';
 import { OrderService } from '../services/OrderService';
+import { USE_MOCK_DATA } from '../services/mockData';
+
+const DEMO_VIP_KEY = '@asankary_demo_vip';
 
 interface AuthContextValue {
   user: User | null;
@@ -24,6 +28,9 @@ interface AuthContextValue {
   signInWithApple: () => Promise<User>;
   isAppleAvailable: boolean;
   setRegistrationInProgress: (inProgress: boolean) => void;
+  // Demo-only (USE_MOCK_DATA): preview the app as a VIP user without logging in.
+  demoVip: boolean;
+  setDemoVip: (on: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -44,6 +51,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAppleAvailable, setIsAppleAvailable] = useState(false);
+  // Demo-only VIP preview (persisted). Lets a guest see VIP pricing offline.
+  const [demoVip, setDemoVipState] = useState(false);
+  useEffect(() => {
+    if (!USE_MOCK_DATA) return;
+    AsyncStorage.getItem(DEMO_VIP_KEY).then((v) => { if (v === '1') setDemoVipState(true); }).catch(() => {});
+  }, []);
+  const setDemoVip = useCallback((on: boolean) => {
+    setDemoVipState(on);
+    AsyncStorage.setItem(DEMO_VIP_KEY, on ? '1' : '0').catch(() => {});
+  }, []);
   const registrationInProgressRef = useRef(false);
 
   const setRegistrationInProgress = useCallback((inProgress: boolean) => {
@@ -231,7 +248,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const isAuthenticated = user !== null;
   const isAdmin = user?.isAdmin === true || user?.role === 'admin';
-  const isVip = user?.role === 'vip';
+  const isVip = user?.role === 'vip' || (USE_MOCK_DATA && demoVip);
   // The store owner — the only admin allowed to manage partners. Gated on UID
   // (no DB-level owner flag exists; partners are also role='admin').
   const isOwner = isAdmin && isOwnerUid(user?.uid);
@@ -256,10 +273,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signInWithApple,
     isAppleAvailable,
     setRegistrationInProgress,
+    demoVip,
+    setDemoVip,
   }), [
     user, isLoading, isAuthenticated, isAdmin, isVip, isOwner, isPartner, isGuest,
     signOut, deleteAccount, refreshUser, updateUserProfile,
     signInWithFacebook, signInWithApple, isAppleAvailable, setRegistrationInProgress,
+    demoVip, setDemoVip,
   ]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

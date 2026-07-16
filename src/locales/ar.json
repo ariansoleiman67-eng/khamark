@@ -240,7 +240,9 @@
     "overview": "نظرة عامة على المنتج",
     "paymentMethods": "طرق الدفع",
     "save": "وفّر",
-    "sku": "SKU"
+    "sku": "SKU",
+    "vipPrice": "سعر VIP",
+    "storage": "السعة"
   },
   "auth": {
     "accountBlocked": "الحساب محظور",
@@ -1005,7 +1007,9 @@
       "brandManager": "إدارة العلامات التجارية",
       "brandManagerSub": "أضف العلامات وارفع الشعارات (تجريبي)",
       "categoryManager": "إدارة الفئات",
-      "categoryManagerSub": "أضف الفئات وارفع الشعارات (تجريبي)"
+      "categoryManagerSub": "أضف الفئات وارفع الشعارات (تجريبي)",
+      "previewVip": "معاينة كـ VIP",
+      "previewVipSub": "شاهد أسعار VIP الحصرية (تجريبي)"
     },
     "language": {
       "changeTitle": "تغيير اللغة",

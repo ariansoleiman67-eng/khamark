@@ -18,7 +18,9 @@ import { useTranslation } from "react-i18next";
 import AppText from "./AppText";
 import AppNumber from "./AppNumber";
 import { useCurrency } from "../contexts/CurrencyContext";
+import { useAuth } from "../contexts/AuthContext";
 import { formatPrice } from "../utils/currency";
+import { getDisplayUnitPrice, hasVipPrice } from "../utils/pricingUtils";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -59,6 +61,7 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
   const { theme, isDark } = useTheme();
   const { t, i18n } = useTranslation();
   const { currency, exchangeRateIQD } = useCurrency();
+  const { isVip } = useAuth();
   const [imageError, setImageError] = useState(false);
   const [thumbFailed, setThumbFailed] = useState(false);
 
@@ -127,8 +130,10 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
       const maxFormatted = formatPrice(product.priceUSD, currency, exchangeRateIQD, { symbol: false });
       return `${minFormatted} - ${maxFormatted}`;
     }
-    return formatPrice(product.priceUSD, currency, exchangeRateIQD);
+    return formatPrice(getDisplayUnitPrice(product, isVip), currency, exchangeRateIQD);
   };
+  const vipActive = isVip && typeof product.vipPriceUSD === "number" && product.vipPriceUSD > 0;
+  const vipLocked = !isVip && typeof product.vipPriceUSD === "number" && hasVipPrice(product);
 
   const effectiveStock =
     product.variations && product.variations.length > 0
@@ -262,11 +267,28 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
         )}
 
         <View style={styles.bottom}>
-          <AppNumber
-            value={getPriceDisplay()}
-            numberOfLines={1}
-            style={[styles.price, { color: theme.colors.text, textAlign }]}
-          />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+              <AppNumber
+                value={getPriceDisplay()}
+                numberOfLines={1}
+                style={[styles.price, { color: vipActive ? "#7C3AED" : theme.colors.text, textAlign }]}
+              />
+              {vipActive && (
+                <View style={{ backgroundColor: "#7C3AED", borderRadius: 5, paddingHorizontal: 5, paddingVertical: 1 }}>
+                  <AppText fontSize={9} style={{ color: "#FFFFFF", fontWeight: "800", letterSpacing: 0.5 }}>VIP</AppText>
+                </View>
+              )}
+            </View>
+            {vipLocked && (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 3, marginTop: 1 }}>
+                <Ionicons name="lock-closed" size={9} color={theme.colors.textSecondary} />
+                <AppText fontSize={9} style={{ color: theme.colors.textSecondary, fontWeight: "700" }}>
+                  {formatPrice(product.vipPriceUSD as number, currency, exchangeRateIQD, { symbol: true })} VIP
+                </AppText>
+              </View>
+            )}
+          </View>
 
           <View ref={addToCartRef} collapsable={false}>
             <Pressable

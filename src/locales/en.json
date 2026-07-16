@@ -240,7 +240,9 @@
     "overview": "Product Overview",
     "paymentMethods": "Payment Methods",
     "save": "Save",
-    "sku": "Sku"
+    "sku": "Sku",
+    "vipPrice": "VIP price",
+    "storage": "Storage"
   },
   "auth": {
     "accountBlocked": "Account Blocked",
@@ -1059,7 +1061,9 @@
       "brandManager": "Brand Manager",
       "brandManagerSub": "Add brands & upload logos (demo)",
       "categoryManager": "Category Manager",
-      "categoryManagerSub": "Add categories & upload logos (demo)"
+      "categoryManagerSub": "Add categories & upload logos (demo)",
+      "previewVip": "Preview as VIP",
+      "previewVipSub": "See VIP-only prices (demo)"
     },
     "language": {
       "changeTitle": "Change Language",

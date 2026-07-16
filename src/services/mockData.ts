@@ -53,6 +53,7 @@ const SEEDS: Seed[] = [
   { id: 'p16', name: 'Havit M9036 Smart Watch', brand: 'Havit', category: 'Smartwatches', priceUSD: 30, stockQty: 0, desc: '1.85" display smartwatch with heart-rate, SpO2 and Bluetooth calling.' },
   { id: 'p17', name: 'Realme Watch S2 Smart Watch with Silicone Strap', brand: 'Realme', category: 'Smartwatches', priceUSD: 85, stockQty: 0, desc: 'AMOLED smartwatch with AI health tracking and 100+ sport modes.' },
   { id: 'p18', name: 'Belkin Wireless Charger Pad 15W', brand: 'Belkin', category: 'Chargers', priceUSD: 29, stockQty: 24, desc: 'Qi 15W fast wireless charging pad with anti-slip surface.' },
+  { id: 'p19', name: 'iPhone 17 Pro Max', brand: 'Apple', category: 'Phones', priceUSD: 1199, stockQty: 20, featured: true, desc: 'Apple iPhone 17 Pro Max with the A19 Pro chip, titanium frame, 6.9" ProMotion display and a pro camera system. Choose your colour and storage.' },
 ];
 
 function build(s: Seed): Product {
@@ -89,9 +90,42 @@ function build(s: Seed): Product {
 export const MOCK_PRODUCTS: Product[] = SEEDS.map(build);
 
 // Give some products a "was" price so the detail page shows a Save% + strikethrough.
-const COMPARE: Record<string, number> = { p1: 13.5, p4: 45, p7: 1399, p9: 60, p13: 44, p15: 28, p17: 117 };
+const COMPARE: Record<string, number> = { p1: 13.5, p4: 45, p7: 1399, p9: 60, p13: 44, p15: 28, p17: 117, p19: 1399 };
 MOCK_PRODUCTS.forEach((p) => {
   if (COMPARE[p.id]) p.compareAtPriceUSD = COMPARE[p.id];
+});
+
+// VIP-only price (shown locked to normal users, revealed to VIP / demo-VIP).
+const VIP_PRICE: Record<string, number> = { p1: 7.9, p4: 27, p7: 999, p9: 39, p13: 29, p19: 1049, p12: 33, p18: 24 };
+MOCK_PRODUCTS.forEach((p) => {
+  if (VIP_PRICE[p.id]) p.vipPriceUSD = VIP_PRICE[p.id];
+});
+
+// Colour + storage variants (per the client's iPhone example). Per-colour images
+// swap the hero on selection; storage adds a price delta to the base price.
+const COLOR_VARIANTS: Record<string, Product['colorVariations']> = {
+  p19: [
+    { variationId: 'p19_c_orange', colorValue: 'Cosmic Orange', colorHex: '#F5670A', imageUrl: img('p19-orange'), stockQuantity: 8 },
+    { variationId: 'p19_c_white', colorValue: 'Silver', colorHex: '#E6E7E9', imageUrl: img('p19-white'), stockQuantity: 6 },
+    { variationId: 'p19_c_black', colorValue: 'Space Black', colorHex: '#1C1C1E', imageUrl: img('p19-black'), stockQuantity: 4 },
+    { variationId: 'p19_c_blue', colorValue: 'Deep Blue', colorHex: '#2B4C8C', imageUrl: img('p19-blue'), stockQuantity: 2 },
+  ],
+  p7: [
+    { variationId: 'p7_c_black', colorValue: 'Titanium Black', colorHex: '#2B2B2E', imageUrl: img('p7-black'), stockQuantity: 5 },
+    { variationId: 'p7_c_gray', colorValue: 'Titanium Gray', colorHex: '#8E8E93', imageUrl: img('p7-gray'), stockQuantity: 4 },
+    { variationId: 'p7_c_white', colorValue: 'Titanium White', colorHex: '#EDEDED', imageUrl: img('p7-white'), stockQuantity: 3 },
+  ],
+};
+const STORAGE_VARIANTS: Record<string, Product['storageOptions']> = {
+  p19: [
+    { id: 'p19_s256', label: '256GB', priceDelta: 0 },
+    { id: 'p19_s512', label: '512GB', priceDelta: 150 },
+    { id: 'p19_s1tb', label: '1TB', priceDelta: 350 },
+  ],
+};
+MOCK_PRODUCTS.forEach((p) => {
+  if (COLOR_VARIANTS[p.id]) p.colorVariations = COLOR_VARIANTS[p.id];
+  if (STORAGE_VARIANTS[p.id]) p.storageOptions = STORAGE_VARIANTS[p.id];
 });
 
 export const MOCK_BANNERS = [1, 2, 3, 4].map((n) => ({

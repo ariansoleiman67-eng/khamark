@@ -549,7 +549,9 @@
     "overview": "پوختەی بەرهەم",
     "paymentMethods": "شێوازەکانی پارەدان",
     "save": "پاشەکەوت",
-    "sku": "SKU"
+    "sku": "SKU",
+    "vipPrice": "نرخی VIP",
+    "storage": "بیرگە"
   },
   "cart": {
     "title": "سەبەتەی کڕین",
@@ -1004,7 +1006,9 @@
       "brandManager": "بەڕێوەبردنی براندەکان",
       "brandManagerSub": "براند زیاد بکە و لۆگۆ باربکە (نمایش)",
       "categoryManager": "بەڕێوەبردنی هاوپۆلەکان",
-      "categoryManagerSub": "هاوپۆل زیاد بکە و لۆگۆ باربکە (نمایش)"
+      "categoryManagerSub": "هاوپۆل زیاد بکە و لۆگۆ باربکە (نمایش)",
+      "previewVip": "پیشبینین وەک VIP",
+      "previewVipSub": "بینینی نرخە تایبەتەکانی VIP (نمایش)"
     },
     "currency": {
       "select": "دراو هەڵبژێرە",

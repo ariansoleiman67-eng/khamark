@@ -47,7 +47,7 @@ export const ProfileScreen: React.FC = () => {
   const { t, i18n } = useTranslation();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const { signOut: logout, user: contextUser, deleteAccount, isVip } = useAuth();
+  const { signOut: logout, user: contextUser, deleteAccount, isVip, demoVip, setDemoVip } = useAuth();
 
   // State
   const [user, setUser] = useState<User | null>(null);
@@ -551,6 +551,13 @@ export const ProfileScreen: React.FC = () => {
               <Animated.View entering={enterAnim(360)} style={{ marginBottom: 20 }}>
                 <SectionTitle title={t('profile.sections.demoTools', { defaultValue: 'Demo Tools' })} labelColor={labelColor} />
                 <View style={{ ...cardStyle, overflow: 'hidden' }}>
+                  <LuxuryMenuItem icon="diamond-outline"
+                    title={t('profile.menu.previewVip', { defaultValue: 'Preview as VIP' })}
+                    subtitle={t('profile.menu.previewVipSub', { defaultValue: 'See VIP-only prices (demo)' })}
+                    hasSwitch switchValue={demoVip}
+                    onSwitchChange={(v) => setDemoVip(v)}
+                    theme={theme} isDark={isDark} tintBg={tintBg} />
+                  <Divider isDark={isDark} />
                   <LuxuryMenuItem icon="pricetags-outline"
                     title={t('profile.menu.brandManager', { defaultValue: 'Brand Manager' })}
                     subtitle={t('profile.menu.brandManagerSub', { defaultValue: 'Add brands & upload logos (demo)' })}

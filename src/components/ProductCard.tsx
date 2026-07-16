@@ -11,7 +11,9 @@ import { Image } from "expo-image";
 import { useTheme } from "./ThemeProvider";
 import { useFavorites } from "../contexts/FavoritesContext";
 import { useCurrency } from "../contexts/CurrencyContext";
+import { useAuth } from "../contexts/AuthContext";
 import { formatPrice } from "../utils/currency";
+import { getDisplayUnitPrice, hasVipPrice } from "../utils/pricingUtils";
 import { Product } from "../types";
 import { SHADOW_STYLES } from "../constants/theme";
 import { getProductImageUrl, logImageDebug } from "../utils/imageUtils";
@@ -62,6 +64,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   const { t, i18n } = useTranslation();
   const { isFavorite, toggleFavorite } = useFavorites();
   const { currency, exchangeRateIQD } = useCurrency();
+  const { isVip } = useAuth();
   const [imageLoading, setImageLoading] = useState(true);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
@@ -134,7 +137,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
     ) || 0;
   const effectiveStock = (product.stockQty || 0) + sizeStock + colorStock;
 
-  // Get price display (supports tiered pricing)
+  // Get price display (supports tiered + VIP pricing)
   const getPriceDisplay = () => {
     if (product.priceTiers && product.priceTiers.length > 0) {
       const minPrice = Math.min(...product.priceTiers.map((t) => t.priceUSD));
@@ -142,8 +145,12 @@ const ProductCard: React.FC<ProductCardProps> = ({
       const maxFormatted = formatPrice(product.priceUSD, currency, exchangeRateIQD, { symbol: false });
       return `${minFormatted} - ${maxFormatted}`;
     }
-    return formatPrice(product.priceUSD, currency, exchangeRateIQD);
+    return formatPrice(getDisplayUnitPrice(product, isVip), currency, exchangeRateIQD);
   };
+  // VIP messaging: badge when a VIP is seeing their price; a locked hint for
+  // normal users when the product has a VIP-only price.
+  const vipActive = isVip && typeof product.vipPriceUSD === "number" && product.vipPriceUSD > 0;
+  const vipLocked = !isVip && hasVipPrice(product) && typeof product.vipPriceUSD === "number";
 
   const getVariantStyles = () => {
     // Use minHeight instead of fixed height to allow content to grow
@@ -453,9 +460,22 @@ const ProductCard: React.FC<ProductCardProps> = ({
             minimumFontScale={0.85}
             style={[
               styles.price,
-              { color: theme.colors.primary, fontSize: adjustFontSize(15) },
+              { color: vipActive ? "#7C3AED" : theme.colors.primary, fontSize: adjustFontSize(15) },
             ]}
           />
+          {vipActive && (
+            <View style={[styles.vipTag, { backgroundColor: "#7C3AED" }]}>
+              <AppText fontSize={9} style={styles.vipTagText}>VIP</AppText>
+            </View>
+          )}
+          {vipLocked && (
+            <View style={styles.vipLockRow}>
+              <Ionicons name="lock-closed" size={10} color={theme.colors.textSecondary} />
+              <AppText fontSize={10} style={[styles.vipLockText, { color: theme.colors.textSecondary }]}>
+                {formatPrice(product.vipPriceUSD as number, currency, exchangeRateIQD, { symbol: true })} VIP
+              </AppText>
+            </View>
+          )}
         </View>
 
         {showAddToCart &&
@@ -612,6 +632,27 @@ const styles = StyleSheet.create({
   },
   price: {
     fontWeight: "bold",
+  },
+  vipTag: {
+    alignSelf: "flex-start",
+    borderRadius: 5,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    marginTop: 2,
+  },
+  vipTagText: {
+    color: "#FFFFFF",
+    fontWeight: "800",
+    letterSpacing: 0.5,
+  },
+  vipLockRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    marginTop: 2,
+  },
+  vipLockText: {
+    fontWeight: "700",
   },
   addToCartButton: {
     alignItems: "center",

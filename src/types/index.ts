@@ -99,7 +99,16 @@ export interface ColorVariation {
   colorValue: string;            // Color name (e.g., 'Blue', 'Red', 'Black')
   colorHex?: string;             // Optional hex code for display (e.g., '#0000FF')
   priceUSD?: number;             // Optional price override
+  imageUrl?: string;             // Optional per-color image (swaps the hero when selected)
   stockQuantity: number;         // Per-color stock
+}
+
+// Storage/capacity option (e.g. iPhone 256GB / 512GB / 1TB). priceDelta is added
+// to the product's base price when selected. Opaque JSONB in the parts table.
+export interface StorageOption {
+  id: string;                    // Unique id (e.g. 'stor_256')
+  label: string;                 // Display label (e.g. '256GB', '1TB')
+  priceDelta: number;            // USD added to the base price (0 for the default)
 }
 
 export interface Product {
@@ -114,6 +123,7 @@ export interface Product {
   imageUrls: string[];  // Match what ProductCard expects
   priceUSD: number;
   compareAtPriceUSD?: number; // "was" price for showing a strikethrough + Save% discount
+  vipPriceUSD?: number;      // Special price shown only to VIP users (locked/hinted for others)
   purchasePrice?: number;    // Cost/buy price from supplier (admin-only, not shown to customers)
   priceTiers?: PriceTier[];  // Quantity-based pricing tiers (wholesale pricing)
   shippingCost?: number; // Individual shipping cost for this product in USD
@@ -155,6 +165,8 @@ export interface Product {
   // ALIBABA VARIATION: Per-color stock management (replaces cosmetic options.colors)
   // If present, each color has its own stock and optional price override
   colorVariations?: ColorVariation[];
+  // Storage/capacity options (e.g. iPhone 256GB / 512GB / 1TB); selection adds priceDelta
+  storageOptions?: StorageOption[];
   // Video support: optional product video URL (BunnyCDN/Cloud)
   videoUrl?: string;
   tenantId?: string;
@@ -174,6 +186,7 @@ export interface CartItem {
   selectedOptions?: {
     color?: string;
     size?: string;
+    storage?: string;
   };
   // ALIBABA VARIATION: Track variationId for per-size stock items
   variationId?: string;
