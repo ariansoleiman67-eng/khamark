@@ -141,7 +141,7 @@ export const ProductDetailsScreen: React.FC = () => {
   const scrollViewRef = useRef<ScrollView>(null); // FIXED: Add missing ref
   const imageRef = useRef<View>(null); // FIXED: Add missing ref
 
-  const { productId } = route.params;
+  const { productId } = route.params ?? {};
 
   // State
   const [product, setProduct] = useState<Product | null>(null);
@@ -539,6 +539,14 @@ export const ProductDetailsScreen: React.FC = () => {
   };
 
   const loadProductData = async () => {
+    // Guard against a missing/empty productId (e.g. a malformed deep link or a
+    // navigate('ProductDetails') without params). Fall through to the "not found"
+    // branch instead of fetching with an undefined id.
+    if (!productId) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -1141,7 +1149,26 @@ export const ProductDetailsScreen: React.FC = () => {
         const allSelections = [...sizeSelections, ...colorSelectionsData];
         await addVariationsToCart(product, allSelections);
       } else {
-        await addToCart(product.id, orderData.quantity, product);
+        // Simple product (incl. phone-style storage products): bake the storage
+        // price delta into the cart line and forward the selected cosmetic options
+        // so the correct price + selection persist (mirrors handleAddToCart).
+        const storageLabel = storageOptions.find((s) => s.id === effectiveStorageId && s.priceDelta >= 0)?.label;
+        const selectedOptions: { color?: string; size?: string; storage?: string } | undefined =
+          selectedColor || selectedSize || (storageLabel && storageOptions.length > 0)
+            ? {
+                ...(selectedColor && { color: selectedColor }),
+                ...(selectedSize && { size: selectedSize }),
+                ...(storageOptions.length > 0 && storageLabel && { storage: storageLabel }),
+              }
+            : undefined;
+        const productForCart = storageDelta > 0
+          ? {
+              ...product,
+              priceUSD: product.priceUSD + storageDelta,
+              vipPriceUSD: typeof product.vipPriceUSD === 'number' ? product.vipPriceUSD + storageDelta : undefined,
+            }
+          : product;
+        await addToCart(product.id, orderData.quantity, productForCart, selectedOptions);
       }
 
       // Fly-to-cart animation
@@ -1214,8 +1241,26 @@ export const ProductDetailsScreen: React.FC = () => {
         const allSelections = [...sizeSelections, ...colorSelectionsData];
         await addVariationsToCart(product, allSelections);
       } else {
-        // Simple product without variations
-        await addToCart(product.id, orderData.quantity, product);
+        // Simple product without variations (incl. phone-style storage products):
+        // bake the storage price delta into the cart line and forward the selected
+        // cosmetic options so the correct price + selection persist (mirrors handleAddToCart).
+        const storageLabel = storageOptions.find((s) => s.id === effectiveStorageId && s.priceDelta >= 0)?.label;
+        const selectedOptions: { color?: string; size?: string; storage?: string } | undefined =
+          selectedColor || selectedSize || (storageLabel && storageOptions.length > 0)
+            ? {
+                ...(selectedColor && { color: selectedColor }),
+                ...(selectedSize && { size: selectedSize }),
+                ...(storageOptions.length > 0 && storageLabel && { storage: storageLabel }),
+              }
+            : undefined;
+        const productForCart = storageDelta > 0
+          ? {
+              ...product,
+              priceUSD: product.priceUSD + storageDelta,
+              vipPriceUSD: typeof product.vipPriceUSD === 'number' ? product.vipPriceUSD + storageDelta : undefined,
+            }
+          : product;
+        await addToCart(product.id, orderData.quantity, productForCart, selectedOptions);
       }
 
       // Fly-to-cart animation for visual feedback
@@ -2071,6 +2116,8 @@ export const ProductDetailsScreen: React.FC = () => {
                   {product.colorVariations.map((colorVar, index) => {
                     const isOutOfStock = colorVar.stockQuantity <= 0;
                     const currentQty = colorVariationQuantities[colorVar.variationId] || 0;
+                    // colorValue comes from admin-entered DB JSON and may be null/empty.
+                    const cv = colorVar.colorValue || '';
 
                     return (
                       <View
@@ -2092,7 +2139,7 @@ export const ProductDetailsScreen: React.FC = () => {
                               width: 20,
                               height: 20,
                               borderRadius: 10,
-                              backgroundColor: colorVar.colorHex || colorVar.colorValue.toLowerCase(),
+                              backgroundColor: colorVar.colorHex || cv.toLowerCase() || '#ccc',
                               borderWidth: 1,
                               borderColor: theme.colors.border,
                               marginRight: isRTL ? 0 : 8,
@@ -2110,7 +2157,7 @@ export const ProductDetailsScreen: React.FC = () => {
                             ]}
                             numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}
                           >
-                            {t(`product.colors.${colorVar.colorValue.toLowerCase()}`, colorVar.colorValue)}
+                            {t(`product.colors.${cv.toLowerCase()}`, cv)}
                           </Text>
                         </View>
 
@@ -2206,8 +2253,9 @@ export const ProductDetailsScreen: React.FC = () => {
                       🎨 {t('product.selectColor', { defaultValue: 'Select Color' })}
                     </Text>
                     <View style={styles.optionChipsContainer}>
-                      {product.options.colors.map(color => {
-                        const isLightColor = ['white', 'yellow', 'cream', 'ivory', 'beige', 'lightgray', 'silver'].includes(color.toLowerCase());
+                      {product.options.colors.filter(color => !!color).map(color => {
+                        const colorLower = (color || '').toLowerCase();
+                        const isLightColor = ['white', 'yellow', 'cream', 'ivory', 'beige', 'lightgray', 'silver'].includes(colorLower);
                         const textColor = isLightColor ? '#000000' : '#FFFFFF';
                         const isSelected = selectedColor === color;
 
@@ -2218,7 +2266,7 @@ export const ProductDetailsScreen: React.FC = () => {
                               styles.optionChip,
                               {
                                 borderColor: isSelected ? theme.colors.primary : theme.colors.border,
-                                backgroundColor: color.toLowerCase(),
+                                backgroundColor: colorLower,
                               },
                             ]}
                             onPress={() => toggleColor(color)}

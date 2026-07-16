@@ -14,9 +14,10 @@ export const formatCurrencyUSD = (
     symbol = true,
   } = options;
 
-  // Handle negative numbers
-  const isNegative = amount < 0;
-  const absAmount = Math.abs(amount);
+  // Handle negative / non-finite numbers
+  const safe = Number.isFinite(amount) ? amount : 0;
+  const isNegative = safe < 0;
+  const absAmount = Math.abs(safe);
 
   // Format with thousand separators
   const formatNumber = (num: number): string => {
@@ -101,7 +102,7 @@ export const roundIQD = (amountIQD: number): number => {
 };
 
 export const convertUSDToIQD = (amountUSD: number, exchangeRate: number = 1500): number => {
-  if (!amountUSD) return 0;
+  if (!Number.isFinite(amountUSD) || !amountUSD) return 0;
   const rawIQD = amountUSD * exchangeRate;
   return roundIQD(rawIQD);
 };
@@ -116,8 +117,9 @@ export const formatCurrencyIQD = (
 ): string => {
   const { compact = false, symbol = true, symbolText = 'IQD ' } = options;
 
-  const isNegative = amount < 0;
-  const absAmount = Math.abs(amount);
+  const safe = Number.isFinite(amount) ? amount : 0;
+  const isNegative = safe < 0;
+  const absAmount = Math.abs(safe);
 
   const formatNumber = (num: number): string => {
     if (compact && num >= 1000000) {
@@ -300,6 +302,7 @@ export const formatPhoneIQ = (phone: string): string => {
 
 // Percentage formatting
 export const formatPercentage = (value: number, decimals: number = 1): string => {
+  if (!Number.isFinite(value)) return '';
   return `${value.toFixed(decimals)}%`;
 };
 
@@ -313,11 +316,12 @@ export const formatWeight = (weightKg: number): string => {
 };
 
 // Dimensions formatting
-export const formatDimensions = (dimensions: {
+export const formatDimensions = (dimensions?: {
   length: number;
   width: number;
   height: number;
-}): string => {
+} | null): string => {
+  if (!dimensions) return '';
   const { length, width, height } = dimensions;
   return `${length} × ${width} × ${height} cm`;
 };
@@ -333,8 +337,8 @@ export const formatDistance = (distanceKm: number): string => {
 
 
 // Create an alias for backward compatibility
-export const formatCurrency = (amount: number, currency = 'USD'): string => {
-  return formatCurrencyUSD(amount, { symbol: true });
+export const formatCurrency = (amount: number, currency: 'USD' | 'IQD' = 'USD'): string => {
+  return formatPrice(amount, currency);
 };
 
 // Localized relative date formatting with i18n support

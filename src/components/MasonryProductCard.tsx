@@ -65,6 +65,18 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
   const [imageError, setImageError] = useState(false);
   const [thumbFailed, setThumbFailed] = useState(false);
 
+  // FlashList (SearchScreen) recycles this component instance across products,
+  // so transient per-image failure state must be reset when the card lands on a
+  // new product. `recyclingKey` only resets expo-image's loader, not these flags.
+  // Render-phase reset (vs. useEffect) avoids a one-frame flash of the stale
+  // broken-image placeholder on the new product.
+  const [lastProductId, setLastProductId] = useState(product.id);
+  if (lastProductId !== product.id) {
+    setLastProductId(product.id);
+    setImageError(false);
+    setThumbFailed(false);
+  }
+
   const isRTL =
     I18nManager.isRTL || i18n.language === "ar" || i18n.language === "ku";
   const textAlign = isRTL ? "right" : "left";

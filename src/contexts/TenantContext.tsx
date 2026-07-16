@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '../services/supabase';
 
@@ -72,21 +72,37 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // In-flight mutexes so a double-tap (common on slow networks) can't fire the
+  // SECURITY DEFINER account-creation RPCs twice. isLoading is display state, not
+  // a synchronous lock, so we use refs which update immediately.
+  const creatingAdminRef = useRef(false);
+  const creatingPartnerRef = useRef(false);
+
   useEffect(() => {
+    // Guard against stale in-flight resolutions overwriting state after `user`
+    // changes (logout / account switch / realtime users-row UPDATE). React does
+    // not cancel the previous run's promise, so we discard its writes explicitly.
+    let cancelled = false;
+
     const fetchAdminData = async () => {
       if (!user || !user.uid) {
-        setTenantId(null);
-        setTenant(null);
-        setAdminProfile(null);
-        setIsLoading(false);
+        if (!cancelled) {
+          setTenantId(null);
+          setTenant(null);
+          setAdminProfile(null);
+          setIsLoading(false);
+        }
         return;
       }
 
-      setIsLoading(true);
-      setError(null);
+      if (!cancelled) {
+        setIsLoading(true);
+        setError(null);
+      }
 
       try {
         const { data: userData, error: userError } = await supabase.from('users').select('*').eq('id', user.uid).single();
+        if (cancelled) return;
         if (userError) throw userError;
 
         if (userData?.is_admin) {
@@ -100,11 +116,12 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             createdAt: userData.created_at,
             updatedAt: userData.updated_at,
           };
-          
+
           setAdminProfile(adminData);
           setTenantId(adminData.tenantId);
 
           const { data: tenantData } = await supabase.from('tenants').select('*').eq('id', adminData.tenantId).single();
+          if (cancelled) return;
           if (tenantData) {
             setTenant({
               id: tenantData.id,
@@ -122,76 +139,90 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           setTenant(null);
         }
       } catch (err: any) {
-        console.error('Error fetching admin data:', err);
-        setError(err.message || 'Failed to load admin data');
+        if (!cancelled) {
+          console.error('Error fetching admin data:', err);
+          setError(err.message || 'Failed to load admin data');
+        }
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
 
     fetchAdminData();
+
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
   const createAdminAccount = useCallback(async (displayName: string, storeName: string, phone?: string, whatsapp?: string) => {
-    // Read the session DIRECTLY. During signup, registerWithPhone has just created the
-    // session, but the AuthContext `user` (derived from the users row via onAuthStateChange)
-    // hasn't updated this tick yet — relying on it caused a false
-    // "User must be authenticated to create admin account". The session is available
-    // immediately, so use its uid/email and fall back to `user` for the upgrade-in-app case.
-    const { data: { session } } = await supabase.auth.getSession();
-    const uid = session?.user?.id || user?.uid;
-    if (!uid) throw new Error('User must be authenticated to create admin account');
-    const email = session?.user?.email || user?.email || '';
-    const phoneVal = phone || user?.phone || '';
-
+    // Ignore re-entrant taps: a second concurrent RPC runs against the now-already-admin
+    // row and either errors on a unique constraint or inserts a duplicate tenant.
+    if (creatingAdminRef.current) return;
+    creatingAdminRef.current = true;
     try {
-      setIsLoading(true);
-      setError(null);
+      // Read the session DIRECTLY. During signup, registerWithPhone has just created the
+      // session, but the AuthContext `user` (derived from the users row via onAuthStateChange)
+      // hasn't updated this tick yet — relying on it caused a false
+      // "User must be authenticated to create admin account". The session is available
+      // immediately, so use its uid/email and fall back to `user` for the upgrade-in-app case.
+      const { data: { session } } = await supabase.auth.getSession();
+      const uid = session?.user?.id || user?.uid;
+      if (!uid) throw new Error('User must be authenticated to create admin account');
+      const email = session?.user?.email || user?.email || '';
+      const phoneVal = phone || user?.phone || '';
 
-      // Elevate to admin + create the tenant via the create_admin_account RPC. A direct
-      // client UPDATE of role/is_admin is reverted by the prevent_privilege_escalation
-      // trigger (correct security), so admin creation must go through this SECURITY
-      // DEFINER function. Requires the migration that defines it to be applied.
-      const { error: rpcErr } = await supabase.rpc('create_admin_account', {
-        p_display_name: displayName,
-        p_store_name: storeName,
-        p_phone: phoneVal || null,
-        p_whatsapp: whatsapp || null,
-      });
-      if (rpcErr) throw rpcErr;
+      try {
+        setIsLoading(true);
+        setError(null);
 
-      setTenantId(uid);
+        // Elevate to admin + create the tenant via the create_admin_account RPC. A direct
+        // client UPDATE of role/is_admin is reverted by the prevent_privilege_escalation
+        // trigger (correct security), so admin creation must go through this SECURITY
+        // DEFINER function. Requires the migration that defines it to be applied.
+        const { error: rpcErr } = await supabase.rpc('create_admin_account', {
+          p_display_name: displayName,
+          p_store_name: storeName,
+          p_phone: phoneVal || null,
+          p_whatsapp: whatsapp || null,
+        });
+        if (rpcErr) throw rpcErr;
 
-      const adminData: AdminDocument = {
-        uid,
-        email,
-        phone: phoneVal,
-        displayName,
-        tenantId: uid,
-        role: 'owner',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setAdminProfile(adminData);
+        setTenantId(uid);
 
-      setTenant({
-        id: uid,
-        name: storeName,
-        ownerUid: uid,
-        ownerEmail: email,
-        phone: phoneVal,
-        whatsapp,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        settings: { currency: 'USD', timezone: 'Asia/Baghdad', language: 'en' },
-      });
+        const adminData: AdminDocument = {
+          uid,
+          email,
+          phone: phoneVal,
+          displayName,
+          tenantId: uid,
+          role: 'owner',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        setAdminProfile(adminData);
 
-    } catch (err: any) {
-      console.error('Error creating admin account:', err);
-      setError(err.message || 'Failed to create admin account');
-      throw err;
+        setTenant({
+          id: uid,
+          name: storeName,
+          ownerUid: uid,
+          ownerEmail: email,
+          phone: phoneVal,
+          whatsapp,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          settings: { currency: 'USD', timezone: 'Asia/Baghdad', language: 'en' },
+        });
+
+      } catch (err: any) {
+        console.error('Error creating admin account:', err);
+        setError(err.message || 'Failed to create admin account');
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
     } finally {
-      setIsLoading(false);
+      creatingAdminRef.current = false;
     }
   }, [user]);
 
@@ -203,23 +234,30 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // Promote the signed-in user to a VIEW-ONLY partner (no store). Mirrors createAdminAccount
   // but via the create_partner_account RPC. The owner shares products to them afterward.
   const createPartnerAccount = useCallback(async (displayName: string, phone?: string) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    const uid = session?.user?.id || user?.uid;
-    if (!uid) throw new Error('User must be authenticated to create partner account');
+    // Ignore re-entrant taps so the create_partner_account RPC can't double-insert.
+    if (creatingPartnerRef.current) return;
+    creatingPartnerRef.current = true;
     try {
-      setIsLoading(true);
-      setError(null);
-      const { error: rpcErr } = await supabase.rpc('create_partner_account', {
-        p_display_name: displayName,
-        p_phone: phone || null,
-      });
-      if (rpcErr) throw rpcErr;
-    } catch (err: any) {
-      console.error('Error creating partner account:', err);
-      setError(err.message || 'Failed to create partner account');
-      throw err;
+      const { data: { session } } = await supabase.auth.getSession();
+      const uid = session?.user?.id || user?.uid;
+      if (!uid) throw new Error('User must be authenticated to create partner account');
+      try {
+        setIsLoading(true);
+        setError(null);
+        const { error: rpcErr } = await supabase.rpc('create_partner_account', {
+          p_display_name: displayName,
+          p_phone: phone || null,
+        });
+        if (rpcErr) throw rpcErr;
+      } catch (err: any) {
+        console.error('Error creating partner account:', err);
+        setError(err.message || 'Failed to create partner account');
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
     } finally {
-      setIsLoading(false);
+      creatingPartnerRef.current = false;
     }
   }, [user]);
 

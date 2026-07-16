@@ -345,6 +345,9 @@ class DiscountService {
       const discount = await this.getDiscountById(discountId);
       if (discount) {
         await this.updateDiscount(discountId, { usageCount: discount.usageCount + 1 });
+        // Invalidate the tenant cache so a discount that just reached its usage
+        // limit is not re-offered/applied from the (up to 5-min) stale snapshot.
+        if (tenantId) delete this.tenantCache[tenantId];
       }
     } catch (error) {
       console.error('Error incrementing usage count:', error);
@@ -369,7 +372,7 @@ class DiscountService {
     return 'active';
   }
 
-  async getPotentialDiscounts(cart: Cart): Promise<{ discount: Discount; missingQuantity?: number; missingAmount?: number }[]> {
+  async getPotentialDiscounts(cart: Cart, isVip: boolean = false): Promise<{ discount: Discount; missingQuantity?: number; missingAmount?: number }[]> {
     try {
       const itemsByTenant = new Map<string, CartItem[]>();
       
@@ -387,11 +390,11 @@ class DiscountService {
 
       for (const [tenantId, items] of itemsByTenant) {
         const tenantDiscounts = await this.getActiveDiscountsByTenant(tenantId);
-        const subtotal = items.reduce((sum, item) => sum + (item.product.priceUSD * item.quantity), 0);
+        const subtotal = lineSubtotal(items, isVip);
         const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
 
         for (const discount of tenantDiscounts) {
-          const check = this.isDiscountApplicableToItems(items, discount);
+          const check = this.isDiscountApplicableToItems(items, discount, isVip);
           if (check.applicable) continue;
 
           if (!discount.isActive || (discount.usageLimit && discount.usageCount >= discount.usageLimit)) continue;

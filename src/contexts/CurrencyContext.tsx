@@ -21,15 +21,18 @@ export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [exchangeRateIQD, setExchangeRateIQD] = useState<number>(1500);
   const [exchangeRateLoaded, setExchangeRateLoaded] = useState(false);
   const { user } = useAuth();
-  const rateLoadedFromCache = useRef(false);
+  // Guards the mount-time race between the cache-hydration effect and the
+  // server-fetch effect: once the server rate has been applied, a late-resolving
+  // cache read must NOT overwrite it with a stale value.
+  const serverRateApplied = useRef(false);
 
   useEffect(() => {
     AsyncStorage.getItem(EXCHANGE_RATE_CACHE_KEY).then(cached => {
       if (cached) {
         const parsed = parseFloat(cached);
-        if (!isNaN(parsed) && parsed > 0) {
+        // Only seed from cache if the server hasn't already applied a fresher rate.
+        if (!isNaN(parsed) && parsed > 0 && !serverRateApplied.current) {
           setExchangeRateIQD(parsed);
-          rateLoadedFromCache.current = true;
         }
       }
     });
@@ -44,8 +47,9 @@ export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const applyRate = (rate: unknown) => {
       const n = Number(rate);
       if (n > 0) {
+        serverRateApplied.current = true;
         setExchangeRateIQD(n);
-        AsyncStorage.setItem(EXCHANGE_RATE_CACHE_KEY, String(n));
+        AsyncStorage.setItem(EXCHANGE_RATE_CACHE_KEY, String(n)).catch(() => {});
       }
     };
 

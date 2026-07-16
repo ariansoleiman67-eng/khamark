@@ -115,13 +115,18 @@ export class ProductService {
   static async getProducts(
     filters: SearchFilters = {},
     pageInfo: PaginationInfo = { page: 1, limit: PAGINATION.PRODUCTS_PER_PAGE, total: 0, hasMore: true },
-    tenantId?: string
+    tenantId?: string,
+    forceRefresh = false
   ): Promise<{ products: Product[]; pagination: PaginationInfo }> {
     if (USE_MOCK_DATA) return mockGetProducts(filters, pageInfo);
     try {
       const cacheKey = `products_${JSON.stringify(filters)}_${pageInfo.page}_${pageInfo.limit}_${tenantId || 'global'}`;
-      const cached = await this.getCachedData(cacheKey);
-      if (cached && !this.isCacheExpired(cached.timestamp)) return cached.data;
+      // forceRefresh skips the cache read (e.g. realtime change events) so we
+      // always serve the freshly-changed row instead of stale-but-unexpired cache.
+      if (!forceRefresh) {
+        const cached = await this.getCachedData(cacheKey);
+        if (cached && !this.isCacheExpired(cached.timestamp)) return cached.data;
+      }
 
       let query = supabase.from('parts').select(LIST_COLUMNS);
 
@@ -200,7 +205,12 @@ export class ProductService {
       if (error) throw error;
 
       const searchLower = searchQuery.toLowerCase();
-      let searchResults = (data || []).map(mapProduct).filter((p: any) => {
+      let searchResults = (data || [])
+        .map(mapProduct)
+        // Hide deactivated/hidden products from search, matching getProducts,
+        // getProductsByTenantId, getFeaturedProducts and getProductsByCategory.
+        .filter((p: any) => p.isActive !== false)
+        .filter((p: any) => {
         if (
           (p.name && p.name.toLowerCase().includes(searchLower)) ||
           (p.nameAr && p.nameAr.toLowerCase().includes(searchLower)) ||
@@ -215,7 +225,9 @@ export class ProductService {
 
       if (filters.minPrice != null) searchResults = searchResults.filter(p => (p.priceUSD || 0) >= filters.minPrice!);
       if (filters.maxPrice != null) searchResults = searchResults.filter(p => (p.priceUSD || 0) <= filters.maxPrice!);
-      if (filters.inStock) searchResults = searchResults.filter(p => (p.stockQty || 0) > 0);
+      // Use the computed inStock (counts variation/color stock + respects status),
+      // not raw stock_qty which is 0 for variation products — matches getProducts.
+      if (filters.inStock) searchResults = searchResults.filter(p => p.inStock);
 
       await this.setCachedData(cacheKey, searchResults);
       return searchResults;
@@ -324,6 +336,10 @@ export class ProductService {
   // Cached + stale-while-revalidate per tenant (powers Search & Store screens).
   // Pass forceRefresh=true (pull-to-refresh) to bypass the cache.
   static async getProductsByTenantId(tenantId: string, forceRefresh = false): Promise<Product[]> {
+    if (USE_MOCK_DATA) {
+      const res = await mockGetProducts({}, { page: 1, limit: 200, total: 0, hasMore: true });
+      return res.products;
+    }
     const cacheKey = `products_by_tenant_${tenantId}`;
     const fetcher = async (): Promise<Product[]> => {
       const { data, error } = await supabase
@@ -424,9 +440,15 @@ export class ProductService {
       'postgres_changes',
       { event: '*', schema: 'public', table: 'parts' },
       async () => {
-        // Simple strategy: just re-fetch the first page on change
-        const result = await this.getProducts(filters, { page: 1, limit: 50, total: 0, hasMore: true }, tenantId);
-        callback(result.products);
+        // Simple strategy: just re-fetch the first page on change.
+        // Bypass the cache (forceRefresh) so a change event serves the fresh row,
+        // and swallow errors so a failed fetch can't become an unhandled rejection.
+        try {
+          const result = await this.getProducts(filters, { page: 1, limit: 50, total: 0, hasMore: true }, tenantId, true);
+          callback(result.products);
+        } catch (error) {
+          console.error('Error refreshing products on realtime change:', error);
+        }
       }
     ).subscribe();
 

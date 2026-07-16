@@ -31,16 +31,35 @@ const normalize = (code: string) => code.trim().toUpperCase();
 async function readMock(): Promise<Promo[]> {
   try {
     const raw = await AsyncStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      // Only trust valid-JSON-AND-array payloads; a non-array (e.g. `{}`, `42`,
+      // `null` from a corrupt/partial write) would crash getAll().sort() etc.
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
   } catch {
     // fall through to seed
   }
+  // Best-effort seed write; failure here is non-fatal (we still return the seed).
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(SEED_PROMOS)).catch(() => {});
   return SEED_PROMOS.slice();
 }
 
 async function writeMock(promos: Promo[]): Promise<void> {
-  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(promos)).catch(() => {});
+  // Let persistence failures reject so save()/remove() callers can surface them
+  // instead of reporting a success that never hit disk.
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(promos));
+}
+
+// Serialize all mock mutations so overlapping save()/remove() read-modify-write
+// cycles can't clobber each other (AsyncStorage has no atomic update). Each op is
+// chained after the previous, whether it resolved or rejected, and the caller still
+// sees its own op's result/rejection.
+let mutationQueue: Promise<unknown> = Promise.resolve();
+function enqueue<T>(op: () => Promise<T>): Promise<T> {
+  const run = mutationQueue.then(op, op);
+  mutationQueue = run.catch(() => {});
+  return run;
 }
 
 // The USD amount a promo takes off a given subtotal (0 if it doesn't qualify).
@@ -73,28 +92,31 @@ export const promoService = {
 
   async save(promo: Partial<Promo> & { code: string }): Promise<Promo> {
     if (USE_MOCK_DATA) {
-      const promos = await readMock();
-      const code = normalize(promo.code);
-      if (promo.id) {
-        const idx = promos.findIndex((p) => p.id === promo.id);
-        if (idx >= 0) {
-          promos[idx] = { ...promos[idx], ...promo, code } as Promo;
-          await writeMock(promos);
-          return promos[idx];
+      return enqueue(async () => {
+        const promos = await readMock();
+        const code = normalize(promo.code);
+        if (promo.id) {
+          const idx = promos.findIndex((p) => p.id === promo.id);
+          if (idx >= 0) {
+            promos[idx] = { ...promos[idx], ...promo, code } as Promo;
+            await writeMock(promos);
+            return promos[idx];
+          }
         }
-      }
-      const created: Promo = {
-        id: `promo-${code.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`,
-        code,
-        type: promo.type ?? 'percentage',
-        value: promo.value ?? 0,
-        minPurchase: promo.minPurchase,
-        isActive: promo.isActive ?? true,
-        sortOrder: promo.sortOrder ?? promos.length,
-      };
-      promos.push(created);
-      await writeMock(promos);
-      return created;
+        const created: Promo = {
+          // Extra random suffix so two creates in the same millisecond can't collide.
+          id: `promo-${code.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+          code,
+          type: promo.type ?? 'percentage',
+          value: promo.value ?? 0,
+          minPurchase: promo.minPurchase,
+          isActive: promo.isActive ?? true,
+          sortOrder: promo.sortOrder ?? promos.length,
+        };
+        promos.push(created);
+        await writeMock(promos);
+        return created;
+      });
     }
     // TODO(live): upsert into Supabase.
     return {
@@ -110,8 +132,10 @@ export const promoService = {
 
   async remove(id: string): Promise<void> {
     if (USE_MOCK_DATA) {
-      const promos = (await readMock()).filter((p) => p.id !== id);
-      await writeMock(promos);
+      await enqueue(async () => {
+        const promos = (await readMock()).filter((p) => p.id !== id);
+        await writeMock(promos);
+      });
       return;
     }
     // TODO(live): delete from Supabase.

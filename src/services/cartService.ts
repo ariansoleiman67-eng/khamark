@@ -36,6 +36,15 @@ export class CartService {
           return cart;
         }
 
+        // Distinguish a genuine "no rows" result (PostgREST code PGRST116),
+        // which means the cart truly doesn't exist yet, from a transient
+        // network/DB error. A transient failure must NOT be fabricated into an
+        // empty cart and cached for 5 minutes, otherwise the user's real cart
+        // appears empty until the cache expires.
+        if (error && error.code !== 'PGRST116') {
+          throw error;
+        }
+
         // Create empty cart if doesn't exist
         const newCart: Cart = {
           userId,
@@ -54,14 +63,15 @@ export class CartService {
         await this.setCachedCart(userId, newCart);
         return newCart;
       } catch (dbError) {
-        // Create a local cart if DB fails
+        // Transient DB/network failure: return a local empty cart but do NOT
+        // cache it, so a recovered connection isn't blocked by a fabricated
+        // empty cart poisoning the 5-minute cache.
         const localCart: Cart = {
           userId,
           items: [],
           subtotalUSD: 0,
           updatedAt: new Date() as any,
         };
-        await this.setCachedCart(userId, localCart);
         return localCart;
       }
     } catch (error: any) {
@@ -290,18 +300,21 @@ export class CartService {
         let itemShipping = 0;
         const cityRates = item.product.shippingRates;
         if (cityRates && cityRates.length > 0) {
-          let cityRate = cityRates.find(rate => rate.city.trim().toLowerCase() === normalizedCity);
+          let cityRate = cityRates.find(rate => {
+            const rateCity = (rate?.city ?? '').trim().toLowerCase();
+            return !!rateCity && rateCity === normalizedCity;
+          });
           if (!cityRate && normalizedCity.length >= 3) {
             cityRate = cityRates.find(rate => {
-              const rateCity = rate.city.trim().toLowerCase();
-              return normalizedCity.includes(rateCity) || rateCity.includes(normalizedCity);
+              const rateCity = (rate?.city ?? '').trim().toLowerCase();
+              return !!rateCity && (normalizedCity.includes(rateCity) || rateCity.includes(normalizedCity));
             });
           }
           if (!cityRate && normalizedCity.length >= 4) {
             const cityStart = normalizedCity.slice(0, 4);
             cityRate = cityRates.find(rate => {
-              const rateCity = rate.city.trim().toLowerCase();
-              return rateCity.startsWith(cityStart) || cityStart.startsWith(rateCity.slice(0, 4));
+              const rateCity = (rate?.city ?? '').trim().toLowerCase();
+              return !!rateCity && (rateCity.startsWith(cityStart) || cityStart.startsWith(rateCity.slice(0, 4)));
             });
           }
           
@@ -341,19 +354,22 @@ export class CartService {
         const cityRates = item.product.shippingRates;
         
         if (cityRates && cityRates.length > 0) {
-          let matchedRate = cityRates.find(r => r.city.trim().toLowerCase() === normalizedCity);
+          let matchedRate = cityRates.find(r => {
+            const rateKey = (r?.city ?? '').trim().toLowerCase();
+            return !!rateKey && rateKey === normalizedCity;
+          });
           if (!matchedRate) {
              matchedRate = cityRates.find(rate => {
-                const rateKey = rate.city.trim().toLowerCase();
-                return (normalizedCity.length >= 3) && (normalizedCity.includes(rateKey) || rateKey.includes(normalizedCity));
+                const rateKey = (rate?.city ?? '').trim().toLowerCase();
+                return !!rateKey && (normalizedCity.length >= 3) && (normalizedCity.includes(rateKey) || rateKey.includes(normalizedCity));
              });
           }
           if (matchedRate) {
             itemShipping = matchedRate.price;
           } else {
             matchedRate = cityRates.find(r => {
-               const rateKey = r.city.trim().toLowerCase();
-               return normalizedCountry && (rateKey === normalizedCountry || (normalizedCountry.length >= 3 && (normalizedCountry.includes(rateKey) || rateKey.includes(normalizedCountry))));
+               const rateKey = (r?.city ?? '').trim().toLowerCase();
+               return !!rateKey && !!normalizedCountry && (rateKey === normalizedCountry || (normalizedCountry.length >= 3 && (normalizedCountry.includes(rateKey) || rateKey.includes(normalizedCountry))));
             });
             if (matchedRate) {
               itemShipping = matchedRate.price;
@@ -630,10 +646,17 @@ export class CartService {
           continue;
         }
 
+        // Unknown/invalid stock (null/undefined column) must not silently
+        // shrink the quantity to 0 and drop the item. Only a real number <= 0
+        // should remove it.
+        const latestStock = Number.isFinite(latestProduct.stockQty)
+          ? latestProduct.stockQty
+          : item.quantity;
+
         const updatedItem: CartItem = {
           ...item,
           product: latestProduct,
-          quantity: Math.min(item.quantity, latestProduct.stockQty),
+          quantity: Math.min(item.quantity, latestStock),
         };
 
         const productDataChanged = 

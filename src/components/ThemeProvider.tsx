@@ -37,7 +37,11 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     (themeMode === 'system' && systemColorScheme === 'dark');
 
   // Convert CustomTheme to Theme format for backward compatibility
-  const theme: Theme = useMemo<Theme>(() => (currentCustomTheme ? {
+  const theme: Theme = useMemo<Theme>(() => ((currentCustomTheme &&
+    currentCustomTheme.colors &&
+    currentCustomTheme.spacing &&
+    currentCustomTheme.borderRadius &&
+    currentCustomTheme.typography) ? {
     dark: currentCustomTheme.isDark,
     colors: {
       primary: currentCustomTheme.colors.primary,
@@ -87,8 +91,9 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
         const customization: ThemeCustomization = JSON.parse(savedCustomization);
         setThemeModeState(customization.mode);
         
-        if (customization.customTheme) {
-          setCurrentCustomThemeState(customization.customTheme);
+        const ct = customization.customTheme;
+        if (ct && ct.colors && ct.spacing && ct.borderRadius && ct.typography) {
+          setCurrentCustomThemeState(ct);
         } else if (customization.selectedPresetId) {
           const preset = getPresetById(customization.selectedPresetId);
           if (preset) {
@@ -99,7 +104,10 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
         // Fallback to old theme system
         const savedTheme = await AsyncStorage.getItem(CACHE_KEYS.THEME);
         if (savedTheme && Object.values(THEME_KEYS).includes(savedTheme as any)) {
-          setThemeModeState(savedTheme as ThemeMode);
+          // Route the legacy value through the full setter so currentCustomTheme
+          // is updated in tandem (avoids isDark/theme desync) and the value is
+          // migrated into the new THEME_CUSTOMIZATION storage.
+          setThemeMode(savedTheme as ThemeMode);
         }
       }
     } catch (error) {

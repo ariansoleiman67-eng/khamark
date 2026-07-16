@@ -134,6 +134,10 @@ export default function App() {
   useEffect(() => {
     if (isReady) {
       const t = setTimeout(() => {
+        // If onFinish never fires at all, this backstop is the only teardown path, so it
+        // must also hide the native splash — otherwise it would strand it on top of a
+        // fully-running app. hideAsync() is idempotent and safe to call more than once.
+        SplashScreenExpo.hideAsync().catch(() => {});
         setShowCustomSplash(false);
       }, 8000);
       return () => clearTimeout(t);
@@ -141,6 +145,11 @@ export default function App() {
   }, [isReady]);
 
   const handleSplashFinish = useCallback(() => {
+    // Hide the native splash on EVERY teardown path, not just the video's happy-path
+    // onStart(readyToPlay). The video-error and failsafe-timeout exits call onFinish
+    // without ever firing onStart, so without this the native splash would stay on top of
+    // the running app forever. hideAsync() is idempotent, so double-calling is harmless.
+    SplashScreenExpo.hideAsync().catch(() => {});
     setShowCustomSplash(false);
   }, []);
 

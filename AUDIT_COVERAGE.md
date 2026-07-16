@@ -25,7 +25,7 @@ Every source + config file. `[ ]` = not yet line-by-line read. `[x]` = fully rea
 - [ ] src/components/ColorPicker.tsx — 296 LOC
 - [ ] src/components/CountdownDisplay.tsx — 193 LOC
 - [ ] src/components/CurrencyPicker.tsx — 242 LOC
-- [ ] src/components/ErrorBoundary.tsx — 186 LOC
+- [x] src/components/ErrorBoundary.tsx (Wave1 audited+fixed) — 186 LOC
 - [ ] src/components/ForceUpdateModal.tsx — 461 LOC
 - [ ] src/components/FormScreenWrapper.tsx — 44 LOC
 - [ ] src/components/GoldenCarousel.tsx — 442 LOC
@@ -35,12 +35,12 @@ Every source + config file. `[ ]` = not yet line-by-line read. `[x]` = fully rea
 - [ ] src/components/LanguagePicker.tsx — 261 LOC
 - [ ] src/components/LiveOrderMap.tsx — 1057 LOC
 - [ ] src/components/Logo.tsx — 121 LOC
-- [ ] src/components/MasonryProductCard.tsx — 451 LOC
+- [x] src/components/MasonryProductCard.tsx (Wave1 audited+fixed) — 451 LOC
 - [ ] src/components/OrderStatusBadge.tsx — 174 LOC
 - [ ] src/components/PasswordPromptModal.tsx — 234 LOC
 - [ ] src/components/PhoneAuthModal.tsx — 321 LOC
 - [ ] src/components/PhoneInput.tsx — 632 LOC
-- [ ] src/components/ProductCard.tsx — 703 LOC
+- [x] src/components/ProductCard.tsx (Wave1 audited+fixed) — 703 LOC
 - [ ] src/components/PushInitializer.tsx — 73 LOC
 - [ ] src/components/ReauthModal.tsx — 463 LOC
 - [ ] src/components/RelatedProductCard.tsx — 309 LOC
@@ -53,7 +53,7 @@ Every source + config file. `[ ]` = not yet line-by-line read. `[x]` = fully rea
 - [ ] src/components/StaticSkeleton.tsx — 242 LOC
 - [ ] src/components/StoreHero.tsx — 411 LOC
 - [ ] src/components/StoreHoursCountdown.tsx — 241 LOC
-- [ ] src/components/ThemeProvider.tsx — 232 LOC
+- [x] src/components/ThemeProvider.tsx (Wave1 audited+fixed) — 232 LOC
 - [ ] src/components/VerificationCodeModal.tsx — 495 LOC
 - [ ] src/components/VoiceBubble.tsx — 309 LOC
 - [ ] src/components/chat/AttachmentMenu.tsx — 194 LOC
@@ -76,12 +76,12 @@ Every source + config file. `[ ]` = not yet line-by-line read. `[x]` = fully rea
 
 ## src/contexts
 
-- [ ] src/contexts/AuthContext.tsx — 289 LOC
-- [ ] src/contexts/CartContext.tsx — 503 LOC
-- [ ] src/contexts/CurrencyContext.tsx — 135 LOC
-- [ ] src/contexts/FavoritesContext.tsx — 138 LOC
-- [ ] src/contexts/NotificationContext.tsx — 185 LOC
-- [ ] src/contexts/TenantContext.tsx — 273 LOC
+- [x] src/contexts/AuthContext.tsx (Wave1 audited+fixed) — 289 LOC
+- [x] src/contexts/CartContext.tsx (Wave1 audited+fixed) — 503 LOC
+- [x] src/contexts/CurrencyContext.tsx (Wave1 audited+fixed) — 135 LOC
+- [x] src/contexts/FavoritesContext.tsx (Wave1 audited+fixed) — 138 LOC
+- [x] src/contexts/NotificationContext.tsx (Wave1 audited+fixed) — 185 LOC
+- [x] src/contexts/TenantContext.tsx (Wave1 audited+fixed) — 273 LOC
 
 ## src/features
 
@@ -125,26 +125,26 @@ Every source + config file. `[ ]` = not yet line-by-line read. `[x]` = fully rea
 ## src/navigation
 
 - [ ] src/navigation/AdminTabNavigator.tsx — 141 LOC
-- [ ] src/navigation/AppNavigator.tsx — 498 LOC
+- [x] src/navigation/AppNavigator.tsx (Wave1 audited+fixed) — 498 LOC
 - [ ] src/navigation/MessengerStack.tsx — 21 LOC
 - [ ] src/navigation/types.ts — 3 LOC
 
 ## src/screens
 
 - [ ] src/screens/BarcodeScannerScreen.tsx — 431 LOC
-- [ ] src/screens/CartScreen.tsx — 1171 LOC
+- [x] src/screens/CartScreen.tsx (Wave1 audited+fixed) — 1171 LOC
 - [ ] src/screens/CategoriesScreen.tsx — 1580 LOC
 - [ ] src/screens/CategoryProductsScreen.tsx — 201 LOC
 - [ ] src/screens/ChatScreen.tsx — 3125 LOC
 - [ ] src/screens/ChatbotScreen.tsx — 925 LOC
-- [ ] src/screens/CheckoutScreen.tsx — 2847 LOC
+- [x] src/screens/CheckoutScreen.tsx (Wave1 audited+fixed) — 2847 LOC
 - [ ] src/screens/FavoritesScreen.tsx — 366 LOC
 - [ ] src/screens/NotificationsScreen.tsx — 690 LOC
 - [ ] src/screens/OrderConfirmationScreen.tsx — 441 LOC
 - [ ] src/screens/OrderDetailScreen.tsx — 1553 LOC
 - [ ] src/screens/OrdersScreen.tsx — 1388 LOC
-- [ ] src/screens/ProductDetailsScreen.tsx — 3533 LOC
-- [ ] src/screens/ProfileScreen.tsx — 768 LOC
+- [x] src/screens/ProductDetailsScreen.tsx (Wave1 audited+fixed) — 3533 LOC
+- [x] src/screens/ProfileScreen.tsx (Wave1 audited+fixed) — 768 LOC
 - [ ] src/screens/QiCardPaymentScreen.tsx — 564 LOC
 - [ ] src/screens/SearchScreen.tsx — 1062 LOC
 - [ ] src/screens/StoreLocationScreen.tsx — 644 LOC
@@ -203,7 +203,7 @@ Every source + config file. `[ ]` = not yet line-by-line read. `[x]` = fully rea
 - [ ] src/screens/auth/SetNewPasswordScreen.tsx — 594 LOC
 - [ ] src/screens/auth/SignInScreen.tsx — 1287 LOC
 - [ ] src/screens/auth/VerifyPhoneScreen.tsx — 721 LOC
-- [ ] src/screens/main/HomeScreen.tsx — 792 LOC
+- [x] src/screens/main/HomeScreen.tsx (Wave1 audited+fixed) — 792 LOC
 - [ ] src/screens/messenger/ChatThreadScreen.tsx — 389 LOC
 - [ ] src/screens/messenger/ConversationsScreen.tsx — 1418 LOC
 - [ ] src/screens/profile/AccountSecurityScreen.tsx — 648 LOC
@@ -239,16 +239,16 @@ Every source + config file. `[ ]` = not yet line-by-line read. `[x]` = fully rea
 - [ ] src/services/auth/otpService.ts — 277 LOC
 - [ ] src/services/auth/phonePasswordAuth.ts — 155 LOC
 - [ ] src/services/auth/securityService.ts — 445 LOC
-- [ ] src/services/authService.ts — 630 LOC
+- [x] src/services/authService.ts (Wave1 audited+fixed) — 630 LOC
 - [ ] src/services/bannerService.ts — 115 LOC
 - [ ] src/services/brandService.ts — 104 LOC
-- [ ] src/services/cartService.ts — 718 LOC
+- [x] src/services/cartService.ts (Wave1 audited+fixed) — 718 LOC
 - [ ] src/services/categoryService.ts — 44 LOC
 - [ ] src/services/categoryStore.ts — 95 LOC
 - [ ] src/services/chatService.ts — 529 LOC
 - [ ] src/services/chatbotService.ts — 1440 LOC
 - [ ] src/services/credentialStorage.ts — 85 LOC
-- [ ] src/services/discountService.ts — 433 LOC
+- [x] src/services/discountService.ts (Wave1 audited+fixed) — 433 LOC
 - [ ] src/services/firebase.ts — 72 LOC
 - [ ] src/services/imageService.ts — 267 LOC
 - [ ] src/services/localCartService.ts — 461 LOC
@@ -256,13 +256,13 @@ Every source + config file. `[ ]` = not yet line-by-line read. `[x]` = fully rea
 - [ ] src/services/mockData.ts — 194 LOC
 - [ ] src/services/phoneAuthService.ts — 77 LOC
 - [ ] src/services/phoneNumberService.ts — 200 LOC
-- [ ] src/services/productService.ts — 500 LOC
-- [ ] src/services/promoService.ts — 120 LOC
+- [x] src/services/productService.ts (Wave1 audited+fixed) — 500 LOC
+- [x] src/services/promoService.ts (Wave1 audited+fixed) — 120 LOC
 - [ ] src/services/qiCardPaymentService.ts — 176 LOC
 - [ ] src/services/safeCallFunction.ts — 24 LOC
 - [ ] src/services/settingsService.ts — 69 LOC
 - [ ] src/services/storeProfileService.ts — 266 LOC
-- [ ] src/services/supabase.ts — 69 LOC
+- [x] src/services/supabase.ts (Wave1 audited+fixed) — 69 LOC
 - [ ] src/services/tenantAdminService.ts — 1542 LOC
 - [ ] src/services/tenantInfoService.ts — 59 LOC
 - [ ] src/services/videoService.ts — 257 LOC
@@ -288,7 +288,7 @@ Every source + config file. `[ ]` = not yet line-by-line read. `[x]` = fully rea
 - [ ] src/utils/cartUtils.ts — 76 LOC
 - [ ] src/utils/categoryIcons.ts — 37 LOC
 - [ ] src/utils/chatPreview.ts — 41 LOC
-- [ ] src/utils/currency.ts — 414 LOC
+- [x] src/utils/currency.ts (Wave1 audited+fixed) — 414 LOC
 - [ ] src/utils/dateUtils.ts — 187 LOC
 - [ ] src/utils/deviceUtils.ts — 68 LOC
 - [ ] src/utils/hashUtils.ts — 97 LOC
@@ -297,7 +297,7 @@ Every source + config file. `[ ]` = not yet line-by-line read. `[x]` = fully rea
 - [ ] src/utils/phoneUtils.ts — 480 LOC
 - [ ] src/utils/platform.ts — 116 LOC
 - [ ] src/utils/pricingUtils.test.ts — 70 LOC
-- [ ] src/utils/pricingUtils.ts — 112 LOC
+- [x] src/utils/pricingUtils.ts (Wave1 audited+fixed) — 112 LOC
 - [ ] src/utils/safeFirebaseCall.ts — 55 LOC
 - [ ] src/utils/timestampUtils.ts — 52 LOC
 - [ ] src/utils/whatsapp.ts — 17 LOC

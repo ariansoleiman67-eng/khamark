@@ -108,6 +108,14 @@ const HomeScreen: React.FC = () => {
   // Ref for scroll-to-top functionality
   const flatListRef = useRef<FlatList>(null);
   const paginationRef = useRef({ page: 1, hasMore: true });
+  // Monotonic token so an out-of-order (stale-tenant) load never clobbers a newer one.
+  const loadSeq = useRef(0);
+  // In-flight guard for pagination (onEndReached can fire multiple times per fling).
+  const loadingMoreRef = useRef(false);
+  // In-flight guard for the add-to-cart bottom-sheet confirm (double-tap protection).
+  const submittingRef = useRef(false);
+  // Always points at the LATEST loadData so the memoized onRefresh isn't stale.
+  const loadDataRef = useRef<() => Promise<void>>(async () => {});
 
   // State
   const [refreshing, setRefreshing] = useState(false);
@@ -141,31 +149,40 @@ const HomeScreen: React.FC = () => {
   );
 
   const loadData = async () => {
+    const seq = ++loadSeq.current;
     try {
       setLoading(true);
       await Promise.all([
-        loadBanners(),
-        loadNewArrivals(),
-        loadBrands(),
+        loadBanners(seq),
+        loadNewArrivals(seq),
+        loadBrands(seq),
       ]);
     } catch (error) {
-      Alert.alert(t('common.error'), t('errors.loadingData'));
+      // Only surface the error for the latest load — a superseded tenant load must stay quiet.
+      if (seq === loadSeq.current) Alert.alert(t('common.error'), t('errors.loadingData'));
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
   };
+  // Keep the ref pointing at the freshest closure (captures the live tenantId) so
+  // onRefresh (memoized with []) never runs a stale first-render loadData.
+  loadDataRef.current = loadData;
 
-  const loadBrands = async () => {
+  const loadBrands = async (seq?: number) => {
     try {
-      setManagedBrands(await brandService.getActiveBrands(tenantId || undefined));
+      const brands = await brandService.getActiveBrands(tenantId || undefined);
+      if (seq !== undefined && seq !== loadSeq.current) return;
+      setManagedBrands(brands);
     } catch {
+      if (seq !== undefined && seq !== loadSeq.current) return;
       setManagedBrands([]);
     }
   };
 
-  const loadBanners = async () => {
+  const loadBanners = async (seq?: number) => {
     try {
       const firestoreBanners = await bannerService.getBanners(true);
+      if (seq !== undefined && seq !== loadSeq.current) return;
       const next = firestoreBanners.length > 0 ? firestoreBanners.map(b => ({ uri: b.imageUrl })) : [];
       // Keep the SAME array reference when the banners haven't changed, so repeat
       // loads on mount (tenantId resolving in stages) don't re-render the memoized
@@ -175,17 +192,21 @@ const HomeScreen: React.FC = () => {
         return same ? prev : next;
       });
     } catch (error) {
+      if (seq !== undefined && seq !== loadSeq.current) return;
       setBannerImages((prev) => (prev.length === 0 ? prev : []));
     }
   };
 
-  const loadNewArrivals = async () => {
+  const loadNewArrivals = async (seq?: number) => {
     try {
       const { products, pagination } = await ProductService.getProducts(
         {}, // Use default sort (sortOrder first, then createdAt desc)
         { page: 1, limit: PAGE_SIZE, total: 0, hasMore: true }, // RESTORED PAGINATION
         tenantId ?? undefined
       );
+
+      // Drop this response if a newer (tenant-change / refresh) load has since started.
+      if (seq !== undefined && seq !== loadSeq.current) return;
 
       // Update pagination ref
       if (pagination) {
@@ -208,12 +229,14 @@ const HomeScreen: React.FC = () => {
         }
       }
     } catch (error) {
+      if (seq !== undefined && seq !== loadSeq.current) return;
       setNewArrivals([]);
     }
   };
 
   const loadMoreProducts = async () => {
-    if (!paginationRef.current.hasMore || loading) return;
+    if (!paginationRef.current.hasMore || loading || loadingMoreRef.current) return;
+    loadingMoreRef.current = true;
 
     try {
       const nextPage = paginationRef.current.page + 1;
@@ -252,6 +275,8 @@ const HomeScreen: React.FC = () => {
       }
     } catch (error) {
       // Silent fail for pagination
+    } finally {
+      loadingMoreRef.current = false;
     }
   };
 
@@ -262,7 +287,7 @@ const HomeScreen: React.FC = () => {
     } catch (error) {
       // Ignore cache clearing errors
     }
-    await loadData();
+    await loadDataRef.current();
     setRefreshing(false);
   }, []);
 
@@ -285,7 +310,8 @@ const HomeScreen: React.FC = () => {
     variationSelections?: any[];
     colorSelections?: any[];
   }) => {
-    if (!cartSheetProduct) return;
+    if (!cartSheetProduct || submittingRef.current) return;
+    submittingRef.current = true;
     try {
       // Check for variation selections
       const hasVarSelections = (orderData.variationSelections && orderData.variationSelections.length > 0) ||
@@ -304,6 +330,8 @@ const HomeScreen: React.FC = () => {
       if (error.message !== 'DIFFERENT_TENANT') {
         Alert.alert(t('common.error'), t('errors.addToCart'));
       }
+    } finally {
+      submittingRef.current = false;
     }
   }, [cartSheetProduct, addToCart, navigation, t]);
 

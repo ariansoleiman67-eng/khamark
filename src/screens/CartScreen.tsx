@@ -127,13 +127,19 @@ const CartItemComponent: React.FC<CartItemComponentProps> = ({
 
   // Calculate available stock based on variations
   const availableStock = React.useMemo(() => {
+    // Untrusted DB columns (stock_qty / variation stock) are typed `number` but can
+    // arrive null/NaN. Coerce every return to a finite number so downstream comparisons,
+    // Math.min and totals never produce null / 'null' text / NaN.
+    const toFiniteStock = (n: number | null | undefined): number =>
+      typeof n === 'number' && Number.isFinite(n) ? n : 0;
+
     // 1. Try to find by ID first
     if (item.variationId) {
       const sizeVar = item.product.variations?.find(v => v.variationId === item.variationId);
-      if (sizeVar) return sizeVar.stockQuantity;
+      if (sizeVar) return toFiniteStock(sizeVar.stockQuantity);
 
       const colorVar = item.product.colorVariations?.find(v => v.variationId === item.variationId);
-      if (colorVar) return colorVar.stockQuantity;
+      if (colorVar) return toFiniteStock(colorVar.stockQuantity);
     }
 
     // 2. Fallback to matching Selected Options
@@ -142,25 +148,25 @@ const CartItemComponent: React.FC<CartItemComponentProps> = ({
       const colorVal = item.selectedOptions.color?.trim().toLowerCase();
 
       if (sizeVal && item.product.variations) {
-        const v = item.product.variations.find(v => 
+        const v = item.product.variations.find(v =>
           v.variationId === item.variationId ||
-          v.sizeValue?.trim().toLowerCase() === sizeVal || 
+          v.sizeValue?.trim().toLowerCase() === sizeVal ||
           `${v.sizeValue} ${v.sizeUnit || ''}`.trim().toLowerCase() === sizeVal
         );
-        if (v) return v.stockQuantity;
+        if (v) return toFiniteStock(v.stockQuantity);
       }
 
       if (colorVal && item.product.colorVariations) {
-        const v = item.product.colorVariations.find(v => 
+        const v = item.product.colorVariations.find(v =>
           v.variationId === item.variationId ||
           v.colorValue?.trim().toLowerCase() === colorVal
         );
-        if (v) return v.stockQuantity;
+        if (v) return toFiniteStock(v.stockQuantity);
       }
     }
 
     // 3. Fallback to main stock
-    return item.product.stockQty;
+    return toFiniteStock(item.product.stockQty);
   }, [item.product, item.variationId, item.selectedOptions]);
 
   const handleQuantityChange = useCallback(async (newQuantity: number) => {
@@ -417,6 +423,8 @@ const CartScreen: React.FC = () => {
   
   const [isUpdating, setIsUpdating] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  // In-flight guard so a fast double-tap on Checkout can't push the screen twice.
+  const navigatingRef = React.useRef(false);
   const [appliedDiscount, setAppliedDiscount] = useState<AppliedDiscount | null>(null);
   const [discountLoading, setDiscountLoading] = useState(false);
   const [opportunities, setOpportunities] = useState<{ discount: Discount; missingQuantity?: number; missingAmount?: number }[]>([]);
@@ -488,10 +496,21 @@ const CartScreen: React.FC = () => {
     setRefreshing(false);
   }, [refreshCart]);
 
+  // Reset the checkout navigation guard whenever the cart regains focus
+  // (returning from Checkout or the login gate), so checkout can be tapped again.
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      navigatingRef.current = false;
+    });
+    return unsubscribe;
+  }, [navigation]);
+
   // Use useAuthGate for checkout
   const handleCheckout = useCallback(() => {
     if (!cart?.items.length) return;
-    
+    if (navigatingRef.current) return;
+    navigatingRef.current = true;
+
     requireAuth(() => {
       (navigation as any).navigate('Checkout');
     }, 'checkout');
@@ -499,15 +518,19 @@ const CartScreen: React.FC = () => {
 
   // Fetch and apply best discount
   useEffect(() => {
+    // Guard against out-of-order responses (cart changes on every qty edit) and
+    // setState after unmount: cleanup flips `ignore` so only the latest run writes.
+    let ignore = false;
     const loadDiscounts = async () => {
       if (!cart || cart.items.length === 0) {
-        setAppliedDiscount(null);
+        if (!ignore) setAppliedDiscount(null);
         return;
       }
 
-      setDiscountLoading(true);
+      if (!ignore) setDiscountLoading(true);
       try {
         const bestDiscount = await discountService.getBestDiscountForCart(cart, isVip);
+        if (ignore) return;
         if (bestDiscount) {
           const applied = discountService.applyDiscountToCart(cart, bestDiscount, isVip);
           setAppliedDiscount(applied);
@@ -515,20 +538,21 @@ const CartScreen: React.FC = () => {
           setAppliedDiscount(null);
         }
       } catch {
-        setAppliedDiscount(null);
+        if (!ignore) setAppliedDiscount(null);
       } finally {
-        setDiscountLoading(false);
+        if (!ignore) setDiscountLoading(false);
       }
-      
+
       try {
         const potential = await discountService.getPotentialDiscounts(cart);
-        setOpportunities(potential);
+        if (!ignore) setOpportunities(potential);
       } catch {
         // Silent fail
       }
     };
 
     loadDiscounts();
+    return () => { ignore = true; };
   }, [cart, isVip]);
 
   const [shippingRegion, setShippingRegion] = useState('Erbil');
@@ -567,21 +591,24 @@ const CartScreen: React.FC = () => {
   } | null>(null);
 
   useEffect(() => {
+    // Guard against out-of-order responses / unmounted setState (see loadDiscounts).
+    let ignore = false;
     const loadCartSummary = async () => {
       if (!cart || !cart.items.length) {
-        setCartSummary(null);
+        if (!ignore) setCartSummary(null);
         return;
       }
 
       try {
         const summary = await CartService.getCartSummaryAsync(cart, shippingRegion, shippingCountry, isVip);
-        setCartSummary(summary);
+        if (!ignore) setCartSummary(summary);
       } catch (error) {
         console.error('Failed to load cart summary', error);
       }
     };
 
     loadCartSummary();
+    return () => { ignore = true; };
   }, [cart, shippingRegion, shippingCountry, isVip]);
 
   // Render cart item

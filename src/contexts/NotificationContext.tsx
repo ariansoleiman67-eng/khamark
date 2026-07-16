@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import * as Notifications from 'expo-notifications';
 import { supabase, uniqueChannel } from '../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -31,13 +31,12 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [ordersBadgeCount, setOrdersBadgeCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
-  const [lastViewedOrdersTime, setLastViewedOrdersTime] = useState<number>(0);
+  // Held in a ref (not state) so opening the Orders tab / marking orders viewed
+  // updates the threshold read by the realtime closures WITHOUT retearing the
+  // effect and resubscribing both realtime channels.
+  const lastViewedRef = useRef<number>(0);
 
   useEffect(() => {
-    AsyncStorage.getItem('last_viewed_orders_time').then(time => {
-      if (time) setLastViewedOrdersTime(parseInt(time, 10));
-    });
-
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       setUserId(session?.user?.id || null);
       if (!session?.user) {
@@ -61,88 +60,122 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
     const setupListeners = async () => {
       setIsLoading(true);
-
-      // Fetch initial notification count
-      const { count: unreadNotifs } = await supabase
-        .from('notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .eq('read', false);
-      
-      const nBadge = unreadNotifs || 0;
-      setBadgeCount(nBadge);
-      await Notifications.setBadgeCountAsync(nBadge);
-
-      // Fetch initial orders count
-      const { data: recentOrders } = await supabase
-        .from('orders')
-        .select('updated_at')
-        .eq('user_id', userId)
-        .order('updated_at', { ascending: false })
-        .limit(20);
-
-      let unreadOrders = 0;
-      if (recentOrders) {
-        recentOrders.forEach(order => {
-          if (new Date(order.updated_at).getTime() > lastViewedOrdersTime) {
-            unreadOrders++;
+      try {
+        // Load the persisted "last viewed orders" time authoritatively here so
+        // both the initial unread computation and the realtime closures use the
+        // correct threshold. Reading it here (instead of depending on it as an
+        // effect dependency) means opening the Orders tab does NOT tear down and
+        // resubscribe the realtime channels.
+        try {
+          const storedViewed = await AsyncStorage.getItem('last_viewed_orders_time');
+          if (storedViewed) {
+            const parsed = parseInt(storedViewed, 10);
+            if (!Number.isNaN(parsed)) lastViewedRef.current = parsed;
           }
-        });
+        } catch {
+          // ignore storage read failure; keep whatever lastViewedRef holds
+        }
+        if (cancelled) return;
+
+        // Fetch initial notification count
+        const { count: unreadNotifs } = await supabase
+          .from('notifications')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .eq('read', false);
+
+        if (cancelled) return;
+        const nBadge = unreadNotifs || 0;
+        setBadgeCount(nBadge);
+        try {
+          await Notifications.setBadgeCountAsync(nBadge);
+        } catch (e) {
+          console.warn('Failed to set device badge count:', e);
+        }
+
+        // Fetch initial orders count
+        const { data: recentOrders } = await supabase
+          .from('orders')
+          .select('updated_at')
+          .eq('user_id', userId)
+          .order('updated_at', { ascending: false })
+          .limit(20);
+
+        if (cancelled) return;
+        let unreadOrders = 0;
+        if (recentOrders) {
+          recentOrders.forEach(order => {
+            if (new Date(order.updated_at).getTime() > lastViewedRef.current) {
+              unreadOrders++;
+            }
+          });
+        }
+        setOrdersBadgeCount(unreadOrders);
+
+        // The effect may have been torn down (or re-run) while the awaits above
+        // were pending. Bail before subscribing so we don't create channels that
+        // the already-finished cleanup will never remove (a permanent leak on
+        // this always-mounted provider).
+        if (cancelled) return;
+
+        // Setup real-time listeners
+        notifChannel = uniqueChannel(`public:notifications:${userId}`)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, async () => {
+            const { count } = await supabase
+              .from('notifications')
+              .select('*', { count: 'exact', head: true })
+              .eq('user_id', userId)
+              .eq('read', false);
+
+            if (cancelled) return;
+            const newBadge = count || 0;
+            setBadgeCount(newBadge);
+            try {
+              await Notifications.setBadgeCountAsync(newBadge);
+            } catch (e) {
+              console.warn('Failed to set device badge count:', e);
+            }
+          })
+          .subscribe();
+
+        ordersChannel = uniqueChannel(`public:orders:${userId}`)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `user_id=eq.${userId}` }, async () => {
+            const { data: updatedOrders } = await supabase
+              .from('orders')
+              .select('updated_at')
+              .eq('user_id', userId)
+              .order('updated_at', { ascending: false })
+              .limit(20);
+
+            if (cancelled) return;
+            let newUnreadOrders = 0;
+            if (updatedOrders) {
+              updatedOrders.forEach(order => {
+                if (new Date(order.updated_at).getTime() > lastViewedRef.current) {
+                  newUnreadOrders++;
+                }
+              });
+            }
+            setOrdersBadgeCount(newUnreadOrders);
+          })
+          .subscribe();
+      } catch (error) {
+        console.error('NotificationContext setupListeners failed:', error);
+      } finally {
+        // Reset loading on every exit path (including thrown awaits) so a
+        // consumer gating on isLoading can never be stuck spinning forever.
+        if (!cancelled) setIsLoading(false);
       }
-      setOrdersBadgeCount(unreadOrders);
-      setIsLoading(false);
-
-      // The effect may have been torn down (or re-run) while the two awaits above
-      // were pending. Bail before subscribing so we don't create channels that the
-      // already-finished cleanup will never remove (a permanent leak on this
-      // always-mounted provider).
-      if (cancelled) return;
-
-      // Setup real-time listeners
-      notifChannel = uniqueChannel(`public:notifications:${userId}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, async () => {
-          const { count } = await supabase
-            .from('notifications')
-            .select('*', { count: 'exact', head: true })
-            .eq('user_id', userId)
-            .eq('read', false);
-          
-          const newBadge = count || 0;
-          setBadgeCount(newBadge);
-          await Notifications.setBadgeCountAsync(newBadge);
-        })
-        .subscribe();
-
-      ordersChannel = uniqueChannel(`public:orders:${userId}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `user_id=eq.${userId}` }, async () => {
-          const { data: updatedOrders } = await supabase
-            .from('orders')
-            .select('updated_at')
-            .eq('user_id', userId)
-            .order('updated_at', { ascending: false })
-            .limit(20);
-
-          let newUnreadOrders = 0;
-          if (updatedOrders) {
-            updatedOrders.forEach(order => {
-              if (new Date(order.updated_at).getTime() > lastViewedOrdersTime) {
-                newUnreadOrders++;
-              }
-            });
-          }
-          setOrdersBadgeCount(newUnreadOrders);
-        })
-        .subscribe();
     };
 
-    setupListeners();
+    setupListeners().catch(() => {});
 
     return () => {
       cancelled = true;
       if (notifChannel) supabase.removeChannel(notifChannel);
       if (ordersChannel) supabase.removeChannel(ordersChannel);
     };
-  }, [userId, lastViewedOrdersTime]);
+  }, [userId]);
 
   const clearBadge = useCallback(async () => {
     if (!userId) return;
@@ -165,7 +198,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   const markOrdersAsViewed = useCallback(async () => {
     const now = Date.now();
-    setLastViewedOrdersTime(now);
+    lastViewedRef.current = now;
     setOrdersBadgeCount(0);
     await AsyncStorage.setItem('last_viewed_orders_time', now.toString());
   }, []);

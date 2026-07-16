@@ -210,17 +210,24 @@ const CheckoutScreen: React.FC = () => {
   const [reduceMotionEnabled, setReduceMotionEnabled] = useState(false);
   // Track if initial data load is done to prevent useFocusEffect race condition
   const initialLoadDoneRef = useRef(false);
+  // Flipped inside the focus callback so the very first (mount) focus is
+  // genuinely skipped — the mount effects already load the data.
+  const hasFocusedOnceRef = useRef(false);
   
   // Add saved cards dynamically
   const allPaymentMethods: PaymentMethodOption[] = [
-    ...(savedCards || []).map(card => ({
-      id: `saved_card_${card.payment_token}`,
-      name: `QiCard ending in ${card.card_mask.slice(-4)}`,
-      icon: 'credit-card',
-      description: `Saved Card`,
-      isAvailable: true,
-      color: '#1976D2',
-    })),
+    // Untrusted DB rows (cast to any[] on load): a null/absent card_mask or
+    // payment_token must never crash this render-path map.
+    ...(savedCards || [])
+      .filter(card => !!card?.payment_token)
+      .map(card => ({
+        id: `saved_card_${card.payment_token}`,
+        name: `QiCard ending in ${(card.card_mask ?? '').slice(-4) || '••••'}`,
+        icon: 'credit-card',
+        description: `Saved Card`,
+        isAvailable: true,
+        color: '#1976D2',
+      })),
     ...PAYMENT_METHODS
   ];
   
@@ -307,14 +314,14 @@ const CheckoutScreen: React.FC = () => {
     }
   }, [user?.uid]);
 
-  // Load everything on mount
+  // Load saved cards once on mount. Addresses are loaded by the user-scoped
+  // effect below (single source of truth) to avoid duplicate concurrent fetches.
   useEffect(() => {
     if (!initialLoadDoneRef.current) {
-      loadUserAddresses();
       loadSavedCards();
       initialLoadDoneRef.current = true;
     }
-  }, [loadUserAddresses, loadSavedCards]);
+  }, [loadSavedCards]);
 
   const loadShippingOffice = useCallback(async () => {
     if (!user?.uid) return;
@@ -391,14 +398,18 @@ const CheckoutScreen: React.FC = () => {
     return () => clearTimeout(safetyTimeout);
   }, [user?.uid]);
 
-  // Reload ALL data when returning from edit screens (skip initial mount)
+  // Reload ALL data when returning from edit screens (skip initial mount).
+  // The first focus fires on mount when the mount effects are already loading,
+  // so skip exactly once — regardless of load timing — to avoid a redundant fetch.
   useFocusEffect(
     useCallback(() => {
-      if (initialLoadDoneRef.current) {
-        loadUserAddresses();
-        loadShippingOffice();
-        loadMoneyExchanger();
+      if (!hasFocusedOnceRef.current) {
+        hasFocusedOnceRef.current = true;
+        return;
       }
+      loadUserAddresses();
+      loadShippingOffice();
+      loadMoneyExchanger();
     }, [loadUserAddresses, loadShippingOffice, loadMoneyExchanger])
   );
 
@@ -624,8 +635,21 @@ const CheckoutScreen: React.FC = () => {
     isSubmittingRef.current = true;
 
     if (!user?.uid) {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) {
+      // This auth check runs BEFORE the main try/finally below, so a network
+      // rejection here would otherwise leave isSubmittingRef stuck true forever
+      // (permanently dead Place Order button). Guard it explicitly.
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) {
+          Alert.alert(
+            t('errors.authenticationError', { defaultValue: 'Authentication Error' }),
+            t('errors.loginAgainToOrder', { defaultValue: 'Please log out and log back in to place orders.' })
+          );
+          isSubmittingRef.current = false;
+          return;
+        }
+      } catch (authError) {
+        console.error('Auth check failed before placing order:', authError);
         Alert.alert(
           t('errors.authenticationError', { defaultValue: 'Authentication Error' }),
           t('errors.loginAgainToOrder', { defaultValue: 'Please log out and log back in to place orders.' })
@@ -916,6 +940,9 @@ const CheckoutScreen: React.FC = () => {
     moneyExchangerInfo,
     currency,
     exchangeRateIQD,
+    saveCardForFuture,
+    isVip,
+    i18n.language,
   ]);
 
   // Empty cart state
@@ -1057,7 +1084,7 @@ const CheckoutScreen: React.FC = () => {
                           </Text>
                           
                           {/* Location Map - Only render for selected address to avoid performance issues */}
-                          {address.coordinates && selectedAddress?.id === address.id && !useManualAddress ? (
+                          {address.coordinates && Number.isFinite(address.coordinates.latitude) && Number.isFinite(address.coordinates.longitude) && selectedAddress?.id === address.id && !useManualAddress ? (
                             <View style={[styles.mapContainer, { backgroundColor: theme.colors.border }]}>
                               {(() => {
                                 // On iOS, MapView is null (not loaded) to prevent native crash
@@ -1117,7 +1144,7 @@ const CheckoutScreen: React.FC = () => {
                                 </View>
                               </View>
                             </View>
-                          ) : address.coordinates ? (
+                          ) : address.coordinates && Number.isFinite(address.coordinates.latitude) && Number.isFinite(address.coordinates.longitude) ? (
                             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 4 }}>
                               <Ionicons name="location" size={14} color={theme.colors.success} />
                               <Text allowFontScaling={false} style={{ fontSize: 12, color: theme.colors.success }}>{t('checkout.locationSaved', { defaultValue: 'Location saved' })}</Text>

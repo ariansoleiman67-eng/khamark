@@ -208,6 +208,12 @@ export class AuthService {
   static async signOut(): Promise<void> {
     try {
       await supabase.auth.signOut();
+    } catch (error: any) {
+      throw new Error(error.message);
+    } finally {
+      // Always purge local data even if the network sign-out failed (offline logout,
+      // token already invalid). Sequencing this in `finally` guarantees a stale profile
+      // or the previous user's cart can never survive on-device / on a shared device.
       await AsyncStorage.multiRemove([
         'user_data',
         'cart',
@@ -216,14 +222,35 @@ export class AuthService {
         '@user_theme',
         '@user_language',
       ]);
-    } catch (error: any) {
-      throw new Error(error.message);
     }
   }
 
   static async changePassword(currentPassword: string, newPassword: string): Promise<void> {
     try {
-      // Supabase just needs the new password if user is already logged in
+      // Re-authenticate with the CURRENT password before changing it. Supabase's
+      // updateUser() alone does NOT verify the old password, so without this an
+      // already-unlocked session could reset the password without knowing it.
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not signed in');
+
+      if (user.email) {
+        const { error: verifyErr } = await supabase.auth.signInWithPassword({
+          email: user.email,
+          password: currentPassword,
+        });
+        if (verifyErr) throw new Error('Current password is incorrect');
+      } else if (user.phone) {
+        // Phone-only account (no email): verify against the phone credential.
+        const phone = user.phone.startsWith('+') ? user.phone : `+${user.phone}`;
+        const { error: verifyErr } = await supabase.auth.signInWithPassword({
+          phone,
+          password: currentPassword,
+        });
+        if (verifyErr) throw new Error('Current password is incorrect');
+      } else {
+        throw new Error('Cannot verify current password');
+      }
+
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
     } catch (error: any) {
@@ -560,69 +587,90 @@ export class AuthService {
     }
   }
 
+  // Address mutations do a read-modify-write on the whole `addresses` JSON array
+  // (getCurrentUserFresh -> mutate -> update). Overlapping calls would both read the
+  // same snapshot and the second write would clobber the first (classic lost update).
+  // Serialize them through a single promise chain so each read happens strictly after
+  // the previous write completes — no operation is dropped.
+  private static addressMutationQueue: Promise<unknown> = Promise.resolve();
+
+  private static enqueueAddressMutation<T>(task: () => Promise<T>): Promise<T> {
+    const run = this.addressMutationQueue.then(task, task);
+    // Keep the chain alive even if a mutation rejects, but let the caller still see
+    // the rejection via the returned `run`.
+    this.addressMutationQueue = run.catch(() => {});
+    return run;
+  }
+
   static async addAddress(userId: string, address: any): Promise<void> {
-    try {
-      const profile = await this.getCurrentUserFresh();
-      if (profile) {
-        const updatedAddresses = [...(profile.addresses || []), address];
-        
-        const { error } = await supabase
-          .from('users')
-          .update({ addresses: updatedAddresses })
-          .eq('id', userId);
-          
-        if (error) throw error;
-        
-        profile.addresses = updatedAddresses;
-        await AsyncStorage.setItem('user_data', JSON.stringify(profile));
+    return this.enqueueAddressMutation(async () => {
+      try {
+        const profile = await this.getCurrentUserFresh();
+        if (profile) {
+          const updatedAddresses = [...(profile.addresses || []), address];
+
+          const { error } = await supabase
+            .from('users')
+            .update({ addresses: updatedAddresses })
+            .eq('id', userId);
+
+          if (error) throw error;
+
+          profile.addresses = updatedAddresses;
+          await AsyncStorage.setItem('user_data', JSON.stringify(profile));
+        }
+      } catch (error: any) {
+        throw new Error(error.message);
       }
-    } catch (error: any) {
-      throw new Error(error.message);
-    }
+    });
   }
 
   static async updateAddress(userId: string, addressId: string, updates: any): Promise<void> {
-    try {
-      const profile = await this.getCurrentUserFresh();
-      if (profile) {
-        const updatedAddresses = (profile.addresses || []).map((addr: any) =>
-          addr.id === addressId ? { ...addr, ...updates } : addr
-        );
-        
-        const { error } = await supabase
-          .from('users')
-          .update({ addresses: updatedAddresses })
-          .eq('id', userId);
-          
-        if (error) throw error;
-        
-        profile.addresses = updatedAddresses;
-        await AsyncStorage.setItem('user_data', JSON.stringify(profile));
+    return this.enqueueAddressMutation(async () => {
+      try {
+        const profile = await this.getCurrentUserFresh();
+        if (profile) {
+          const updatedAddresses = (profile.addresses || []).map((addr: any) =>
+            addr.id === addressId ? { ...addr, ...updates } : addr
+          );
+
+          const { error } = await supabase
+            .from('users')
+            .update({ addresses: updatedAddresses })
+            .eq('id', userId);
+
+          if (error) throw error;
+
+          profile.addresses = updatedAddresses;
+          await AsyncStorage.setItem('user_data', JSON.stringify(profile));
+        }
+      } catch (error: any) {
+        throw new Error(error.message);
       }
-    } catch (error: any) {
-      throw new Error(error.message);
-    }
+    });
   }
 
   static async removeAddress(userId: string, addressId: string): Promise<void> {
-    try {
-      const profile = await this.getCurrentUserFresh();
-      if (profile) {
-        const updatedAddresses = (profile.addresses || []).filter((addr: any) => addr.id !== addressId);
-        
-        const { error } = await supabase
-          .from('users')
-          .update({ addresses: updatedAddresses })
-          .eq('id', userId);
-          
-        if (error) throw error;
-        
-        profile.addresses = updatedAddresses;
-        await AsyncStorage.setItem('user_data', JSON.stringify(profile));
+    return this.enqueueAddressMutation(async () => {
+      try {
+        const profile = await this.getCurrentUserFresh();
+        if (profile) {
+          const updatedAddresses = (profile.addresses || []).filter((addr: any) => addr.id !== addressId);
+
+          const { error } = await supabase
+            .from('users')
+            .update({ addresses: updatedAddresses })
+            .eq('id', userId);
+
+          if (error) throw error;
+
+          profile.addresses = updatedAddresses;
+          await AsyncStorage.setItem('user_data', JSON.stringify(profile));
+        }
+      } catch (error: any) {
+        throw new Error(error.message);
       }
-    } catch (error: any) {
-      throw new Error(error.message);
-    }
+    });
   }
 }
 

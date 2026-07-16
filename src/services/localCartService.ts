@@ -11,6 +11,25 @@ const CART_STORAGE_KEY = 'local_cart_';
 
 export class LocalCartService {
   /**
+   * Per-user serialization of cart writes.
+   *
+   * Every mutator is a read-modify-write cycle (getCart -> mutate -> saveCart)
+   * on a single AsyncStorage key. Without serialization two concurrent calls
+   * both read the same base cart and the last saveCart silently clobbers the
+   * other's change (lost update). We chain each user's writes so they run
+   * strictly one-at-a-time, in call order.
+   */
+  private static writeChains: Record<string, Promise<unknown>> = {};
+
+  private static enqueue<T>(userId: string, task: () => Promise<T>): Promise<T> {
+    const run = (this.writeChains[userId] ?? Promise.resolve())
+      .catch(() => {})
+      .then(task);
+    this.writeChains[userId] = run;
+    return run;
+  }
+
+  /**
    * Get cart from local storage
    */
   static async getCart(userId: string): Promise<Cart | null> {
@@ -60,6 +79,18 @@ export class LocalCartService {
     product: Product,
     selectedOptions?: { color?: string; size?: string; storage?: string }
   ): Promise<Cart> {
+    return this.enqueue(userId, () =>
+      this.addToCartImpl(userId, productId, quantity, product, selectedOptions)
+    );
+  }
+
+  private static async addToCartImpl(
+    userId: string,
+    productId: string,
+    quantity: number = 1,
+    product: Product,
+    selectedOptions?: { color?: string; size?: string; storage?: string }
+  ): Promise<Cart> {
     try {
       let cart = await this.getCart(userId);
       if (!cart) {
@@ -79,24 +110,11 @@ export class LocalCartService {
         }
       }
 
-      // Helper to compare selectedOptions (Case Insensitive)
-      const optionsMatch = (a?: { color?: string; size?: string; storage?: string }, b?: { color?: string; size?: string; storage?: string }) => {
-        if (!a && !b) return true;
-        if (!a || !b) return false;
-
-        const colorA = a.color?.trim().toLowerCase();
-        const colorB = b.color?.trim().toLowerCase();
-        const sizeA = a.size?.trim().toLowerCase();
-        const sizeB = b.size?.trim().toLowerCase();
-        const storageA = a.storage?.trim().toLowerCase();
-        const storageB = b.storage?.trim().toLowerCase();
-
-        return colorA === colorB && sizeA === sizeB && storageA === storageB;
-      };
-
-      // Find existing item by productId AND selectedOptions (same product + same options = merge)
-      const existingItemIndex = cart.items.findIndex(item => 
-        item.productId === productId && optionsMatch(item.selectedOptions, selectedOptions)
+      // Find existing item by productId AND selectedOptions (same product + same options = merge).
+      // Uses the shared, normalized optionsMatch so add / update / remove all key items
+      // the same way (case-insensitive, whitespace-trimmed).
+      const existingItemIndex = cart.items.findIndex(item =>
+        item.productId === productId && this.optionsMatch(item.selectedOptions, selectedOptions)
       );
 
       if (existingItemIndex >= 0) {
@@ -146,6 +164,16 @@ export class LocalCartService {
    * Used for products with per-size or per-color stock control
    */
   static async addVariationsToCart(
+    userId: string,
+    product: Product,
+    selections: Array<{ variationId: string; quantity: number; priceUSD?: number; sizeValue?: number | string; sizeUnit?: string; colorValue?: string }>
+  ): Promise<Cart> {
+    return this.enqueue(userId, () =>
+      this.addVariationsToCartImpl(userId, product, selections)
+    );
+  }
+
+  private static async addVariationsToCartImpl(
     userId: string,
     product: Product,
     selections: Array<{ variationId: string; quantity: number; priceUSD?: number; sizeValue?: number | string; sizeUnit?: string; colorValue?: string }>
@@ -277,13 +305,33 @@ export class LocalCartService {
   ): boolean {
     if (!a && !b) return true;
     if (!a || !b) return false;
-    return a.color === b.color && a.size === b.size && a.storage === b.storage;
+    // Normalize (trim + lowercase) so 'Red' and 'red ' are treated as the same
+    // option, matching how addToCart merges items. Keeps add / update / remove
+    // consistent — otherwise an item merged case-insensitively can never be
+    // matched (and therefore updated or removed) again.
+    const norm = (s?: string) => s?.trim().toLowerCase();
+    return (
+      norm(a.color) === norm(b.color) &&
+      norm(a.size) === norm(b.size) &&
+      norm(a.storage) === norm(b.storage)
+    );
   }
 
   /**
    * Update item quantity in cart
    */
   static async updateQuantity(
+    userId: string,
+    productId: string,
+    quantity: number,
+    selectedOptions?: { color?: string; size?: string; storage?: string }
+  ): Promise<Cart> {
+    return this.enqueue(userId, () =>
+      this.updateQuantityImpl(userId, productId, quantity, selectedOptions)
+    );
+  }
+
+  private static async updateQuantityImpl(
     userId: string,
     productId: string,
     quantity: number,
@@ -305,8 +353,10 @@ export class LocalCartService {
       }
 
       if (quantity <= 0) {
-        // Remove item if quantity is 0 or negative
-        return await this.removeFromCart(userId, productId, selectedOptions);
+        // Remove item if quantity is 0 or negative. Call the impl directly (not
+        // the public method) so we stay inside the current serialized write and
+        // don't deadlock on this user's write chain.
+        return await this.removeFromCartImpl(userId, productId, selectedOptions);
       }
 
       // Check stock limit
@@ -336,7 +386,17 @@ export class LocalCartService {
    * Remove item from cart
    */
   static async removeFromCart(
-    userId: string, 
+    userId: string,
+    productId: string,
+    selectedOptions?: { color?: string; size?: string; storage?: string }
+  ): Promise<Cart> {
+    return this.enqueue(userId, () =>
+      this.removeFromCartImpl(userId, productId, selectedOptions)
+    );
+  }
+
+  private static async removeFromCartImpl(
+    userId: string,
     productId: string,
     selectedOptions?: { color?: string; size?: string; storage?: string }
   ): Promise<Cart> {
@@ -368,20 +428,24 @@ export class LocalCartService {
    * Clear entire cart
    */
   static async clearCart(userId: string): Promise<void> {
-    try {
-      const emptyCart: Cart = {
-        userId,
-        items: [],
-        subtotalUSD: 0,
-        updatedAt: new Date() as any,
-      };
+    // Serialize with the other mutators so a clear can't race with an in-flight
+    // add (e.g. the "Different Store" clear-then-add flow) and lose an update.
+    return this.enqueue(userId, async () => {
+      try {
+        const emptyCart: Cart = {
+          userId,
+          items: [],
+          subtotalUSD: 0,
+          updatedAt: new Date() as any,
+        };
 
-      await this.saveCart(emptyCart);
-    } catch (error: any) {
-      // eslint-disable-next-line no-console
-      console.error('Error clearing local cart:', error);
-      throw error;
-    }
+        await this.saveCart(emptyCart);
+      } catch (error: any) {
+        // eslint-disable-next-line no-console
+        console.error('Error clearing local cart:', error);
+        throw error;
+      }
+    });
   }
 
   /**

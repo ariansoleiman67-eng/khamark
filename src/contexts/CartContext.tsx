@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { Alert } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Cart, Product } from '../types';
@@ -52,7 +52,10 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   const [cart, setCart] = useState<Cart | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isAddingToCart, setIsAddingToCart] = useState(false);
+  // In-flight guard for add operations. Uses a ref (not state) so the check is
+  // synchronous and unaffected by React's async render batching — two taps in the
+  // same frame both observe the up-to-date value and the second is rejected.
+  const isAddingRef = useRef(false);
   const [previousUserId, setPreviousUserId] = useState<string | null>(null);
   const { t } = useTranslation();
 
@@ -75,10 +78,31 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
           };
         }
 
-        // Merge items (avoid duplicates, sum quantities)
+        // Compare selectedOptions case-insensitively, mirroring
+        // LocalCartService.addToCart so a merge keys on the same dimensions the
+        // rest of the cart is keyed on (color/size/storage), not productId alone.
+        const optionsMatch = (
+          a?: { color?: string; size?: string; storage?: string },
+          b?: { color?: string; size?: string; storage?: string }
+        ) => {
+          if (!a && !b) return true;
+          if (!a || !b) return false;
+          return (
+            a.color?.trim().toLowerCase() === b.color?.trim().toLowerCase() &&
+            a.size?.trim().toLowerCase() === b.size?.trim().toLowerCase() &&
+            a.storage?.trim().toLowerCase() === b.storage?.trim().toLowerCase()
+          );
+        };
+
+        // Merge items (avoid duplicates, sum quantities). Only merge when the
+        // product AND its variation/options match; otherwise keep as a distinct
+        // line so a guest variation never sums into the wrong user variation.
         for (const guestItem of guestCart.items) {
           const existingIndex = userCart.items.findIndex(
-            item => item.productId === guestItem.productId
+            item =>
+              item.productId === guestItem.productId &&
+              (item.variationId || null) === (guestItem.variationId || null) &&
+              optionsMatch(item.selectedOptions, guestItem.selectedOptions)
           );
           if (existingIndex >= 0) {
             // Sum quantities, respect stock limits
@@ -115,6 +139,11 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
 
   // Load cart when user changes (handles login/logout and guest mode)
   useEffect(() => {
+    // Guard against a superseded run: if the user/cartUserId changes again while
+    // an earlier load is still awaiting, that stale run must not overwrite state
+    // with the wrong user's cart (cross-account leak).
+    let active = true;
+
     const loadCartForUser = async () => {
       setIsLoading(true);
       setError(null);
@@ -123,6 +152,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
         // If user just logged in (was guest before), merge carts
         if (user?.uid && previousUserId === null) {
           const mergedCart = await mergeGuestCartToUser(user.uid);
+          if (!active) return;
           if (mergedCart) {
             setCart(mergedCart);
             setPreviousUserId(user.uid);
@@ -135,19 +165,24 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
         if (user?.uid) {
           await CartService.clearCartCache(user.uid);
         }
-        
+
         const loadedCart = await LocalCartService.getCart(cartUserId);
+        if (!active) return;
         setCart(loadedCart);
         setPreviousUserId(user?.uid || null);
       } catch (err: any) {
         console.error('Error loading cart:', err);
-        setError(err.message || 'Failed to load cart');
+        if (active) setError(err.message || 'Failed to load cart');
       } finally {
-        setIsLoading(false);
+        if (active) setIsLoading(false);
       }
     };
 
     loadCartForUser();
+
+    return () => {
+      active = false;
+    };
   }, [user?.uid, cartUserId, previousUserId, mergeGuestCartToUser]);
 
   const loadCart = useCallback(async () => {
@@ -198,12 +233,12 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     }
 
     // Prevent rapid consecutive additions
-    if (isAddingToCart) {
+    if (isAddingRef.current) {
       return;
     }
 
     setError(null);
-    setIsAddingToCart(true);
+    isAddingRef.current = true;
 
     try {
       const updatedCart = await LocalCartService.addToCart(
@@ -233,7 +268,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
               onPress: async () => {
                 // Wipe the cart and then add this item
                 try {
-                  setIsAddingToCart(true); // Prevent UI flashes
+                  isAddingRef.current = true; // Prevent UI flashes
                   if (user?.uid) {
                     await CartUtils.clearAllCartData(user.uid);
                   } else {
@@ -266,7 +301,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
                    console.error('Error clearing cart & adding new item:', clearErr);
                    setError((clearErr as Error).message || 'Failed to restart cart');
                 } finally {
-                   setIsAddingToCart(false);
+                   isAddingRef.current = false;
                 }
               }
             }
@@ -279,9 +314,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
         throw err;
       }
     } finally {
-      setIsAddingToCart(false);
+      isAddingRef.current = false;
     }
-  }, [cartUserId, user?.uid, isAddingToCart, t]);
+  }, [cartUserId, user?.uid, t]);
 
   // ALIBABA VARIATION: Batch add multiple size variations in one operation
   const addVariationsToCart = useCallback(async (
@@ -289,12 +324,12 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     selections: Array<{ variationId: string; quantity: number; priceUSD?: number; sizeValue?: number | string; sizeUnit?: string; colorValue?: string }>
   ) => {
     // Prevent rapid consecutive additions
-    if (isAddingToCart) {
+    if (isAddingRef.current) {
       return;
     }
 
     setError(null);
-    setIsAddingToCart(true);
+    isAddingRef.current = true;
 
     try {
       const updatedCart = await LocalCartService.addVariationsToCart(
@@ -317,7 +352,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
               onPress: async () => {
                 // Wipe the cart and then add this item
                 try {
-                  setIsAddingToCart(true); // Prevent UI flashes
+                  isAddingRef.current = true; // Prevent UI flashes
                   if (user?.uid) {
                     await CartUtils.clearAllCartData(user.uid);
                   } else {
@@ -341,7 +376,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
                    console.error('Error clearing cart & adding variations:', clearErr);
                    setError((clearErr as Error).message || 'Failed to restart cart');
                 } finally {
-                   setIsAddingToCart(false);
+                   isAddingRef.current = false;
                 }
               }
             }
@@ -353,9 +388,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
         throw err;
       }
     } finally {
-      setIsAddingToCart(false);
+      isAddingRef.current = false;
     }
-  }, [cartUserId, isAddingToCart, t]);
+  }, [cartUserId, t]);
 
   // GUEST LOGIN SYSTEM: Allow guest to update cart
   const updateQuantity = useCallback(async (

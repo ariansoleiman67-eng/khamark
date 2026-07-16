@@ -62,6 +62,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     AsyncStorage.setItem(DEMO_VIP_KEY, on ? '1' : '0').catch(() => {});
   }, []);
   const registrationInProgressRef = useRef(false);
+  // First-resolution gate: keep the full-screen splash for the initial load only,
+  // so later auth events (TOKEN_REFRESHED on resume/auto-refresh) don't tear down
+  // the navigator. Latest-wins sequence for concurrent fetchUser() calls, and a
+  // handle to the "account blocked" sign-out timer so we can clear it on unmount.
+  const initialLoadDone = useRef(false);
+  const fetchSeq = useRef(0);
+  const blockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const setRegistrationInProgress = useCallback((inProgress: boolean) => {
     registrationInProgressRef.current = inProgress;
@@ -87,17 +94,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const fetchUser = useCallback(async () => {
+    // Latest-wins guard: fetchUser runs concurrently from the auth-state listener
+    // and the AppState 'active' handler on resume. A slower call that falls back
+    // to a cached profile must not overwrite a fresher result, so drop any
+    // response that has been superseded by a newer fetch.
+    const seq = ++fetchSeq.current;
     try {
       const userData = await AuthService.getCurrentUserFresh();
+      if (seq !== fetchSeq.current) return;
 
       if (userData?.isBlocked) {
-        setTimeout(async () => {
+        if (blockTimerRef.current) clearTimeout(blockTimerRef.current);
+        blockTimerRef.current = setTimeout(() => {
           Alert.alert(
             i18next.t('auth.accountBlocked', { defaultValue: 'Account Blocked' }),
             i18next.t('auth.accountBlockedMessage', { defaultValue: 'Your account has been blocked by the admin.' })
           );
-          await AuthService.signOut();
-          setUser(null);
+          // Always drop the in-memory user, even if the network sign-out rejects,
+          // so a blocked account can't keep browsing on a cached session.
+          AuthService.signOut().catch(() => {}).finally(() => setUser(null));
         }, 100);
         return;
       }
@@ -108,6 +123,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         await clearUserIfNoSession();
       }
     } catch (error) {
+      if (seq !== fetchSeq.current) return;
       console.error('Error fetching user:', error);
       await clearUserIfNoSession();
     }
@@ -129,7 +145,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               i18next.t('auth.accountBlocked', { defaultValue: 'Account Blocked' }), 
               i18next.t('auth.accountBlockedMessage', { defaultValue: 'Your account has been blocked by the admin.' })
             );
-            AuthService.signOut().then(() => setUser(null));
+            AuthService.signOut().catch(() => {}).finally(() => setUser(null));
           }
         }
       ).subscribe();
@@ -141,8 +157,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return;
       }
 
-      setIsLoading(true);
-      
+      // Only gate the app behind the splash on the very first resolution.
+      // Supabase fires TOKEN_REFRESHED on auto-refresh/resume; flipping isLoading
+      // on every event would unmount the navigator and remount it at the initial
+      // route, wiping any in-progress form. Refresh the user silently instead.
+      if (!initialLoadDone.current) setIsLoading(true);
+
       try {
         if (sessionUser) {
           setupBlockListener(sessionUser.uid);
@@ -158,6 +178,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.error('Auth state change error:', error);
         setUser(null);
       } finally {
+        initialLoadDone.current = true;
         setIsLoading(false);
       }
     });
@@ -179,6 +200,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       unsubscribe();
       appStateSubscription.remove();
       if (blockChannel) supabase.removeChannel(blockChannel);
+      if (blockTimerRef.current) clearTimeout(blockTimerRef.current);
     };
   }, []);
 
@@ -237,9 +259,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, [user, refreshUser]);
 
-  const signInWithFacebook = useCallback(async () => {
-      // Mock for migration
-      return {} as User;
+  const signInWithFacebook = useCallback(async (): Promise<User> => {
+      // Facebook provider is not wired up yet. Fail loudly so the caller's catch
+      // surfaces a message instead of running its post-login flow on a fake
+      // success (which would leave an unauthenticated guest in a logged-in state).
+      throw new Error(i18next.t('auth.facebookUnavailable', { defaultValue: 'Facebook sign-in is not available yet' }));
   }, []);
 
   const signInWithApple = useCallback(async () => {

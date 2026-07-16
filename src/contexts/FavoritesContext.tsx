@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from './AuthContext';
 
@@ -34,6 +34,12 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
 
+  // Synchronous mirror of `favorites`. React state updates are async/batched,
+  // so back-to-back mutations (e.g. two hearts tapped in one frame) would each
+  // read the same stale `favorites` and clobber one another. Reading/writing
+  // this ref makes the next-state computation synchronous and race-free.
+  const favoritesRef = useRef<string[]>([]);
+
   // Get storage key based on user (so different users have different favorites)
   const getStorageKey = useCallback(() => {
     return user?.uid 
@@ -41,72 +47,95 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }
       : `${FAVORITES_STORAGE_KEY}_guest`;
   }, [user?.uid]);
 
-  // Load favorites from storage on mount and when user changes
-  useEffect(() => {
-    loadFavorites();
-  }, [user?.uid]);
-
-  const loadFavorites = async () => {
-    try {
-      setIsLoading(true);
-      const storageKey = getStorageKey();
-      const storedFavorites = await AsyncStorage.getItem(storageKey);
-      
-      if (storedFavorites) {
-        const parsed = JSON.parse(storedFavorites);
-        if (Array.isArray(parsed)) {
-          setFavorites(parsed);
-        }
-      } else {
-        setFavorites([]);
-      }
-    } catch (error) {
-      console.error('Error loading favorites:', error);
-      setFavorites([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const saveFavorites = async (newFavorites: string[]) => {
+  // Persist favorites under the current user's storage key.
+  const saveFavorites = useCallback(async (newFavorites: string[]) => {
     try {
       const storageKey = getStorageKey();
       await AsyncStorage.setItem(storageKey, JSON.stringify(newFavorites));
     } catch (error) {
       console.error('Error saving favorites:', error);
     }
-  };
+  }, [getStorageKey]);
+
+  // Update the synchronous ref and React state together so they never diverge.
+  const applyFavorites = useCallback((next: string[]) => {
+    favoritesRef.current = next;
+    setFavorites(next);
+  }, []);
+
+  // Load favorites from storage on mount and when the user changes. Reset
+  // synchronously so the previous account's favorites can't linger in state
+  // (privacy leak) or be written under the new user's key during the async
+  // read window. `active` drops a stale read if the user changes again before
+  // it resolves.
+  useEffect(() => {
+    let active = true;
+    favoritesRef.current = [];
+    setFavorites([]);
+    setIsLoading(true);
+    const storageKey = getStorageKey();
+    (async () => {
+      try {
+        const storedFavorites = await AsyncStorage.getItem(storageKey);
+        if (!active) return;
+        if (storedFavorites) {
+          const parsed = JSON.parse(storedFavorites);
+          if (Array.isArray(parsed)) {
+            const cleaned = parsed.filter(
+              (x: unknown): x is string => typeof x === 'string'
+            );
+            favoritesRef.current = cleaned;
+            setFavorites(cleaned);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading favorites:', error);
+        if (active) {
+          favoritesRef.current = [];
+          setFavorites([]);
+        }
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [user?.uid, getStorageKey]);
 
   const isFavorite = useCallback((productId: string): boolean => {
     return favorites.includes(productId);
   }, [favorites]);
 
   const addToFavorites = useCallback(async (productId: string) => {
-    if (!favorites.includes(productId)) {
-      const newFavorites = [...favorites, productId];
-      setFavorites(newFavorites);
-      await saveFavorites(newFavorites);
+    // Read the synchronous ref (not the possibly-stale `favorites` state) so
+    // rapid successive adds each build on the latest list instead of clobbering.
+    if (favoritesRef.current.includes(productId)) {
+      return;
     }
-  }, [favorites, getStorageKey]);
+    const newFavorites = [...favoritesRef.current, productId];
+    applyFavorites(newFavorites);
+    await saveFavorites(newFavorites);
+  }, [applyFavorites, saveFavorites]);
 
   const removeFromFavorites = useCallback(async (productId: string) => {
-    const newFavorites = favorites.filter(id => id !== productId);
-    setFavorites(newFavorites);
+    const newFavorites = favoritesRef.current.filter(id => id !== productId);
+    applyFavorites(newFavorites);
     await saveFavorites(newFavorites);
-  }, [favorites, getStorageKey]);
+  }, [applyFavorites, saveFavorites]);
 
   const toggleFavorite = useCallback(async (productId: string) => {
-    if (favorites.includes(productId)) {
+    if (favoritesRef.current.includes(productId)) {
       await removeFromFavorites(productId);
     } else {
       await addToFavorites(productId);
     }
-  }, [favorites, addToFavorites, removeFromFavorites]);
+  }, [addToFavorites, removeFromFavorites]);
 
   const clearFavorites = useCallback(async () => {
-    setFavorites([]);
+    applyFavorites([]);
     await saveFavorites([]);
-  }, [getStorageKey]);
+  }, [applyFavorites, saveFavorites]);
 
   const value: FavoritesContextType = React.useMemo(() => ({
     favorites,

@@ -69,6 +69,13 @@ export const ProfileScreen: React.FC = () => {
   const tintBg = theme.colors.primary + '12';
   const isRTL = i18n?.language ? getDirection(i18n.language) === 'rtl' : false;
 
+  // Auth identity comes from AuthContext (contextUser); `user` holds the richer
+  // fetched profile. Gate the guest-vs-authenticated UI on the session, not on the
+  // profile fetch, so a transient/offline getCurrentUserFresh() miss can't demote a
+  // logged-in user to the guest experience. Fall back to contextUser for display.
+  const isAuthed = !!contextUser;
+  const displayUser = user ?? contextUser;
+
   // Sync with AuthContext
   useFocusEffect(
     React.useCallback(() => {
@@ -101,12 +108,16 @@ export const ProfileScreen: React.FC = () => {
         setUser(userData);
         setOrderStats(stats);
         setNotificationSettings(settings);
-      } else {
-        setUser(null);
-        setOrderStats({ totalOrders: 0, totalSpent: 0, pendingOrders: 0 });
       }
+      // If userData is falsy we intentionally keep the previously loaded profile
+      // and stats: loadUserData only runs for an authenticated session, so a null
+      // result is a transient cache miss / offline read, not a logout. Clearing
+      // here would wrongly flip the screen to the guest UI. Logout is handled by
+      // the contextUser effects below.
     } catch (error) {
-      // Silently fail
+      // Keep any previously loaded profile on failure. The guest/authed gate reads
+      // contextUser (isAuthed), so a failed refresh no longer shows the guest UI.
+      console.warn('ProfileScreen: failed to refresh user data', error);
     } finally {
       setLoading(false);
     }
@@ -147,13 +158,15 @@ export const ProfileScreen: React.FC = () => {
   };
 
   const handleNotificationSettingChange = async (setting: keyof typeof notificationSettings, value: boolean) => {
+    const updated = { ...notificationSettings, [setting]: value };
     try {
-      const updated = { ...notificationSettings, [setting]: value };
-      setNotificationSettings(updated);
+      // Functional updater so a concurrent toggle of the other switch isn't lost.
+      setNotificationSettings(prev => ({ ...prev, [setting]: value }));
       await NotificationService.updateNotificationSettings(updated);
     } catch (e: any) {
       Alert.alert(t('common.error'), e.message);
-      setNotificationSettings(notificationSettings);
+      // Revert only this setting (functional) instead of restoring a stale snapshot.
+      setNotificationSettings(prev => ({ ...prev, [setting]: !value }));
     }
   };
 
@@ -280,7 +293,7 @@ export const ProfileScreen: React.FC = () => {
           <Animated.View entering={enterAnim(80, 450)}
             style={{ marginHorizontal: 20, marginTop: 12, marginBottom: 8 }}>
             <ImageBackground
-              source={user?.coverUrl ? { uri: user.coverUrl } : require('../../assets/hero-truck.jpg')}
+              source={displayUser?.coverUrl ? { uri: displayUser.coverUrl } : require('../../assets/hero-truck.jpg')}
               style={{ borderRadius: 20, overflow: 'hidden', minHeight: 240 }}
               imageStyle={{ borderRadius: 20 }}
               resizeMode="cover"
@@ -321,13 +334,13 @@ export const ProfileScreen: React.FC = () => {
                     borderWidth: 2.5, borderColor: 'rgba(255,255,255,0.3)',
                     marginRight: 14,
                   }}>
-                    {user?.profileImageUrl ? (
-                      <Image source={{ uri: user.profileImageUrl }}
+                    {displayUser?.profileImageUrl ? (
+                      <Image source={{ uri: displayUser.profileImageUrl }}
                         style={{ width: 72, height: 72, borderRadius: 36 }}
                         contentFit="cover" transition={0} cachePolicy="memory-disk" priority="high" />
-                    ) : user ? (
+                    ) : isAuthed ? (
                       <Text allowFontScaling={false} style={{ fontSize: 28, fontWeight: '700', color: 'white' }}>
-                        {getMonogram(user.fullName || '')}
+                        {getMonogram(displayUser?.fullName || '')}
                       </Text>
                     ) : (
                       <Logo size={38} variant="white" />
@@ -339,15 +352,15 @@ export const ProfileScreen: React.FC = () => {
                     <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
                       <Text allowFontScaling={false} style={{ fontSize: 22, fontWeight: '700', color: 'white', letterSpacing: -0.3 }}
                         adjustsFontSizeToFit numberOfLines={1}>
-                        {user ? (user.fullName || t('profile.yourName', { defaultValue: 'Your Name' })) : t('profile.guest.welcome', { defaultValue: 'Welcome, Guest!' })}
+                        {isAuthed ? (displayUser?.fullName || t('profile.yourName', { defaultValue: 'Your Name' })) : t('profile.guest.welcome', { defaultValue: 'Welcome, Guest!' })}
                       </Text>
-                      {user && (
+                      {isAuthed && (
                         <TouchableOpacity onPress={() => (navigation as any).navigate('EditProfile')} style={{ marginLeft: 8, padding: 4 }} activeOpacity={0.7}>
                           <Ionicons name="pencil" size={16} color="rgba(255,255,255,0.9)" />
                         </TouchableOpacity>
                       )}
 
-                      {user && isVip && (
+                      {isAuthed && isVip && (
                         <View style={{
                           backgroundColor: '#FFD700',
                           marginLeft: 8,
@@ -369,7 +382,7 @@ export const ProfileScreen: React.FC = () => {
                         </View>
                       )}
                     </View>
-                    {!user && (
+                    {!isAuthed && (
                       <Text allowFontScaling={false} style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 4 }}>
                         {t('profile.guest.subtitle', { defaultValue: 'Sign in to access your profile and orders' })}
                       </Text>
@@ -378,7 +391,7 @@ export const ProfileScreen: React.FC = () => {
                 </View>
 
                 {/* Stats row (logged in only) */}
-                {user && (
+                {isAuthed && (
                   <View style={{
                     flexDirection: 'row', width: '100%', marginTop: 12, paddingTop: 16,
                     borderTopWidth: 0.5, borderTopColor: 'rgba(255,255,255,0.2)',
@@ -407,10 +420,10 @@ export const ProfileScreen: React.FC = () => {
                   </View>
                 )}
                 {/* Email — below the stats */}
-                {user && user.email && !isSyntheticEmail(user.email) && (
+                {displayUser?.email && !isSyntheticEmail(displayUser.email) && (
                   <Text allowFontScaling={false} style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)', marginTop: 50, textAlign: isRTL ? 'right' : 'left' }}
                     numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
-                    {user.email}
+                    {displayUser?.email}
                   </Text>
                 )}
               </LinearGradient>
@@ -420,7 +433,7 @@ export const ProfileScreen: React.FC = () => {
 
 
           {/* =============== GUEST BUTTONS =============== */}
-          {!user && (
+          {!isAuthed && (
             <Animated.View entering={enterAnim(160)}
               style={{ paddingHorizontal: 20, marginTop: 8, marginBottom: 20, gap: 10 }}>
               <TouchableOpacity
@@ -493,7 +506,7 @@ export const ProfileScreen: React.FC = () => {
             )}
 
             {/* ---- Account Section ---- */}
-            {user && (
+            {isAuthed && (
               <Animated.View entering={enterAnim(240)} style={{ marginBottom: 20 }}>
                 <SectionTitle title={t('profile.sections.account')} labelColor={labelColor} />
                 <View style={{ ...cardStyle, overflow: 'hidden' }}>
@@ -623,7 +636,7 @@ export const ProfileScreen: React.FC = () => {
             {/* ---- Logout / Sign In ---- */}
             <Animated.View entering={enterAnim(560)}
               style={{ marginBottom: 20 }}>
-              {user ? (
+              {isAuthed ? (
                 <TouchableOpacity onPress={handleLogout} activeOpacity={0.7}
                   style={{
                     ...cardStyle, padding: 16,

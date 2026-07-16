@@ -87,7 +87,12 @@ export const getEffectiveUnitPrice = (
   quantity: number = 1,
   isVip: boolean = false
 ): number => {
-  if (isVip && typeof product.vipPriceUSD === 'number' && product.vipPriceUSD > 0) {
+  if (
+    isVip &&
+    typeof product.vipPriceUSD === 'number' &&
+    product.vipPriceUSD > 0 &&
+    product.vipPriceUSD < product.priceUSD
+  ) {
     return product.vipPriceUSD;
   }
   return calculateTieredPrice(quantity, product.priceUSD, product.priceTiers, isVip);
