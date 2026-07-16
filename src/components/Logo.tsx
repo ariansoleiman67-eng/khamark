@@ -66,7 +66,7 @@ const Logo: React.FC<LogoProps> = ({
               borderRadius: (effectiveSize * 0.9) / 2,
             }
           ]}
-          contentFit="cover"
+          contentFit="contain"
           transition={200}
           onError={() => setImageError(true)}
         />
@@ -80,7 +80,7 @@ const Logo: React.FC<LogoProps> = ({
               color: fallbackColor,
             }
           ]}>
-            HA
+            A
           </Text>
         </View>
       )}
