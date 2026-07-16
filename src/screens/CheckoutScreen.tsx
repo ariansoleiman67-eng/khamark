@@ -49,7 +49,7 @@ import addressService from '../services/addressService';
 import { RootStackParamList } from '../types';
 import { getCountryByCode } from '../constants/countries';
 import discountService from '../services/discountService';
-import { promoService, computePromoDiscount } from '../services/promoService';
+import { promoService, computePromoDiscount, Promo } from '../services/promoService';
 import { QiCardPaymentService } from '../services/qiCardPaymentService';
 
 type CheckoutScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Checkout'>;
@@ -177,6 +177,7 @@ const CheckoutScreen: React.FC = () => {
   const [promoError, setPromoError] = useState<string | null>(null);
   const [promoApplying, setPromoApplying] = useState(false);
   const manualPromoRef = useRef(false);
+  const appliedPromoRef = useRef<Promo | null>(null);
   
   // Shipping office state (for out-of-country customers)
   const [useShippingOffice, setUseShippingOffice] = useState(false);
@@ -450,35 +451,51 @@ const CheckoutScreen: React.FC = () => {
     return { regularSubtotal, vipSubtotal, savings, discountPercent };
   }, [isVip, cart]);
 
-  // Fetch and apply best discount
-  useEffect(() => {
-    const loadDiscount = async () => {
-      if (!cart || cart.items.length === 0) {
-        setAppliedDiscount(null);
-        manualPromoRef.current = false;
-        return;
-      }
-      // A manually-entered promo code wins over the auto-best-discount.
-      if (manualPromoRef.current) return;
+  // Fetch and apply the best AUTO discount (skipped while a manual promo is active).
+  const runAutoDiscount = useCallback(async () => {
+    if (!cart || cart.items.length === 0) {
+      setAppliedDiscount(null);
+      manualPromoRef.current = false;
+      appliedPromoRef.current = null;
+      return;
+    }
+    // A manually-entered promo code wins over the auto-best-discount.
+    if (manualPromoRef.current) return;
 
-      setDiscountLoading(true);
-      try {
-        const bestDiscount = await discountService.getBestDiscountForCart(cart, isVip);
-        if (bestDiscount) {
-          const applied = discountService.applyDiscountToCart(cart, bestDiscount, isVip);
-          setAppliedDiscount(applied);
-        } else {
-          setAppliedDiscount(null);
-        }
-      } catch (error) {
-        setAppliedDiscount(null);
-      } finally {
-        setDiscountLoading(false);
-      }
-    };
-
-    loadDiscount();
+    setDiscountLoading(true);
+    try {
+      const bestDiscount = await discountService.getBestDiscountForCart(cart, isVip);
+      setAppliedDiscount(bestDiscount ? discountService.applyDiscountToCart(cart, bestDiscount, isVip) : null);
+    } catch (error) {
+      setAppliedDiscount(null);
+    } finally {
+      setDiscountLoading(false);
+    }
   }, [cart, isVip]);
+
+  useEffect(() => { runAutoDiscount(); }, [runAutoDiscount]);
+
+  // Keep a manually-applied promo in sync with cart changes: recompute its saved
+  // amount off the current subtotal, and drop it (restoring auto-discounts) if it
+  // no longer qualifies (e.g. cart fell below the code's minimum purchase).
+  useEffect(() => {
+    if (!manualPromoRef.current) return;
+    const promo = appliedPromoRef.current;
+    if (!promo) return;
+    const subtotal = cartSummary?.subtotal || 0;
+    const saved = computePromoDiscount(promo, subtotal);
+    if (saved <= 0) {
+      manualPromoRef.current = false;
+      appliedPromoRef.current = null;
+      setAppliedDiscount(null);
+      setPromoInput('');
+      setPromoError(t('checkout.promoNoLongerEligible', { defaultValue: 'Promo code no longer applies to your cart' }));
+      runAutoDiscount();
+    } else {
+      setAppliedDiscount((prev) => (prev ? { ...prev, savedAmount: saved } : prev));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartSummary?.subtotal]);
 
   // Apply a manually-entered promo code (resolves via promoService, then flows
   // through the same appliedDiscount pipeline as the auto-discount).
@@ -500,6 +517,7 @@ const CheckoutScreen: React.FC = () => {
         return;
       }
       manualPromoRef.current = true;
+      appliedPromoRef.current = promo;
       setAppliedDiscount({
         discountId: promo.id,
         discountName: `${t('checkout.promoCodeLabel', { defaultValue: 'Code' })} ${promo.code}`,
@@ -514,10 +532,12 @@ const CheckoutScreen: React.FC = () => {
 
   const removePromo = useCallback(() => {
     manualPromoRef.current = false;
+    appliedPromoRef.current = null;
     setAppliedDiscount(null);
     setPromoInput('');
     setPromoError(null);
-  }, []);
+    runAutoDiscount();
+  }, [runAutoDiscount]);
 
   const validateShippingAddress = useCallback((): boolean => {
     if (selectedAddress) {

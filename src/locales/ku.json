@@ -690,7 +690,8 @@
     "promoCodeLabel": "کۆد",
     "promoRemove": "لابردن",
     "promoPlaceholder": "کۆدی داشکاندن",
-    "promoApply": "جێبەجێکردن"
+    "promoApply": "جێبەجێکردن",
+    "promoNoLongerEligible": "کۆدی داشکاندن ئیتر بۆ سەبەتەکەت ناگونجێت"
   },
   "qiCard": {
     "title": "پارەدانی کارتی کی",

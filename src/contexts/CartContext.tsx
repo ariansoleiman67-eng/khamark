@@ -12,11 +12,11 @@ interface CartContextValue {
   isLoading: boolean;
   error: string | null;
   refreshCart: () => Promise<void>;
-  addToCart: (productId: string, quantity?: number, product?: Product, selectedOptions?: { color?: string; size?: string }) => Promise<void>;
+  addToCart: (productId: string, quantity?: number, product?: Product, selectedOptions?: { color?: string; size?: string; storage?: string }) => Promise<void>;
   // ALIBABA VARIATION: Batch add multiple variations in one operation
   addVariationsToCart: (product: Product, selections: Array<{ variationId: string; quantity: number; priceUSD?: number; sizeValue?: number | string; sizeUnit?: string; colorValue?: string }>) => Promise<void>;
-  updateQuantity: (productId: string, quantity: number, selectedOptions?: { color?: string; size?: string }) => Promise<void>;
-  removeFromCart: (productId: string, selectedOptions?: { color?: string; size?: string }) => Promise<void>;
+  updateQuantity: (productId: string, quantity: number, selectedOptions?: { color?: string; size?: string; storage?: string }) => Promise<void>;
+  removeFromCart: (productId: string, selectedOptions?: { color?: string; size?: string; storage?: string }) => Promise<void>;
   clearCart: () => Promise<void>;
   getCartItemCount: () => number;
   isProductInCart: (productId: string) => boolean;
@@ -178,7 +178,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     productId: string, 
     quantity: number = 1, 
     product?: Product,
-    selectedOptions?: { color?: string; size?: string }
+    selectedOptions?: { color?: string; size?: string; storage?: string }
   ) => {
     if (!product) {
       setError('Product data is required');
@@ -361,7 +361,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   const updateQuantity = useCallback(async (
     productId: string, 
     quantity: number, 
-    selectedOptions?: { color?: string; size?: string }
+    selectedOptions?: { color?: string; size?: string; storage?: string }
   ) => {
     setError(null);
 
@@ -379,7 +379,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   // GUEST LOGIN SYSTEM: Allow guest to remove from cart
   const removeFromCart = useCallback(async (
     productId: string,
-    selectedOptions?: { color?: string; size?: string }
+    selectedOptions?: { color?: string; size?: string; storage?: string }
   ) => {
     setError(null);
 

@@ -58,7 +58,7 @@ export class LocalCartService {
     productId: string,
     quantity: number = 1,
     product: Product,
-    selectedOptions?: { color?: string; size?: string }
+    selectedOptions?: { color?: string; size?: string; storage?: string }
   ): Promise<Cart> {
     try {
       let cart = await this.getCart(userId);
@@ -80,16 +80,18 @@ export class LocalCartService {
       }
 
       // Helper to compare selectedOptions (Case Insensitive)
-      const optionsMatch = (a?: { color?: string; size?: string }, b?: { color?: string; size?: string }) => {
+      const optionsMatch = (a?: { color?: string; size?: string; storage?: string }, b?: { color?: string; size?: string; storage?: string }) => {
         if (!a && !b) return true;
         if (!a || !b) return false;
-        
+
         const colorA = a.color?.trim().toLowerCase();
         const colorB = b.color?.trim().toLowerCase();
         const sizeA = a.size?.trim().toLowerCase();
         const sizeB = b.size?.trim().toLowerCase();
-        
-        return colorA === colorB && sizeA === sizeB;
+        const storageA = a.storage?.trim().toLowerCase();
+        const storageB = b.storage?.trim().toLowerCase();
+
+        return colorA === colorB && sizeA === sizeB && storageA === storageB;
       };
 
       // Find existing item by productId AND selectedOptions (same product + same options = merge)
@@ -270,12 +272,12 @@ export class LocalCartService {
    * Helper to compare selectedOptions
    */
   private static optionsMatch(
-    a?: { color?: string; size?: string }, 
-    b?: { color?: string; size?: string }
+    a?: { color?: string; size?: string; storage?: string },
+    b?: { color?: string; size?: string; storage?: string }
   ): boolean {
     if (!a && !b) return true;
     if (!a || !b) return false;
-    return a.color === b.color && a.size === b.size;
+    return a.color === b.color && a.size === b.size && a.storage === b.storage;
   }
 
   /**
@@ -285,7 +287,7 @@ export class LocalCartService {
     userId: string,
     productId: string,
     quantity: number,
-    selectedOptions?: { color?: string; size?: string }
+    selectedOptions?: { color?: string; size?: string; storage?: string }
   ): Promise<Cart> {
     try {
       const cart = await this.getCart(userId);
@@ -336,7 +338,7 @@ export class LocalCartService {
   static async removeFromCart(
     userId: string, 
     productId: string,
-    selectedOptions?: { color?: string; size?: string }
+    selectedOptions?: { color?: string; size?: string; storage?: string }
   ): Promise<Cart> {
     try {
       const cart = await this.getCart(userId);

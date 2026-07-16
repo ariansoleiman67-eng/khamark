@@ -690,7 +690,8 @@
     "promoCodeLabel": "رمز",
     "promoRemove": "إزالة",
     "promoPlaceholder": "رمز الخصم",
-    "promoApply": "تطبيق"
+    "promoApply": "تطبيق",
+    "promoNoLongerEligible": "رمز الخصم لم يعد ينطبق على سلتك"
   },
   "qiCard": {
     "title": "دفع بطاقة كي",

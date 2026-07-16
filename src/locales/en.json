@@ -728,7 +728,8 @@
     "promoCodeLabel": "Code",
     "promoRemove": "Remove",
     "promoPlaceholder": "Promo code",
-    "promoApply": "Apply"
+    "promoApply": "Apply",
+    "promoNoLongerEligible": "Promo code no longer applies to your cart"
   },
   "qiCard": {
     "title": "QI Card Payment",
