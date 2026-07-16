@@ -31,6 +31,7 @@ import { LocalCartService } from '../services/localCartService';
 import { useCart } from '../contexts/CartContext';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { useAuth } from '../contexts/AuthContext';
+import { getDisplayUnitPrice, getEffectiveUnitPrice } from '../utils/pricingUtils';
 import { useFavorites } from '../contexts/FavoritesContext';
 import { COLLECTIONS } from '../constants/config';
 import Button from '../components/Button';
@@ -971,8 +972,11 @@ export const ProductDetailsScreen: React.FC = () => {
   // ======================================================
   // Alibaba-style bottom bar helpers
   // ======================================================
-  const hasSizeVariations = !!(product.variations && product.variations.length > 0);
-  const hasColorVariations = !!(product.colorVariations && product.colorVariations.length > 0);
+  // Storage-option (phone-style) products use the simple single-select selector and
+  // behave as a normal product for quantity/total — NOT the per-colour wholesale grid.
+  const hasStorageOptions = !!(product.storageOptions && product.storageOptions.length > 0);
+  const hasSizeVariations = !hasStorageOptions && !!(product.variations && product.variations.length > 0);
+  const hasColorVariations = !hasStorageOptions && !!(product.colorVariations && product.colorVariations.length > 0);
   const variationTotalQty = hasSizeVariations ? getTotalVariationQuantity() : 0;
   const colorVariationTotalQty = hasColorVariations ? getTotalColorVariationQuantity() : 0;
   const totalSelectedQty = variationTotalQty + colorVariationTotalQty;
@@ -989,9 +993,11 @@ export const ProductDetailsScreen: React.FC = () => {
 
   // Calculate the tiered unit price based on the total quantity (for wholesale pricing).
   // isVip now comes from AuthContext (honours the demo "Preview as VIP" toggle).
-  const tieredUnitPrice = LocalCartService.getTieredPrice(product, pricingQty, isVip);
+  // Uses getEffectiveUnitPrice directly so a flat VIP price is always honoured.
+  const tieredUnitPrice = getEffectiveUnitPrice(product, pricingQty, isVip);
   // Hero "from" unit price (qty 1), VIP-aware; storage delta added in the render.
-  const heroUnitPrice = LocalCartService.getTieredPrice(product, 1, isVip);
+  // Uses the flat-VIP-aware helper directly (same path as the product cards).
+  const heroUnitPrice = getDisplayUnitPrice(product, isVip);
   const vipActive = isVip && typeof product.vipPriceUSD === 'number' && product.vipPriceUSD > 0;
   const vipLocked = !isVip && typeof product.vipPriceUSD === 'number' && product.vipPriceUSD > 0 && product.vipPriceUSD < product.priceUSD;
   // Storage options (capacity) — selection adds a price delta to the base price.
@@ -1045,10 +1051,10 @@ export const ProductDetailsScreen: React.FC = () => {
       totalPriceNumber = variationSubtotal;
     }
   } else {
-    // Simple product
+    // Simple product (incl. phone-style storage products) — add the storage delta.
     const qty = activeQtyForPricing > 0 ? activeQtyForPricing : 0;
-    totalPriceNumber = tieredUnitPrice * qty;
-    originalPriceNumber = product.priceUSD * qty;
+    totalPriceNumber = (tieredUnitPrice + storageDelta) * qty;
+    originalPriceNumber = (product.priceUSD + storageDelta) * qty;
   }
   
   const totalPriceText = formatPrice(totalPriceNumber, currentCurrency as any, exchangeRateIQD);

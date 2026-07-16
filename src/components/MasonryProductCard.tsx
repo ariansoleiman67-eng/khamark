@@ -267,7 +267,7 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
         )}
 
         <View style={styles.bottom}>
-          <View style={{ flex: 1, minWidth: 0 }}>
+          <View style={{ width: "100%" }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
               <AppNumber
                 value={getPriceDisplay()}
