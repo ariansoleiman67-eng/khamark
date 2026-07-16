@@ -1032,7 +1032,8 @@
       "account": "Account",
       "settings": "Settings",
       "notifications": "Notifications",
-      "support": "Support"
+      "support": "Support",
+      "demoTools": "Demo Tools"
     },
     "menu": {
       "editProfile": "Edit Profile",
@@ -1054,7 +1055,11 @@
       "phone": "Phone",
       "password": "Password",
       "profile": "Profile",
-      "profileSubtitle": "Name, email, phone & password"
+      "profileSubtitle": "Name, email, phone & password",
+      "brandManager": "Brand Manager",
+      "brandManagerSub": "Add brands & upload logos (demo)",
+      "categoryManager": "Category Manager",
+      "categoryManagerSub": "Add categories & upload logos (demo)"
     },
     "language": {
       "changeTitle": "Change Language",

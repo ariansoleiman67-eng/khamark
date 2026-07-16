@@ -978,7 +978,8 @@
       "account": "الحساب",
       "settings": "الإعدادات",
       "notifications": "الإشعارات",
-      "support": "الدعم"
+      "support": "الدعم",
+      "demoTools": "أدوات العرض التجريبي"
     },
     "menu": {
       "editProfile": "تعديل الملف الشخصي",
@@ -1000,7 +1001,11 @@
       "phone": "رقم الهاتف",
       "password": "كلمة المرور",
       "profile": "الملف الشخصي",
-      "profileSubtitle": "الاسم، البريد، الهاتف وكلمة المرور"
+      "profileSubtitle": "الاسم، البريد، الهاتف وكلمة المرور",
+      "brandManager": "إدارة العلامات التجارية",
+      "brandManagerSub": "أضف العلامات وارفع الشعارات (تجريبي)",
+      "categoryManager": "إدارة الفئات",
+      "categoryManagerSub": "أضف الفئات وارفع الشعارات (تجريبي)"
     },
     "language": {
       "changeTitle": "تغيير اللغة",

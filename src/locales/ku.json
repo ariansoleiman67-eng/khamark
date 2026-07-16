@@ -977,7 +977,8 @@
       "account": "هەژمار",
       "settings": "ڕێکخراوەکان",
       "notifications": "ئاگادارکردنەوەکان",
-      "support": "پشتگیری"
+      "support": "پشتگیری",
+      "demoTools": "ئامرازەکانی نمایش"
     },
     "menu": {
       "editProfile": "پرۆفایل بگۆڕە",
@@ -999,7 +1000,11 @@
       "phone": "ژمارەی مۆبایل",
       "password": "وشەی نهێنی",
       "profile": "پرۆفایل",
-      "profileSubtitle": "ناو، ئیمەیل، مۆبایل و وشەی نهێنی"
+      "profileSubtitle": "ناو، ئیمەیل، مۆبایل و وشەی نهێنی",
+      "brandManager": "بەڕێوەبردنی براندەکان",
+      "brandManagerSub": "براند زیاد بکە و لۆگۆ باربکە (نمایش)",
+      "categoryManager": "بەڕێوەبردنی هاوپۆلەکان",
+      "categoryManagerSub": "هاوپۆل زیاد بکە و لۆگۆ باربکە (نمایش)"
     },
     "currency": {
       "select": "دراو هەڵبژێرە",

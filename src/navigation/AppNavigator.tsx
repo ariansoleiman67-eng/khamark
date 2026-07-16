@@ -99,6 +99,7 @@ import AdminInvoiceSettingsScreen from '../screens/admin/AdminInvoiceSettingsScr
 import AdminChatScreen from '../screens/admin/AdminChatScreen';
 import AdminBannerScreen from '../screens/admin/AdminBannerScreen';
 import AdminBrandManagerScreen from '../screens/admin/AdminBrandManagerScreen';
+import { USE_MOCK_DATA } from '../services/mockData';
 import AdminCategoryManagerScreen from '../screens/admin/AdminCategoryManagerScreen';
 import AdminCustomersScreen from '../screens/admin/AdminCustomersScreen';
 import AdminPartnerManagementScreen from '../screens/admin/AdminPartnerManagementScreen';
@@ -476,6 +477,14 @@ const AppNavigator: React.FC = () => {
         
         {/* Chat Screens */}
         <Stack.Screen name="ChatScreen" component={ChatScreen} />
+
+        {/* Demo-only: brand/category managers reachable from Profile in offline mock mode */}
+        {USE_MOCK_DATA && (
+          <>
+            <Stack.Screen name="AdminBrandManagement" component={AdminBrandManagerScreen} />
+            <Stack.Screen name="AdminCategoryManagement" component={AdminCategoryManagerScreen} />
+          </>
+        )}
         </Stack.Navigator>
       </NavigationContainer>
     </ErrorBoundary>

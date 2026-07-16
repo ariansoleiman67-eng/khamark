@@ -22,6 +22,7 @@ import { AuthService } from '../services/authService';
 import { NotificationService } from '../services/NotificationService';
 import { OrderService } from '../services/OrderService';
 import { ImageService } from '../services/imageService';
+import { USE_MOCK_DATA } from '../services/mockData';
 
 import Logo from '../components/Logo';
 import { changeLanguage, getDirection } from '../locales';
@@ -544,6 +545,26 @@ export const ProfileScreen: React.FC = () => {
                   theme={theme} isDark={isDark} tintBg={tintBg} />
               </View>
             </Animated.View>
+
+            {/* ---- Demo Tools (offline mock mode only) ---- */}
+            {USE_MOCK_DATA && (
+              <Animated.View entering={enterAnim(360)} style={{ marginBottom: 20 }}>
+                <SectionTitle title={t('profile.sections.demoTools', { defaultValue: 'Demo Tools' })} labelColor={labelColor} />
+                <View style={{ ...cardStyle, overflow: 'hidden' }}>
+                  <LuxuryMenuItem icon="pricetags-outline"
+                    title={t('profile.menu.brandManager', { defaultValue: 'Brand Manager' })}
+                    subtitle={t('profile.menu.brandManagerSub', { defaultValue: 'Add brands & upload logos (demo)' })}
+                    onPress={() => (navigation as any).navigate('AdminBrandManagement')}
+                    theme={theme} isDark={isDark} tintBg={tintBg} />
+                  <Divider isDark={isDark} />
+                  <LuxuryMenuItem icon="grid-outline"
+                    title={t('profile.menu.categoryManager', { defaultValue: 'Category Manager' })}
+                    subtitle={t('profile.menu.categoryManagerSub', { defaultValue: 'Add categories & upload logos (demo)' })}
+                    onPress={() => (navigation as any).navigate('AdminCategoryManagement')}
+                    theme={theme} isDark={isDark} tintBg={tintBg} />
+                </View>
+              </Animated.View>
+            )}
 
             {/* ---- Notifications Section ---- */}
             <Animated.View entering={enterAnim(400)} style={{ marginBottom: 20 }}>
