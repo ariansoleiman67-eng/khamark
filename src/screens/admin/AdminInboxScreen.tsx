@@ -331,6 +331,10 @@ const AdminInboxScreen: React.FC = () => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // Latest-wins guard: subscribeToAdminConversations re-fetches on every realtime
+  // change, so overlapping enrich queries can resolve out of order. Only the newest
+  // enrich result is allowed to write back.
+  const enrichSeqRef = React.useRef(0);
 
   useFocusEffect(
     useCallback(() => {
@@ -346,8 +350,9 @@ const AdminInboxScreen: React.FC = () => {
         setConversations(list as Conversation[]);
         setLoading(false);
         setRefreshing(false);
+        const seq = ++enrichSeqRef.current;
         enrichConversationsWithUsers(list).then((enriched) => {
-          setConversations(enriched as Conversation[]);
+          if (seq === enrichSeqRef.current) setConversations(enriched as Conversation[]);
         });
       });
 

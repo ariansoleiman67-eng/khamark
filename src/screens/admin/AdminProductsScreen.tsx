@@ -93,6 +93,13 @@ const getEffectiveStock = (p: Product) => {
   return mainStock + sizeStock + colorStock;
 };
 
+// Editable wholesale tier: a PriceTier plus a stable client-side key so the tier rows
+// (whose price input is uncontrolled) keep their identity when a tier above them is
+// removed. The `_key` is stripped when tiers are mapped into the saved product payload.
+type EditablePriceTier = PriceTier & { _key?: string };
+
+const newTierKey = () => `tier_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
 const AdminProductsScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
   const { tenantId, isLoading: tenantLoading } = useTenant();
@@ -100,6 +107,9 @@ const AdminProductsScreen: React.FC = () => {
   const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlashList<Product>>(null);
+  // Always-current tenant id, so an in-flight loadProducts() can detect a tenant switch
+  // that happened while it was awaiting and drop its now-stale result.
+  const tenantIdRef = useRef(tenantId);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -117,7 +127,7 @@ const AdminProductsScreen: React.FC = () => {
   const [videoUploadProgress, setVideoUploadProgress] = useState(0);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [reorderingIndex, setReorderingIndex] = useState<number | null>(null);
-  const [priceTiers, setPriceTiers] = useState<PriceTier[]>([]);
+  const [priceTiers, setPriceTiers] = useState<EditablePriceTier[]>([]);
   const [showScrollHint, setShowScrollHint] = useState(false);
 
   // ===== REORDER MODE =====
@@ -177,6 +187,9 @@ const AdminProductsScreen: React.FC = () => {
   });
 
   useEffect(() => {
+    // Keep the ref in lockstep with the active tenant so an in-flight loadProducts()
+    // can tell whether the tenant changed under it before applying its result.
+    tenantIdRef.current = tenantId;
     setProducts([]);
     setSearchQuery('');
     setEditingProduct(null);
@@ -198,6 +211,12 @@ const AdminProductsScreen: React.FC = () => {
     // Also reset view state so a tenant switch doesn't carry over filters/reorder mode.
     setFilterStatus('all');
     setReorderMode(false);
+    // Clear the rest of the tenant-scoped view state (selection, sort, categories) so
+    // nothing from the previous tenant bleeds into the new one (CLAUDE.md tenant rule).
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+    setSortMode('default');
+    setManagedCategories([]);
     setLoading(true);
   }, [tenantId]);
 
@@ -248,14 +267,19 @@ const AdminProductsScreen: React.FC = () => {
       if (!tenantLoading) setLoading(false);
       return;
     }
+    const reqTenant = tenantId;
     try {
       const service = createTenantAdminService(tenantId);
       const productsData = await service.getAllProducts();
+      // Drop the result if the tenant changed while this request was in flight —
+      // otherwise a slow tenant-A response could overwrite tenant-B's list.
+      if (tenantIdRef.current !== reqTenant) return;
       setProducts(productsData as any as Product[]);
     } catch (error) {
+      if (tenantIdRef.current !== reqTenant) return;
       Alert.alert(t('admin.common.error'), t('admin.products.failedToLoad'));
     } finally {
-      setLoading(false);
+      if (tenantIdRef.current === reqTenant) setLoading(false);
     }
   }, [tenantId, tenantLoading, t]);
 
@@ -430,7 +454,7 @@ const AdminProductsScreen: React.FC = () => {
     setNewCityName('');
     setNewCityPrice('');
     setImageUrls(product.imageUrls || []);
-    setPriceTiers(product.priceTiers || []);
+    setPriceTiers((product.priceTiers || []).map(tr => ({ ...tr, _key: newTierKey() })));
     setColorOptions(product.options?.colors || []);
     setVariations(product.variations || []);
     setColorVariations(product.colorVariations || []);
@@ -546,7 +570,7 @@ const AdminProductsScreen: React.FC = () => {
         brand: formData.brand || '',
         imageUrls: imageUrls,
         priceTiers: priceTiers.length > 0
-          ? priceTiers.sort((a, b) => a.minQty - b.minQty).map(tier => ({
+          ? [...priceTiers].sort((a, b) => a.minQty - b.minQty).map(tier => ({
               minQty: tier.minQty,
               priceUSD: tier.priceUSD,
               ...(tier.maxQty !== undefined && { maxQty: tier.maxQty })
@@ -896,15 +920,19 @@ const AdminProductsScreen: React.FC = () => {
           setBulkBusy(true);
           try {
             const service = createTenantAdminService(tenantId);
-            await Promise.all(ids.map(id => service.updateProduct(id, { status }).catch(() => {})));
-            setProducts(prev => prev.map(p => (ids.includes(p.id) ? { ...p, status } : p)));
+            const results = await Promise.allSettled(ids.map(id => service.updateProduct(id, { status })));
+            const failed = results.filter(r => r.status === 'rejected').length;
             setSelectionMode(false); setSelectedIds(new Set());
+            // Reconcile with server truth instead of optimistically flipping local state,
+            // so partial/total failures aren't silently shown as success.
+            await loadProducts();
+            if (failed) Alert.alert(t('admin.common.error'), t('admin.products.bulkFailed', { defaultValue: 'Bulk update failed.' }));
           } catch { Alert.alert(t('admin.common.error'), t('admin.products.bulkFailed', { defaultValue: 'Bulk update failed.' })); }
           finally { setBulkBusy(false); }
         } },
       ]
     );
-  }, [selectedIds, tenantId, t]);
+  }, [selectedIds, tenantId, t, loadProducts]);
 
   const bulkDelete = useCallback(() => {
     const ids = Array.from(selectedIds);
@@ -918,15 +946,19 @@ const AdminProductsScreen: React.FC = () => {
           setBulkBusy(true);
           try {
             const service = createTenantAdminService(tenantId);
-            await Promise.all(ids.map(id => service.deleteProduct(id).catch(() => {})));
-            setProducts(prev => prev.filter(p => !ids.includes(p.id)));
+            const results = await Promise.allSettled(ids.map(id => service.deleteProduct(id)));
+            const failed = results.filter(r => r.status === 'rejected').length;
             setSelectionMode(false); setSelectedIds(new Set());
+            // Reconcile with server truth instead of optimistically removing rows,
+            // so failed deletes don't vanish from the UI while surviving on the server.
+            await loadProducts();
+            if (failed) Alert.alert(t('admin.common.error'), t('admin.products.bulkFailed', { defaultValue: 'Bulk update failed.' }));
           } catch { Alert.alert(t('admin.common.error'), t('admin.products.bulkFailed', { defaultValue: 'Bulk update failed.' })); }
           finally { setBulkBusy(false); }
         } },
       ]
     );
-  }, [selectedIds, tenantId, t]);
+  }, [selectedIds, tenantId, t, loadProducts]);
 
   // ===== REORDER FUNCTIONS =====
   const enterReorderMode = useCallback(() => {
@@ -2291,7 +2323,7 @@ const AdminProductsScreen: React.FC = () => {
                         onPress={() => {
                           const lastTier = priceTiers[priceTiers.length - 1];
                           const newMinQty = lastTier ? (lastTier.maxQty || lastTier.minQty) + 1 : 5;
-                          setPriceTiers([...priceTiers, { minQty: newMinQty, priceUSD: 0 }]);
+                          setPriceTiers([...priceTiers, { minQty: newMinQty, priceUSD: 0, _key: newTierKey() }]);
                         }}
                         activeOpacity={0.7}
                       >
@@ -2317,16 +2349,14 @@ const AdminProductsScreen: React.FC = () => {
                   ) : (
                     <View style={styles.priceTiersList}>
                       {priceTiers.map((tier, index) => (
-                        <View key={index} style={[styles.priceTierRow, { backgroundColor: theme.colors.background }]}>
+                        <View key={tier._key ?? index} style={[styles.priceTierRow, { backgroundColor: theme.colors.background }]}>
                           {/* ✅ all single line - no multiline */}
                           <View style={styles.tierInputGroup}>
                             <Text allowFontScaling={false} style={[styles.tierLabel, { color: theme.colors.textSecondary }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{t('admin.products.form.minQty')}</Text>
                             <TextInput allowFontScaling={false}                              style={[styles.input, { backgroundColor: theme.colors.surface, color: theme.colors.text }]}
                               value={tier.minQty ? tier.minQty.toString() : ''}
                               onChangeText={(text) => {
-                                const newTiers = [...priceTiers];
-                                newTiers[index].minQty = parseInt(text) || 0;
-                                setPriceTiers(newTiers);
+                                setPriceTiers(prev => prev.map((tr, i) => (i === index ? { ...tr, minQty: parseInt(text) || 0 } : tr)));
                               }}
                               keyboardType="number-pad"
                               multiline={false}
@@ -2342,9 +2372,7 @@ const AdminProductsScreen: React.FC = () => {
                             <TextInput allowFontScaling={false}                              style={[styles.input, { backgroundColor: theme.colors.surface, color: theme.colors.text }]}
                               value={tier.maxQty ? tier.maxQty.toString() : ''}
                               onChangeText={(text) => {
-                                const newTiers = [...priceTiers];
-                                newTiers[index].maxQty = text ? parseInt(text) : undefined;
-                                setPriceTiers(newTiers);
+                                setPriceTiers(prev => prev.map((tr, i) => (i === index ? { ...tr, maxQty: text ? parseInt(text) : undefined } : tr)));
                               }}
                               keyboardType="number-pad"
                               multiline={false}
@@ -2360,11 +2388,9 @@ const AdminProductsScreen: React.FC = () => {
                             <TextInput allowFontScaling={false}                              style={[styles.input, { backgroundColor: theme.colors.surface, color: theme.colors.text }]}
                               defaultValue={tier.priceUSD ? tier.priceUSD.toString() : ''}
                               onEndEditing={(e) => {
-                                const newTiers = [...priceTiers];
                                 const sanitized = e.nativeEvent.text.replace(',', '.');
                                 const parsed = parseFloat(sanitized);
-                                newTiers[index].priceUSD = isNaN(parsed) ? 0 : parsed;
-                                setPriceTiers(newTiers);
+                                setPriceTiers(prev => prev.map((tr, i) => (i === index ? { ...tr, priceUSD: isNaN(parsed) ? 0 : parsed } : tr)));
                               }}
                               keyboardType="numeric"
                               multiline={false}

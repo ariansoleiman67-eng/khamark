@@ -151,6 +151,7 @@ const AdminOrdersScreen: React.FC = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [messagingCustomer, setMessagingCustomer] = useState(false); // action-scoped: opening the customer chat (must NOT gate the whole screen)
   const [trackingUrl, setTrackingUrl] = useState('');
   const [amountPaidInput, setAmountPaidInput] = useState('');
   const [returnModalOpen, setReturnModalOpen] = useState(false);     // return/refund picker
@@ -677,7 +678,7 @@ const AdminOrdersScreen: React.FC = () => {
     }
 
     try {
-      setLoading(true); // Reuse loading state or create a new one for this action
+      setMessagingCustomer(true); // dedicated flag: don't unmount the modal/list behind a fullscreen spinner
 
       // 1. Try to find existing conversation for this tenant & user
       // detailed in implementation plan
@@ -708,12 +709,12 @@ const AdminOrdersScreen: React.FC = () => {
           );
         } else {
           Alert.alert(t('admin.common.error'), "Cannot verify admin identity.");
-          setLoading(false);
+          setMessagingCustomer(false);
           return;
         }
       }
 
-      setLoading(false);
+      setMessagingCustomer(false);
       setModalVisible(false); // Close modal before navigating
 
       if (conversation) {
@@ -766,7 +767,7 @@ const AdminOrdersScreen: React.FC = () => {
 
     } catch (error) {
       console.error('Error opening chat:', error);
-      setLoading(false);
+      setMessagingCustomer(false);
       Alert.alert(t('admin.common.error'), t('admin.orders.chatError'));
     }
   };
@@ -1731,14 +1732,19 @@ const AdminOrdersScreen: React.FC = () => {
                   <TouchableOpacity
                     style={styles.customerRow}
                     onPress={handleMessageCustomer}
+                    disabled={messagingCustomer}
                   >
                     <Ionicons name="chatbubble-ellipses-outline" size={20} color="#3B82F6" />
                     <Text allowFontScaling={false} style={[styles.customerPhone, { color: '#3B82F6' }]} adjustsFontSizeToFit numberOfLines={1}>
                       {t('admin.orders.messageCustomer', { defaultValue: 'Message Customer' })}
                     </Text>
-                    <View style={[styles.callBadge, { backgroundColor: '#EFF6FF' }]}>
-                      <Text allowFontScaling={false} style={[styles.callBadgeText, { color: '#3B82F6' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{t('admin.orders.chat', { defaultValue: 'Chat' })}</Text>
-                    </View>
+                    {messagingCustomer ? (
+                      <ActivityIndicator size="small" color="#3B82F6" />
+                    ) : (
+                      <View style={[styles.callBadge, { backgroundColor: '#EFF6FF' }]}>
+                        <Text allowFontScaling={false} style={[styles.callBadgeText, { color: '#3B82F6' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{t('admin.orders.chat', { defaultValue: 'Chat' })}</Text>
+                      </View>
+                    )}
                   </TouchableOpacity>
 
                   {/* Address */}
@@ -2118,7 +2124,7 @@ const AdminOrdersScreen: React.FC = () => {
                           {t('admin.orders.iqdAmount', { defaultValue: 'Amount (IQD)' })}:
                         </Text>
                         <Text allowFontScaling={false} style={[styles.shippingOfficeValue, { color: theme.colors.text, fontWeight: '600' }]}>
-                          {Math.round(selectedOrder.totalUSD * (selectedOrder.exchangeRate || 1)).toLocaleString()} IQD
+                          {Math.round((selectedOrder.totalUSD || 0) * (selectedOrder.exchangeRate || 1)).toLocaleString()} IQD
                         </Text>
                       </View>
                       
@@ -2127,7 +2133,7 @@ const AdminOrdersScreen: React.FC = () => {
                           {t('admin.orders.usdAmount', { defaultValue: 'Amount (USD)' })}:
                         </Text>
                         <Text allowFontScaling={false} style={[styles.shippingOfficeValue, { color: theme.colors.text }]}>
-                          ${selectedOrder.totalUSD.toFixed(2)}
+                          ${(selectedOrder.totalUSD || 0).toFixed(2)}
                         </Text>
                       </View>
 

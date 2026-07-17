@@ -1,6 +1,6 @@
 import { storeProfileService } from '../../services/storeProfileService';
 import { supabase } from '../../services/supabase';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { isSyntheticEmail } from '../../utils/hashUtils';
 import {
   View,
@@ -113,6 +113,10 @@ const AdminDashboardScreen: React.FC = () => {
   const [storeProfile, setStoreProfile] = useState<DashboardStoreProfile | null>(null);
   const [businessName, setBusinessName] = useState('');
 
+  // Tracks the currently-selected tenant so late/in-flight loadData responses
+  // from a previous tenant can be discarded instead of overwriting current state.
+  const activeTenantRef = useRef(tenantId);
+
   // Handle logo upload directly from dashboard
   const handleLogoUpload = async () => {
     if (!tenantId) return;
@@ -170,6 +174,7 @@ const AdminDashboardScreen: React.FC = () => {
 
   // GOLDEN TEMPLATE: Clear data when tenantId changes
   useEffect(() => {
+    activeTenantRef.current = tenantId;
     setRecentOrders([]);
     setStats(null);
     setLoading(true);
@@ -178,6 +183,10 @@ const AdminDashboardScreen: React.FC = () => {
   const loadData = useCallback(async () => {
     if (!tenantId) return;
 
+    // Snapshot the tenant this request is for; if the admin switches tenants
+    // while this is in flight, discard the stale response instead of writing it.
+    const reqTenant = tenantId;
+
     try {
       const service = createTenantAdminService(tenantId);
       const [statsData, ordersData, profile] = await Promise.all([
@@ -185,6 +194,9 @@ const AdminDashboardScreen: React.FC = () => {
         service.getAllOrders(5),
         storeProfileService.getStoreProfile(tenantId),
       ]);
+
+      // Bail if the selected tenant changed while this request was in flight.
+      if (reqTenant !== activeTenantRef.current) return;
 
       setStats(statsData);
 
@@ -203,6 +215,7 @@ const AdminDashboardScreen: React.FC = () => {
       // Business name (Admin → Business Info) — banner shows this first, like Settings.
       try {
         const { data: tRow } = await supabase.from('tenants').select('business_info').eq('id', tenantId).single();
+        if (reqTenant !== activeTenantRef.current) return;
         const info = (tRow?.business_info || {}) as any;
         setBusinessName(info.name || info.businessName || info.displayName || '');
       } catch { /* fall back to store name */ }
@@ -212,17 +225,24 @@ const AdminDashboardScreen: React.FC = () => {
         id: order.id!,
         orderNumber: order.orderNumber,
         customerName: order.shippingAddress?.fullName || 'Guest',
-        total: order.totalUSD,
-        status: order.status,
+        total: order.totalUSD ?? 0,
+        status: order.status || 'pending',
         createdAt: order.createdAt?.toDate?.() || new Date(),
       }));
-      
+
+      if (reqTenant !== activeTenantRef.current) return;
       setRecentOrders(mappedOrders);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
-      Alert.alert(t('admin.common.error'), t('admin.dashboard.loadFailed'));
+      if (reqTenant === activeTenantRef.current) {
+        Alert.alert(t('admin.common.error'), t('admin.dashboard.loadFailed'));
+      }
     } finally {
-      setLoading(false);
+      // Only clear the spinner for the tenant currently on screen; a stale
+      // response must not flip the loading state for a newer tenant's load.
+      if (reqTenant === activeTenantRef.current) {
+        setLoading(false);
+      }
     }
   }, [tenantId, t]);
 
@@ -327,14 +347,14 @@ const AdminDashboardScreen: React.FC = () => {
           adjustsFontSizeToFit
           numberOfLines={1}
         >
-          ${order.total.toFixed(2)}
+          ${(order.total ?? 0).toFixed(2)}
         </Text>
         <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) + '20' }]}>
           <Text allowFontScaling={false}
             style={[styles.statusText, { color: getStatusColor(order.status) }]}
             numberOfLines={1}
           >
-            {t(`admin.orders.status.${order.status.toLowerCase()}`, { defaultValue: order.status })}
+            {t(`admin.orders.status.${(order.status || 'pending').toLowerCase()}`, { defaultValue: order.status || 'pending' })}
           </Text>
         </View>
       </View>

@@ -49,6 +49,7 @@ const AdminSuccessScreen: React.FC = () => {
   const checkScale = useRef(new Animated.Value(0)).current;
   const fadeIn = useRef(new Animated.Value(0)).current;
   const buttonFade = useRef(new Animated.Value(0)).current;
+  const submitting = useRef(false);
 
   useEffect(() => {
     Animated.sequence([
@@ -78,10 +79,11 @@ const AdminSuccessScreen: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleEnterDashboard = async () => {
-    try {
-      await refreshUser();
-    } catch (_) { /* ignore */ }
+  const handleEnterDashboard = () => {
+    if (submitting.current) return;
+    submitting.current = true;
+    // useEffect already refreshes auth in the background; don't gate navigation on the network.
+    refreshUser().catch(() => { /* ignore */ });
     navigation.reset({ index: 0, routes: [{ name: 'Main' as any }] });
   };
 

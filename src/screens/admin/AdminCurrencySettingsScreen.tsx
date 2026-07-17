@@ -53,6 +53,24 @@ const AdminCurrencySettingsScreen = () => {
   }, [tenantId]);
 
   const handleSave = async () => {
+    // Reject empty/invalid rates BEFORE saving. An undefined/zero rate would be
+    // serialized away (JSON drops undefined keys), silently deleting the stored
+    // exchange rate and reverting every buyer to the hardcoded fallback. The sane
+    // range also catches fat-fingered ~10x values (e.g. 13105 instead of 1310).
+    if (
+      exchangeRateIQD === undefined ||
+      exchangeRateIQD < 100 ||
+      exchangeRateIQD > 100000
+    ) {
+      Alert.alert(
+        t('admin.common.error'),
+        t('admin.currency.invalidRate', {
+          defaultValue: 'Please enter a valid exchange rate.',
+        })
+      );
+      return;
+    }
+
     try {
       setSaving(true);
 
@@ -61,7 +79,7 @@ const AdminCurrencySettingsScreen = () => {
       const existingInfo = await settingsService.getBusinessInfo() || {};
       await settingsService.updateBusinessInfo({
         ...existingInfo,
-        exchangeRateIQD: exchangeRateIQD || undefined,
+        exchangeRateIQD,
       });
       
       Alert.alert(t('admin.common.success'), t('admin.currency.successMessage'));
@@ -118,7 +136,7 @@ const AdminCurrencySettingsScreen = () => {
                 setExchangeRateIQD(isNaN(num) ? undefined : num);
               }}
               placeholder={t('admin.currency.ratePlaceholder')}
-              keyboardType="numeric"
+              keyboardType="number-pad"
               containerStyle={styles.input}
             />
             <Text allowFontScaling={false} style={[styles.hintText, { color: theme.colors.textSecondary }]}>

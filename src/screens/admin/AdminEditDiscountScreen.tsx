@@ -76,10 +76,15 @@ const AdminEditDiscountScreen: React.FC = () => {
     if (isEditing) {
       loadDiscount();
     }
-  }, [discountId]);
+    // tenantId starts null in TenantContext and resolves asynchronously — keep it
+    // in the deps so the loaders re-run (and clear their spinners) once it lands.
+  }, [discountId, tenantId]);
 
   const loadProducts = async () => {
-    if (!tenantId) return;
+    if (!tenantId) {
+      setProductsLoading(false);
+      return;
+    }
     try {
       setProductsLoading(true);
       const tenantService = new TenantAdminService(tenantId);
@@ -93,7 +98,10 @@ const AdminEditDiscountScreen: React.FC = () => {
   };
 
   const loadDiscount = async () => {
-    if (!tenantId) return;
+    if (!tenantId) {
+      setLoading(false);
+      return;
+    }
     try {
       const tenantService = new TenantAdminService(tenantId);
       const discount = await tenantService.getDiscount(discountId);
@@ -569,10 +577,10 @@ const AdminEditDiscountScreen: React.FC = () => {
               </View>
             ) : (
               allProducts
-                .filter(p => 
-                  productSearchQuery.length === 0 || 
-                  p.name.toLowerCase().includes(productSearchQuery.toLowerCase()) ||
-                  p.partNumber.toLowerCase().includes(productSearchQuery.toLowerCase())
+                .filter(p =>
+                  productSearchQuery.length === 0 ||
+                  (p.name || '').toLowerCase().includes(productSearchQuery.toLowerCase()) ||
+                  (p.partNumber || '').toLowerCase().includes(productSearchQuery.toLowerCase())
                 )
                 .filter(p => p.id) // Filter out products without id
                 .slice(0, showProductPicker ? 100 : 5)
@@ -611,7 +619,7 @@ const AdminEditDiscountScreen: React.FC = () => {
                           {product.name}
                         </Text>
                         <Text allowFontScaling={false} style={[styles.productItemMeta, { color: theme.colors.textSecondary }]}>
-                          {product.partNumber} • ${product.priceUSD}
+                          {product.partNumber || '—'} • ${product.priceUSD ?? 0}
                         </Text>
                       </View>
                     </TouchableOpacity>

@@ -9,6 +9,16 @@ const formatCurrency = (val: number) =>
 
 const formatInt = (val: number) => new Intl.NumberFormat('en-US').format(Math.round(val || 0));
 
+// HTML-entity escape for any value interpolated as TEXT into the invoice template.
+// expo-print renders this HTML in a WebView, so unescaped '<', '>', '&', quotes in
+// product/settings/partner text would corrupt the markup (or execute). Base64 image
+// and logo `src` values are our own and are intentionally left un-escaped.
+const esc = (s: any): string =>
+  String(s ?? '').replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string)
+  );
+
 // Total sellable stock = main + size-variation + color-variation stock.
 export const partnerEffectiveStock = (p: any): number => {
   const main = p?.stockQty || 0;
@@ -200,8 +210,8 @@ export const generatePartnerInventoryInvoiceHtml = (products: any[], opts: Build
             <tr>
               <td style="width:44px;padding:0;border:none;">${imgHtml}</td>
               <td style="padding:0;padding-${isRTL ? 'right' : 'left'}:8px;border:none;vertical-align:middle;text-align:${textAlign};">
-                <div style="font-weight:700;color:#0f172a;font-size:10.5px;line-height:1.25;word-break:break-word;">${productName(p)}</div>
-                <div style="color:#64748b;font-size:9px;font-family:monospace;letter-spacing:0.2px;margin-top:1px;">${p.partNumber || 'N/A'}</div>
+                <div style="font-weight:700;color:#0f172a;font-size:10.5px;line-height:1.25;word-break:break-word;">${esc(productName(p))}</div>
+                <div style="color:#64748b;font-size:9px;font-family:monospace;letter-spacing:0.2px;margin-top:1px;">${esc(p.partNumber || 'N/A')}</div>
               </td>
             </tr>
           </table>
@@ -295,13 +305,13 @@ export const generatePartnerInventoryInvoiceHtml = (products: any[], opts: Build
           <tr>
             <td style="width: 60px;">${logoHtml}</td>
             <td style="text-align:${textAlign}; padding: 0 14px;">
-              <div class="logo-text">${L.company}</div>
-              <div class="logo-sub">${[L.phone, L.address].filter(Boolean).join(' · ')}</div>
+              <div class="logo-text">${esc(L.company)}</div>
+              <div class="logo-sub">${[L.phone, L.address].filter(Boolean).map(esc).join(' · ')}</div>
             </td>
             <td style="text-align:${isRTL ? 'left' : 'right'};">
               <div class="report-title">${L.title}</div>
-              <div class="report-meta">${opts.partnerName ? `${L.partner}: ${opts.partnerName}` : L.subtitle}</div>
-              <div class="report-meta">${dateStr ? `${L.date}: ${dateStr}` : ''}</div>
+              <div class="report-meta">${opts.partnerName ? `${L.partner}: ${esc(opts.partnerName)}` : L.subtitle}</div>
+              <div class="report-meta">${dateStr ? `${L.date}: ${esc(dateStr)}` : ''}</div>
             </td>
           </tr>
         </table>
@@ -367,11 +377,11 @@ export const generatePartnerInventoryInvoiceHtml = (products: any[], opts: Build
       </div>
 
       <div class="footer">
-        <div style="font-weight:700;color:#475569;">${L.company}</div>
+        <div style="font-weight:700;color:#475569;">${esc(L.company)}</div>
         <table class="footer-grid"><tr>
-          ${L.phone ? `<td>📞 ${L.phone}</td>` : ''}
-          ${L.email ? `<td>✉️ ${L.email}</td>` : ''}
-          ${L.website ? `<td>🌐 ${L.website}</td>` : ''}
+          ${L.phone ? `<td>📞 ${esc(L.phone)}</td>` : ''}
+          ${L.email ? `<td>✉️ ${esc(L.email)}</td>` : ''}
+          ${L.website ? `<td>🌐 ${esc(L.website)}</td>` : ''}
         </tr></table>
       </div>
     </div>

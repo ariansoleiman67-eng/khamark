@@ -52,22 +52,32 @@ const AdminAnalyticsScreen = () => {
   } | null>(null);
 
   useEffect(() => {
-    fetchData();
-  }, [startDate, endDate, tenantId]);
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      // Pass tenantId to service
-      const analyticsData = await adminService.getAnalyticsData(startDate, endDate, tenantId);
-      setData(analyticsData);
-    } catch (error) {
-      // console.error('Error fetching analytics:', error);
-      Alert.alert(t('admin.common.error'), t('admin.analytics.noData'));
-    } finally {
+    let cancelled = false;
+    // GOLDEN_RULES: never fetch admin data without a resolved tenantId. A null/undefined
+    // tenantId makes getAnalyticsData skip its tenant filter and aggregate every tenant's
+    // orders (cross-tenant revenue/profit exposure), so gate the fetch here.
+    if (!tenantId) {
+      setData(null);
       setLoading(false);
+      return;
     }
-  };
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        // Pass tenantId to service
+        const analyticsData = await adminService.getAnalyticsData(startDate, endDate, tenantId);
+        // Drop stale/out-of-order responses and writes after unmount or a later date change.
+        if (!cancelled) setData(analyticsData);
+      } catch (error) {
+        // console.error('Error fetching analytics:', error);
+        if (!cancelled) Alert.alert(t('admin.common.error'), t('admin.analytics.noData'));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    fetchData();
+    return () => { cancelled = true; };
+  }, [startDate, endDate, tenantId]);
 
   const onStartDateChange = (event: any, selectedDate?: Date) => {
     if (Platform.OS === 'android') setShowStartPicker(false);

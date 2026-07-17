@@ -40,8 +40,14 @@ const AdminCategoryManagerScreen: React.FC = () => {
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
-    setItems(await categoryStore.getAll());
-    setLoading(false);
+    try {
+      setItems(await categoryStore.getAll());
+    } catch (e) {
+      console.warn('[AdminCategoryManager] Failed to load categories', e);
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
   useEffect(() => { load(); }, [load]);
 

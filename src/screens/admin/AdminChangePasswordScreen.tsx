@@ -57,10 +57,19 @@ const AdminChangePasswordScreen = () => {
         { text: t('common.ok'), onPress: () => navigation.goBack() }
       ]);
     } catch (error: any) {
-      if (error.message.includes('auth/wrong-password')) {
+      // AuthService.changePassword is Supabase-backed and throws
+      // Error('Current password is incorrect') on a bad current password — never
+      // a Firebase 'auth/wrong-password' code. Match the real message and always
+      // surface a localized string so ar/ku admins don't get raw English errors.
+      const msg = (error?.message || '').toLowerCase();
+      if (
+        msg.includes('wrong-password') ||
+        msg.includes('invalid-credential') ||
+        msg.includes('current password is incorrect')
+      ) {
         Alert.alert(t('admin.common.error'), t('admin.changePassword.wrongPassword'));
       } else {
-        Alert.alert(t('admin.common.error'), error.message || t('admin.changePassword.failed'));
+        Alert.alert(t('admin.common.error'), t('admin.changePassword.failed'));
       }
     } finally {
       setLoading(false);

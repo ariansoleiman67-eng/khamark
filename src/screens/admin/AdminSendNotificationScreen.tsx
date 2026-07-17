@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -59,7 +59,10 @@ const AdminSendNotificationScreen: React.FC = () => {
   const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const insets = useSafeAreaInsets();
   const [sending, setSending] = useState(false);
-  
+  // Guards post-await work (Alert / navigation / setState) when the screen
+  // is popped while sendNotificationToUsers is still in flight.
+  const isMountedRef = useRef(true);
+
   const [formData, setFormData] = useState({
     title: '',
     titleAr: '',
@@ -83,6 +86,15 @@ const AdminSendNotificationScreen: React.FC = () => {
     });
     setSending(false);
   }, [tenantId]);
+
+  // Track mount state so a slow send that resolves after the user leaves
+  // the screen does not fire a stray Alert / navigation / setState.
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const notificationTypes: { key: NotificationType; label: string; icon: keyof typeof Ionicons.glyphMap; color: string }[] = [
     { key: 'general', label: t('admin.sendNotification.general', { defaultValue: 'General' }), icon: 'megaphone', color: theme.colors.primary },
@@ -116,11 +128,14 @@ const AdminSendNotificationScreen: React.FC = () => {
                 type: formData.type,
                 targetUsers: 'all',
               });
-              
+
+              // Screen was popped mid-request: skip Alert/navigation/setState.
+              if (!isMountedRef.current) return;
+
               Alert.alert(t('admin.common.success'), t('admin.sendNotification.success'), [
                 { text: t('common.ok'), onPress: () => navigation.goBack() }
               ]);
-              
+
               setFormData({
                 title: '',
                 titleAr: '',
@@ -131,9 +146,10 @@ const AdminSendNotificationScreen: React.FC = () => {
                 type: 'general',
               });
             } catch (error) {
+              if (!isMountedRef.current) return;
               Alert.alert(t('admin.common.error'), t('admin.sendNotification.failed'));
             } finally {
-              setSending(false);
+              if (isMountedRef.current) setSending(false);
             }
           },
         },

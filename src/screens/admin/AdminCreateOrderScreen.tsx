@@ -335,6 +335,12 @@ const AdminCreateOrderScreen: React.FC = () => {
   const [cashText, setCashText] = useState('');
   const [note, setNote] = useState('');
   const [creating, setCreating] = useState(false);
+  // Synchronous re-entry lock: `creating` state doesn't commit within one JS tick,
+  // so a fast double-tap would pass the guard twice and ring up two orders. The ref
+  // flips instantly and is the real gate; `creating` stays for the visual/disabled state.
+  const creatingRef = useRef(false);
+  // Distinguishes a failed product load (show retry) from a genuinely empty catalog.
+  const [loadError, setLoadError] = useState(false);
 
   // Region (country) is the single source of truth for the phone code. Defaults
   // to Iraq (+964); the phone selector below stays in sync with it.
@@ -393,15 +399,16 @@ const AdminCreateOrderScreen: React.FC = () => {
   // Persist the in-progress sale so an app crash/kill mid-sale doesn't lose the cart.
   const hydratedRef = useRef(false);
 
-  useEffect(() => {
+  const loadProducts = useCallback(async () => {
     if (!tenantId) return;
-    (async () => {
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const svc = createTenantAdminService(tenantId);
+      const list = await svc.getAllProducts();
+      setProducts(list);
+      // Restore a saved draft, rebuilding cart lines from the freshly-loaded products.
       try {
-        const svc = createTenantAdminService(tenantId);
-        const list = await svc.getAllProducts();
-        setProducts(list);
-        // Restore a saved draft, rebuilding cart lines from the freshly-loaded products.
-        try {
           const raw = await AsyncStorage.getItem(`pos_draft_${tenantId}`);
           if (raw) {
             const d = JSON.parse(raw);
@@ -436,14 +443,17 @@ const AdminCreateOrderScreen: React.FC = () => {
             if (d.note) setNote(d.note);
           }
         } catch { /* ignore a corrupt draft */ }
-      } catch (e) {
-        console.error('Failed to load products', e);
-      } finally {
-        setLoading(false);
-        hydratedRef.current = true;
-      }
-    })();
+    } catch (e) {
+      console.error('Failed to load products', e);
+      // Surface a retry affordance instead of masquerading as an empty catalog.
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+      hydratedRef.current = true;
+    }
   }, [tenantId]);
+
+  useEffect(() => { loadProducts(); }, [loadProducts]);
 
   // Typing stays instant (the input keeps `value={search}`), but the full-catalog
   // refilter + FlatList reconcile run at low priority off the keystroke's sync tick.
@@ -597,7 +607,7 @@ const AdminCreateOrderScreen: React.FC = () => {
   }, [step, lines.length]);
 
   const handleCreate = async (force = false) => {
-    if (!tenantId || !lines.length || creating) return;
+    if (!tenantId || !lines.length || creatingRef.current) return;
 
     // Never silently ring up a loss — confirm if any line is $0 or at/below its cost.
     if (!force) {
@@ -620,6 +630,10 @@ const AdminCreateOrderScreen: React.FC = () => {
     }
 
     try {
+      // Flip the ref synchronously (before the first await) so a second tap in the
+      // same tick sees the lock; the loss-confirmation path above deliberately runs
+      // before this, so the recursive handleCreate(true) is never blocked.
+      creatingRef.current = true;
       setCreating(true);
       const items = lines.map((l) => ({
         productId: l.product.id,
@@ -648,6 +662,7 @@ const AdminCreateOrderScreen: React.FC = () => {
     } catch (e: any) {
       Alert.alert(t('common.error', { defaultValue: 'Error' }), e.message || t('admin.inStore.createFailed', { defaultValue: 'Failed to create sale' }));
     } finally {
+      creatingRef.current = false;
       setCreating(false);
     }
   };
@@ -702,6 +717,20 @@ const AdminCreateOrderScreen: React.FC = () => {
       {/* Catalog */}
       {loading ? (
         <View style={styles.center}><ActivityIndicator color={C.primary} /></View>
+      ) : loadError && products.length === 0 ? (
+        // A failed fetch must not masquerade as an empty catalog — give a way to retry.
+        <View style={styles.center}>
+          <Ionicons name="cloud-offline-outline" size={44} color={C.textSecondary} />
+          <Text allowFontScaling={false} style={[styles.empty, { color: C.textSecondary, marginTop: 12 }]}>
+            {t('admin.inStore.loadFailed', { defaultValue: "Couldn't load products" })}
+          </Text>
+          <TouchableOpacity onPress={loadProducts} activeOpacity={0.85} style={[styles.retryBtn, { borderColor: C.primary }]}>
+            <Ionicons name="refresh" size={18} color={C.primary} />
+            <Text allowFontScaling={false} style={{ color: C.primary, fontWeight: '700', marginLeft: 6, fontSize: 14.5 }}>
+              {t('common.retry', { defaultValue: 'Retry' })}
+            </Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <FlatList
           data={filtered}
@@ -1285,6 +1314,7 @@ const styles = StyleSheet.create({
   statusBadge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, alignItems: 'center', alignSelf: 'flex-start', flexShrink: 0 },
   statusBadgeText: { fontSize: 11, fontWeight: '800', textAlign: 'center', letterSpacing: 0.2 },
   empty: { textAlign: 'center', marginTop: 50, fontSize: 14.5 },
+  retryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 16, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, borderWidth: 1.5 },
 
   // "Review cart" sticky bar (browse step)
   viewCartWrap: { position: 'absolute', left: SPACING.md, right: SPACING.md, bottom: SPACING.md },

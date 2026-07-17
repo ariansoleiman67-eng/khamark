@@ -9,6 +9,7 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -71,7 +72,25 @@ const AdminOperatingHoursScreen = () => {
       setLoading(true);
       const data = await settingsService.getOperatingHours();
       if (data) {
-        setSchedule(data);
+        // The stored value is a raw JSONB blob (`data.data as OperatingHours`)
+        // with no runtime validation. Normalize per-day so a partial/malformed
+        // row (missing day keys, non-object/non-string fields) can't crash the
+        // render or the time picker.
+        const raw = data as any;
+        setSchedule(prev => {
+          const normalized: OperatingHours = { ...prev };
+          DAYS.forEach(d => {
+            const dayRaw = raw[d];
+            const base = prev[d] ?? defaultSchedule;
+            normalized[d] = {
+              isOpen: typeof dayRaw?.isOpen === 'boolean' ? dayRaw.isOpen : base.isOpen,
+              openTime: typeof dayRaw?.openTime === 'string' && dayRaw.openTime ? dayRaw.openTime : base.openTime,
+              closeTime: typeof dayRaw?.closeTime === 'string' && dayRaw.closeTime ? dayRaw.closeTime : base.closeTime,
+            };
+          });
+          if (raw.updatedAt) normalized.updatedAt = raw.updatedAt;
+          return normalized;
+        });
       }
     } catch (error) {
       console.error('Error fetching operating hours:', error);
@@ -106,14 +125,13 @@ const AdminOperatingHoursScreen = () => {
   };
 
   const openTimePicker = (day: typeof DAYS[number], mode: 'open' | 'close') => {
-    const currentWaitTime = mode === 'open' 
-      ? schedule[day].openTime 
-      : schedule[day].closeTime;
-    
-    const [hours, minutes] = currentWaitTime.split(':').map(Number);
+    const daySchedule = schedule[day] ?? defaultSchedule;
+    const currentWaitTime =
+      (mode === 'open' ? daySchedule.openTime : daySchedule.closeTime) || '09:00';
+
+    const [hours, minutes] = String(currentWaitTime).split(':').map(Number);
     const date = new Date();
-    date.setHours(hours);
-    date.setMinutes(minutes);
+    date.setHours(Number.isFinite(hours) ? hours : 9, Number.isFinite(minutes) ? minutes : 0, 0, 0);
 
     setPickerDay(day);
     setPickerMode(mode);
@@ -127,6 +145,9 @@ const AdminOperatingHoursScreen = () => {
     }
 
     if (selectedDate && pickerDay) {
+      // Keep the (controlled) picker value in sync so the iOS inline spinner
+      // tracks the user's selection instead of snapping back on re-render.
+      setPickerValue(selectedDate);
       const hours = selectedDate.getHours().toString().padStart(2, '0');
       const minutes = selectedDate.getMinutes().toString().padStart(2, '0');
       const timeString = `${hours}:${minutes}`;
@@ -142,7 +163,7 @@ const AdminOperatingHoursScreen = () => {
   };
 
   const renderDayRow = (day: typeof DAYS[number]) => {
-    const daySchedule = schedule[day];
+    const daySchedule = schedule[day] ?? defaultSchedule;
     const isClosed = !daySchedule.isOpen;
 
     return (
@@ -233,13 +254,51 @@ const AdminOperatingHoursScreen = () => {
       </View>
 
       {showPicker && (
-        <DateTimePicker
-          value={pickerValue}
-          mode="time"
-          is24Hour={true}
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={handleTimeChange}
-        />
+        Platform.OS === 'ios' ? (
+          <Modal
+            transparent
+            animationType="fade"
+            visible={showPicker}
+            onRequestClose={() => setShowPicker(false)}
+          >
+            <TouchableOpacity
+              style={styles.pickerOverlay}
+              activeOpacity={1}
+              onPress={() => setShowPicker(false)}
+            >
+              <TouchableOpacity
+                activeOpacity={1}
+                style={[styles.pickerSheet, { backgroundColor: theme.colors.surface }]}
+              >
+                <View style={[styles.pickerHeader, { borderBottomColor: theme.colors.border }]}>
+                  <TouchableOpacity onPress={() => setShowPicker(false)}>
+                    <Text
+                      allowFontScaling={false}
+                      style={[styles.pickerDone, { color: theme.colors.primary }]}
+                    >
+                      {t('common.done')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <DateTimePicker
+                  value={pickerValue}
+                  mode="time"
+                  is24Hour={true}
+                  display="spinner"
+                  onChange={handleTimeChange}
+                />
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </Modal>
+        ) : (
+          <DateTimePicker
+            value={pickerValue}
+            mode="time"
+            is24Hour={true}
+            display="default"
+            onChange={handleTimeChange}
+          />
+        )
       )}
     </SafeAreaView>
   );
@@ -303,6 +362,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
+  },
+  pickerDone: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  pickerHeader: {
+    alignItems: 'flex-end',
+    borderBottomWidth: 1,
+    padding: SPACING.md,
+  },
+  pickerOverlay: {
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  pickerSheet: {
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingBottom: 30,
   },
   saveButton: {
     width: '100%',

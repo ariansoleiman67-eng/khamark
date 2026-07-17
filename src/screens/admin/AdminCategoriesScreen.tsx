@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Modal, TextInput, ScrollView, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,6 +28,7 @@ export default function AdminCategoriesScreen() {
   const [form, setForm] = useState<Partial<TenantCategory>>(emptyForm());
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
 
   const load = useCallback(async () => {
     if (!tenantId) { setLoading(false); return; }
@@ -72,6 +73,8 @@ export default function AdminCategoriesScreen() {
       const res = await ImageService.uploadImage(uri);
       if (res.success && res.url) setForm(prev => ({ ...prev, imageUrl: res.url }));
       else Alert.alert(t('common.error', 'Error'), t('admin.categories.uploadError', 'Upload failed'));
+    } catch {
+      Alert.alert(t('common.error', 'Error'), t('admin.categories.uploadError', 'Upload failed'));
     } finally { setUploading(false); }
   };
 
@@ -81,6 +84,8 @@ export default function AdminCategoriesScreen() {
       return;
     }
     if (!tenantId) return;
+    if (savingRef.current) return;
+    savingRef.current = true;
     const svc = createTenantAdminService(tenantId);
     setSaving(true);
     try {
@@ -91,7 +96,7 @@ export default function AdminCategoriesScreen() {
       await load();
     } catch {
       Alert.alert(t('common.error', 'Error'), t('admin.categories.saveError', 'Could not save'));
-    } finally { setSaving(false); }
+    } finally { savingRef.current = false; setSaving(false); }
   };
 
   const confirmDelete = (c: TenantCategory) => {

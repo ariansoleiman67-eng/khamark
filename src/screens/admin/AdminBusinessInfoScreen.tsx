@@ -67,7 +67,7 @@ const AdminBusinessInfoScreen = () => {
     return { dialCode: '+1', digits: phone.replace(/[^\d]/g, ''), countryCode: 'US' as CountryCode };
   };
 
-  const fetchBusinessInfo = async () => {
+  const fetchBusinessInfo = async (isActive: () => boolean = () => true) => {
     try {
       setLoading(true);
 
@@ -78,6 +78,8 @@ const AdminBusinessInfoScreen = () => {
           .select('store_name, business_info')
           .eq('id', tenantId)
           .single();
+        // Bail if a newer fetch (tenant switch / unmount) superseded this one.
+        if (!isActive()) return;
         if (!error && tenantData) {
           const info = tenantData.business_info || {};
           const rawEmail = info.email || '';
@@ -115,6 +117,8 @@ const AdminBusinessInfoScreen = () => {
       // But for multi-tenant, we should probably start empty or default
       if (!tenantId) {
         const data = await settingsService.getBusinessInfo();
+        // Bail if a newer fetch (tenant switch / unmount) superseded this one.
+        if (!isActive()) return;
         if (data) {
           setFormData(data);
           // Parse phone
@@ -134,15 +138,18 @@ const AdminBusinessInfoScreen = () => {
         }
       }
     } catch (error) {
+      if (!isActive()) return;
       console.error('Error fetching business info:', error);
       Alert.alert(t('admin.common.error'), t('admin.businessInfo.failed'));
     } finally {
-      setLoading(false);
+      if (isActive()) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchBusinessInfo();
+    let ignore = false;
+    fetchBusinessInfo(() => !ignore);
+    return () => { ignore = true; };
   }, [tenantId]);
 
   const handleSave = async () => {

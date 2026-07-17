@@ -11,6 +11,8 @@ import {
   Alert,
   I18nManager,
   Switch,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -144,7 +146,7 @@ const AdminBrandManagerScreen: React.FC = () => {
 
       {/* Add/Edit modal */}
       <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
           <View style={[styles.modalCard, { backgroundColor: theme.colors.card }]}>
             <Text style={[styles.modalTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
               {form.id ? t('admin.brands.edit', { defaultValue: 'Edit Brand' }) : t('admin.brands.add', { defaultValue: 'Add Brand' })}
@@ -186,7 +188,7 @@ const AdminBrandManagerScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );

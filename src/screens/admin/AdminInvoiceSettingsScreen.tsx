@@ -38,6 +38,8 @@ const AdminInvoiceSettingsScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   // Form state
   const [companyName, setCompanyName] = useState('');
@@ -56,11 +58,20 @@ const AdminInvoiceSettingsScreen: React.FC = () => {
 
   // Load existing settings
   useEffect(() => {
-    if (!tenantId) return;
+    // No tenant resolved yet: clear the spinner instead of hanging on it forever.
+    if (!tenantId) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
     const loadSettings = async () => {
+      setLoading(true);
+      setLoadError(false);
       try {
         const service = new TenantAdminService(tenantId);
         const data = await service.getSettings(SETTINGS_DOC_ID) as InvoiceSettings | null;
+        // Drop stale results from a tenant we've already switched away from.
+        if (cancelled) return;
         if (data) {
           setCompanyName(data.companyName || '');
           setCompanyNameAr(data.companyNameAr || '');
@@ -77,8 +88,14 @@ const AdminInvoiceSettingsScreen: React.FC = () => {
               setPhoneDigits(data.phone.slice(match.dialCode.length).trim());
             } else {
               // No matching dial code found, put everything in digits
+              setPhoneDialCode('+1');
+              setPhoneCountryCode('US');
               setPhoneDigits(data.phone.replace(/[^\d]/g, ''));
             }
+          } else {
+            setPhoneDialCode('+1');
+            setPhoneCountryCode('US');
+            setPhoneDigits('');
           }
           setEmail(data.email || '');
           setAddress(data.address || '');
@@ -87,15 +104,39 @@ const AdminInvoiceSettingsScreen: React.FC = () => {
           setTaxId(data.taxId || '');
           setWebsite(data.website || '');
           setLogoUrl(data.logoUrl || '');
+        } else {
+          // No settings for this tenant (e.g. after switching to a fresh tenant):
+          // reset the whole form so the previous tenant's data can't remain on
+          // screen and be re-saved under the new tenantId.
+          setCompanyName('');
+          setCompanyNameAr('');
+          setCompanyNameKu('');
+          setPhoneDigits('');
+          setPhoneDialCode('+1');
+          setPhoneCountryCode('US');
+          setEmail('');
+          setAddress('');
+          setAddressAr('');
+          setAddressKu('');
+          setTaxId('');
+          setWebsite('');
+          setLogoUrl('');
         }
       } catch (err) {
+        if (cancelled) return;
         console.error('Failed to load invoice settings:', err);
+        // Flag the failure so the form isn't shown blank, which would let a Save
+        // overwrite the tenant's real, previously-saved settings with empty values.
+        setLoadError(true);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     loadSettings();
-  }, [tenantId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [tenantId, reloadKey]);
 
   const handlePickLogo = useCallback(async () => {
     try {
@@ -123,6 +164,18 @@ const AdminInvoiceSettingsScreen: React.FC = () => {
   const handleSave = useCallback(async () => {
     if (!tenantId) return;
 
+    // The initial load failed, so the form is blank/unreliable. Saving now would
+    // overwrite the tenant's real invoice details with empty values — block it.
+    if (loadError) {
+      Alert.alert(
+        t('common.error'),
+        t('admin.invoiceSettings.loadFailedCannotSave', {
+          defaultValue: 'Could not load your current settings. Please reload before saving to avoid overwriting your data.',
+        })
+      );
+      return;
+    }
+
     setSaving(true);
     try {
       const service = new TenantAdminService(tenantId);
@@ -149,7 +202,7 @@ const AdminInvoiceSettingsScreen: React.FC = () => {
     } finally {
       setSaving(false);
     }
-  }, [tenantId, companyName, companyNameAr, companyNameKu, phoneDigits, phoneDialCode, email, address, addressAr, addressKu, taxId, website, logoUrl, t]);
+  }, [tenantId, loadError, companyName, companyNameAr, companyNameKu, phoneDigits, phoneDialCode, email, address, addressAr, addressKu, taxId, website, logoUrl, t]);
 
   const renderInput = (
     label: string,
@@ -190,6 +243,31 @@ const AdminInvoiceSettingsScreen: React.FC = () => {
         <StatusBar style={isDark ? 'light' : 'dark'} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: isDark ? theme.colors.background : '#E0F7FA' }]}
+        edges={['top', 'left', 'right']}
+      >
+        <StatusBar style={isDark ? 'light' : 'dark'} />
+        <View style={styles.loadingContainer}>
+          <Ionicons name="cloud-offline-outline" size={48} color={theme.colors.textSecondary} />
+          <Text allowFontScaling={false} style={[styles.errorText, { color: theme.colors.text }]}>
+            {t('admin.invoiceSettings.loadError', { defaultValue: 'Could not load invoice settings. Check your connection and try again.' })}
+          </Text>
+          <TouchableOpacity
+            style={[styles.retryButton, { backgroundColor: theme.colors.primary }]}
+            onPress={() => setReloadKey(k => k + 1)}
+          >
+            <Text allowFontScaling={false} style={styles.retryButtonText}>
+              {t('common.retry', { defaultValue: 'Retry' })}
+            </Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -409,6 +487,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  errorText: {
+    fontSize: 15,
+    fontWeight: '600',
+    lineHeight: 22,
+    marginHorizontal: SPACING.lg,
+    marginTop: SPACING.md,
+    textAlign: 'center',
+  },
   flex: {
     flex: 1,
   },
@@ -509,6 +595,17 @@ const styles = StyleSheet.create({
   },
   logoPreviewContainer: {
     alignItems: 'center',
+  },
+  retryButton: {
+    borderRadius: 10,
+    marginTop: SPACING.lg,
+    paddingHorizontal: 28,
+    paddingVertical: 12,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
   },
   saveButton: {
     padding: 8,

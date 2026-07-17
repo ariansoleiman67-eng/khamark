@@ -102,17 +102,19 @@ const AdminEditStoreLocationScreen = () => {
   const [activeTimeField, setActiveTimeField] = useState<{ day: string; field: 'open' | 'close' } | null>(null);
 
   useEffect(() => {
-    if (isEditing && locationId) {
+    // RACE FIX: defer the load until the admin id is known and re-run once auth rehydrates,
+    // so a cold-start / stale-closure currentAdminId ('') can't false-fail the ownership check.
+    if (isEditing && locationId && currentAdminId) {
       loadLocation();
     }
-  }, [locationId]);
+  }, [locationId, currentAdminId]);
 
   const loadLocation = async () => {
     try {
       const location = await locationService.getLocationById(locationId!);
       if (location) {
         // OWNERSHIP CHECK: Block editing if not owner
-        if (location.createdByAdminId && location.createdByAdminId !== currentAdminId) {
+        if (location.createdByAdminId && currentAdminId && location.createdByAdminId !== currentAdminId) {
           Alert.alert(
             t('admin.common.error'),
             t('admin.storeLocations.noPermission') || 'You do not have permission to edit this location'
@@ -121,10 +123,10 @@ const AdminEditStoreLocationScreen = () => {
           return;
         }
         
-        setName(location.name);
+        setName(location.name || '');
         setNameAr(location.nameAr || '');
         setNameKu(location.nameKu || '');
-        setAddress(location.address);
+        setAddress(location.address || '');
         setAddressAr(location.addressAr || '');
         setAddressKu(location.addressKu || '');
         if (location.phone) {
@@ -134,7 +136,7 @@ const AdminEditStoreLocationScreen = () => {
           setPhoneCountry(parsed.countryCode);
         }
         setEmail(location.email || '');
-        setCity(location.city);
+        setCity(location.city || '');
         setLatitude(location.latitude);
         setLongitude(location.longitude);
         setType(location.type);
@@ -495,6 +497,50 @@ const AdminEditStoreLocationScreen = () => {
           </View>
 
 
+
+          {/* Working Hours */}
+          <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+            <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text }]}>{t('admin.storeLocations.workingHours', { defaultValue: 'Working Hours' })}</Text>
+            {DAYS.map((day) => {
+              const dh = workingHours[day] ?? DEFAULT_WORKING_HOURS[day];
+              return (
+                <View key={day} style={[styles.hoursRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                  <View style={[styles.dayInfo, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                    <Switch
+                      value={dh.isOpen}
+                      onValueChange={(v) => updateWorkingHour(day, 'isOpen', v)}
+                      trackColor={{ false: theme.colors.border, true: theme.colors.primary + '60' }}
+                      thumbColor={dh.isOpen ? theme.colors.primary : '#f4f3f4'}
+                    />
+                    <Text allowFontScaling={false} style={[styles.dayLabel, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+                      {t(`admin.days.${day}`, { defaultValue: day.charAt(0).toUpperCase() + day.slice(1) })}
+                    </Text>
+                  </View>
+                  {dh.isOpen ? (
+                    <View style={[styles.hoursInputRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                      <TouchableOpacity
+                        style={[styles.timeButton, { borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}
+                        onPress={() => openTimePicker(day, 'open')}
+                      >
+                        <Text allowFontScaling={false} style={[styles.timeButtonText, { color: theme.colors.text }]}>{dh.open}</Text>
+                      </TouchableOpacity>
+                      <Text allowFontScaling={false} style={[styles.hoursTo, { color: theme.colors.textSecondary }]}>-</Text>
+                      <TouchableOpacity
+                        style={[styles.timeButton, { borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}
+                        onPress={() => openTimePicker(day, 'close')}
+                      >
+                        <Text allowFontScaling={false} style={[styles.timeButtonText, { color: theme.colors.text }]}>{dh.close}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <Text allowFontScaling={false} style={[styles.timeButtonText, { color: theme.colors.textSecondary }]}>
+                      {t('admin.operatingHours.closed', { defaultValue: 'Closed' })}
+                    </Text>
+                  )}
+                </View>
+              );
+            })}
+          </View>
 
           <View style={styles.bottomSpacing} />
         </ScrollView>

@@ -54,6 +54,19 @@ const formatCurrency = (val: number) => {
   }).format(val);
 };
 
+// Escape any dynamic string interpolated into the generated PDF HTML. Customer names, phones,
+// recipient names (entered at checkout) and product/part/company text can contain <, >, & or
+// quotes; unescaped, they break the surrounding markup in the expo-print WebView (a stray '<A>'
+// swallows the rest of the row, '&' renders as a broken entity) or could inject tags. Chained
+// replaces (& first) keep this strict-safe with no index-signature typing issues.
+const escapeHtml = (s: any): string =>
+  String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
 // Available (sellable) stock on hand: main + size-variation + color-variation quantities.
 const getAvailableStock = (p: any): number => {
   const main = Number(p?.stockQty) || 0;
@@ -367,7 +380,7 @@ export const ReportsGenerator = () => {
       return `
         <tr>
           <td class="n"><span class="rank">${i + 1}</span></td>
-          <td><span class="partno">${r.partNumber || '—'}</span></td>
+          <td><span class="partno">${escapeHtml(r.partNumber || '—')}</span></td>
           <td class="n"><span class="muted">${r.qty.toLocaleString('en-US')}</span></td>
           <td class="n"><span class="stk ${stk}">${r.stock.toLocaleString('en-US')}</span></td>
           <td class="n"><span class="muted">${money(r.unitBuy)}</span></td>
@@ -474,7 +487,7 @@ export const ReportsGenerator = () => {
             <div class="brand">
               ${logoSrc ? `<img class="logo" src="${logoSrc}" />` : ''}
               <div>
-                <div class="co">${L.company}</div>
+                <div class="co">${escapeHtml(L.company)}</div>
                 <div class="eyebrow">${L.eyebrow}</div>
               </div>
             </div>
@@ -534,7 +547,7 @@ export const ReportsGenerator = () => {
           <div class="foot">
             <div class="note">${L.note}</div>
             <div class="contact">
-              <b>${L.company}</b>${L.phone ? ` &middot; 📞 ${L.phone}` : ''}${L.email ? ` &middot; ✉️ ${L.email}` : ''}${L.address ? ` &middot; 📍 ${L.address}` : ''}
+              <b>${escapeHtml(L.company)}</b>${L.phone ? ` &middot; 📞 ${escapeHtml(L.phone)}` : ''}${L.email ? ` &middot; ✉️ ${escapeHtml(L.email)}` : ''}${L.address ? ` &middot; 📍 ${escapeHtml(L.address)}` : ''}
             </div>
           </div>
         </div>
@@ -599,9 +612,9 @@ export const ReportsGenerator = () => {
     const groupedUnpaid = Array.from(map.values());
 
     const itemsHtml = groupedUnpaid.map((item, index) => {
-      let customerHtml = `<strong>${item.name}</strong>`;
-      if (item.recipientName) customerHtml += `<br/><span style="color: #4B5563; font-size: 11px;">🏢 ${item.recipientName}</span>`;
-      if (item.phone) customerHtml += `<br/><span style="color: #6B7280; font-size: 11px;">${item.phone}</span>`;
+      let customerHtml = `<strong>${escapeHtml(item.name)}</strong>`;
+      if (item.recipientName) customerHtml += `<br/><span style="color: #4B5563; font-size: 11px;">🏢 ${escapeHtml(item.recipientName)}</span>`;
+      if (item.phone) customerHtml += `<br/><span style="color: #6B7280; font-size: 11px;">${escapeHtml(item.phone)}</span>`;
 
       return `
         <tr style="background: ${index % 2 === 0 ? '#fff' : '#F8F9FC'};">
@@ -702,7 +715,7 @@ export const ReportsGenerator = () => {
           ? `<img src="${imgSrc}" class="thumb" onerror="this.style.display='none'"/>`
           : `<span class="ph">📦</span>`;
         return `<tr>
-          <td><div class="pcell">${imgHtml}<div><div class="pname">${name}</div>${it.partNumber ? `<div class="ppart">${it.partNumber}</div>` : ''}</div></div></td>
+          <td><div class="pcell">${imgHtml}<div><div class="pname">${escapeHtml(name)}</div>${it.partNumber ? `<div class="ppart">${escapeHtml(it.partNumber)}</div>` : ''}</div></div></td>
           <td style="text-align:center;">${q}</td>
           <td style="text-align:center;">$${formatCurrency(price)}</td>
           <td style="text-align:${endAlign};font-weight:600;">$${formatCurrency(price * q)}</td>
@@ -712,7 +725,7 @@ export const ReportsGenerator = () => {
       return `
         <div class="order-card">
           <div class="order-head">
-            <span class="order-no">${L.order} ${orderNum}</span>
+            <span class="order-no">${L.order} ${escapeHtml(orderNum)}</span>
             <span class="order-date">${L.date}: ${fmtDate(order.createdAt)}</span>
           </div>
           <table>
@@ -767,7 +780,7 @@ export const ReportsGenerator = () => {
       <body>
         <div class="top">
           <div>
-            <div class="brand-name">${L.company}</div>
+            <div class="brand-name">${escapeHtml(L.company)}</div>
             <div class="badge">${L.title}</div>
           </div>
           ${invoiceSettings?.logoUrl
@@ -775,15 +788,15 @@ export const ReportsGenerator = () => {
             : `<img src="data:image/png;base64,${LOGO_BASE64}" class="logo"/>`}
         </div>
         <div class="cust">
-          <div><strong>${L.customer}:</strong> ${user?.name || 'N/A'}</div>
-          ${user?.phone ? `<div><strong>${L.phone}:</strong> ${user.phone}</div>` : ''}
+          <div><strong>${L.customer}:</strong> ${escapeHtml(user?.name || 'N/A')}</div>
+          ${user?.phone ? `<div><strong>${L.phone}:</strong> ${escapeHtml(user.phone)}</div>` : ''}
         </div>
         ${ordersHtml}
         <div class="grand">
           <span class="grand-label">${L.grandTotal}</span>
           <span class="grand-value">$${formatCurrency(user?.remaining || 0)} USD</span>
         </div>
-        <div class="foot-note">${L.company}</div>
+        <div class="foot-note">${escapeHtml(L.company)}</div>
       </body>
       </html>
     `;

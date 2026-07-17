@@ -59,7 +59,7 @@ const AdminStoreLocationsScreen = () => {
   useFocusEffect(
     useCallback(() => {
       loadLocations();
-    }, [])
+    }, [currentAdminId])
   );
 
   const handleRefresh = () => {
@@ -101,7 +101,7 @@ const AdminStoreLocationsScreen = () => {
         <View style={[styles.locationInfo, isRTL && { marginLeft: 0, marginRight: SPACING.md }]}>
           <Text allowFontScaling={false} style={[styles.locationName, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{item.name}</Text>
           <Text allowFontScaling={false} style={[styles.locationType, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
-            {item.type.toUpperCase()} • {item.city}
+            {(item.type ? item.type.toUpperCase() : '')} • {item.city}
           </Text>
         </View>
         <View style={[

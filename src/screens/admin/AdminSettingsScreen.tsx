@@ -195,6 +195,11 @@ const AdminSettingsScreen: React.FC = () => {
 
   // Clear ALL state when tenantId changes
   useEffect(() => {
+    // Guard against out-of-order responses on rapid tenant switches (A→B): the
+    // cleanup flips `cancelled` so a slower tenant-A fetch can never overwrite
+    // tenant-B's header/logo/cover (tenant-isolation rule).
+    let cancelled = false;
+
     setNotificationsEnabled(true);
     setShowLanguagePicker(false);
     setSyncing(false);
@@ -205,7 +210,7 @@ const AdminSettingsScreen: React.FC = () => {
 
     if (tenantId) {
       storeProfileService.getStoreProfile(tenantId)
-        .then(profile => setStoreProfile(profile))
+        .then(profile => { if (!cancelled) setStoreProfile(profile); })
         .catch(err => console.error('Failed to load store profile for header:', err));
 
       // Business name (set in Admin → Business Info), shown in the header.
@@ -213,12 +218,14 @@ const AdminSettingsScreen: React.FC = () => {
         try {
           const { data } = await supabase.from('tenants').select('business_info').eq('id', tenantId).single();
           const info = (data?.business_info || {}) as any;
-          setBusinessName(info.name || info.businessName || info.displayName || '');
+          if (!cancelled) setBusinessName(info.name || info.businessName || info.displayName || '');
         } catch {
           // ignore — header falls back to store name
         }
       })();
     }
+
+    return () => { cancelled = true; };
   }, [tenantId]);
 
   const handleLanguageChange = (languageCode: string) => {

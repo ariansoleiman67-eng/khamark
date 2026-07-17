@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -58,7 +58,12 @@ export default function AdminPartnerManagementScreen() {
 
   const [partners, setPartners] = useState<PartnerWithStats[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [busyUid, setBusyUid] = useState<string | null>(null);
+  // Request-generation guard: every load() invocation bumps this; only the
+  // latest call is allowed to write state, so an out-of-order or stale (e.g.
+  // wrong-tenant) response can never overwrite fresher data.
+  const reqIdRef = useRef(0);
 
   // Add-partner modal
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -68,7 +73,14 @@ export default function AdminPartnerManagementScreen() {
   const [adding, setAdding] = useState(false);
 
   const load = useCallback(async () => {
-    if (!tenantId) return;
+    if (!tenantId) {
+      // Unresolved/absent tenant: clear the initial spinner so we never hang
+      // on a permanent full-screen ActivityIndicator with no recovery path.
+      setLoading(false);
+      return;
+    }
+    const reqId = ++reqIdRef.current;
+    setError(false);
     try {
       const service = createTenantAdminService(tenantId);
       const [partnerList, products, orders] = await Promise.all([
@@ -96,11 +108,15 @@ export default function AdminPartnerManagementScreen() {
         }, 0);
         return { ...p, productCount: assigned.length, profitPotential };
       });
+      // Drop stale/out-of-order results (a newer load — e.g. after a tenant
+      // switch — has already superseded this one).
+      if (reqId !== reqIdRef.current) return;
       setPartners(withStats);
     } catch (e) {
       console.error('Failed to load partners:', e);
+      if (reqId === reqIdRef.current) setError(true);
     } finally {
-      setLoading(false);
+      if (reqId === reqIdRef.current) setLoading(false);
     }
   }, [tenantId]);
 
@@ -342,6 +358,22 @@ export default function AdminPartnerManagementScreen() {
         <View style={styles.center}>
           <ActivityIndicator size="large" color={ACCENT} />
         </View>
+      ) : error && !partners.length ? (
+        <View style={styles.emptyContainer}>
+          <View style={[styles.emptyIconCircle, { backgroundColor: 'rgba(139,92,246,0.1)' }]}>
+            <Ionicons name="cloud-offline-outline" size={48} color={ACCENT} />
+          </View>
+          <Text allowFontScaling={false} style={[styles.emptyTitle, { color: theme.colors.text }]}>{t('admin.partners.errorTitle', { defaultValue: "Couldn't Load Partners" })}</Text>
+          <Text allowFontScaling={false} style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
+            {t('admin.partners.errorSubtitle', { defaultValue: 'Check your connection and try again.' })}
+          </Text>
+          <TouchableOpacity activeOpacity={0.9} onPress={() => { setLoading(true); load(); }} style={styles.retryBtn}>
+            <LinearGradient colors={['#9D6BFF', '#7C3AED']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.retryBtnInner}>
+              <Ionicons name="refresh" size={18} color="#fff" />
+              <Text allowFontScaling={false} style={styles.retryBtnText}>{t('common.retry', { defaultValue: 'Retry' })}</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
       ) : (
         <FlatList
           data={partners}
@@ -530,6 +562,9 @@ const styles = StyleSheet.create({
   emptyIconCircle: { width: 100, height: 100, borderRadius: 50, justifyContent: 'center', alignItems: 'center', marginBottom: SPACING.lg },
   emptyTitle: { fontSize: 20, fontWeight: '700', marginBottom: SPACING.sm, textAlign: 'center' },
   emptySubtitle: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  retryBtn: { marginTop: SPACING.lg, borderRadius: 14, overflow: 'hidden' },
+  retryBtnInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, paddingHorizontal: 28 },
+  retryBtnText: { color: '#fff', fontWeight: '700', fontSize: 15, marginLeft: 8 },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: SPACING.md, paddingTop: SPACING.sm },

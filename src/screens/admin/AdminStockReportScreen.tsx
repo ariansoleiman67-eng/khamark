@@ -121,7 +121,7 @@ const AdminStockReportScreen: React.FC = () => {
     // received). Pending/processing orders aren't collectable yet under COD, so
     // they're excluded — consistent with the analytics card and the unpaid report.
     const remaining = Math.round((total - paid) * 100) / 100;
-    return o.status === 'delivered' && remaining > 0.01;
+    return String(o.status || '').toLowerCase() === 'delivered' && remaining > 0.01;
   });
   
   const totalUnpaidAmountUSD = unpaidOrders.reduce((sum, o) => {

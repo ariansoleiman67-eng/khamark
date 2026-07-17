@@ -11,6 +11,9 @@ import {
   Alert,
   I18nManager,
   Switch,
+  KeyboardAvoidingView,
+  ScrollView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,6 +27,14 @@ import { promoService, Promo, PromoType } from '../../services/promoService';
 // works offline in demo mode. No image/logo — promos are text-only.
 const emptyForm = (): Partial<Promo> => ({ code: '', type: 'percentage', value: undefined, minPurchase: undefined, isActive: true });
 
+// Keep only digits and a single decimal point (localized comma -> dot first), so
+// partial input like "5." survives a re-render instead of being stripped.
+const sanitizeDecimal = (v: string): string => {
+  const cleaned = v.replace(/,/g, '.').replace(/[^0-9.]/g, '');
+  const dot = cleaned.indexOf('.');
+  return dot === -1 ? cleaned : cleaned.slice(0, dot + 1) + cleaned.slice(dot + 1).replace(/\./g, '');
+};
+
 const AdminPromoManagerScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
   const { t, i18n } = useTranslation();
@@ -35,15 +46,29 @@ const AdminPromoManagerScreen: React.FC = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [form, setForm] = useState<Partial<Promo>>(emptyForm());
   const [saving, setSaving] = useState(false);
+  // Numeric fields hold RAW text (not a Number() round-trip) so partial input like
+  // "5." survives and a bad paste never renders a literal "NaN" in the field.
+  const [valueText, setValueText] = useState('');
+  const [minText, setMinText] = useState('');
 
   const load = useCallback(async () => {
-    setPromos(await promoService.getAll());
-    setLoading(false);
+    try {
+      setPromos(await promoService.getAll());
+    } catch {
+      // Keep whatever was loaded before; never leave the spinner stuck on failure.
+    } finally {
+      setLoading(false);
+    }
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  const openAdd = () => { setForm(emptyForm()); setModalVisible(true); };
-  const openEdit = (p: Promo) => { setForm({ ...p }); setModalVisible(true); };
+  const openAdd = () => { setForm(emptyForm()); setValueText(''); setMinText(''); setModalVisible(true); };
+  const openEdit = (p: Promo) => {
+    setForm({ ...p });
+    setValueText(p.value != null ? String(p.value) : '');
+    setMinText(p.minPurchase != null ? String(p.minPurchase) : '');
+    setModalVisible(true);
+  };
 
   // Human-readable discount line: "10% off" / "$5 off" (+ " • min $30").
   const describe = (p: Promo): string => {
@@ -53,7 +78,7 @@ const AdminPromoManagerScreen: React.FC = () => {
 
   const save = async () => {
     const code = form.code?.trim();
-    const value = Number(form.value) || 0;
+    const value = Number(valueText) || 0;
     if (!code || value <= 0) {
       Alert.alert(
         t('common.error', { defaultValue: 'Error' }),
@@ -63,18 +88,24 @@ const AdminPromoManagerScreen: React.FC = () => {
     }
     setSaving(true);
     try {
-      const min = form.minPurchase != null && String(form.minPurchase) !== '' ? Number(form.minPurchase) : undefined;
+      const minParsed = minText.trim() !== '' ? Number(minText) : NaN;
+      const min = Number.isFinite(minParsed) && minParsed > 0 ? minParsed : undefined;
       await promoService.save({
         id: form.id,
         code,
         type: (form.type as PromoType) ?? 'percentage',
         value,
-        minPurchase: min && min > 0 ? min : undefined,
+        minPurchase: min,
         isActive: form.isActive ?? true,
         sortOrder: form.sortOrder,
       });
       setModalVisible(false);
       await load();
+    } catch {
+      Alert.alert(
+        t('common.error', { defaultValue: 'Error' }),
+        t('admin.promos.saveFailed', { defaultValue: 'Could not save. Try again.' })
+      );
     } finally {
       setSaving(false);
     }
@@ -89,7 +120,17 @@ const AdminPromoManagerScreen: React.FC = () => {
         {
           text: t('common.delete', { defaultValue: 'Delete' }),
           style: 'destructive',
-          onPress: async () => { await promoService.remove(p.id); await load(); },
+          onPress: async () => {
+            try {
+              await promoService.remove(p.id);
+              await load();
+            } catch {
+              Alert.alert(
+                t('common.error', { defaultValue: 'Error' }),
+                t('admin.promos.deleteFailed', { defaultValue: 'Could not delete. Try again.' })
+              );
+            }
+          },
         },
       ]
     );
@@ -144,8 +185,9 @@ const AdminPromoManagerScreen: React.FC = () => {
 
       {/* Add/Edit modal */}
       <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: theme.colors.card }]}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <ScrollView style={styles.modalOverlay} contentContainerStyle={styles.modalScroll} keyboardShouldPersistTaps="handled">
+            <View style={[styles.modalCard, { backgroundColor: theme.colors.card }]}>
             <Text style={[styles.modalTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
               {form.id ? t('admin.promos.edit', { defaultValue: 'Edit Code' }) : t('admin.promos.add', { defaultValue: 'Add Code' })}
             </Text>
@@ -180,8 +222,8 @@ const AdminPromoManagerScreen: React.FC = () => {
               {isPercentage ? t('admin.promos.percentOff', { defaultValue: 'Percent off (%)' }) : t('admin.promos.amountOff', { defaultValue: 'Amount off ($)' })}
             </Text>
             <TextInput
-              value={form.value != null ? String(form.value) : ''}
-              onChangeText={v => setForm(f => ({ ...f, value: v === '' ? undefined : Number(v) }))}
+              value={valueText}
+              onChangeText={v => setValueText(sanitizeDecimal(v))}
               keyboardType="numeric"
               placeholder="0"
               placeholderTextColor={theme.colors.placeholder}
@@ -190,8 +232,8 @@ const AdminPromoManagerScreen: React.FC = () => {
 
             <Text style={[styles.label, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left', marginTop: 16 }]}>{t('admin.promos.minPurchase', { defaultValue: 'Min purchase ($)' })}</Text>
             <TextInput
-              value={form.minPurchase != null ? String(form.minPurchase) : ''}
-              onChangeText={v => setForm(f => ({ ...f, minPurchase: v === '' ? undefined : Number(v) }))}
+              value={minText}
+              onChangeText={v => setMinText(sanitizeDecimal(v))}
               keyboardType="numeric"
               placeholder="0"
               placeholderTextColor={theme.colors.placeholder}
@@ -211,8 +253,9 @@ const AdminPromoManagerScreen: React.FC = () => {
                 {saving ? <ActivityIndicator color={theme.colors.textOnPrimary} /> : <Text style={{ color: theme.colors.textOnPrimary, fontWeight: '700' }}>{t('common.save', { defaultValue: 'Save' })}</Text>}
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -230,7 +273,8 @@ const styles = StyleSheet.create({
   sub: { fontSize: 13, marginTop: 2, fontWeight: '600' },
   status: { fontSize: 12, marginTop: 2, fontWeight: '600' },
   actionBtn: { padding: 8 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+  modalScroll: { flexGrow: 1, justifyContent: 'flex-end' },
   modalCard: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 36 },
   modalTitle: { fontSize: 20, fontWeight: '800', marginBottom: 16 },
   label: { fontSize: 13, fontWeight: '600', marginBottom: 6 },

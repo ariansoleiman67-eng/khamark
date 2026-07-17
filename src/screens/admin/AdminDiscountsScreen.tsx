@@ -39,6 +39,7 @@ const AdminDiscountsScreen: React.FC = () => {
       if (!tenantLoading) {
         setLoading(false);
       }
+      setRefreshing(false);
       return;
     }
 
@@ -214,23 +215,23 @@ const AdminDiscountsScreen: React.FC = () => {
               </Text>
             </View>
             
-            {discount.minPurchase && (
+            {discount.minPurchase ? (
               <View style={rowStyle}>
                 <Ionicons name="wallet-outline" size={16} color={theme.colors.textSecondary} />
                 <Text allowFontScaling={false} style={[styles.detailText, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
                   {t('admin.discounts.minOrder', { defaultValue: 'Min Order' })}: ${discount.minPurchase}
                 </Text>
               </View>
-            )}
+            ) : null}
 
-            {discount.minQuantity && (
+            {discount.minQuantity ? (
               <View style={rowStyle}>
                 <Ionicons name="basket-outline" size={16} color={theme.colors.textSecondary} />
                 <Text allowFontScaling={false} style={[styles.detailText, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
                   {t('admin.discounts.minItems', { defaultValue: 'Min Items' })}: {discount.minQuantity}
                 </Text>
               </View>
-            )}
+            ) : null}
 
             <View style={rowStyle}>
               <Ionicons name="stats-chart-outline" size={16} color={theme.colors.textSecondary} />

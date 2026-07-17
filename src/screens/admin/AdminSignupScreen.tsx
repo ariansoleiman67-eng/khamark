@@ -1,6 +1,6 @@
 /* eslint-disable react-native/no-inline-styles, react-native/no-color-literals */
 import { supabase } from '../../services/supabase';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -65,7 +65,13 @@ const AdminSignupScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // Synchronous re-entrancy latch (double-tap) + mounted guard (post-await nav).
+  const submittingRef = useRef(false);
+  const aliveRef = useRef(true);
+  useEffect(() => () => { aliveRef.current = false; }, []);
+
   const handleSendCode = async () => {
+    if (submittingRef.current) return;
     setErrorMessage('');
 
     if (method === 'phone') {
@@ -74,6 +80,7 @@ const AdminSignupScreen: React.FC = () => {
         return;
       }
       try {
+        submittingRef.current = true;
         setLoading(true);
         const countryInfo = getCountryInfo(selectedCountry);
         const cleanPhone = phone.replace(/\D/g, '').replace(/^0+/, '');
@@ -87,14 +94,16 @@ const AdminSignupScreen: React.FC = () => {
         }
 
         // Send OTP → VerifyPhone (admin-register mode)
+        if (!aliveRef.current) return;
         navigation.navigate('VerifyPhone' as any, {
           mode: 'admin-register',
           phone: formattedPhone,
         });
       } catch (error: any) {
-        setErrorMessage(error.message || t('common.error'));
+        if (aliveRef.current) setErrorMessage(error.message || t('common.error'));
       } finally {
-        setLoading(false);
+        submittingRef.current = false;
+        if (aliveRef.current) setLoading(false);
       }
     } else {
       if (!email.trim()) {
@@ -106,6 +115,7 @@ const AdminSignupScreen: React.FC = () => {
         return;
       }
       try {
+        submittingRef.current = true;
         setLoading(true);
         const exists = await isEmailRegistered(email.trim());
         if (exists) {
@@ -118,13 +128,15 @@ const AdminSignupScreen: React.FC = () => {
           options: { shouldCreateUser: true },
         });
         if (otpErr) throw otpErr;
+        if (!aliveRef.current) return;
         navigation.navigate('AdminVerifyEmail' as any, {
           email: email.trim(),
         });
       } catch (error: any) {
-        setErrorMessage(error.message || t('common.error'));
+        if (aliveRef.current) setErrorMessage(error.message || t('common.error'));
       } finally {
-        setLoading(false);
+        submittingRef.current = false;
+        if (aliveRef.current) setLoading(false);
       }
     }
   };
@@ -143,7 +155,7 @@ const AdminSignupScreen: React.FC = () => {
           showsVerticalScrollIndicator={false}
         >
           {/* ── Back ── */}
-          <TouchableOpacity style={styles.backButton} onPress={handleBack} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.backButton} onPress={handleBack} disabled={loading} activeOpacity={0.7}>
             <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={20} color={colors.text} />
           </TouchableOpacity>
 
@@ -231,7 +243,7 @@ const AdminSignupScreen: React.FC = () => {
           </TouchableOpacity>
 
           {/* ── Cancel ── */}
-          <TouchableOpacity onPress={handleBack} style={styles.quietButton} activeOpacity={0.6}>
+          <TouchableOpacity onPress={handleBack} disabled={loading} style={styles.quietButton} activeOpacity={0.6}>
             <Text allowFontScaling={false} style={styles.quietLink}>{t('auth.adminSetup.cancel')}</Text>
           </TouchableOpacity>
         </ScrollView>

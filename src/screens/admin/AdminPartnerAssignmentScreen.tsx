@@ -39,7 +39,10 @@ export default function AdminPartnerAssignmentScreen() {
   const [query, setQuery] = useState('');
 
   const loadProducts = useCallback(async () => {
-    if (!tenantId) return;
+    if (!tenantId) {
+      setLoading(false);
+      return;
+    }
     try {
       const service = createTenantAdminService(tenantId);
       const productsData = await service.getAllProducts();
@@ -47,7 +50,7 @@ export default function AdminPartnerAssignmentScreen() {
 
       const initialSelected = new Set<string>();
       productsData.forEach((p: any) => {
-        if (p.coAdminIds && p.coAdminIds.includes(userId)) {
+        if (Array.isArray(p.coAdminIds) && p.coAdminIds.includes(userId)) {
           initialSelected.add(p.id);
         }
       });

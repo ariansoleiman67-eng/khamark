@@ -104,19 +104,29 @@ const AdminSecurityScreen: React.FC = () => {
       return;
     }
 
+    // Route params are untyped (useRoute<any>) and may arrive without a phone
+    // number (e.g. an email flow where `email` is empty falls into the phone
+    // branch). Normalize + require a phone before touching `.replace` on it.
+    const useEmailBranch = method === 'email' && !!email;
+    const rawPhone = phone ? String(phone) : '';
+    if (!useEmailBranch && !rawPhone) {
+      setErrorMessage(t('auth.adminSetup.fillBothFields', { defaultValue: 'Missing phone number' }));
+      return;
+    }
+
     try {
       setLoading(true);
 
-      if (method === 'email' && email) {
+      if (useEmailBranch) {
         // Email admin registration
         await registerWithEmail(email, password, name);
         const whatsappNumber = whatsapp ? whatsapp.replace('+', '') : '';
         await createAdminAccount(name, storeName, '', whatsappNumber);
       } else {
         // Phone admin registration
-        await registerWithPhone({ phone, password, name, language: 'en', role: 'admin' });
-        const whatsappNumber = whatsapp ? whatsapp.replace('+', '') : phone.replace('+', '');
-        await createAdminAccount(name, storeName, phone, whatsappNumber);
+        await registerWithPhone({ phone: rawPhone, password, name, language: 'en', role: 'admin' });
+        const whatsappNumber = whatsapp ? whatsapp.replace('+', '') : rawPhone.replace('+', '');
+        await createAdminAccount(name, storeName, rawPhone, whatsappNumber);
       }
 
       // Refresh auth so AuthContext picks up admin role from admins collection

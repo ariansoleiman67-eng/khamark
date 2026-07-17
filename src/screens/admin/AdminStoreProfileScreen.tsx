@@ -4,7 +4,7 @@
  * Allows admin to set store profile info that appears on all products.
  * Data is stored at: tenants/{tenantId}/public/storeProfile
  */
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Image as ExpoImage } from 'expo-image';
 import {
   View,
@@ -88,6 +88,10 @@ const AdminStoreProfileScreen: React.FC = () => {
   const [waDialCode, setWaDialCode] = useState('+1');
   const [waCountry, setWaCountry] = useState<CountryCode>('US');
 
+  // Track which tenant's data has already hydrated the editable form, so that
+  // re-focusing the screen never clobbers the admin's unsaved edits (see loadData).
+  const hydratedTenantRef = useRef<string | null>(null);
+
   // Helper: parse a full phone string into { dialCode, digits, countryCode }
   const parsePhoneNumber = (phone: string) => {
     const allC = getAllCountries();
@@ -101,7 +105,23 @@ const AdminStoreProfileScreen: React.FC = () => {
     // store's real contact number to a wrong "+1…" value on the next save.
     return { dialCode: '+964', digits: phone.replace(/[^\d]/g, '').replace(/^0+/, ''), countryCode: 'IQ' as CountryCode };
   };
-  
+
+  // Safely parse an "HH:MM" time string into a Date for the time picker.
+  // Malformed/garbage values (e.g. '8', 'closed', null) fall back to 08:00
+  // instead of producing an Invalid Date, which can crash the iOS inline picker.
+  const parseHHMM = (value?: string | null): Date => {
+    const match = /^(\d{1,2}):(\d{2})$/.exec((value ?? '').trim());
+    const date = new Date();
+    if (match) {
+      const h = parseInt(match[1], 10);
+      const m = parseInt(match[2], 10);
+      date.setHours(Number.isFinite(h) ? h : 8, Number.isFinite(m) ? m : 0, 0, 0);
+    } else {
+      date.setHours(8, 0, 0, 0);
+    }
+    return date;
+  };
+
   // Derived state for UI toggles
   // Derived state for UI toggles
   const useCustomHours = profile.openTime != null || profile.closeTime != null;
@@ -131,14 +151,21 @@ const AdminStoreProfileScreen: React.FC = () => {
       
       // Load store profile
       const existingProfile = await storeProfileService.getStoreProfile(tenantId);
-      if (existingProfile) {
+      // Only hydrate the editable form the FIRST time we load a given tenant.
+      // useFocusEffect re-runs loadData on every focus (e.g. returning from the
+      // "Add Location" screen); re-running setProfile()/phone-parse there would
+      // silently wipe the admin's unsaved edits. Keyed by tenantId so a tenant
+      // switch still re-hydrates for the new tenant. The locations list below is
+      // still refreshed on every focus.
+      const shouldHydrate = hydratedTenantRef.current !== tenantId;
+      if (existingProfile && shouldHydrate) {
         // Migration: ensure coverUrls exists or is populated from legacy coverUrl
         if (existingProfile.coverUrl && (!existingProfile.coverUrls || existingProfile.coverUrls.length === 0)) {
           existingProfile.coverUrls = [existingProfile.coverUrl];
         } else if (!existingProfile.coverUrls) {
           existingProfile.coverUrls = [];
         }
-        
+
         setProfile(existingProfile);
         setSelectedLocationId(existingProfile.publicLocationId || null);
 
@@ -155,6 +182,8 @@ const AdminStoreProfileScreen: React.FC = () => {
           setWaDigits(parsed.digits);
           setWaCountry(parsed.countryCode);
         }
+
+        hydratedTenantRef.current = tenantId;
       }
       
       // Load admin's locations
@@ -887,7 +916,7 @@ const AdminStoreProfileScreen: React.FC = () => {
                     </TouchableOpacity>
                   ) : (
                     <DateTimePicker
-                      value={profile.openTime ? new Date(new Date().setHours(parseInt(profile.openTime.split(':')[0]), parseInt(profile.openTime.split(':')[1]))) : new Date()}
+                      value={profile.openTime ? parseHHMM(profile.openTime) : new Date()}
                       mode="time"
                       display="default"
                       onChange={(e, d) => handleTimeChange('open', e, d)}
@@ -897,7 +926,7 @@ const AdminStoreProfileScreen: React.FC = () => {
                 </View>
                 {Platform.OS === 'android' && showOpenPicker && (
                    <DateTimePicker
-                     value={profile.openTime ? new Date(new Date().setHours(parseInt(profile.openTime.split(':')[0]), parseInt(profile.openTime.split(':')[1]))) : new Date()}
+                     value={profile.openTime ? parseHHMM(profile.openTime) : new Date()}
                      mode="time"
                      is24Hour={true}
                      display="default"
@@ -924,7 +953,7 @@ const AdminStoreProfileScreen: React.FC = () => {
                     </TouchableOpacity>
                   ) : (
                     <DateTimePicker
-                      value={profile.closeTime ? new Date(new Date().setHours(parseInt(profile.closeTime.split(':')[0]), parseInt(profile.closeTime.split(':')[1]))) : new Date()}
+                      value={profile.closeTime ? parseHHMM(profile.closeTime) : new Date()}
                       mode="time"
                       display="default"
                       onChange={(e, d) => handleTimeChange('close', e, d)}
@@ -934,7 +963,7 @@ const AdminStoreProfileScreen: React.FC = () => {
                 </View>
                 {Platform.OS === 'android' && showClosePicker && (
                    <DateTimePicker
-                     value={profile.closeTime ? new Date(new Date().setHours(parseInt(profile.closeTime.split(':')[0]), parseInt(profile.closeTime.split(':')[1]))) : new Date()}
+                     value={profile.closeTime ? parseHHMM(profile.closeTime) : new Date()}
                      mode="time"
                      is24Hour={true}
                      display="default"

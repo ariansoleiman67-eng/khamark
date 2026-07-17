@@ -264,6 +264,7 @@ const AdminConversationsListScreen: React.FC = () => {
   const [userDataMap, setUserDataMap] = useState<Record<string, { name: string; phone: string }>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'all' | 'unread'>('all');
@@ -310,7 +311,7 @@ const AdminConversationsListScreen: React.FC = () => {
     });
 
     return () => unsubscribe();
-  }, [adminId]);
+  }, [adminId, refreshKey]);
 
   // Filter conversations
   const filtered = useMemo(() => {
@@ -485,7 +486,13 @@ const AdminConversationsListScreen: React.FC = () => {
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
-                onRefresh={() => setRefreshing(true)}
+                onRefresh={() => {
+                  if (!adminId) return;
+                  setRefreshing(true);
+                  // Re-establish the realtime subscription so its fetchConvs runs
+                  // again; the subscription callback resets `refreshing` to false.
+                  setRefreshKey(k => k + 1);
+                }}
                 colors={[theme.colors.primary]}
                 tintColor={theme.colors.primary}
               />

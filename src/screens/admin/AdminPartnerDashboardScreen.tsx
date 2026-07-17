@@ -32,6 +32,13 @@ import { sharePartnerInventoryInvoice, partnerEffectiveStock as effectiveStock, 
 const ACCENT = '#8B5CF6';
 const PROFIT = '#10B981';
 const money = (n: number) => `$${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+// Localized ar-IQ/ku numeric keypads emit Eastern-Arabic (٠-٩) or Persian (۰-۹) digits and the
+// Arabic decimal separator (٫); normalize them to ASCII so typed amounts aren't parsed as 0.
+const normalizeDigits = (s: string): string =>
+  s
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06F0))
+    .replace(/٫/g, '.');
 
 export default function AdminPartnerDashboardScreen() {
   const { theme, isDark } = useTheme();
@@ -59,6 +66,7 @@ export default function AdminPartnerDashboardScreen() {
   const [moneyAmount, setMoneyAmount] = useState('');
   const [moneyNote, setMoneyNote] = useState('');
   const [savingMoney, setSavingMoney] = useState(false);
+  const savingMoneyRef = useRef(false);                          // synchronous guard (blocks double-tap before setSavingMoney commits)
   const [itemPickerOpen, setItemPickerOpen] = useState(false);   // "pay out via item" picker
   const [savingItem, setSavingItem] = useState(false);           // in-flight guard for item payout
   const savingItemRef = useRef(false);                           // synchronous guard (blocks double-tap before the confirm Alert resolves)
@@ -105,9 +113,17 @@ export default function AdminPartnerDashboardScreen() {
   };
 
   const handleAddMoney = async () => {
-    const amt = parseFloat((moneyAmount || '').replace(/[^0-9.]/g, '')) || 0;
+    if (savingMoneyRef.current) return;   // synchronous re-entry lock — a 2nd tap bails before the write
+    const amt = parseFloat(normalizeDigits(moneyAmount || '').replace(/[^0-9.]/g, '')) || 0;
     const ownerTenant = (products[0] as any)?.tenantId || OWNER_STORE_TENANT_ID;
-    if (amt <= 0 || !viewUid || !ownerTenant) return;
+    if (amt <= 0) {
+      Alert.alert(
+        t('admin.partnerDashboard.enterAmountTitle', { defaultValue: 'Enter an amount' }),
+        t('admin.partnerDashboard.enterAmount', { defaultValue: 'Please enter a valid amount greater than 0.' })
+      );
+      return;
+    }
+    if (!viewUid || !ownerTenant) return;
     // A payout can only be drawn from the profit earned so far (not yet paid out).
     if (moneyDir === 'out') {
       const available = realizedProfit - ledgerOut;
@@ -120,6 +136,7 @@ export default function AdminPartnerDashboardScreen() {
       }
     }
     try {
+      savingMoneyRef.current = true;   // claimed synchronously (all code above is sync → no interleave)
       setSavingMoney(true);
       await createTenantAdminService(ownerTenant).addPartnerLedgerEntry(viewUid, { dir: moneyDir, amount: amt, note: moneyNote.trim() });
       await reloadLedger();
@@ -127,6 +144,7 @@ export default function AdminPartnerDashboardScreen() {
     } catch {
       Alert.alert(t('admin.common.error', { defaultValue: 'Error' }), t('admin.partnerDashboard.moneyFailed', { defaultValue: 'Could not save the entry.' }));
     } finally {
+      savingMoneyRef.current = false;
       setSavingMoney(false);
     }
   };

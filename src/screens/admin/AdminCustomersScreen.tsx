@@ -231,15 +231,17 @@ const AdminCustomersScreen: React.FC = () => {
   };
 
   const handleOpenInMaps = () => {
-    if (selectedLocation) {
-      const { latitude, longitude, title } = selectedLocation;
-      const url = Platform.select({
-        ios: `maps:0,0?q=${title}@${latitude},${longitude}`,
-        android: `geo:0,0?q=${latitude},${longitude}(${title})`,
-      });
-      if (url) {
-        Linking.openURL(url);
-      }
+    if (!selectedLocation) return;
+    const { latitude, longitude, title } = selectedLocation;
+    const label = encodeURIComponent(title || '');
+    const url = Platform.select({
+      ios: `maps:0,0?q=${label}@${latitude},${longitude}`,
+      android: `geo:0,0?q=${latitude},${longitude}(${label})`,
+    });
+    if (url) {
+      Linking.openURL(url).catch(() =>
+        Alert.alert(t('admin.common.error'), t('admin.customers.mapUnavailable', { defaultValue: 'Map unavailable' }))
+      );
     }
   };
 

@@ -150,46 +150,46 @@ Every source + config file. `[ ]` = not yet line-by-line read. `[x]` = fully rea
 - [x] src/screens/StoreLocationScreen.tsx (Wave2 audited) — 644 LOC
 - [x] src/screens/StoreProductsScreen.tsx (Wave2 audited) — 157 LOC
 - [x] src/screens/ThemeCustomizationScreen.tsx (Wave2 audited) — 638 LOC
-- [ ] src/screens/admin/AdminAccountSecurityScreen.tsx — 401 LOC
-- [ ] src/screens/admin/AdminAnalyticsScreen.tsx — 437 LOC
-- [ ] src/screens/admin/AdminBannerScreen.tsx — 692 LOC
-- [ ] src/screens/admin/AdminBrandManagerScreen.tsx — 221 LOC
-- [ ] src/screens/admin/AdminBusinessInfoScreen.tsx — 411 LOC
-- [ ] src/screens/admin/AdminCategoriesScreen.tsx — 220 LOC
-- [ ] src/screens/admin/AdminCategoryManagerScreen.tsx — 216 LOC
-- [ ] src/screens/admin/AdminChangePasswordScreen.tsx — 252 LOC
-- [ ] src/screens/admin/AdminChatScreen.tsx — 9 LOC
-- [ ] src/screens/admin/AdminConversationsListScreen.tsx — 675 LOC
-- [ ] src/screens/admin/AdminCreateOrderScreen.tsx — 1356 LOC
-- [ ] src/screens/admin/AdminCurrencySettingsScreen.tsx — 208 LOC
-- [ ] src/screens/admin/AdminCustomersScreen.tsx — 1147 LOC
-- [ ] src/screens/admin/AdminDashboardScreen.tsx — 1075 LOC
-- [ ] src/screens/admin/AdminDetailsScreen.tsx — 246 LOC
-- [ ] src/screens/admin/AdminDiscountsScreen.tsx — 517 LOC
-- [ ] src/screens/admin/AdminEditDiscountScreen.tsx — 998 LOC
-- [ ] src/screens/admin/AdminEditStoreLocationScreen.tsx — 786 LOC
-- [ ] src/screens/admin/AdminInboxScreen.tsx — 722 LOC
-- [ ] src/screens/admin/AdminInvoiceSettingsScreen.tsx — 546 LOC
-- [ ] src/screens/admin/AdminOperatingHoursScreen.tsx — 331 LOC
-- [ ] src/screens/admin/AdminOrdersScreen.tsx — 3596 LOC
-- [ ] src/screens/admin/AdminPartnerAssignmentScreen.tsx — 336 LOC
-- [ ] src/screens/admin/AdminPartnerDashboardScreen.tsx — 868 LOC
-- [ ] src/screens/admin/AdminPartnerManagementScreen.tsx — 553 LOC
-- [ ] src/screens/admin/AdminProductsScreen.tsx — 3173 LOC
-- [ ] src/screens/admin/AdminPromoManagerScreen.tsx — 246 LOC
-- [ ] src/screens/admin/AdminSecurityScreen.tsx — 325 LOC
-- [ ] src/screens/admin/AdminSendNotificationScreen.tsx — 545 LOC
-- [ ] src/screens/admin/AdminSettingsScreen.tsx — 900 LOC
-- [ ] src/screens/admin/AdminSignupScreen.tsx — 394 LOC
-- [ ] src/screens/admin/AdminStockReportScreen.tsx — 1608 LOC
-- [ ] src/screens/admin/AdminStoreLocationsScreen.tsx — 360 LOC
-- [ ] src/screens/admin/AdminStoreNameScreen.tsx — 268 LOC
-- [ ] src/screens/admin/AdminStoreProfileScreen.tsx — 1564 LOC
-- [ ] src/screens/admin/AdminSuccessScreen.tsx — 176 LOC
-- [ ] src/screens/admin/AdminVerifyEmailScreen.tsx — 401 LOC
-- [ ] src/screens/admin/ReportsGenerator.tsx — 1196 LOC
-- [ ] src/screens/admin/index.ts — 7 LOC
-- [ ] src/screens/admin/partnerInvoice.ts — 433 LOC
+- [x] src/screens/admin/AdminAccountSecurityScreen.tsx (Wave3 audited) — 401 LOC
+- [x] src/screens/admin/AdminAnalyticsScreen.tsx (Wave3 audited) — 437 LOC
+- [x] src/screens/admin/AdminBannerScreen.tsx (Wave3 audited) — 692 LOC
+- [x] src/screens/admin/AdminBrandManagerScreen.tsx (Wave3 audited) — 221 LOC
+- [x] src/screens/admin/AdminBusinessInfoScreen.tsx (Wave3 audited) — 411 LOC
+- [x] src/screens/admin/AdminCategoriesScreen.tsx (Wave3 audited) — 220 LOC
+- [x] src/screens/admin/AdminCategoryManagerScreen.tsx (Wave3 audited) — 216 LOC
+- [x] src/screens/admin/AdminChangePasswordScreen.tsx (Wave3 audited) — 252 LOC
+- [x] src/screens/admin/AdminChatScreen.tsx (Wave3 audited) — 9 LOC
+- [x] src/screens/admin/AdminConversationsListScreen.tsx (Wave3 audited) — 675 LOC
+- [x] src/screens/admin/AdminCreateOrderScreen.tsx (Wave3 audited) — 1356 LOC
+- [x] src/screens/admin/AdminCurrencySettingsScreen.tsx (Wave3 audited) — 208 LOC
+- [x] src/screens/admin/AdminCustomersScreen.tsx (Wave3 audited) — 1147 LOC
+- [x] src/screens/admin/AdminDashboardScreen.tsx (Wave3 audited) — 1075 LOC
+- [x] src/screens/admin/AdminDetailsScreen.tsx (Wave3 audited) — 246 LOC
+- [x] src/screens/admin/AdminDiscountsScreen.tsx (Wave3 audited) — 517 LOC
+- [x] src/screens/admin/AdminEditDiscountScreen.tsx (Wave3 audited) — 998 LOC
+- [x] src/screens/admin/AdminEditStoreLocationScreen.tsx (Wave3 audited) — 786 LOC
+- [x] src/screens/admin/AdminInboxScreen.tsx (Wave3 audited) — 722 LOC
+- [x] src/screens/admin/AdminInvoiceSettingsScreen.tsx (Wave3 audited) — 546 LOC
+- [x] src/screens/admin/AdminOperatingHoursScreen.tsx (Wave3 audited) — 331 LOC
+- [x] src/screens/admin/AdminOrdersScreen.tsx (Wave3 audited) — 3596 LOC
+- [x] src/screens/admin/AdminPartnerAssignmentScreen.tsx (Wave3 audited) — 336 LOC
+- [x] src/screens/admin/AdminPartnerDashboardScreen.tsx (Wave3 audited) — 868 LOC
+- [x] src/screens/admin/AdminPartnerManagementScreen.tsx (Wave3 audited) — 553 LOC
+- [x] src/screens/admin/AdminProductsScreen.tsx (Wave3 audited) — 3173 LOC
+- [x] src/screens/admin/AdminPromoManagerScreen.tsx (Wave3 audited) — 246 LOC
+- [x] src/screens/admin/AdminSecurityScreen.tsx (Wave3 audited) — 325 LOC
+- [x] src/screens/admin/AdminSendNotificationScreen.tsx (Wave3 audited) — 545 LOC
+- [x] src/screens/admin/AdminSettingsScreen.tsx (Wave3 audited) — 900 LOC
+- [x] src/screens/admin/AdminSignupScreen.tsx (Wave3 audited) — 394 LOC
+- [x] src/screens/admin/AdminStockReportScreen.tsx (Wave3 audited) — 1608 LOC
+- [x] src/screens/admin/AdminStoreLocationsScreen.tsx (Wave3 audited) — 360 LOC
+- [x] src/screens/admin/AdminStoreNameScreen.tsx (Wave3 audited) — 268 LOC
+- [x] src/screens/admin/AdminStoreProfileScreen.tsx (Wave3 audited) — 1564 LOC
+- [x] src/screens/admin/AdminSuccessScreen.tsx (Wave3 audited) — 176 LOC
+- [x] src/screens/admin/AdminVerifyEmailScreen.tsx (Wave3 audited) — 401 LOC
+- [x] src/screens/admin/ReportsGenerator.tsx (Wave3 audited) — 1196 LOC
+- [x] src/screens/admin/index.ts (Wave3 audited) — 7 LOC
+- [x] src/screens/admin/partnerInvoice.ts (Wave3 audited) — 433 LOC
 - [x] src/screens/auth/AboutYouScreen.tsx (Wave2 audited) — 481 LOC
 - [x] src/screens/auth/ForgotPasswordScreen.tsx (Wave2 audited) — 673 LOC
 - [x] src/screens/auth/LegacyEmailLoginScreen.tsx (Wave2 audited) — 265 LOC

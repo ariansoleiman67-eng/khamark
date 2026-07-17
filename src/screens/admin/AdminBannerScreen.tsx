@@ -109,15 +109,18 @@ const AdminBannerScreen: React.FC = () => {
   };
 
   const handleToggleActive = async (banner: BannerItem) => {
+    const next = !banner.isActive;
     const success = await bannerService.updateBanner(banner.id, {
-      isActive: !banner.isActive,
+      isActive: next,
     });
     if (success) {
       setBanners((prev) =>
         prev.map((b) =>
-          b.id === banner.id ? { ...b, isActive: !b.isActive } : b
+          b.id === banner.id ? { ...b, isActive: next } : b
         )
       );
+    } else {
+      Alert.alert(t('common.error'), t('admin.banner.updateFailed', { defaultValue: 'Failed to update banner' }));
     }
   };
 

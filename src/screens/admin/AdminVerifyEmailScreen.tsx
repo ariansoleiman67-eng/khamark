@@ -67,6 +67,11 @@ const AdminVerifyEmailScreen: React.FC = () => {
   // A shorter UI cooldown would let the user tap Resend before the server allows it → error.
   const [cooldown, setCooldown] = useState(60);
   const inputRefs = useRef<(TextInput | null)[]>([]);
+  // Synchronous re-entrancy guards. `loading`/`resending` state commits after a
+  // re-render, so a same-frame double-tap (or an auto-submit racing a Confirm tap)
+  // would otherwise fire two verifyOtp/signInWithOtp calls before `disabled` applies.
+  const verifyingRef = useRef(false);
+  const resendingRef = useRef(false);
 
   // Countdown timer for resend
   useEffect(() => {
@@ -127,6 +132,7 @@ const AdminVerifyEmailScreen: React.FC = () => {
   };
 
   const handleVerify = async (codeArray?: string[]) => {
+    if (verifyingRef.current) return;
     const otpCode = (codeArray || code).join('');
     if (otpCode.length !== 6) {
       setErrorMessage(t('auth.adminSetup.require6Digits'));
@@ -134,6 +140,7 @@ const AdminVerifyEmailScreen: React.FC = () => {
     }
 
     try {
+      verifyingRef.current = true;
       setLoading(true);
       // Supabase verifies the emailed 6-digit code and creates a session for this
       // email; registerWithEmail later finishes the account on that session.
@@ -157,13 +164,15 @@ const AdminVerifyEmailScreen: React.FC = () => {
       setCode(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
     } finally {
+      verifyingRef.current = false;
       setLoading(false);
     }
   };
 
   const handleResend = async () => {
-    if (cooldown > 0) return;
+    if (cooldown > 0 || resendingRef.current) return;
     try {
+      resendingRef.current = true;
       setResending(true);
       setErrorMessage('');
       const { error: rErr } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
@@ -172,6 +181,7 @@ const AdminVerifyEmailScreen: React.FC = () => {
     } catch (error: any) {
       setErrorMessage(error.message || t('common.error'));
     } finally {
+      resendingRef.current = false;
       setResending(false);
     }
   };
