@@ -80,6 +80,7 @@ const SearchScreen: React.FC = () => {
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [hasError, setHasError] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [visualAnalysis, setVisualAnalysis] = useState<VisualAnalysis | null>(visualAnalysisParam || null);
   const [isVisualSearch, setIsVisualSearch] = useState(!!isVisualSearchParam);
@@ -129,6 +130,7 @@ const SearchScreen: React.FC = () => {
   // Load real products from Supabase
   const loadProducts = useCallback(async () => {
     setIsLoading(true);
+    setHasError(false);
     try {
       const productsList = tenantId
         ? await ProductService.getProductsByTenantId(tenantId)
@@ -144,6 +146,7 @@ const SearchScreen: React.FC = () => {
 
     } catch (error) {
       console.error('Error loading products:', error);
+      setHasError(true);
     } finally {
       setIsLoading(false);
     }
@@ -202,7 +205,7 @@ const SearchScreen: React.FC = () => {
     }
 
     // 2. Primary query words — +3 each
-    const primaryWords = analysis.primaryQuery.toLowerCase().split(/\s+/).filter(w => w.length > 1);
+    const primaryWords = (analysis.primaryQuery || '').toLowerCase().split(/\s+/).filter(w => w.length > 1);
     for (const word of primaryWords) {
       if (allProductText.includes(word)) score += 3;
     }
@@ -224,12 +227,12 @@ const SearchScreen: React.FC = () => {
     }
 
     // 5. Keywords — +1 each
-    for (const keyword of analysis.keywords) {
+    for (const keyword of (analysis.keywords || [])) {
       if (allProductText.includes(keyword.toLowerCase())) score += 1;
     }
 
     // 6. Compatible models — +3 each match
-    for (const model of analysis.compatibleModels) {
+    for (const model of (analysis.compatibleModels || [])) {
       const modelLower = model.toLowerCase();
       if (pModels.some(m => m.includes(modelLower) || modelLower.includes(m))) {
         score += 3;
@@ -239,7 +242,7 @@ const SearchScreen: React.FC = () => {
     }
 
     // 7. Alternative names — +2 each
-    for (const altName of analysis.alternativeNames) {
+    for (const altName of (analysis.alternativeNames || [])) {
       if (allProductText.includes(altName.toLowerCase())) score += 2;
     }
 
@@ -354,10 +357,10 @@ const SearchScreen: React.FC = () => {
     if (!isVisualSearch) {
       switch (filters.sortBy) {
         case 'name':
-          filtered.sort((a, b) => 
-            filters.sortOrder === 'asc' 
-              ? a.name.localeCompare(b.name)
-              : b.name.localeCompare(a.name)
+          filtered.sort((a, b) =>
+            filters.sortOrder === 'asc'
+              ? (a.name || '').localeCompare(b.name || '')
+              : (b.name || '').localeCompare(a.name || '')
           );
           break;
         case 'price':
@@ -440,7 +443,7 @@ const SearchScreen: React.FC = () => {
     if (visualAnalysis.brand) badges.push({ icon: 'pricetag', label: visualAnalysis.brand });
     if (visualAnalysis.category) badges.push({ icon: 'grid', label: visualAnalysis.category });
     if (visualAnalysis.partNumber) badges.push({ icon: 'barcode', label: visualAnalysis.partNumber });
-    if (visualAnalysis.compatibleModels.length > 0) badges.push({ icon: 'car-sport', label: visualAnalysis.compatibleModels.slice(0, 3).join(', ') });
+    if ((visualAnalysis.compatibleModels?.length || 0) > 0) badges.push({ icon: 'car-sport', label: (visualAnalysis.compatibleModels || []).slice(0, 3).join(', ') });
 
     return (
       <Animated.View style={[{
@@ -766,23 +769,45 @@ const SearchScreen: React.FC = () => {
         // (or a short/empty list) bounce up and down. bounces→iOS, overScrollMode→Android.
         bounces={false}
         overScrollMode="never"
+        // Recovery affordance: a failed load leaves the list empty; let the user pull to retry.
+        refreshing={isLoading}
+        onRefresh={loadProducts}
         ListEmptyComponent={
           // ALIBABA: No animations on empty state
-          <View style={[styles.emptyContainer, { backgroundColor: isDark ? theme.colors.background : '#FFF3E0' }]}>
-            <Ionicons name="search-outline" size={64} color={theme.colors.textSecondary} />
-            <Text allowFontScaling={false} style={[styles.emptyTitle, { color: theme.colors.text }]}>
-              {t('search.noResults')}
-            </Text>
-            <Text allowFontScaling={false} style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
-              {t('search.noResultsSubtitle')}
-            </Text>
-            <Button
-              title={t('search.clearFilters')}
-              onPress={resetFilters}
-              variant="outline"
-              style={{ marginTop: 16 }}
-            />
-          </View>
+          hasError && products.length === 0 ? (
+            // Distinct load-error state so a failed fetch isn't mistaken for a genuine zero-result set.
+            <View style={[styles.emptyContainer, { backgroundColor: isDark ? theme.colors.background : '#FFF3E0' }]}>
+              <Ionicons name="cloud-offline-outline" size={64} color={theme.colors.textSecondary} />
+              <Text allowFontScaling={false} style={[styles.emptyTitle, { color: theme.colors.text }]}>
+                {t('common.somethingWentWrong')}
+              </Text>
+              <Text allowFontScaling={false} style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
+                {t('search.loadErrorSubtitle', { defaultValue: 'Please check your connection and try again.' })}
+              </Text>
+              <Button
+                title={t('common.retry')}
+                onPress={loadProducts}
+                variant="outline"
+                style={{ marginTop: 16 }}
+              />
+            </View>
+          ) : (
+            <View style={[styles.emptyContainer, { backgroundColor: isDark ? theme.colors.background : '#FFF3E0' }]}>
+              <Ionicons name="search-outline" size={64} color={theme.colors.textSecondary} />
+              <Text allowFontScaling={false} style={[styles.emptyTitle, { color: theme.colors.text }]}>
+                {t('search.noResults')}
+              </Text>
+              <Text allowFontScaling={false} style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
+                {t('search.noResultsSubtitle')}
+              </Text>
+              <Button
+                title={t('search.clearFilters')}
+                onPress={resetFilters}
+                variant="outline"
+                style={{ marginTop: 16 }}
+              />
+            </View>
+          )
         }
       />
     </KeyboardAvoidingView>

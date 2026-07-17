@@ -283,6 +283,14 @@ const VerifyPhoneScreen: React.FC = () => {
         navigation.goBack();
       }
     } catch (error: any) {
+      // Verification failed — re-close the registration gate we optimistically opened
+      // above (line ~240). Leaving registrationInProgress=true here permanently muzzles
+      // AuthContext's auth listener, so a later successful sign-in never lands in the app.
+      // Reset here (NOT in finally): on success the gate must stay open until the
+      // downstream setup screen consumes it.
+      if (mode === 'register' || mode === 'admin-register' || mode === 'partner-register') {
+        setRegistrationInProgress(false);
+      }
       // Smooth retry: clear the boxes, show inline error, refocus the first box
       setError(error.message || t('auth.verifyFailed', { defaultValue: 'Verification failed. Try again.' }));
       setCode(['', '', '', '', '', '']);

@@ -389,6 +389,9 @@ export default function ConversationsScreen() {
 
   useEffect(() => {
     if (!user?.uid) {
+      // Clear any previous account's conversations so a logout / switch to
+      // guest never leaves the prior user's private chats visible on screen.
+      setItems([]);
       setLoading(false);
       setRefreshing(false);
       return;

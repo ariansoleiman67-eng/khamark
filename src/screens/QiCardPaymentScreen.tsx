@@ -76,7 +76,6 @@ const QiCardPaymentScreen: React.FC = () => {
   // ── State ──
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessingResult, setIsProcessingResult] = useState(false);
-  const [paymentCompleted, setPaymentCompleted] = useState(false);
   const [resultStatus, setResultStatus] = useState<'success' | 'failed' | 'timeout' | 'canceled' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -89,6 +88,13 @@ const QiCardPaymentScreen: React.FC = () => {
   const spinAnim = useRef(new Animated.Value(0)).current;
 
   const webViewRef = useRef<WebView>(null);
+
+  // Synchronous re-entry / completion guard for the payment flow. Unlike React
+  // state, a ref updates immediately, so two WebView callbacks firing in the
+  // same tick (onNavigationStateChange + onShouldStartLoadWithRequest) cannot
+  // both pass the guard. It also lets late WebView errors be ignored once the
+  // payment outcome is being verified or has already settled.
+  const paymentCompletedRef = useRef(false);
 
   // ── Android back button handler ──
   useEffect(() => {
@@ -145,8 +151,8 @@ const QiCardPaymentScreen: React.FC = () => {
 
   // ── Handle payment completion (WebView redirect intercepted) ──
   const handlePaymentComplete = useCallback(async () => {
-    if (paymentCompleted) return;
-    setPaymentCompleted(true);
+    if (paymentCompletedRef.current) return;
+    paymentCompletedRef.current = true;
     setIsProcessingResult(true);
 
     try {
@@ -155,7 +161,15 @@ const QiCardPaymentScreen: React.FC = () => {
 
       if (result.status === 'SUCCESS') {
         setResultStatus('success');
-        await clearCart();
+        // Payment is confirmed and the card is charged. Clearing the cart is
+        // best-effort — it must NOT be able to flip this settled success into a
+        // failure/timeout, so isolate its rejection instead of letting it bubble
+        // into the outer catch.
+        try {
+          await clearCart();
+        } catch {
+          /* ignore — payment already succeeded; cart clear is best-effort */
+        }
         // Wait for animation, then navigate
         successTimerRef.current = setTimeout(() => {
           navigation.replace('OrderConfirmation', { orderId, orderNumber });
@@ -184,7 +198,7 @@ const QiCardPaymentScreen: React.FC = () => {
     } finally {
       setIsProcessingResult(false);
     }
-  }, [paymentId, orderId, orderNumber, paymentCompleted, navigation, t]);
+  }, [paymentId, orderId, orderNumber, navigation, t]);
 
   // ── Intercept WebView navigation ──
   const handleNavigationStateChange = useCallback(
@@ -410,6 +424,10 @@ const QiCardPaymentScreen: React.FC = () => {
           onError={(syntheticEvent) => {
             const { nativeEvent } = syntheticEvent;
             console.error('WebView error:', nativeEvent);
+            // Once payment interception/verification has begun (or the outcome
+            // has settled), a WebView error is no longer authoritative — never
+            // let it override an in-flight or already-decided payment outcome.
+            if (paymentCompletedRef.current) return;
             // Only show error if it's not a custom scheme redirect
             if (!nativeEvent.url?.startsWith('asankary://')) {
               setError(t('qiCard.webviewError', { defaultValue: 'Failed to load payment form. Please try again.' }));
@@ -419,6 +437,10 @@ const QiCardPaymentScreen: React.FC = () => {
           onHttpError={(syntheticEvent) => {
             const { nativeEvent } = syntheticEvent;
             console.error('WebView HTTP error:', nativeEvent.statusCode);
+            // Ignore HTTP errors (e.g. a transient 4xx on an intermediate 3DS
+            // redirect hop, or a late event) once the payment is being verified
+            // or has already settled.
+            if (paymentCompletedRef.current) return;
             if (nativeEvent.statusCode >= 400) {
               setError(t('qiCard.webviewError', { defaultValue: 'Failed to load payment form. Please try again.' }));
               setResultStatus('failed');

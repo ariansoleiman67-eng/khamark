@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   FlatList,
   Keyboard,
@@ -59,6 +60,9 @@ export default function ChatThreadScreen() {
 
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  // Synchronous re-entrancy guard: `sending` state only flips on the next render,
+  // so two taps in the same frame would both pass a state-based check and double-send.
+  const sendingRef = useRef(false);
 
   // keep list padding correct (never cut by composer)
   const [composerH, setComposerH] = useState(64);
@@ -67,14 +71,18 @@ export default function ChatThreadScreen() {
   const translateY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    // Android is configured with windowSoftInputMode="adjustResize" (AndroidManifest)
+    // + softwareKeyboardLayoutMode="resize" (app.json), so the OS already shrinks the
+    // window and lifts the absolute bottom:0 composer to sit on top of the keyboard.
+    // Applying an extra translateY here would double-shift it a full keyboard-height
+    // above the keyboard. Only iOS (which does not auto-resize) needs the manual avoid.
+    if (Platform.OS !== 'ios') return;
 
     const onShow = (e: any) => {
       const h = e?.endCoordinates?.height ?? 0;
       Animated.timing(translateY, {
         toValue: -h,
-        duration: Platform.OS === 'ios' ? 240 : 140,
+        duration: 240,
         useNativeDriver: true,
       }).start();
 
@@ -84,13 +92,13 @@ export default function ChatThreadScreen() {
     const onHide = () => {
       Animated.timing(translateY, {
         toValue: 0,
-        duration: Platform.OS === 'ios' ? 220 : 120,
+        duration: 220,
         useNativeDriver: true,
       }).start();
     };
 
-    const s = Keyboard.addListener(showEvt, onShow);
-    const h = Keyboard.addListener(hideEvt, onHide);
+    const s = Keyboard.addListener('keyboardWillShow', onShow);
+    const h = Keyboard.addListener('keyboardWillHide', onHide);
     return () => {
       s.remove();
       h.remove();
@@ -126,8 +134,9 @@ export default function ChatThreadScreen() {
 
   const onSend = async () => {
     const trimmed = text.trim();
-    if (!trimmed || sending || !user?.uid) return;
+    if (!trimmed || sendingRef.current || !user?.uid) return;
 
+    sendingRef.current = true;
     setSending(true);
     setText('');
 
@@ -135,7 +144,16 @@ export default function ChatThreadScreen() {
       // ✅ strict whitelist safe (your service already enforces it)
       await sendMessage(conversationId, trimmed, user.uid, 'user');
       requestAnimationFrame(() => listRef.current?.scrollToOffset({ offset: 0, animated: true }));
+    } catch (e) {
+      // sendMessage re-throws on failure (network / blocked / not-found). Restore the
+      // optimistically-cleared text (unless the user already started a new message) and
+      // surface the error so the message isn't silently lost.
+      setText((prev) => prev || trimmed);
+      Alert.alert(
+        t('chat.sendFailed', { defaultValue: 'Message failed to send. Tap send to retry.' })
+      );
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
   };

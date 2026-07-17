@@ -144,7 +144,8 @@ const AnimatedInputWrapper = ({
   );
 };
 
-const maskIdentifier = (method: 'phone' | 'email', identifier: string): string => {
+const maskIdentifier = (method: 'phone' | 'email' | undefined, identifier?: string): string => {
+  if (!identifier) return '';
   if (method === 'phone') {
     if (identifier.length < 4) return identifier;
     const last2 = identifier.slice(-2);
@@ -185,13 +186,22 @@ const PasswordScreen: React.FC = () => {
 
   const masked = maskIdentifier(method, identifier);
 
-  // Load saved credentials on mount
+  // Guard: required params missing (e.g. restored nav state / deep link) — go back gracefully
+  React.useEffect(() => {
+    if (!method || !identifier) {
+      navigation.goBack();
+    }
+  }, [method, identifier, navigation]);
+
+  // Load saved credentials on mount — only prefill when they belong to THIS account
   React.useEffect(() => {
     const loadSaved = async () => {
       try {
         const credentials = await CredentialStorage.getCredentials();
-        if (credentials) {
-          setPassword(credentials.password);
+        // getCredentials() is a single global slot; only prefill if it matches the
+        // current identifier, and never clobber input the user has already typed.
+        if (credentials && credentials.email === identifier) {
+          setPassword((prev) => (prev ? prev : credentials.password));
           setRememberMe(true);
         }
       } catch (e) {
@@ -199,7 +209,7 @@ const PasswordScreen: React.FC = () => {
       }
     };
     loadSaved();
-  }, []);
+  }, [identifier]);
 
   const handleSuccessfulLogin = () => {
     if (requireAuth && returnReason) {
@@ -237,7 +247,14 @@ const PasswordScreen: React.FC = () => {
         await loginWithEmail(identifier, password);
       }
 
-      await refreshUser();
+      // Login already succeeded above; a failed user refresh is NOT a wrong-password
+      // error, so isolate it from the catch below (otherwise a transient network
+      // hiccup would be misreported as "Incorrect password").
+      try {
+        await refreshUser();
+      } catch (e) {
+        console.log('refreshUser failed after successful login:', e);
+      }
 
       try {
         if (rememberMe) {
@@ -293,6 +310,11 @@ const PasswordScreen: React.FC = () => {
     { delay: 1000, x: SCREEN_WIDTH * 0.65, size: 3, duration: 8000 },
     { delay: 3000, x: SCREEN_WIDTH * 0.85, size: 2, duration: 10000 },
   ];
+
+  // Required params missing — render nothing; the guard effect navigates back.
+  if (!method || !identifier) {
+    return null;
+  }
 
   return (
     <View style={styles.container}>

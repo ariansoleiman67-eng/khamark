@@ -1,5 +1,5 @@
 /* eslint-disable react-native/no-inline-styles, react-native/no-color-literals */
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   TextInput,
@@ -280,6 +280,10 @@ const ForgotPasswordScreen: React.FC = () => {
   const [selectedCountry, setSelectedCountry] = useState<CountryCode>(userRegion);
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
+  // Synchronous re-entrancy guard: `loading` state flips a frame late, so a
+  // fast double-tap can fire handleContinue twice (two reset emails / duplicate
+  // nav) before the button's disabled prop commits. This ref blocks that.
+  const inFlight = useRef(false);
 
   // Sync selectedCountry when userRegion loads from AsyncStorage
   useEffect(() => {
@@ -287,6 +291,8 @@ const ForgotPasswordScreen: React.FC = () => {
   }, [userRegion]);
 
   const handleContinue = async () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
     try {
       if (resetMethod === 'phone') {
         if (!phone.trim()) {
@@ -300,7 +306,11 @@ const ForgotPasswordScreen: React.FC = () => {
         }
 
         setLoading(true);
-        const countryInfo = getCountryInfo(selectedCountry);
+        // getCountryInfo returns undefined for codes absent from the map (its
+        // declared return type lies). selectedCountry is seeded from a persisted,
+        // unchecked-cast region value, so a legacy/corrupt code would make
+        // `.dialCode` throw. Fall back to IQ (always present in the map).
+        const countryInfo = getCountryInfo(selectedCountry) ?? getCountryInfo('IQ');
         const formattedPhone = `${countryInfo.dialCode}${phone.replace(/\D/g, '')}`;
 
         const exists = await isPhoneRegistered(formattedPhone);
@@ -349,6 +359,7 @@ const ForgotPasswordScreen: React.FC = () => {
       Alert.alert(t('auth.error'), error.message || 'Failed to process request');
     } finally {
       setLoading(false);
+      inFlight.current = false;
     }
   };
 

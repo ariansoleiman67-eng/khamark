@@ -61,14 +61,23 @@ const StoreCompanyTab: React.FC<StoreCompanyTabProps> = ({ profile }) => {
     Linking.openURL(url).catch(() => {});
   };
 
+  // Only treat the location as usable when both coordinates are finite numbers.
+  // The DB `location` JSON is assigned unvalidated, so it may be an empty/partial
+  // object (e.g. {} or missing longitude) even though the type claims otherwise.
+  const hasGeo = !!(
+    profile.location &&
+    Number.isFinite(profile.location.latitude) &&
+    Number.isFinite(profile.location.longitude)
+  );
+
   const openMap = () => {
-    if (profile.location) {
-      const url = Platform.select({
-        ios: `maps:${profile.location.latitude},${profile.location.longitude}`,
-        android: `geo:${profile.location.latitude},${profile.location.longitude}?q=${profile.location.latitude},${profile.location.longitude}`,
-      });
-      Linking.openURL(url || '');
-    }
+    if (!hasGeo || !profile.location) return;
+    const { latitude, longitude } = profile.location;
+    const url = Platform.select({
+      ios: `https://maps.apple.com/?ll=${latitude},${longitude}`,
+      android: `geo:${latitude},${longitude}?q=${latitude},${longitude}`,
+    });
+    Linking.openURL(url || '').catch(() => {});
   };
 
   // Card Header Component - Premium Navy strip with decorative elements
@@ -169,10 +178,10 @@ const StoreCompanyTab: React.FC<StoreCompanyTabProps> = ({ profile }) => {
     { 
       id: 'directions', 
       icon: 'navigate', 
-      label: t('common.directions', 'Directions'), 
+      label: t('common.directions', 'Directions'),
       color: '#FF6B35',
-      value: profile.location, 
-      action: openMap 
+      value: hasGeo ? profile.location : undefined,
+      action: openMap
     },
   ].filter(qa => qa.value);
 
@@ -227,7 +236,7 @@ const StoreCompanyTab: React.FC<StoreCompanyTabProps> = ({ profile }) => {
         )}
 
         {/* Location Map Card */}
-        {profile.location && (
+        {hasGeo && profile.location && (
           <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
             <CardHeader 
               title={t('common.location', 'Location')} 

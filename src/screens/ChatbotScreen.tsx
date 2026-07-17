@@ -106,6 +106,23 @@ const ChatbotScreen: React.FC = () => {
     }
   }, [isRecording]);
 
+  // Cleanup on unmount: clear the recording timer and stop any live recorder
+  // so we don't setState on an unmounted component or leave the mic/audio session open.
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+      isRecordingIntentRef.current = false;
+      try {
+        audioRecorder.stop().catch(() => {});
+      } catch (e) {
+        // recorder may not be active on unmount — safe to ignore
+      }
+    };
+  }, [audioRecorder]);
+
   // ✅ We’ll position the bottom bar using keyboard TOP Y (screenY) – no gaps
   const [keyboardTopY, setKeyboardTopY] = useState<number | null>(null);
 
@@ -218,6 +235,10 @@ const ChatbotScreen: React.FC = () => {
   );
 
   const startRecording = async () => {
+    // Guard against a second recording being launched while one is already
+    // recording, uploading, or a text send is in flight (e.g. tapping the mic
+    // that briefly flashes back during stopAndSendRecording).
+    if (isRecording || isUploadingVoice || isLoading) return;
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
     }
@@ -302,8 +323,11 @@ const ChatbotScreen: React.FC = () => {
 
     LayoutAnimation.configureNext(LayoutAnimation.create(250, 'easeInEaseOut', 'opacity'));
     setIsRecording(false);
+    // Flip the in-flight flag synchronously (before the awaited stop below) so the
+    // composer never re-renders with both flags false and flashes the mic back on.
+    setIsUploadingVoice(true);
     if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
-    
+
     try {
       try { await audioRecorder.stop(); } catch (e) {}
       const uri = audioRecorder.uri;
@@ -334,7 +358,6 @@ const ChatbotScreen: React.FC = () => {
 
       if (!uri) return;
 
-      setIsUploadingVoice(true);
       const fileName = `voice_ai_${Date.now()}.m4a`;
       const mimeType = 'audio/m4a';
 

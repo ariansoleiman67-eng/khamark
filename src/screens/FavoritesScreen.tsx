@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -40,11 +40,19 @@ const FavoritesScreen: React.FC = () => {
 
   const styles = useMemo(() => createStyles(theme), [theme]);
 
+  // Monotonic request id: discards stale/out-of-order fetch results so a slow
+  // earlier response can never overwrite a newer one (and avoids setState after unmount).
+  const reqIdRef = useRef(0);
+
   // Fetch products for favorite IDs
   const fetchFavoriteProducts = useCallback(async (force = false) => {
+    const reqId = ++reqIdRef.current;
+
     if (favorites.length === 0) {
-      setProducts([]);
-      setIsLoading(false);
+      if (reqId === reqIdRef.current) {
+        setProducts([]);
+        setIsLoading(false);
+      }
       return;
     }
 
@@ -52,11 +60,15 @@ const FavoritesScreen: React.FC = () => {
       setIsLoading(true);
       // Single batched query (was one request per favorite — slow with many saves).
       const validProducts = await ProductService.getProductsByIds(favorites, force);
-      setProducts(validProducts);
+      if (reqId === reqIdRef.current) {
+        setProducts(validProducts);
+      }
     } catch {
       // Silently handle fetch errors
     } finally {
-      setIsLoading(false);
+      if (reqId === reqIdRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [favorites]);
 
@@ -184,8 +196,8 @@ const FavoritesScreen: React.FC = () => {
         )}
       </View>
 
-      {/* Empty State */}
-      {products.length === 0 ? (
+      {/* Empty State — distinguish "no favorites saved" from "favorites exist but failed to load" */}
+      {favorites.length === 0 ? (
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIconContainer}>
             <Ionicons
@@ -204,6 +216,27 @@ const FavoritesScreen: React.FC = () => {
 
             <Feather name="shopping-bag" size={18} color="#ffffff" style={styles.shopButtonIcon} />
             <Text allowFontScaling={false} style={styles.shopButtonText}>{t('favorites.startBrowsing')}</Text>
+          </TouchableOpacity>
+        </View>
+      ) : products.length === 0 ? (
+        /* Favorites exist but products could not be loaded (offline / cold cache).
+           getProductsByIds swallows fetch errors and returns [], so offer an explicit retry
+           instead of falsely claiming the wishlist is empty. */
+        <View style={styles.emptyContainer}>
+          <View style={styles.emptyIconContainer}>
+            <Ionicons
+              name="cloud-offline-outline"
+              size={80}
+              color={theme.colors.textSecondary}
+            />
+          </View>
+          <Text allowFontScaling={false} style={styles.emptyTitle}>{t('common.somethingWentWrong')}</Text>
+          <TouchableOpacity
+            style={styles.shopButton}
+            onPress={() => fetchFavoriteProducts(true)}>
+
+            <Feather name="refresh-cw" size={18} color="#ffffff" style={styles.shopButtonIcon} />
+            <Text allowFontScaling={false} style={styles.shopButtonText}>{t('common.retry')}</Text>
           </TouchableOpacity>
         </View>
       ) : (

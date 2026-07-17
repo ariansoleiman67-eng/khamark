@@ -34,6 +34,16 @@ import { Address } from '../../types';
 
 const { width } = Dimensions.get('window');
 
+// Guard against truthy-but-partial jsonb coordinates (e.g. {} or a lat with no lng).
+// Both latitude and longitude must be finite numbers before we render a map / overlay.
+const hasValidCoordinates = (
+  address: Address
+): address is Address & { coordinates: { latitude: number; longitude: number } } =>
+  typeof address.coordinates?.latitude === 'number' &&
+  !Number.isNaN(address.coordinates.latitude) &&
+  typeof address.coordinates?.longitude === 'number' &&
+  !Number.isNaN(address.coordinates.longitude);
+
 const MyAddressScreen: React.FC = () => {
   const { theme } = useTheme();
   const { t, i18n } = useTranslation();
@@ -47,7 +57,7 @@ const MyAddressScreen: React.FC = () => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const isMountedRef = React.useRef(true);
 
-  const loadAddresses = async () => {
+  const loadAddresses = async (isRefresh = false) => {
     if (!user?.uid) {
       // Production: console.warn removed
       setLoading(false);
@@ -55,7 +65,12 @@ const MyAddressScreen: React.FC = () => {
     }
 
     try {
-      setLoading(true);
+      // Only show the full-screen loader on the first cold load. Focus-refetch
+      // and pull-to-refresh keep the existing list mounted (RefreshControl owns
+      // its own spinner) instead of flashing the centered loader.
+      if (!isRefresh && addresses.length === 0) {
+        setLoading(true);
+      }
       const userAddresses = await addressService.getUserAddresses(user.uid);
       setAddresses(userAddresses);
     } catch (error) {
@@ -68,7 +83,7 @@ const MyAddressScreen: React.FC = () => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadAddresses();
+    await loadAddresses(true);
     setRefreshing(false);
   };
 
@@ -294,7 +309,7 @@ const MyAddressScreen: React.FC = () => {
         )}
 
         {/* Location Map */}
-        {address.coordinates && (
+        {hasValidCoordinates(address) && (
           <View style={{
             marginTop: SPACING.md,
             borderRadius: 8,
@@ -370,7 +385,7 @@ const MyAddressScreen: React.FC = () => {
         )}
 
         {/* Location status when no coordinates */}
-        {!address.coordinates && (
+        {!hasValidCoordinates(address) && (
           <View style={{
             marginTop: SPACING.sm,
             flexDirection: 'row',

@@ -1,5 +1,5 @@
 /* eslint-disable react-native/no-inline-styles, react-native/no-color-literals */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Alert,
   View,
@@ -239,6 +239,10 @@ const RegisterScreen: React.FC = () => {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [appleLoading, setAppleLoading] = useState(false);
 
+  // Synchronous re-entry guard: `loading` state is committed a frame late, so a
+  // double-tap dispatched in the same gesture frame can slip through disabled={}.
+  const submittingRef = useRef(false);
+
   // Sync selectedCountry when userRegion loads from AsyncStorage
   useEffect(() => {
     setSelectedCountry(userRegion);
@@ -272,6 +276,9 @@ const RegisterScreen: React.FC = () => {
   };
 
   const handleContinue = async () => {
+    // Synchronous re-entry guard against sub-frame double-taps (disabled={} lags a render).
+    if (submittingRef.current || loading) return;
+
     setErrorMessage('');
 
     if (registerMethod === 'phone') {
@@ -281,8 +288,12 @@ const RegisterScreen: React.FC = () => {
       }
 
       try {
+        submittingRef.current = true;
         setLoading(true);
-        const countryInfo = getCountryInfo(selectedCountry);
+        // getCountryInfo can return undefined for a stale/garbage persisted region
+        // code (useUserRegion casts AsyncStorage JSON via `as CountryCode`). Fall back
+        // to IQ (always present in the map) so `.dialCode` never dereferences undefined.
+        const countryInfo = getCountryInfo(selectedCountry) || getCountryInfo('IQ');
         const cleanPhone = phone.replace(/\D/g, '').replace(/^0+/, '');
         const formattedPhone = `${countryInfo.dialCode}${cleanPhone}`;
 
@@ -301,6 +312,7 @@ const RegisterScreen: React.FC = () => {
       } catch (error: any) {
         setErrorMessage(error.message || 'Something went wrong');
       } finally {
+        submittingRef.current = false;
         setLoading(false);
       }
     } else {
@@ -314,6 +326,7 @@ const RegisterScreen: React.FC = () => {
       }
 
       try {
+        submittingRef.current = true;
         setLoading(true);
         const exists = await isEmailRegistered(email.trim());
 
@@ -331,6 +344,7 @@ const RegisterScreen: React.FC = () => {
       } catch (error: any) {
         setErrorMessage(error.message || 'Something went wrong');
       } finally {
+        submittingRef.current = false;
         setLoading(false);
       }
     }

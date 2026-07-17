@@ -322,7 +322,15 @@ const HelpSupportScreen: React.FC = () => {
               </Text>
               <TouchableOpacity
                 onPress={() => {
-                  openWhatsApp(BRAND.contactPhone, t('helpSupport.whatsappMessage', { defaultValue: "Hi, I need help with my question that's not covered in the FAQ" }));
+                  const phone = (BRAND.contactPhone || '').replace(/[^\d]/g, '');
+                  if (!phone) {
+                    Alert.alert(
+                      t('helpSupport.title'),
+                      t('helpSupport.contactUnavailable', { defaultValue: 'Support contact is not available yet. Please try again later.' })
+                    );
+                    return;
+                  }
+                  openWhatsApp(phone, t('helpSupport.whatsappMessage', { defaultValue: "Hi, I need help with my question that's not covered in the FAQ" }));
                 }}
                 style={{
                   backgroundColor: theme.colors.primary,

@@ -207,8 +207,13 @@ const CategoriesScreen: React.FC = () => {
       
       setProducts(fetchedProducts);
       
-      // Extract unique categories from products
-      const uniqueCategories = Array.from(new Set(fetchedProducts.map(p => p.category)));
+      // Extract unique categories from products.
+      // Product.category is typed `string` but the DB column is nullable, so guard
+      // against null/undefined/'' here — a null category name would later crash
+      // renderCategoryFilter's cat.name.toLowerCase() (source of the S0 crash).
+      const uniqueCategories = Array.from(
+        new Set(fetchedProducts.map(p => p.category).filter((c): c is string => !!c))
+      );
       const categoriesWithCounts = uniqueCategories.map((categoryName, index) => {
         const categoryProducts = fetchedProducts.filter(p => p.category === categoryName);
         return {
@@ -652,10 +657,12 @@ const CategoriesScreen: React.FC = () => {
     const categoryOptions = [
       { id: 'All', originalName: 'All', displayName: t('categories.all') },
       ...categories.map(cat => {
-        let displayName = cat.name;
+        // Defensive: cat.name is typed string but can be null from nullable DB data.
+        const safeName = cat.name || '';
+        let displayName = safeName;
 
         // Create a safe translation key: lowercase and remove spaces
-        const translationKey = cat.name.toLowerCase().replace(/\s+/g, '');
+        const translationKey = safeName.toLowerCase().replace(/\s+/g, '');
         const fallback = t(`categories.${translationKey}`);
 
         // If we have a successful translation from our JSON files (it didn't return the raw key)
@@ -668,7 +675,7 @@ const CategoriesScreen: React.FC = () => {
         } else if (i18n.language === 'ku' && cat.nameKu && cat.nameKu.trim() !== '') {
           displayName = cat.nameKu;
         } else {
-          displayName = cat.name;
+          displayName = safeName;
         }
 
         return { id: cat.id, originalName: cat.name, displayName };

@@ -41,10 +41,12 @@ const CategoryProductsScreen: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(false);
   const [sortDesc, setSortDesc] = useState(false);
 
   const load = useCallback(async () => {
     try {
+      setError(false);
       let items: Product[];
       if (brand) {
         const res = await ProductService.getProducts(
@@ -59,6 +61,7 @@ const CategoryProductsScreen: React.FC = () => {
       setProducts(items);
     } catch {
       setProducts([]);
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -153,12 +156,29 @@ const CategoryProductsScreen: React.FC = () => {
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
           ListEmptyComponent={
-            <View style={styles.center}>
-              <MaterialCommunityIcons name="package-variant" size={48} color={theme.colors.textSecondary} />
-              <AppText fontSize={16} style={{ color: theme.colors.textSecondary, marginTop: 12 }}>
-                {t('home.noProducts', { defaultValue: 'No products available' })}
-              </AppText>
-            </View>
+            error ? (
+              <View style={styles.center}>
+                <MaterialCommunityIcons name="cloud-off-outline" size={48} color={theme.colors.textSecondary} />
+                <AppText fontSize={16} style={{ color: theme.colors.textSecondary, marginTop: 12, textAlign: 'center' }}>
+                  {t('common.loadError', { defaultValue: 'Could not load products. Check your connection.' })}
+                </AppText>
+                <TouchableOpacity
+                  onPress={load}
+                  style={[styles.retryBtn, { backgroundColor: theme.colors.primary }]}
+                >
+                  <AppText fontSize={15} style={styles.retryText}>
+                    {t('common.retry', { defaultValue: 'Retry' })}
+                  </AppText>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.center}>
+                <MaterialCommunityIcons name="package-variant" size={48} color={theme.colors.textSecondary} />
+                <AppText fontSize={16} style={{ color: theme.colors.textSecondary, marginTop: 12 }}>
+                  {t('home.noProducts', { defaultValue: 'No products available' })}
+                </AppText>
+              </View>
+            )
           }
         />
       )}
@@ -195,6 +215,13 @@ const styles = StyleSheet.create({
   column: { justifyContent: 'space-between' },
   cardWrap: {},
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80 },
+  retryBtn: {
+    marginTop: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 999,
+  },
+  retryText: { color: '#fff', fontWeight: '700' },
 });
 
 export default CategoryProductsScreen;

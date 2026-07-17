@@ -94,6 +94,7 @@ const AddEditAddressScreen: React.FC = () => {
   
   
   const isMountedRef = React.useRef(true);
+  const savingRef = React.useRef(false);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -237,7 +238,10 @@ const AddEditAddressScreen: React.FC = () => {
             cityCode: prev.cityCode || defaultCity,
             phone: prev.phone || user?.phone || defaultPhone,
             address: prev.address || addressStreet,
-            coordinates: resolvedCoordinates,
+            // Preserve any coordinates the user already set (e.g. via the
+            // "Use current location" button) so a slower background GPS fix
+            // can't clobber a newer/more-accurate one or wipe it to undefined.
+            coordinates: prev.coordinates || resolvedCoordinates,
             city: '',
             region: ''
           }));
@@ -488,6 +492,11 @@ const AddEditAddressScreen: React.FC = () => {
     
     if (!user?.uid) return;
 
+    // Synchronous in-flight guard: `disabled={loading}` is async React state and
+    // won't block a rage/double-tap that lands before the re-render commits.
+    if (savingRef.current) return;
+    savingRef.current = true;
+
     try {
       setLoading(true);
 
@@ -609,6 +618,7 @@ const AddEditAddressScreen: React.FC = () => {
       console.error('Error saving address:', error);
       Alert.alert(t('addresses.saveFailed'), error.message || t('addresses.failedToSave'));
     } finally {
+      savingRef.current = false;
       setLoading(false);
     }
   };

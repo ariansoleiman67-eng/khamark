@@ -82,6 +82,11 @@ const UpdatePhoneScreen: React.FC = () => {
   const [cooldown, setCooldown] = useState(0);
   const inputRefs = useRef<(TextInput | null)[]>([]);
 
+  // Synchronous in-flight guard shared by the async submit handlers (verify /
+  // resend). `loading` is React state and only flips on the next render, so it
+  // can't block a second call dispatched within the same frame.
+  const busyRef = useRef(false);
+
   // Cooldown timer
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -166,6 +171,13 @@ const UpdatePhoneScreen: React.FC = () => {
       return;
     }
 
+    // Auto-verify fires the instant the 6th digit lands, and the OTP boxes stay
+    // interactive during the request — without a synchronous guard a second
+    // tap/re-type would call verifyOtp again with an already-consumed token and
+    // surface a false "incorrect code" over a successful verification.
+    if (busyRef.current) return;
+    busyRef.current = true;
+
     try {
       setLoading(true);
       setErrorMessage('');
@@ -177,9 +189,17 @@ const UpdatePhoneScreen: React.FC = () => {
       const { error } = await supabase.auth.verifyOtp({ phone: cleanPhone, token: otpCode, type: 'phone_change' });
       if (error) throw error;
 
-      // Mirror onto the app's public.users row (what the app reads).
-      await updateUserProfile({ phone: cleanPhone });
-      await refreshUser();
+      // The phone is now changed & verified on the Supabase auth user. Mirroring
+      // it onto the app's public.users row is a best-effort follow-up: if it
+      // fails the verification still succeeded, so don't clear the code or report
+      // it as a wrong/expired code — the OTP is already consumed and re-entering
+      // or resending would only confuse the user.
+      try {
+        await updateUserProfile({ phone: cleanPhone });
+        await refreshUser();
+      } catch (syncError) {
+        console.warn('[UpdatePhone] profile mirror failed after successful verify:', syncError);
+      }
 
       Alert.alert(
         hasExisting ? t('updatePhone.phoneUpdated') : t('updatePhone.phoneAdded'),
@@ -187,6 +207,7 @@ const UpdatePhoneScreen: React.FC = () => {
         [{ text: t('common.ok'), onPress: () => navigation.goBack() }]
       );
     } catch (error: any) {
+      // Reached only when verifyOtp itself fails (wrong / expired / reused code).
       const raw = String(error?.message || '');
       if (/already|registered|in use|exists/i.test(raw)) {
         setErrorMessage(t('updatePhone.alreadyInUse', { defaultValue: 'This number is already on another account.' }));
@@ -199,11 +220,20 @@ const UpdatePhoneScreen: React.FC = () => {
       inputRefs.current[0]?.focus();
     } finally {
       setLoading(false);
+      busyRef.current = false;
     }
   };
 
   const handleResend = async () => {
     if (cooldown > 0) return;
+
+    // Same synchronous re-entrancy guard as handleVerify (busyRef is shared by
+    // both submit handlers). `cooldown` is React state and won't flip until the
+    // next render, so two taps within one frame would otherwise both pass the
+    // cooldown check and fire a duplicate updateUser → duplicate SMS.
+    if (busyRef.current) return;
+    busyRef.current = true;
+
     try {
       setLoading(true);
       const cleanPhone = phone.replace(/\s/g, '');
@@ -215,6 +245,7 @@ const UpdatePhoneScreen: React.FC = () => {
       setErrorMessage(error.message || t('updatePhone.resendFailed', { defaultValue: 'Failed to resend code' }));
     } finally {
       setLoading(false);
+      busyRef.current = false;
     }
   };
 
@@ -308,6 +339,7 @@ const UpdatePhoneScreen: React.FC = () => {
                     textContentType="oneTimeCode"
                     autoComplete="sms-otp"
                     selectTextOnFocus
+                    editable={!loading}
                   />
                 ))}
               </View>

@@ -51,7 +51,13 @@ const RegisterSuccessScreen: React.FC = () => {
   const fadeIn = useRef(new Animated.Value(0)).current;
   const buttonFade = useRef(new Animated.Value(0)).current;
 
+  // Guards single-shot navigation against double-tap / timer+tap races
+  const hasNavigated = useRef(false);
+
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let cancelled = false;
+
     // Subtle check animation
     Animated.sequence([
       Animated.spring(checkScale, {
@@ -79,16 +85,24 @@ const RegisterSuccessScreen: React.FC = () => {
       } catch (e) {
         // ignore — user is still signed in via Firebase
       }
-      setTimeout(() => {
+      if (cancelled) return;
+      timer = setTimeout(() => {
         handleContinue();
       }, 2000);
     };
 
     doRefreshAndContinue();
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleContinue = () => {
+    if (hasNavigated.current) return;
+    hasNavigated.current = true;
     navigation.reset({ index: 0, routes: [{ name: 'Main' as any }] });
   };
 

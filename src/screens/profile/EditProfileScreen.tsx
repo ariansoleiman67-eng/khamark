@@ -363,11 +363,33 @@ const EditProfileScreen: React.FC = () => {
             <Text allowFontScaling={false} style={{ fontSize: 26, fontWeight: '700', color: theme.colors.text, letterSpacing: -0.3, textAlign: 'center' }}>
               {fullName || t('profile.yourName', { defaultValue: 'Your Name' })}
             </Text>
-            {user?.createdAt && (
-              <Text allowFontScaling={false} style={{ fontSize: 13, color: labelColor, marginTop: 4 }}>
-                {t('profile.memberSince', { defaultValue: 'Member since {{year}}', year: new Date(user.createdAt).getFullYear() })}
-              </Text>
-            )}
+            {(() => {
+              // createdAt is typed as Timestamp but at runtime may be a Supabase
+              // ISO string, a legacy Firestore Timestamp object, or Unix seconds.
+              // Normalize to a millisecond value and hide the line if it's unparseable
+              // so we never render "Member since NaN" / "Member since 1970".
+              const raw: any = user?.createdAt;
+              if (!raw) return null;
+              let ms: number;
+              if (typeof raw.toMillis === 'function') {
+                ms = raw.toMillis();
+              } else if (typeof raw.toDate === 'function') {
+                ms = raw.toDate().getTime();
+              } else if (typeof raw === 'number') {
+                // Values below ~1e12 are Unix seconds; convert to milliseconds.
+                ms = raw < 1e12 ? raw * 1000 : raw;
+              } else if (typeof raw.seconds === 'number') {
+                ms = raw.seconds * 1000;
+              } else {
+                ms = new Date(raw).getTime();
+              }
+              if (isNaN(ms)) return null;
+              return (
+                <Text allowFontScaling={false} style={{ fontSize: 13, color: labelColor, marginTop: 4 }}>
+                  {t('profile.memberSince', { defaultValue: 'Member since {{year}}', year: new Date(ms).getFullYear() })}
+                </Text>
+              );
+            })()}
           </Animated.View>
 
           {/* ---- Cards ---- */}

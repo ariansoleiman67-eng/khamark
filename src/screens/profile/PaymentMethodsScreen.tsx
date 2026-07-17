@@ -30,6 +30,24 @@ interface SavedMoneyExchangerInfo {
   totalAmount: string;
 }
 
+// money_exchanger_info is a free-form JSONB column; never trust its shape.
+// Coerce every field to a safe display string so a non-string value
+// (object/array from corruption, a different writer, or a schema change)
+// can't crash the render with "Objects are not valid as a React child".
+const asDisplayString = (value: unknown): string => {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return String(value);
+  return '';
+};
+
+const normalizeExchangerInfo = (raw: any): SavedMoneyExchangerInfo => ({
+  officeName: asDisplayString(raw?.officeName),
+  officePhone: asDisplayString(raw?.officePhone),
+  receiverName: asDisplayString(raw?.receiverName),
+  receiverPhone: asDisplayString(raw?.receiverPhone),
+  totalAmount: asDisplayString(raw?.totalAmount),
+});
+
 const PaymentMethodsScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
   const navigation = useNavigation();
@@ -82,6 +100,7 @@ const PaymentMethodsScreen: React.FC = () => {
   // Load saved money exchanger info from Firestore
   const loadExchangerInfo = useCallback(async () => {
     if (!user?.uid) {
+      setSavedExchangerInfo(null); // clear on logout / no user — never leak the previous account's info
       setExchangerLoading(false);
       return;
     }
@@ -91,9 +110,11 @@ const PaymentMethodsScreen: React.FC = () => {
         .select('money_exchanger_info')
         .eq('id', user.uid)
         .single();
-        
+
       if (data?.money_exchanger_info) {
-        setSavedExchangerInfo(data.money_exchanger_info as SavedMoneyExchangerInfo);
+        setSavedExchangerInfo(normalizeExchangerInfo(data.money_exchanger_info));
+      } else {
+        setSavedExchangerInfo(null); // this user has no saved info — clear any stale state
       }
     } catch (error) {
       // silently fail

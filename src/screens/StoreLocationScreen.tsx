@@ -39,6 +39,89 @@ import { useTheme } from '../components/ThemeProvider';
 import { SPACING } from '../constants/theme';
 import { BRAND, GOOGLE_MAPS_API_KEY } from '../constants/config';
 import { locationService, StoreLocation } from '../services/locationService';
+import { supabase } from '../services/supabase';
+
+// --- Local helpers ---
+// LocationService does not implement getActiveLocations / getStoreTypeIcon /
+// getLocalizedName / getLocalizedAddress / isStoreOpen. They were previously
+// called as `locationService.X(...)` and, being undefined, threw during render
+// (and getActiveLocations threw on load). Implement them here so this screen is
+// self-contained and can never crash on a missing service member. (Ideal future
+// home: LocationService itself — this can be swapped back once it exposes them.)
+
+const DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+const getStoreTypeIcon = (type?: string | null): string => {
+  switch (type) {
+    case 'main': return 'business';
+    case 'branch': return 'storefront';
+    case 'service': return 'construct';
+    default: return 'location';
+  }
+};
+
+const getLocalizedName = (loc: StoreLocation, lang?: string): string => {
+  if (!loc) return '';
+  if (lang === 'ar' && loc.nameAr) return loc.nameAr;
+  if (lang === 'ku' && loc.nameKu) return loc.nameKu;
+  return loc.name || loc.address || '';
+};
+
+const getLocalizedAddress = (loc: StoreLocation, lang?: string): string => {
+  if (!loc) return '';
+  if (lang === 'ar' && loc.addressAr) return loc.addressAr;
+  if (lang === 'ku' && loc.addressKu) return loc.addressKu;
+  return loc.address || '';
+};
+
+const isStoreOpen = (loc: StoreLocation): boolean => {
+  try {
+    const hours = loc?.workingHours;
+    if (!hours) return true; // No schedule configured -> treat as open
+    const now = new Date();
+    const schedule = hours[DAY_KEYS[now.getDay()]];
+    if (!schedule || schedule.isOpen === false) return false;
+    if (!schedule.open || !schedule.close) return true;
+    const toMinutes = (s: string) => {
+      const [h, m] = String(s).split(':');
+      return (parseInt(h, 10) || 0) * 60 + (parseInt(m, 10) || 0);
+    };
+    const cur = now.getHours() * 60 + now.getMinutes();
+    return cur >= toMinutes(schedule.open) && cur < toMinutes(schedule.close);
+  } catch {
+    return true;
+  }
+};
+
+const mapDbToStoreLocation = (data: any): StoreLocation => ({
+  id: data.id,
+  name: data.name,
+  nameAr: data.name_ar,
+  nameKu: data.name_ku,
+  address: data.address,
+  addressAr: data.address_ar,
+  addressKu: data.address_ku,
+  phone: data.phone,
+  email: data.email,
+  city: data.city,
+  latitude: Number(data.latitude),
+  longitude: Number(data.longitude),
+  type: data.type,
+  isActive: data.is_active,
+  workingHours: data.working_hours,
+  createdByAdminId: data.created_by_admin_id,
+  createdAt: data.created_at ? new Date(data.created_at) : undefined,
+  updatedAt: data.updated_at ? new Date(data.updated_at) : undefined,
+});
+
+const fetchActiveLocations = async (): Promise<StoreLocation[]> => {
+  const { data, error } = await supabase
+    .from('store_locations')
+    .select('*')
+    .eq('is_active', true);
+  if (error) throw error;
+  return (data || []).map(mapDbToStoreLocation);
+};
 
 export const StoreLocationScreen: React.FC = () => {
   const { theme } = useTheme();
@@ -64,7 +147,7 @@ export const StoreLocationScreen: React.FC = () => {
   const loadLocations = async () => {
     try {
       setLoading(true);
-      const storeLocations = await locationService.getActiveLocations();
+      const storeLocations = await fetchActiveLocations();
       setLocations(storeLocations);
       
       // If we have locations, center map on first location or main store
@@ -105,7 +188,7 @@ export const StoreLocationScreen: React.FC = () => {
 
   const openWhatsApp = (storeLocation: StoreLocation) => {
     const phoneNumber = storeLocation.phone;
-    const storeName = locationService.getLocalizedName(storeLocation, i18n.language);
+    const storeName = getLocalizedName(storeLocation, i18n.language);
     const message = `Hello, I would like to inquire about products at ${storeName}.`;
     const url = `whatsapp://send?phone=${phoneNumber}&text=${encodeURIComponent(message)}`;
     Linking.openURL(url).catch(() => {
@@ -142,24 +225,24 @@ export const StoreLocationScreen: React.FC = () => {
             isRTL ? { marginRight: 0, marginLeft: SPACING.md } : null,
           ]}>
             <Ionicons
-              name={locationService.getStoreTypeIcon(storeLocation.type) as any}
+              name={getStoreTypeIcon(storeLocation.type) as any}
               size={24}
               color={locationService.getStoreTypeColor(storeLocation.type)}
             />
           </View>
           <View style={{ flex: 1 }}>
             <Text allowFontScaling={false} style={[styles.storeName, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
-              {locationService.getLocalizedName(storeLocation, i18n.language)}
+              {getLocalizedName(storeLocation, i18n.language)}
             </Text>
             <View style={[styles.statusRow, isRTL && { flexDirection: 'row-reverse' }]}>
               <Text allowFontScaling={false} style={[styles.storeType, { color: theme.colors.textSecondary }, isRTL ? { marginRight: 0, marginLeft: SPACING.sm } : null]}>
-                {storeLocation.type.toUpperCase()}
+                {(storeLocation.type || 'branch').toUpperCase()}
               </Text>
               <Text allowFontScaling={false} style={[
                 styles.storeStatus,
-                { color: locationService.isStoreOpen(storeLocation) ? '#4CAF50' : '#FF5722' }
+                { color: isStoreOpen(storeLocation) ? '#4CAF50' : '#FF5722' }
               ]}>
-                {locationService.isStoreOpen(storeLocation)
+                {isStoreOpen(storeLocation)
                   ? `🟢 ${t('storeLocations.open', { defaultValue: 'Open' })}`
                   : `🔴 ${t('storeLocations.closed', { defaultValue: 'Closed' })}`}
               </Text>
@@ -172,7 +255,7 @@ export const StoreLocationScreen: React.FC = () => {
           <View style={[styles.infoRow, isRTL && { flexDirection: 'row-reverse' }]}>
             <Ionicons name="location" size={16} color={theme.colors.textSecondary} />
             <Text allowFontScaling={false} style={[styles.infoText, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }, isRTL ? { marginLeft: 0, marginRight: SPACING.sm } : null]}>
-              {locationService.getLocalizedAddress(storeLocation, i18n.language)}
+              {getLocalizedAddress(storeLocation, i18n.language)}
             </Text>
           </View>
           <View style={[styles.infoRow, isRTL && { flexDirection: 'row-reverse' }]}>
@@ -292,8 +375,8 @@ export const StoreLocationScreen: React.FC = () => {
                 latitude: storeLocation.latitude,
                 longitude: storeLocation.longitude,
               }}
-              title={locationService.getLocalizedName(storeLocation, i18n.language)}
-              description={locationService.getLocalizedAddress(storeLocation, i18n.language)}
+              title={getLocalizedName(storeLocation, i18n.language)}
+              description={getLocalizedAddress(storeLocation, i18n.language)}
               pinColor={locationService.getStoreTypeColor(storeLocation.type)}
               onPress={() => setSelectedLocation(storeLocation)}
             />
@@ -307,10 +390,10 @@ export const StoreLocationScreen: React.FC = () => {
           <View style={styles.locationInfoHeader}>
             <View style={{ flex: 1 }}>
               <Text allowFontScaling={false} style={[styles.locationTitle, { color: theme.colors.text }]}>
-                {locationService.getLocalizedName(selectedLocation, i18n.language)}
+                {getLocalizedName(selectedLocation, i18n.language)}
               </Text>
               <Text allowFontScaling={false} style={[styles.locationSubtitle, { color: theme.colors.textSecondary }]}>
-                {selectedLocation.type.toUpperCase()} • {locationService.isStoreOpen(selectedLocation)
+                {(selectedLocation.type || 'branch').toUpperCase()} • {isStoreOpen(selectedLocation)
                   ? `🟢 ${t('storeLocations.open', { defaultValue: 'Open' })}`
                   : `🔴 ${t('storeLocations.closed', { defaultValue: 'Closed' })}`}
               </Text>

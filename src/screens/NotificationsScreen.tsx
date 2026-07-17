@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -43,6 +43,14 @@ export const NotificationsScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<string>('all');
   const [showOnlyUnread, setShowOnlyUnread] = useState(false);
+
+  // Keep the latest filter values in a ref so the realtime subscription can read
+  // them without re-subscribing (which would tear down/rebuild the Supabase
+  // channel and force a network refetch) on every filter change.
+  const filterRef = useRef({ selectedFilter, showOnlyUnread });
+  useEffect(() => {
+    filterRef.current = { selectedFilter, showOnlyUnread };
+  }, [selectedFilter, showOnlyUnread]);
 
   // ALIBABA-STYLE: Clear badge on mount (user opened notifications)
   useEffect(() => {
@@ -89,12 +97,18 @@ export const NotificationsScreen: React.FC = () => {
     setFilteredNotifications(filtered);
   }, []);
 
-  // Setup real-time notifications
+  // Setup real-time notifications. Subscribe once for the screen's lifetime and
+  // read the current filter values from a ref so filter changes don't recreate
+  // the channel (avoids forced refetches and stale-closure list overwrites).
   useEffect(() => {
     const unsubscribe = NotificationService.subscribeToNotifications(
       (updatedNotifications) => {
         setNotifications(updatedNotifications);
-        filterNotifications(updatedNotifications, selectedFilter, showOnlyUnread);
+        filterNotifications(
+          updatedNotifications,
+          filterRef.current.selectedFilter,
+          filterRef.current.showOnlyUnread
+        );
       },
       (error) => {
         console.error('Notifications subscription error:', error);
@@ -102,7 +116,7 @@ export const NotificationsScreen: React.FC = () => {
     );
 
     return unsubscribe;
-  }, [selectedFilter, showOnlyUnread, filterNotifications]);
+  }, [filterNotifications]);
 
   // Focus effect to load notifications when screen is focused
   useFocusEffect(

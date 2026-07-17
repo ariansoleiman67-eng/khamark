@@ -1,5 +1,5 @@
 /* eslint-disable react-native/no-inline-styles, react-native/no-color-literals */
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -84,6 +84,10 @@ const SetNewPasswordScreen: React.FC = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  // Synchronous re-entrancy guard shared by both submit paths (primary + skip).
+  // `loading` is async state, so it cannot block same-frame double taps or
+  // cross-handler concurrency (submit in flight while "Not now" is tapped).
+  const busyRef = useRef(false);
 
   const isRegister = mode === 'register' || mode === 'admin-register' || mode === 'partner-register';
 
@@ -116,6 +120,7 @@ const SetNewPasswordScreen: React.FC = () => {
   };
 
   const handleSubmit = async () => {
+    if (busyRef.current) return;
     setErrorMessage('');
 
     if (!password.trim() || !confirmPassword.trim()) {
@@ -132,6 +137,7 @@ const SetNewPasswordScreen: React.FC = () => {
       return;
     }
 
+    busyRef.current = true;
     try {
       setLoading(true);
 
@@ -180,10 +186,13 @@ const SetNewPasswordScreen: React.FC = () => {
       setErrorMessage(error.message || t('auth.setPassword.failedSet'));
     } finally {
       setLoading(false);
+      busyRef.current = false;
     }
   };
 
   const handleSkip = async () => {
+    if (busyRef.current) return;
+    busyRef.current = true;
     try {
       setLoading(true);
       if (mode === 'register' && method === 'phone' && name) {
@@ -204,6 +213,7 @@ const SetNewPasswordScreen: React.FC = () => {
       setErrorMessage(error.message || t('auth.setPassword.failedRegistration'));
     } finally {
       setLoading(false);
+      busyRef.current = false;
     }
   };
 
@@ -379,12 +389,16 @@ const SetNewPasswordScreen: React.FC = () => {
             </TouchableOpacity>
           </Animated.View>
 
-          {/* ── "Not now" skip link (register only) ── */}
-          {isRegister && mode !== 'partner-register' && (
+          {/* ── "Not now" skip link (phone register only) ── */}
+          {/* Email register has no passwordless path — skipping would navigate to
+              RegisterSuccess without creating an account (ghost account), so the
+              skip link is only shown for phone registration. */}
+          {isRegister && mode !== 'partner-register' && method === 'phone' && (
             <Animated.View entering={FadeIn.duration(400).delay(500)}>
               <TouchableOpacity
                 onPress={handleSkip}
-                style={styles.quietButton}
+                disabled={loading}
+                style={[styles.quietButton, loading && { opacity: 0.5 }]}
                 activeOpacity={0.6}
               >
                 <AppText style={styles.quietLink}>

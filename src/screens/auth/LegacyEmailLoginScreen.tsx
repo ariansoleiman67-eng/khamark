@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -33,8 +33,16 @@ const LegacyEmailLoginScreen: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  // Synchronous re-entrancy guard: `loading` state doesn't commit before a fast
+  // double-tap fires onPress again, so a ref is the only reliable guard here.
+  const submittingRef = useRef(false);
 
   const handleLogin = async () => {
+    // Short-circuit a concurrent submission before it can issue a second login.
+    if (submittingRef.current) {
+      return;
+    }
+
     try {
       // Validation
       if (!email.trim()) {
@@ -47,6 +55,7 @@ const LegacyEmailLoginScreen: React.FC = () => {
         return;
       }
 
+      submittingRef.current = true;
       setLoading(true);
 
       // Login
@@ -57,6 +66,7 @@ const LegacyEmailLoginScreen: React.FC = () => {
     } catch (error: any) {
       Alert.alert(t('auth.error'), error.message || t('auth.loginFailed', { defaultValue: 'Login failed' }));
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };

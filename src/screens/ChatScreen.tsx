@@ -1303,6 +1303,8 @@ const ChatScreen = (props: any) => {
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [previewCaption, setPreviewCaption] = useState('');
   const [previewVisible, setPreviewVisible] = useState(false);
+  // Synchronous in-flight guard so a double-tap can't upload/send the same image twice.
+  const sendingPreviewRef = useRef(false);
 
   // Audio recorder state
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
@@ -1352,6 +1354,22 @@ const ChatScreen = (props: any) => {
       pulseAnim.setValue(1);
     }
   }, [isRecording]);
+
+  // Unmount cleanup: if the user navigates away mid-recording, stop the timer
+  // and release the recorder. Without this the setInterval keeps firing
+  // setRecordingDuration on an unmounted component and the mic/temp file leaks.
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+      if (isRecordingIntentRef.current) {
+        isRecordingIntentRef.current = false;
+        try { audioRecorder.stop().catch(() => {}); } catch {}
+      }
+    };
+  }, []);
 
   // User detail modal (Admin only)
   const [userDetailVisible, setUserDetailVisible] = useState(false);
@@ -1524,7 +1542,8 @@ const ChatScreen = (props: any) => {
 
   // Send the previewed image
   const handleSendPreviewImage = async () => {
-    if (!previewUri) return;
+    if (!previewUri || sendingPreviewRef.current) return;
+    sendingPreviewRef.current = true;
     try {
       setPreviewVisible(false);
       const uri = previewUri;
@@ -1566,6 +1585,8 @@ const ChatScreen = (props: any) => {
       }
     } catch {
       Alert.alert(t('common.error'), 'Failed to send image');
+    } finally {
+      sendingPreviewRef.current = false;
     }
   };
 

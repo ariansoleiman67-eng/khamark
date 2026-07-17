@@ -141,7 +141,15 @@ const StoreProductsTab: React.FC<StoreProductsTabProps> = ({ products }) => {
     } else if (activeFilter === 'High $') {
       filtered = [...filtered].sort((a, b) => (b.priceUSD ?? 0) - (a.priceUSD ?? 0));
     } else if (activeFilter === 'New') {
-       filtered = [...filtered].reverse();
+       // Products arrive newest-first from the service, so sort explicitly by
+       // creation date (descending) instead of reversing (which would surface
+       // the OLDEST items). Note: createdAt is a raw ISO string from Supabase
+       // despite the Timestamp type, so use new Date(...) not .toMillis().
+       filtered = [...filtered].sort(
+         (a, b) =>
+           new Date((b.createdAt as any) || 0).getTime() -
+           new Date((a.createdAt as any) || 0).getTime()
+       );
     }
 
     setDisplayProducts(filtered);

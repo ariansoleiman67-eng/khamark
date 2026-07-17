@@ -131,25 +131,25 @@ Every source + config file. `[ ]` = not yet line-by-line read. `[x]` = fully rea
 
 ## src/screens
 
-- [ ] src/screens/BarcodeScannerScreen.tsx — 431 LOC
+- [x] src/screens/BarcodeScannerScreen.tsx (Wave2 audited) — 431 LOC
 - [x] src/screens/CartScreen.tsx (Wave1 audited+fixed) — 1171 LOC
-- [ ] src/screens/CategoriesScreen.tsx — 1580 LOC
-- [ ] src/screens/CategoryProductsScreen.tsx — 201 LOC
-- [ ] src/screens/ChatScreen.tsx — 3125 LOC
-- [ ] src/screens/ChatbotScreen.tsx — 925 LOC
+- [x] src/screens/CategoriesScreen.tsx (Wave2 audited) — 1580 LOC
+- [x] src/screens/CategoryProductsScreen.tsx (Wave2 audited) — 201 LOC
+- [x] src/screens/ChatScreen.tsx (Wave2 audited) — 3125 LOC
+- [x] src/screens/ChatbotScreen.tsx (Wave2 audited) — 925 LOC
 - [x] src/screens/CheckoutScreen.tsx (Wave1 audited+fixed) — 2847 LOC
-- [ ] src/screens/FavoritesScreen.tsx — 366 LOC
-- [ ] src/screens/NotificationsScreen.tsx — 690 LOC
-- [ ] src/screens/OrderConfirmationScreen.tsx — 441 LOC
-- [ ] src/screens/OrderDetailScreen.tsx — 1553 LOC
-- [ ] src/screens/OrdersScreen.tsx — 1388 LOC
+- [x] src/screens/FavoritesScreen.tsx (Wave2 audited) — 366 LOC
+- [x] src/screens/NotificationsScreen.tsx (Wave2 audited) — 690 LOC
+- [x] src/screens/OrderConfirmationScreen.tsx (Wave2 audited) — 441 LOC
+- [x] src/screens/OrderDetailScreen.tsx (Wave2 audited) — 1553 LOC
+- [x] src/screens/OrdersScreen.tsx (Wave2 audited) — 1388 LOC
 - [x] src/screens/ProductDetailsScreen.tsx (Wave1 audited+fixed) — 3533 LOC
 - [x] src/screens/ProfileScreen.tsx (Wave1 audited+fixed) — 768 LOC
-- [ ] src/screens/QiCardPaymentScreen.tsx — 564 LOC
-- [ ] src/screens/SearchScreen.tsx — 1062 LOC
-- [ ] src/screens/StoreLocationScreen.tsx — 644 LOC
-- [ ] src/screens/StoreProductsScreen.tsx — 157 LOC
-- [ ] src/screens/ThemeCustomizationScreen.tsx — 638 LOC
+- [x] src/screens/QiCardPaymentScreen.tsx (Wave2 audited) — 564 LOC
+- [x] src/screens/SearchScreen.tsx (Wave2 audited) — 1062 LOC
+- [x] src/screens/StoreLocationScreen.tsx (Wave2 audited) — 644 LOC
+- [x] src/screens/StoreProductsScreen.tsx (Wave2 audited) — 157 LOC
+- [x] src/screens/ThemeCustomizationScreen.tsx (Wave2 audited) — 638 LOC
 - [ ] src/screens/admin/AdminAccountSecurityScreen.tsx — 401 LOC
 - [ ] src/screens/admin/AdminAnalyticsScreen.tsx — 437 LOC
 - [ ] src/screens/admin/AdminBannerScreen.tsx — 692 LOC
@@ -190,38 +190,38 @@ Every source + config file. `[ ]` = not yet line-by-line read. `[x]` = fully rea
 - [ ] src/screens/admin/ReportsGenerator.tsx — 1196 LOC
 - [ ] src/screens/admin/index.ts — 7 LOC
 - [ ] src/screens/admin/partnerInvoice.ts — 433 LOC
-- [ ] src/screens/auth/AboutYouScreen.tsx — 481 LOC
-- [ ] src/screens/auth/ForgotPasswordScreen.tsx — 673 LOC
-- [ ] src/screens/auth/LegacyEmailLoginScreen.tsx — 265 LOC
-- [ ] src/screens/auth/LoginGateScreen.tsx — 356 LOC
-- [ ] src/screens/auth/OnboardingScreen.tsx — 154 LOC
-- [ ] src/screens/auth/PartnerSignupScreen.tsx — 161 LOC
-- [ ] src/screens/auth/PasswordScreen.tsx — 662 LOC
-- [ ] src/screens/auth/PhoneLoginScreen.tsx — 798 LOC
-- [ ] src/screens/auth/RegisterScreen.tsx — 752 LOC
-- [ ] src/screens/auth/RegisterSuccessScreen.tsx — 184 LOC
-- [ ] src/screens/auth/SetNewPasswordScreen.tsx — 594 LOC
-- [ ] src/screens/auth/SignInScreen.tsx — 1287 LOC
-- [ ] src/screens/auth/VerifyPhoneScreen.tsx — 721 LOC
+- [x] src/screens/auth/AboutYouScreen.tsx (Wave2 audited) — 481 LOC
+- [x] src/screens/auth/ForgotPasswordScreen.tsx (Wave2 audited) — 673 LOC
+- [x] src/screens/auth/LegacyEmailLoginScreen.tsx (Wave2 audited) — 265 LOC
+- [x] src/screens/auth/LoginGateScreen.tsx (Wave2 audited) — 356 LOC
+- [x] src/screens/auth/OnboardingScreen.tsx (Wave2 audited) — 154 LOC
+- [x] src/screens/auth/PartnerSignupScreen.tsx (Wave2 audited) — 161 LOC
+- [x] src/screens/auth/PasswordScreen.tsx (Wave2 audited) — 662 LOC
+- [x] src/screens/auth/PhoneLoginScreen.tsx (Wave2 audited) — 798 LOC
+- [x] src/screens/auth/RegisterScreen.tsx (Wave2 audited) — 752 LOC
+- [x] src/screens/auth/RegisterSuccessScreen.tsx (Wave2 audited) — 184 LOC
+- [x] src/screens/auth/SetNewPasswordScreen.tsx (Wave2 audited) — 594 LOC
+- [x] src/screens/auth/SignInScreen.tsx (Wave2 audited) — 1287 LOC
+- [x] src/screens/auth/VerifyPhoneScreen.tsx (Wave2 audited) — 721 LOC
 - [x] src/screens/main/HomeScreen.tsx (Wave1 audited+fixed) — 792 LOC
-- [ ] src/screens/messenger/ChatThreadScreen.tsx — 389 LOC
-- [ ] src/screens/messenger/ConversationsScreen.tsx — 1418 LOC
-- [ ] src/screens/profile/AccountSecurityScreen.tsx — 648 LOC
-- [ ] src/screens/profile/AddEditAddressScreen.tsx — 1308 LOC
-- [ ] src/screens/profile/ChangePasswordScreen.tsx — 894 LOC
-- [ ] src/screens/profile/ConfirmIdentityScreen.tsx — 259 LOC
-- [ ] src/screens/profile/EditProfileScreen.tsx — 464 LOC
-- [ ] src/screens/profile/HelpSupportScreen.tsx — 355 LOC
-- [ ] src/screens/profile/MyAddressScreen.tsx — 648 LOC
-- [ ] src/screens/profile/PaymentMethodsScreen.tsx — 873 LOC
-- [ ] src/screens/profile/PrivacyPolicyScreen.tsx — 509 LOC
-- [ ] src/screens/profile/ShippingInfoScreen.tsx — 462 LOC
-- [ ] src/screens/profile/TermsAndConditionsScreen.tsx — 372 LOC
-- [ ] src/screens/profile/UpdateEmailScreen.tsx — 329 LOC
-- [ ] src/screens/profile/UpdatePhoneScreen.tsx — 494 LOC
-- [ ] src/screens/store/StoreCompanyTab.tsx — 634 LOC
-- [ ] src/screens/store/StoreHomeTab.tsx — 459 LOC
-- [ ] src/screens/store/StoreProductsTab.tsx — 479 LOC
+- [x] src/screens/messenger/ChatThreadScreen.tsx (Wave2 audited) — 389 LOC
+- [x] src/screens/messenger/ConversationsScreen.tsx (Wave2 audited) — 1418 LOC
+- [x] src/screens/profile/AccountSecurityScreen.tsx (Wave2 audited) — 648 LOC
+- [x] src/screens/profile/AddEditAddressScreen.tsx (Wave2 audited) — 1308 LOC
+- [x] src/screens/profile/ChangePasswordScreen.tsx (Wave2 audited) — 894 LOC
+- [x] src/screens/profile/ConfirmIdentityScreen.tsx (Wave2 audited) — 259 LOC
+- [x] src/screens/profile/EditProfileScreen.tsx (Wave2 audited) — 464 LOC
+- [x] src/screens/profile/HelpSupportScreen.tsx (Wave2 audited) — 355 LOC
+- [x] src/screens/profile/MyAddressScreen.tsx (Wave2 audited) — 648 LOC
+- [x] src/screens/profile/PaymentMethodsScreen.tsx (Wave2 audited) — 873 LOC
+- [x] src/screens/profile/PrivacyPolicyScreen.tsx (Wave2 audited) — 509 LOC
+- [x] src/screens/profile/ShippingInfoScreen.tsx (Wave2 audited) — 462 LOC
+- [x] src/screens/profile/TermsAndConditionsScreen.tsx (Wave2 audited) — 372 LOC
+- [x] src/screens/profile/UpdateEmailScreen.tsx (Wave2 audited) — 329 LOC
+- [x] src/screens/profile/UpdatePhoneScreen.tsx (Wave2 audited) — 494 LOC
+- [x] src/screens/store/StoreCompanyTab.tsx (Wave2 audited) — 634 LOC
+- [x] src/screens/store/StoreHomeTab.tsx (Wave2 audited) — 459 LOC
+- [x] src/screens/store/StoreProductsTab.tsx (Wave2 audited) — 479 LOC
 
 ## src/services
 

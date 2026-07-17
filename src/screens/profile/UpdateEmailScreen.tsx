@@ -56,6 +56,7 @@ const UpdateEmailScreen: React.FC = () => {
   const { theme } = useTheme();
   const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const reauthRef = useRef<ReauthModalHandle>(null);
+  const doneInFlight = useRef(false);
 
   const currentEmail = user?.email || '';
   const isInternalEmail = isSyntheticEmail(currentEmail) || currentEmail.includes('@asankaryapp.');
@@ -121,6 +122,12 @@ const UpdateEmailScreen: React.FC = () => {
   };
 
   const handleDone = async () => {
+    // Synchronous one-shot guard: a double-tap on "Done" (while reloadUser
+    // is awaiting) would otherwise dispatch navigation.goBack() twice and
+    // pop two screens instead of one. The screen unmounts after goBack, so
+    // the flag never needs resetting.
+    if (doneInFlight.current) return;
+    doneInFlight.current = true;
     await reloadUser();
     refreshUser();
     navigation.goBack();

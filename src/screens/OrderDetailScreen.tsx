@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { LiveOrderMap } from '../components/LiveOrderMap';
 import { 
   View, 
@@ -118,11 +118,17 @@ const OrderDetailScreen: React.FC = () => {
   const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   // const insets = useSafeAreaInsets();
 
-  const { orderId } = route.params;
+  // route.params can be undefined (malformed deep link / notification without params);
+  // never destructure it blindly, and fall back to an empty id we guard on below.
+  const orderId = route.params?.orderId ?? '';
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tenantContact, setTenantContact] = useState<TenantContactInfo | null>(null);
+
+  // Synchronous in-flight guards (state re-renders too late to block same-frame double taps)
+  const messagingSellerRef = useRef(false);
+  const reorderingRef = useRef(false);
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
 
@@ -132,6 +138,11 @@ const OrderDetailScreen: React.FC = () => {
   }, [orderId]);
 
   const loadOrderDetails = async () => {
+    if (!orderId) {
+      setError(t('orders.orderNotFound'));
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       setError(null);
@@ -235,6 +246,10 @@ const OrderDetailScreen: React.FC = () => {
       return;
     }
 
+    // Prevent double-send / double-navigate from rapid taps
+    if (messagingSellerRef.current) return;
+    messagingSellerRef.current = true;
+
     try {
       // Get or create conversation for this product
       // CONSOLIDATION: Try to find existing conversation with this tenant first
@@ -317,6 +332,8 @@ ${t('orders.messagePrompt', { defaultValue: 'Hi, I have a question about this or
         t('common.error'),
         t('orders.messageSellerError', { defaultValue: 'Could not start conversation. Please try again.' })
       );
+    } finally {
+      messagingSellerRef.current = false;
     }
   };
 
@@ -385,6 +402,10 @@ ${t('orders.messagePrompt', { defaultValue: 'Hi, I have a question about this or
   const handleReorder = async () => {
     if (!order) return;
 
+    // Prevent a double reorder (which would double cart quantities) from same-frame taps
+    if (reorderingRef.current) return;
+    reorderingRef.current = true;
+
     try {
       setLoading(true);
       const result = await OrderService.reorder(orderId);
@@ -410,6 +431,8 @@ ${t('orders.messagePrompt', { defaultValue: 'Hi, I have a question about this or
     } catch (reorderError: any) {
       setLoading(false);
       Alert.alert(t('common.error'), reorderError.message || t('orders.reorder.failed', { defaultValue: 'Failed to reorder' }));
+    } finally {
+      reorderingRef.current = false;
     }
   };
 
@@ -488,6 +511,10 @@ ${t('orders.messagePrompt', { defaultValue: 'Hi, I have a question about this or
       </SafeAreaView>
     );
   }
+
+  // Normalize items once: a legacy/malformed order can arrive with items null/undefined,
+  // and the render body dereferences it (.length / .map) below.
+  const items = Array.isArray(order.items) ? order.items : [];
 
   // Get shipping amount using helper
   const shippingAmount = getShippingAmount(order);
@@ -580,10 +607,10 @@ ${t('orders.messagePrompt', { defaultValue: 'Hi, I have a question about this or
           {/* Order Items */}
         <View style={styles.card}>
           <Text allowFontScaling={false} style={styles.cardTitle}>
-            {" "}{t('orders.itemsOrdered')} ({order.items.length}){" "}
+            {" "}{t('orders.itemsOrdered')} ({items.length}){" "}
           </Text>
 
-          {order.items.map((item, index) => {
+          {items.map((item, index) => {
             const hasWholesaleDiscount = item.originalPriceUSD && item.originalPriceUSD > item.priceUSD;
             const savingsPercent = hasWholesaleDiscount 
               ? Math.round((1 - item.priceUSD / item.originalPriceUSD!) * 100) 

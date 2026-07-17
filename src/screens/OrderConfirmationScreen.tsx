@@ -169,7 +169,8 @@ const OrderConfirmationScreen: React.FC = () => {
             </View>
 
             {/* Items Ordered — wholesale badge + struck-through original, like Order Details */}
-            {order.items.length > 0 && (
+            {/* items is a nullable JSONB column mapped straight through as `Order`; guard before use. */}
+            {Array.isArray(order.items) && order.items.length > 0 && (
               <View style={[styles.card, { backgroundColor: cardBg }]}>
                 <Text allowFontScaling={false} style={[styles.cardTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
                   {t('orders.itemsOrdered', { defaultValue: 'Items Ordered' })} ({order.items.length})

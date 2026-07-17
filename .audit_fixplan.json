@@ -1,597 +1,615 @@
 {
-  "src/screens/CheckoutScreen.tsx": [
+  "src/screens/CategoriesScreen.tsx": [
     {
       "sev": "S0",
-      "lines": "215-223 (esp. 218)",
+      "lines": "654-672 (crash at 658; source at 211/216)",
       "cat": "crash-null-access",
-      "whatsWrong": "allPaymentMethods is rebuilt every render by mapping savedCards and calling `card.card_mask.slice(-4)`. savedCards is populated from `supabase.from('saved_cards').select('*')` and cast to `any[]` (setSavedCards(data), line 301), so the typed `card_mask: string` is not enforced at runtime. If any saved_cards row has a null/absent card_mask (partial write, older schema, tokenized card with no mask), `.slice` throws 'Cannot read property slice of null' during render and the entire Checkout screen white-screens — the user can never reach payment.",
-      "rootCause": "Untrusted DB data typed as string but accessed without a null guard, in a render-path map.",
-      "failureScenario": "User has one saved card whose card_mask column is NULL. On opening Checkout, loadSavedCards sets savedCards=[{card_mask:null,...}]; the render-time map runs card_mask.slice(-4) -> TypeError -> screen crashes to error boundary. Cash-on-delivery users are blocked too because the crash happens before any UI paints.",
-      "fix": "Guard the access: `name: \\`QiCard ending in ${(card.card_mask ?? '').slice(-4) || '••••'}\\``. Ideally also filter out rows missing payment_token/card_mask before mapping."
-    },
+      "whatsWrong": "renderCategoryFilter maps over `categories` and calls `cat.name.toLowerCase()` at line 658 with no null guard. `categories` is built in loadData (line 211 `fetchedProducts.map(p => p.category)`, line 216 `name: categoryName`). ProductService.mapProduct assigns `category: data.category` with NO fallback (productService.ts:23) and the DB column is nullable — the service itself guards `p.category &&` before calling toLowerCase (productService.ts:220), proving null is a real value. A product row with category=null therefore produces a Category whose `name` is null. Because `showFilters` defaults to true (line 121), the filter grid renders on the very first successful load and `null.toLowerCase()` throws, tearing the whole screen down to the root ErrorBoundary.",
+      "rootCause": "Category names are derived from raw, possibly-null product.category values and consumed unguarded, while the type system lies (`category: string`).",
+      "failureScenario": "Supabase returns a single product with `category: null` (a legacy/imported row). loadData succeeds, header renders the category filter grid, execution hits `cat.name.toLowerCase()` at line 658 → `TypeError: Cannot read property 'toLowerCase' of null` → CategoriesScreen crashes to the error boundary (blank/crash screen) instead of showing products.",
+      "fix": "Filter nulls at the source in loadData: `const uniqueCategories = Array.from(new Set(fetchedProducts.map(p => p.category).filter(Boolean)));` (line 211). Defensively also change line 658 to `const translationKey = (cat.name || '').toLowerCase().replace(/\\s+/g, '');` and line 654 to `let displayName = cat.name || '';`."
+    }
+  ],
+  "src/screens/OrderConfirmationScreen.tsx": [
     {
-      "sev": "S2",
-      "lines": "901-919 (dep array) with 798",
-      "cat": "stale-closure-missing-deps",
-      "whatsWrong": "handlePlaceOrder is wrapped in useCallback whose dep array omits `saveCardForFuture` (used at line 798), plus `isVip` (used 676/706/719) and `i18n.language` (used 807). Toggling the 'Save this card' checkbox calls setSaveCardForFuture but does NOT list as a dep, so the memoized callback is not recreated and keeps the stale value captured at its last recreation.",
-      "rootCause": "Incomplete useCallback dependency list; captured state goes stale.",
-      "failureScenario": "Screen loads (callback created with saveCardForFuture=false after cartSummary resolves). User picks New QiCard, ticks 'Save this card for future purchases' (state=true, callback NOT recreated because saveCardForFuture isn't a dep and nothing else changed), then taps Place Order. Inside, `isQiCardNew && saveCardForFuture` reads the stale false, so tokenOptions stays undefined and needPaymentToken is never sent — the card is silently NOT saved despite the checked box. If isVip flips mid-session, order prices are computed from the stale value.",
-      "fix": "Add the missing deps: `[..., saveCardForFuture, isVip, i18n.language]` to the handlePlaceOrder useCallback dependency array (or read them via refs)."
-    },
-    {
-      "sev": "S2",
-      "lines": "311-317, 381-383, 395-403",
-      "cat": "double-fetch-race",
-      "whatsWrong": "initialLoadDoneRef is meant to make the focus-effect skip the initial mount (comment lines 211-212). But mount-effect A (311) sets it to true synchronously while also calling loadUserAddresses, AND mount-effect B (364) calls loadUserAddresses again inside Promise.all. By the time useFocusEffect fires its first (mount) focus, the ref is already true, so it runs loadUserAddresses a third time. Net: 2-3 concurrent identical address fetches on every mount, toggling addressesLoading and racing to setUserAddresses/setSelectedAddress.",
-      "rootCause": "The skip-initial-focus guard is armed (set true) during the same mount commit it is supposed to protect, and address loading is duplicated across two mount effects.",
-      "failureScenario": "On a slow network, three overlapping getUserAddresses calls resolve out of order; a later-started-but-earlier-resolving response can overwrite selectedAddress that the user just tapped, or the addressesLoading skeleton flickers as the three calls flip the flag. Wasteful traffic on low-end/roaming Iraqi connections.",
-      "fix": "Remove loadUserAddresses from one of the two mount effects (keep a single source of truth), and set the focus-skip ref only AFTER the first focus has been observed (e.g. a separate hasFocusedOnceRef flipped inside the focus callback) so the initial focus is genuinely skipped."
-    },
-    {
-      "sev": "S2",
-      "lines": "1069, 1104, 1115",
+      "sev": "S0",
+      "lines": "172, 175, 178, 195",
       "cat": "crash-null-access",
-      "whatsWrong": "Inside the map fallback and overlay, `address.coordinates.latitude.toFixed(4/6)` and `.longitude.toFixed()` run under the guard `address.coordinates && ...`. That guard only checks the object is truthy, not that latitude/longitude are finite numbers. The Address type declares them as number, but coordinates comes from stored/synced address data and can be a partial object (e.g. `{latitude: null}` or `{lat, lng}` with wrong keys).",
-      "rootCause": "Truthy-only guard on a nested object whose numeric fields are assumed but not validated.",
-      "failureScenario": "A saved address whose coordinates were written as `{}` or `{latitude: null, longitude: null}` (garbage/legacy import). Selecting that address enters the map branch; on iOS (MapView null) it hits the text fallback `address.coordinates.latitude.toFixed(4)` -> 'Cannot read property toFixed of null/undefined' -> screen crashes.",
-      "fix": "Guard the numbers, not just the object: `const c = address.coordinates; const hasCoords = c && Number.isFinite(c.latitude) && Number.isFinite(c.longitude);` and gate all three render sites plus the MapView on hasCoords."
-    },
-    {
-      "sev": "S2",
-      "lines": "626-636 (esp. 627) with finally 895-900",
-      "cat": "stuck-guard-floating-rejection",
-      "whatsWrong": "`await supabase.auth.getSession()` at line 627 runs BEFORE the try/finally that starts at 671. isSubmittingRef.current was set true at 624. Every early-return path resets the ref, and validateCart is safe (it never throws — internal try/catch returns {valid:false}). But if getSession rejects (network failure), the awaited call throws, handlePlaceOrder rejects as an unhandled promise, and the finally at 895 (which resets isSubmittingRef=false) is never reached because control never entered the try.",
-      "rootCause": "An unguarded await sits outside the try whose finally is responsible for clearing the in-flight ref.",
-      "failureScenario": "A user whose in-memory user.uid is momentarily falsy (token refresh / cold resume) taps Place Order while offline. getSession() rejects; isSubmittingRef stays true forever; no spinner (setIsProcessing at 661 not reached) and no alert. Every subsequent tap on Place Order returns immediately at the line 623 guard — the button is permanently dead until the screen is unmounted.",
-      "fix": "Wrap the getSession auth check in its own try/catch that resets isSubmittingRef.current=false and shows an error on failure, or move the pre-flight checks inside the main try so the existing finally always clears the ref."
+      "whatsWrong": "`order.items.length` is dereferenced with no null-guard. `Order.items` is typed `OrderItem[]` but OrderService.getOrderById (OrderService.ts:282) maps it as `items: data.items` with NO default and returns via `as Order`. Supabase's `items` JSONB column can be null (legacy/partial/corrupt order rows). A row with items=null does NOT throw, so the catch on line 88 is skipped, `order` is truthy, the `order ?` check on line 137 passes, and line 172 evaluates `null.length` → TypeError, which crashes into the ErrorBoundary — on the very first screen shown after a successful checkout/payment.",
+      "rootCause": "Type lie: `getOrderById` casts DB data to `Order` (`as Order`) without normalizing the nullable JSONB `items` column to an array, and this screen trusts the non-optional type.",
+      "failureScenario": "User completes checkout and pays. A partially-written or legacy order row in Supabase has `items: null` (e.g. checkout inserted the order row but the items write failed, or a migrated legacy order). getOrderById returns `{ ...order, items: null }` with no error. `order` is truthy so the loading fallback is skipped, and line 172 `order.items.length > 0` throws 'Cannot read property length of null'. The customer sees a red-screen crash right after paying, with no confirmation and no way to view their order.",
+      "fix": "Guard with a safe local array before use: `const items = Array.isArray(order.items) ? order.items : [];` then use `items.length` / `items.map` everywhere (lines 172,175,178,195). Minimal inline fix: change line 172 to `{Array.isArray(order.items) && order.items.length > 0 && (` and line 175/195 to reference the same guarded value."
     }
   ],
-  "App.tsx": [
+  "src/screens/OrderDetailScreen.tsx": [
     {
-      "sev": "S1",
-      "lines": "56, 93-95, 143-145",
-      "cat": "broken-splash-hang",
-      "whatsWrong": "SplashScreenExpo.hideAsync() is called in exactly ONE place — handleSplashStart (l.94), wired to VideoSplash's onStart. In SplashScreen.tsx, onStart fires ONLY from the statusChange 'readyToPlay' branch (l.163-166). The two failure finish paths — video-error (SplashScreen.tsx l.159) and failsafe-timeout (l.138) — call onFinish WITHOUT ever firing onStart. On those paths App sets showCustomSplash=false (unmounting the JS VideoSplash) but never calls hideAsync(), so the native Expo splash (preventAutoHideAsync at l.56) stays on top of the now-running app forever. The 8s JS backstop (l.134-141) also only touches showCustomSplash, not the native splash, so it does not rescue this.",
-      "rootCause": "Hiding the native splash is gated solely on the video's happy-path readyToPlay event; every error/stall exit bypasses it.",
-      "failureScenario": "On a 320dp low-RAM Android the bundled intro.mp4 fails to decode or stalls past 6s (codec/OOM). VideoSplash emits statusChange with event.error (or its 6s failsafe fires) -> finish('video-error'/'failsafe-timeout') -> onFinish -> App unmounts VideoSplash. onStart (readyToPlay) never fired, so handleSplashStart never ran, so hideAsync() was never called. User stares at a frozen native splash covering a fully running app and must force-quit.",
-      "fix": "Hide the native splash on every splash teardown, not just onStart. In handleSplashFinish (l.143-145): `const handleSplashFinish = useCallback(() => { SplashScreenExpo.hideAsync().catch(() => {}); setShowCustomSplash(false); }, []);` AND add the same `SplashScreenExpo.hideAsync().catch(() => {})` inside the 8s backstop callback (before setShowCustomSplash(false) at l.137). Simplest robust alternative: call hideAsync() once isReady flips true, since the JS VideoSplash renders its own poster and already covers the screen."
+      "sev": "S0",
+      "lines": "583, 586",
+      "cat": "crash-null-access",
+      "whatsWrong": "order.items.length (583) and order.items.map (586) are accessed with no null/undefined guard, even though the SAME file treats order.items as possibly-absent — line 142 guards `orderData?.items` and line 224 guards `!order.items`. The `!order` guard at line 470 does NOT cover an order object whose items field is null/undefined.",
+      "rootCause": "Inconsistent null-handling: items is defended in the data-load path and in handleMessageSeller, but assumed present in the render body.",
+      "failureScenario": "OrderService.getOrderById returns a legacy/malformed order where items is null or undefined (e.g. Supabase line-item join returns nothing, or a mock/garbage row omits items). It passes the `error || !order` guard at line 470, then render reaches `({order.items.length})` -> 'TypeError: Cannot read property \\'length\\' of undefined' -> entire screen crashes to the ErrorBoundary / white screen.",
+      "fix": "Normalize once after the guard: `const items = Array.isArray(order.items) ? order.items : [];` then use `items.length` at 583 and `items.map(...)` at 586. (Minimal: `({order.items?.length ?? 0})` and `{(order.items ?? []).map(...)}`.)"
+    },
+    {
+      "sev": "S2",
+      "lines": "121",
+      "cat": "crash-null-access",
+      "whatsWrong": "`const { orderId } = route.params;` destructures route.params with no fallback. In React Navigation v7 route.params is typed/possible as `undefined`, and destructuring undefined throws synchronously during render before any UI or error state can show.",
+      "rootCause": "Route params assumed always present; the app exposes deep links (asankary:// + universal links) that can land here without a params object.",
+      "failureScenario": "A malformed deep link or a push-notification handler navigates to OrderDetail without passing a params object -> `const { orderId } = route.params` throws 'Cannot destructure property orderId of route.params as it is undefined' on mount -> hard crash, no graceful error screen (which the code otherwise has).",
+      "fix": "`const { orderId } = route.params ?? {};` then early-return the existing error UI when `!orderId` instead of calling getOrderById(undefined)."
+    },
+    {
+      "sev": "S2",
+      "lines": "223, 385, 961, 1017",
+      "cat": "double-submit",
+      "whatsWrong": "The 'Message Seller' button (961 -> handleMessageSeller 223) has NO in-flight guard; the button stays visible and enabled for the entire duration of getOrCreateConversation + sendMessage + navigate. 'Reorder' (1017 -> handleReorder 385) only flips `loading` asynchronously, so two taps in the same frame still both execute before the re-render commits.",
+      "rootCause": "No synchronous re-entrancy protection on async action handlers; relying on an async setState to hide the button is racy.",
+      "failureScenario": "On a slow Iraqi mobile network the user taps 'Message Seller' twice ~1s apart -> sendMessage fires twice so the seller receives two identical order-inquiry messages and ChatScreen is navigated twice. For Reorder, two rapid taps -> OrderService.reorder runs twice -> cart quantities double (real money impact at checkout).",
+      "fix": "Add a synchronous ref guard: `const busy = useRef(false); ... if (busy.current) return; busy.current = true; try { ... } finally { busy.current = false; }` at the top of both handlers, and/or a `sending` state to disable the buttons."
     }
   ],
-  "src/contexts/AuthContext.tsx": [
+  "src/screens/OrdersScreen.tsx": [
     {
-      "sev": "S1",
-      "lines": "138-163 (esp. 144)",
-      "cat": "state-teardown",
-      "whatsWrong": "The onAuthStateChanged handler calls setIsLoading(true) on EVERY auth event, not just the first load. Supabase fires TOKEN_REFRESHED on periodic auto-refresh and on app resume (supabase.ts autoRefreshToken:true + startAutoRefresh). Because AppNavigator.tsx:300 returns a full-screen splash instead of the NavigationContainer whenever isLoading is true, each refresh unmounts the ENTIRE navigator subtree and remounts it at the initial route.",
-      "rootCause": "isLoading is used both as 'first cold-load gate' and gets flipped on every subsequent auth event; the navigator hard-gates on it.",
-      "failureScenario": "A customer is filling the multi-field checkout/address form. About an hour in (or they background the app to copy an address and return with a stale access token), Supabase auto-refreshes the token and fires TOKEN_REFRESHED -> handler sets isLoading(true) -> AppNavigator unmounts the whole stack and shows the Logo splash -> when fetchUser finishes and isLoading flips false, the app remounts at the initial route. The half-filled form and their navigation position are gone. On slow Iraqi networks the splash also visibly lingers for seconds on every resume.",
-      "fix": "Only show the splash on the very first resolution. Add `const initialLoadDone = useRef(false);` and in the handler: `if (registrationInProgressRef.current) { setIsLoading(false); return; } if (!initialLoadDone.current) setIsLoading(true); try { ... } finally { initialLoadDone.current = true; setIsLoading(false); }`. Subsequent TOKEN_REFRESHED/USER_UPDATED events then refresh the user silently without tearing down the app."
+      "sev": "S0",
+      "lines": "78-172, 95-111",
+      "cat": "rules-of-hooks-crash",
+      "whatsWrong": "The `if (needsAuth()) { navigation.navigate(...); return <skeleton/>; }` guard at lines 95-111 sits AFTER only 9 hooks (useTheme..useAuthGate, 78-92) but BEFORE ~15 more hooks (useState x11 at 135-150, useEffect at 156, useCallback loadOrders/filterOrders at 177/203, useFocusEffect at 258, useMemo at 412, useCallback renderEmptyState/renderListHeader at 952/1004). needsAuth() = `!isAuthenticated || !user`, which changes between renders. Also navigation.navigate() is called during render (line 97), a forbidden side-effect.",
+      "rootCause": "Conditional early-return placed in the middle of the hook list; the number of hooks React sees is not constant across renders.",
+      "failureScenario": "Guest opens Orders while auth is still resolving (or logs in via LoginGate and returns). Render #1: needsAuth() true -> 9 hooks run, early return. Render #2: auth resolves / user set -> needsAuth() false -> all ~24 hooks run. React throws 'Rendered more hooks than during the previous render.' -> red screen / ErrorBoundary. The in-render navigation.navigate also triggers 'Cannot update a component while rendering a different component.'",
+      "fix": "Never early-return before all hooks. Do the redirect in an effect and gate the JSX after every hook has run:\n\n  useEffect(() => { if (needsAuth()) navigation.navigate('LoginGate', { reason: 'orders' }); }, [needsAuth, navigation]);\n  // ...ALL other hooks unchanged...\n  if (needsAuth()) {\n    return (<SafeAreaView ...>{/* skeleton */}</SafeAreaView>);\n  }\n  if (loading) { ... }\n  return ( ...main... );\n\nMove the needsAuth() JSX guard down next to the `if (loading)` block so hook order is identical on every render."
     },
     {
       "sev": "S1",
-      "lines": "132",
-      "cat": "floating-promise",
-      "whatsWrong": "`AuthService.signOut().then(() => setUser(null))` has no .catch. authService.ts:220 makes signOut() rethrow on failure, so on rejection setUser(null) never runs and there is an unhandled promise rejection.",
-      "rootCause": "",
-      "failureScenario": "Admin blocks a customer while that customer's phone is on a flaky network. The realtime UPDATE arrives, the 'Account Blocked' Alert shows, but supabase.auth.signOut() throws (no network). The .then callback never fires, so the blocked user is NOT signed out — they keep browsing/ordering with a valid cached session until the next cold start, and an unhandled rejection is logged.",
-      "fix": "Guarantee the local clear regardless of the network call: `AuthService.signOut().catch(() => {}).finally(() => setUser(null));` (setUser(null) drops the in-memory user even if the server sign-out failed)."
+      "lines": "177-200, 258-266, 1173-1176",
+      "cat": "effect-deps-refetch-loop",
+      "whatsWrong": "loadOrders is memoized with deps [selectedStatus, selectedDateFilter, searchQuery, t] (line 200), and it is a dependency of the useFocusEffect callback (line 262). While the screen is focused, changing any of those state values recreates loadOrders, which recreates the focus-effect callback, which React Navigation re-runs immediately — calling loadOrders() again, which sets loading=true (line 182) and re-renders the full-screen skeleton (line 1081).",
+      "rootCause": "Fetching and filtering are conflated: loadOrders only reads the filters to call filterOrders() after the fetch, but that couples the fetch function's identity to every filter/search keystroke, and the focus-effect re-runs on identity change.",
+      "failureScenario": "User taps search, types '12'. Each keystroke -> setSearchQuery -> loadOrders identity changes -> useFocusEffect re-fires -> loadOrders() -> setLoading(true) -> the entire search UI + TextInput unmount and the skeleton flashes -> keyboard dismissed -> a fresh OrderService.getUserOrders network call fires per character. Search is unusable; every status/date chip tap likewise refetches from the network.",
+      "fix": "Decouple fetch from filter. Make loadOrders independent of filters:\n\n  const loadOrders = useCallback(async (refresh=false) => { ...; const userOrders = await OrderService.getUserOrders(refresh); setOrders(userOrders); }, [isAuthenticated]);\n\nRe-filter reactively instead of inside loadOrders:\n\n  useEffect(() => { filterOrders(orders, selectedStatus, selectedDateFilter, searchQuery); }, [orders, selectedStatus, selectedDateFilter, searchQuery, filterOrders]);\n\nNow loadOrders is stable and the focus effect no longer re-fires on keystrokes/filter taps. Remove the direct filterOrders() calls from loadOrders and the handlers."
     },
     {
       "sev": "S1",
-      "lines": "94-101",
-      "cat": "floating-promise",
-      "whatsWrong": "The isBlocked branch schedules `setTimeout(async () => { Alert(...); await AuthService.signOut(); setUser(null); }, 100)` — a floating async with no try/catch. If AuthService.signOut() rejects, setUser(null) is skipped (blocked user retained) and the rejection is unhandled. The timer id is also never stored or cleared.",
-      "rootCause": "",
-      "failureScenario": "On app resume fetchUser() detects the freshly-blocked account, but the scheduled signOut() fails on a network blip -> the blocked user stays logged in with a live session. Same retention bug as line 132, on the fetch path. (Secondary: the uncleared timer can fire setUser after unmount.)",
-      "fix": "Wrap and always clear locally, and track the timer: `const blockTimer = useRef<ReturnType<typeof setTimeout>>();` then `blockTimer.current = setTimeout(() => { Alert.alert(...); AuthService.signOut().catch(() => {}).finally(() => setUser(null)); }, 100);` and clear it in the effect cleanup with `if (blockTimer.current) clearTimeout(blockTimer.current);`."
+      "lines": "179-183, 1081-1156",
+      "cat": "loading-state-thrash",
+      "whatsWrong": "loadOrders() (called on every screen focus via useFocusEffect) unconditionally does setLoading(true) when refresh is false (lines 181-182). The `if (loading)` block (1081) replaces the whole screen — including any already-rendered list — with the skeleton.",
+      "rootCause": "No 'already have data' guard around the loading flag; focus always forces a cold-load UI.",
+      "failureScenario": "User scrolls the orders list, taps an order to open OrderDetail, then presses back. On refocus, loadOrders() fires -> setLoading(true) -> the populated list is replaced by the 3-card skeleton and scroll position is lost, flashing for the duration of the fetch every single time they return to the tab.",
+      "fix": "Only show the full skeleton on the first cold load; refresh silently afterward:\n\n  if (refresh) { setRefreshing(true); }\n  else if (orders.length === 0) { setLoading(true); }\n\nSo returning to an already-loaded screen re-fetches in the background without wiping the list."
     },
     {
       "sev": "S2",
-      "lines": "165-176 (with 149 / 170)",
-      "cat": "race-condition",
-      "whatsWrong": "There is no in-flight/latest-wins guard on fetchUser(). On resume it is invoked concurrently from two sources: the AppState 'active' handler here (getSession -> fetchUser) AND the onAuthStateChange handler (TOKEN_REFRESHED -> fetchUser at line 149). Two parallel getCurrentUserFresh() calls can resolve out of order, and getCurrentUserFresh (authService.ts:324-337) may return a stale cached profile on one path while the other returns fresh data.",
-      "rootCause": "",
-      "failureScenario": "User resumes the app; the fresh-data fetch resolves first and setUser(freshProfile), then the slower fetch that fell back to the cached profile resolves and setUser(cachedProfile), overwriting fresh state with stale data — e.g. re-showing an old VIP/role/isBlocked value, or reverting a just-updated profile. Also a redundant double network fetch + double splash every resume.",
-      "fix": "Add a sequence ref and drop superseded responses: `const fetchSeq = useRef(0); const fetchUser = useCallback(async () => { const seq = ++fetchSeq.current; const userData = await AuthService.getCurrentUserFresh(); if (seq !== fetchSeq.current) return; ... }, [...])`. Optionally drop the AppState handler's redundant fetchUser since startAutoRefresh already triggers onAuthStateChange on resume."
-    },
-    {
-      "sev": "S2",
-      "lines": "240-243",
-      "cat": "dead-mock-live-ui",
-      "whatsWrong": "signInWithFacebook returns `{} as User` (a type lie), but it is wired to a visible 'Continue with Facebook' button (SignInScreen.tsx:466, PhoneLoginScreen.tsx:244). Those handlers ignore the return value and unconditionally call handleSuccessfulLogin() on the fake success.",
-      "rootCause": "",
-      "failureScenario": "User taps 'Continue with Facebook'. The mock resolves `{}` (no error), so handleSuccessfulLogin() runs and navigation.reset/goBack fires as if authenticated — but no Supabase session or user was set. The user is bounced to a post-login screen while still an unauthenticated guest, or lands in a broken state expecting user data that is null.",
-      "fix": "Fail loudly instead of faking success: `const signInWithFacebook = useCallback(async (): Promise<User> => { throw new Error(i18next.t('auth.facebookUnavailable', { defaultValue: 'Facebook sign-in is not available yet' })); }, []);` (the caller's catch then shows a message), and/or hide the Facebook button until the provider is implemented."
+      "lines": "483, 570-573, 244-252",
+      "cat": "unguarded-api-shape",
+      "whatsWrong": "Render and filter code dereference order fields with no null guard: `order.orderNumber.replace(...)` (483), `order.items.length` (570) and `order.items.slice(...)` (573) in the render body; and in filterOrders `order.orderNumber.toLowerCase()` and `order.items.some(...)` (247-249). filterOrders is called directly from handleSearch/handleStatusFilter/handleDateFilter (271/277/297) with NO surrounding try/catch (only loadOrders wraps it).",
+      "rootCause": "Trusts the Order type's non-null orderNumber/items even though rows come from Supabase mapping and the audit brief assumes hostile/garbage/partial server data.",
+      "failureScenario": "Supabase returns (or maps) an order row with items=null or orderNumber=null. renderOrderItem hits order.items.length -> TypeError during render -> crash. Or user types in search -> filterOrders runs outside any try/catch -> order.items.some throws -> uncaught -> red screen.",
+      "fix": "Guard every access: `(order.orderNumber || '').replace(...)`, `order.items?.length ?? 0`, `(order.items || []).slice(...)`, and in filterOrders `order.orderNumber?.toLowerCase().includes(searchLower) || order.items?.some(item => item.productName?.toLowerCase().includes(searchLower) || item.partNumber?.toLowerCase().includes(searchLower))`."
     }
   ],
-  "src/contexts/CartContext.tsx": [
+  "src/screens/StoreLocationScreen.tsx": [
+    {
+      "sev": "S0",
+      "lines": "145, 152, 160, 162, 175, 295, 296, 310, 313",
+      "cat": "crash-undefined-method",
+      "whatsWrong": "renderLocationCard / marker / selected-card render call locationService.getStoreTypeIcon (145), getLocalizedName (152, 295, 310), getLocalizedAddress (175, 296) and isStoreOpen (160,162,313) — NONE of these exist on LocationService (verified by repo-wide grep: they appear only as call sites here). These calls happen during RENDER, outside any try/catch. The moment any store data is present, the first card render evaluates line 145 `locationService.getStoreTypeIcon(...)` -> 'undefined is not a function' thrown in render -> component crash (ErrorBoundary fallback / blank screen). This is currently masked only because finding #1 prevents data from ever loading; fixing #1 alone will immediately expose this crash.",
+      "rootCause": "Five service helpers referenced by the view were never implemented on LocationService; @ts-nocheck (line 1) hides the missing-member errors.",
+      "failureScenario": "As soon as getActiveLocations is fixed to return one store, the screen renders a card, calls getStoreTypeIcon on line 145, and throws during render -> the whole screen white-screens instead of showing stores.",
+      "fix": "Implement getStoreTypeIcon(type), getLocalizedName(loc, lang), getLocalizedAddress(loc, lang), and isStoreOpen(loc) on LocationService (returning an Ionicons name string, the lang-appropriate name/address falling back to loc.name/loc.address, and a boolean from workingHours respectively), then delete // @ts-nocheck so these are compile-checked."
+    },
     {
       "sev": "S1",
-      "lines": "201-203, 209-216 (also 268-283, 292-294, 320)",
-      "cat": "race-condition / double-tap",
-      "whatsWrong": "The in-flight guard for addToCart (and addVariationsToCart) reads the `isAddingToCart` STATE variable, not a ref. React state updates are async: two taps dispatched in the same frame both execute a closure that captured `isAddingToCart === false`, so both pass `if (isAddingToCart) return;` (line 201) and both call `LocalCartService.addToCart`. That service does an async read-modify-write on AsyncStorage (getCart -> mutate -> saveCart). Two concurrent calls both read the same base cart and both saveCart, so one increment is silently lost (or, for the DIFFERENT_TENANT/clear flow, the cart is double-processed). `isAddingToCart` is used ONLY as this guard — it is never placed in contextValue nor consumed by any UI — so a state variable buys nothing here and is strictly worse than a ref. Compounding it, the outer `finally` at line 282 flips the guard back to false the instant Alert.alert returns (Alert is non-blocking), so the guard is fully open while the 'Different Store' dialog is on screen.",
-      "rootCause": "Using async React state as a synchronous concurrency lock.",
-      "failureScenario": "On a 320dp low-RAM Android with a laggy frame, user taps 'Add to cart' twice in ~50ms. Both taps see isAddingToCart=false, both run addToCart(product, qty 1). Both LocalCartService.addToCart calls getCart() read quantity=0, each writes quantity=1. Final cart shows 1 item instead of 2 (lost update). Under the DIFFERENT_TENANT path, two overlapping 'Clear & Add' presses can clear-then-add twice, corrupting the cart.",
-      "fix": "Replace the state guard with a ref so the check is synchronous and unaffected by render timing:\n\n  const isAddingRef = useRef(false);\n  ...\n  if (isAddingRef.current) return;\n  isAddingRef.current = true;\n  try { /* existing body */ } finally { isAddingRef.current = false; }\n\nApply the same ref to addVariationsToCart, and remove `isAddingToCart` from the useCallback dependency arrays (lines 284, 358). Keep a separate boolean state only if you later expose it for a spinner."
+      "lines": "67",
+      "cat": "broken-feature",
+      "whatsWrong": "locationService.getActiveLocations() is called but LocationService (src/services/locationService.ts) has NO such method. It is undefined, so `undefined()` throws 'locationService.getActiveLocations is not a function'. The // @ts-nocheck on line 1 hides this from type-check. The error is swallowed by the try/catch, so every single mount hits the catch block, fires the 'Failed to load store locations' alert, leaves locations=[], and renders the empty state. The store-locations feature is 100% non-functional in production.",
+      "rootCause": "Screen calls a service method that was never implemented (or was removed); @ts-nocheck suppresses the compile error that would have caught it.",
+      "failureScenario": "User opens Profile -> Store Locations. Instead of any stores, they always get an error alert and 'No Store Locations Found', regardless of data or network.",
+      "fix": "Implement the method on LocationService, e.g. `async getActiveLocations(): Promise<StoreLocation[]> { const { data, error } = await supabase.from('store_locations').select('*').eq('is_active', true); if (error) throw error; return (data || []).map(this.mapDbToLocation); }` and remove `// @ts-nocheck` so the type checker guards these calls."
     },
     {
       "sev": "S2",
-      "lines": "79-93",
-      "cat": "correctness / variation merge",
-      "whatsWrong": "The guest->user cart merge dedups items with `userCart.items.findIndex(item => item.productId === guestItem.productId)` — matching ONLY on productId and ignoring `selectedOptions` (color/size/storage) and `variationId`. This directly contradicts LocalCartService.addToCart, whose own `optionsMatch` helper dedups by productId AND selectedOptions. Since CartItem carries selectedOptions and variationId (types/index.ts lines 186-192), merging a guest variation into a different user variation sums their quantities under the WRONG variation and silently discards the guest's chosen options and price.",
-      "rootCause": "Merge key omits the variation dimensions the rest of the cart is keyed on.",
-      "failureScenario": "Guest adds iPhone 15 / 128GB / Black (qty 1). User (already logged in earlier on this device) has iPhone 15 / 256GB / White (qty 1) in their saved cart. On login, mergeGuestCartToUser finds existingIndex by productId, so it does `items[i].quantity = min(1+1, maxQty) = 2` on the 256GB White line and never pushes the 128GB Black line. The user now has 2x 256GB White and lost the 128GB Black they picked — wrong product, wrong quantity, wrong price at checkout.",
-      "fix": "Mirror the service's matching. Reuse an optionsMatch/variationId comparison:\n\n  const existingIndex = userCart.items.findIndex(item =>\n    item.productId === guestItem.productId &&\n    (item.variationId || null) === (guestItem.variationId || null) &&\n    optionsMatch(item.selectedOptions, guestItem.selectedOptions)\n  );\n\n(Export optionsMatch from LocalCartService or duplicate it.) Only sum when both product AND variation/options match; otherwise push the guest item as a distinct line."
-    },
-    {
-      "sev": "S2",
-      "lines": "117-151",
-      "cat": "race-condition / stale-response",
-      "whatsWrong": "loadCartForUser is an async effect with no cancellation/generation guard. Each `setCart(...)` runs after an `await LocalCartService.getCart(...)`. If `user?.uid` changes again before an in-flight load resolves (fast logout->login, or account switch), an earlier load can resolve AFTER the later one and overwrite state with the wrong user's cart. There is no cleanup function to invalidate the stale run.",
-      "rootCause": "Async effect without a cleanup flag to discard superseded responses.",
-      "failureScenario": "Admin/tester switches accounts quickly: user goes A -> B. Effect run for A is mid-getCart when B's run starts and finishes first (B's cart already cached). Then A's getCart resolves and calls setCart(A's cart), so user B is shown user A's cart items — a cross-account data leak into the UI until next refresh.",
-      "fix": "Add a per-run guard in the effect:\n\n  useEffect(() => {\n    let active = true;\n    const loadCartForUser = async () => {\n      ... \n      if (!active) return;         // before each setCart\n      setCart(loadedCart);\n      if (!active) return;\n      setPreviousUserId(user?.uid || null);\n    };\n    loadCartForUser();\n    return () => { active = false; };\n  }, [...]);\n\nGuard every setState (setCart/setError/setIsLoading/setPreviousUserId) with `if (active)`."
+      "lines": "156, 313",
+      "cat": "crash-null-data",
+      "whatsWrong": "storeLocation.type.toUpperCase() (156) and selectedLocation.type.toUpperCase() (313) assume `type` is a non-null string. mapDbToLocation maps `type: data.type` with no default, so a store_locations row with null/missing type yields type=null. `null.toUpperCase()` throws during render, crashing the card. (getStoreTypeColor is safe because it has a default case, but .toUpperCase has no such guard.)",
+      "rootCause": "No null-guard/default on the server-controlled `type` enum before calling a string method on it.",
+      "failureScenario": "Admin/backend inserts a store row without a `type` value; when the card renders, line 156 throws and the store list crashes.",
+      "fix": "Guard it: `{(storeLocation.type || 'branch').toUpperCase()}` (and same at 313), or default type in mapDbToLocation."
     }
   ],
-  "src/contexts/TenantContext.tsx": [
+  "src/screens/auth/PasswordScreen.tsx": [
     {
-      "sev": "S1",
-      "lines": "75-133",
-      "cat": "race-condition / stale-state-after-auth-change",
-      "whatsWrong": "The async fetchAdminData in the useEffect writes state (setAdminProfile/setTenantId/setTenant/setIsLoading) after two awaits (lines 89 and 107) with NO cancellation guard and no effect cleanup. When `user` changes while a fetch is in flight, the stale in-flight resolution overwrites the newer state. AuthContext has a realtime users-table UPDATE listener that calls setUser frequently, plus normal login/logout, so re-entrancy is routine, not theoretical.",
-      "rootCause": "Effect starts an un-cancellable async task and unconditionally calls setState on completion; React does not cancel the previous run's promise when deps change.",
-      "failureScenario": "Admin A is logged in. A users-row UPDATE (or a slow network fetch) leaves fetchAdminData for A pending at the `await supabase.from('tenants')...` on line 107. The admin logs out → user becomes null → the effect re-runs, the null branch (78-82) synchronously clears tenantId/tenant/adminProfile and sets isLoading=false. Then A's in-flight promise resolves and executes setAdminProfile(A)/setTenantId(A.id)/setTenant(A) — repopulating admin + tenant state for a now-logged-out (or switched B) user. This directly violates the GOLDEN_RULE 'clear all tenant state on tenant change' and can leak admin-scoped screens/paths to the wrong session. On provider unmount it also produces setState-after-unmount warnings.",
-      "fix": "Add a cancellation flag and cleanup, and guard every setState:\n\nuseEffect(() => {\n  let cancelled = false;\n  const fetchAdminData = async () => {\n    if (!user || !user.uid) {\n      if (!cancelled) { setTenantId(null); setTenant(null); setAdminProfile(null); setIsLoading(false); }\n      return;\n    }\n    if (!cancelled) { setIsLoading(true); setError(null); }\n    try {\n      const { data: userData, error: userError } = await supabase.from('users').select('*').eq('id', user.uid).single();\n      if (cancelled) return;\n      if (userError) throw userError;\n      if (userData?.is_admin) {\n        /* ...build adminData... */\n        if (cancelled) return;\n        setAdminProfile(adminData); setTenantId(adminData.tenantId);\n        const { data: tenantData } = await supabase.from('tenants').select('*').eq('id', adminData.tenantId).single();\n        if (cancelled) return;\n        if (tenantData) setTenant(/* ... */);\n      } else if (!cancelled) { setAdminProfile(null); setTenantId(null); setTenant(null); }\n    } catch (err: any) {\n      if (!cancelled) setError(err?.message || 'Failed to load admin data');\n    } finally {\n      if (!cancelled) setIsLoading(false);\n    }\n  };\n  fetchAdminData();\n  return () => { cancelled = true; };\n}, [user]);"
-    },
-    {
-      "sev": "S1",
-      "lines": "135-196, 205-224",
-      "cat": "double-tap / missing in-flight guard",
-      "whatsWrong": "createAdminAccount and createPartnerAccount fire their SECURITY DEFINER RPCs (create_admin_account at 155, create_partner_account at 212) with no re-entrancy guard. setIsLoading(true) is set but never checked, so a second concurrent invocation is not blocked. Because these are useCallback-memoized context methods, a double-tap or a taps-during-slow-network invokes the RPC twice.",
-      "rootCause": "No in-flight ref/boolean guard at the top of the create functions; isLoading is display state, not a mutex.",
-      "failureScenario": "On a slow Iraqi mobile connection the user double-taps 'Create store'. Two create_admin_account RPCs run concurrently. The first elevates the user and inserts the tenant row; the second runs against the now-already-admin row and either errors on a unique/duplicate constraint or inserts a second tenant. The second promise rejects → setError + throw (189-192) → the awaiting screen shows a failure toast even though the account WAS created, leaving the user confused / stuck. Same pattern lets createPartnerAccount double-insert.",
-      "fix": "Add a ref mutex (import useRef):\n\nconst creatingRef = useRef(false);\nconst createAdminAccount = useCallback(async (...) => {\n  if (creatingRef.current) return;      // ignore double-tap\n  creatingRef.current = true;\n  const { data: { session } } = await supabase.auth.getSession();\n  /* ...existing body... */\n  try { setIsLoading(true); ... }\n  finally { creatingRef.current = false; setIsLoading(false); }\n}, [user]);\n\nApply the same guard (a separate ref) to createPartnerAccount."
-    }
-  ],
-  "src/contexts/FavoritesContext.tsx": [
-    {
-      "sev": "S1",
-      "lines": "84-104",
-      "cat": "race-condition / stale-closure",
-      "whatsWrong": "addToFavorites (L84-90), removeFromFavorites (L92-96) and toggleFavorite (L98-104) all compute the next array from the `favorites` value captured in the closure (`[...favorites, productId]`, `favorites.filter(...)`) instead of a functional updater. Because the callbacks list `favorites` in their deps, they are only refreshed AFTER a re-render commits. If two mutating calls fire before React re-renders (two different products hearted within the same frame on a laggy device, or any loop/batch that calls these back-to-back), both see the SAME stale `favorites`, and the second setFavorites/saveFavorites silently overwrites the first — the first favorite is lost from both state and AsyncStorage.",
-      "rootCause": "Next-state derived from a captured render value rather than the previous state passed by React's functional setState updater.",
-      "failureScenario": "320dp low-RAM Android, render lagging behind input. User rapidly taps the heart on product p1 then product p2 in the same frame before React commits. Call 1: favorites=[] -> setFavorites([p1]), save([p1]). Call 2: still closes over favorites=[] (no re-render yet) -> setFavorites([p2]), save([p2]). Final state and storage = [p2]; p1 is silently gone. (Same failure for any programmatic 'add all' loop.)",
-      "fix": "Use functional updaters and persist the computed value:\n\nconst addToFavorites = useCallback(async (productId: string) => {\n  let next: string[] | undefined;\n  setFavorites(prev => { if (prev.includes(productId)) return prev; next = [...prev, productId]; return next; });\n  if (next) await saveFavorites(next);\n}, [getStorageKey]);\n\nconst removeFromFavorites = useCallback(async (productId: string) => {\n  let next: string[] = [];\n  setFavorites(prev => { next = prev.filter(id => id !== productId); return next; });\n  await saveFavorites(next);\n}, [getStorageKey]);\n\ntoggleFavorite can keep delegating to these. This removes `favorites` from the deps and eliminates the stale-closure overwrite."
-    },
-    {
-      "sev": "S2",
-      "lines": "45-69",
-      "cat": "logout / user-switch not clearing data (async window)",
-      "whatsWrong": "When `user?.uid` changes (logout or account switch), the effect (L45-47) calls loadFavorites, which sets isLoading=true (L51) but does NOT reset `favorites` before the async AsyncStorage.getItem (L53) resolves. During that window the previous account's favorites remain in state and, critically, getStorageKey() (L52/73) has already flipped to the new (guest/other-user) key. Any mutation during the window writes the previous user's data into the new user's storage key.",
-      "rootCause": "Favorites state is cleared only asynchronously (after the new key's read completes) instead of synchronously on uid change, leaving a stale/mutable cross-account window.",
-      "failureScenario": "User A has [p1,p2] favorited (state=[p1,p2]). User logs out -> uid becomes undefined -> effect runs loadFavorites for the guest key; on a slow device getItem takes ~100-300ms. During that window the Favorites screen still renders A's saved items to the now-logged-out session (privacy leak of the prior account's data). If the guest taps remove on p1 in that window, removeFromFavorites closes over favorites=[p1,p2] but getStorageKey() now returns the guest key -> saveFavorites([p2]) pollutes the GUEST key with A's product before loadFavorites overwrites state.",
-      "fix": "Reset synchronously and guard against the async setState with a cancel flag, inlining the load so the captured key is stable:\n\nuseEffect(() => {\n  setFavorites([]);\n  setIsLoading(true);\n  let active = true;\n  (async () => {\n    const key = getStorageKey();\n    try {\n      const raw = await AsyncStorage.getItem(key);\n      const parsed = raw ? JSON.parse(raw) : [];\n      if (active && Array.isArray(parsed)) setFavorites(parsed.filter((x: unknown) => typeof x === 'string'));\n    } catch (e) { if (active) setFavorites([]); }\n    finally { if (active) setIsLoading(false); }\n  })();\n  return () => { active = false; };\n}, [user?.uid]);"
-    }
-  ],
-  "src/contexts/NotificationContext.tsx": [
-    {
-      "sev": "S1",
-      "lines": "60-99, 141",
-      "cat": "race-condition / stale-response clobbering (logout data leak)",
-      "whatsWrong": "The `cancelled` flag (set in cleanup on line 141) is only checked on line 99, AFTER the three setState calls on lines 73, 92, and 93. When `userId` changes (logout -> null, or fast user A -> user B switch), the effect for the old user is torn down and `cancelled` is set true, but its in-flight `await supabase...` on line 66/77 is still pending. When it resolves, lines 73/92/93 fire `setBadgeCount`, `setOrdersBadgeCount`, and `setIsLoading(false)` with the OLD user's data, overwriting the freshly-cleared/refetched state.",
-      "rootCause": "Guard is placed only before channel subscription, not before the state mutations that follow the awaits.",
-      "failureScenario": "User A (badge = 5) taps logout. Auth listener sets userId=null and setBadgeCount(0) (line 44). Effect-A cleanup runs: cancelled=true, channels removed. But effect-A's setupListeners await on line 66 was already in flight; it resolves with A's count=5 and executes line 73 `setBadgeCount(5)`. Result: the login screen (or next user) now shows A's stale badge of 5 and a re-enabled isLoading=false. Previous user's notification count leaks into the UI after logout.",
-      "fix": "Add `if (cancelled) return;` immediately after each await, before touching state. E.g. after line 70: `if (cancelled) return;` (before setBadgeCount on 73); and after line 82: `if (cancelled) return;` (before the loop/setOrdersBadgeCount on 92-93). Apply the same guard inside the realtime callbacks (after lines 108 and 123) before calling setState."
-    },
-    {
-      "sev": "S1",
-      "lines": "62-93, 138",
-      "cat": "no error handling / infinite loading spinner + floating promise",
-      "whatsWrong": "`setupListeners` sets `setIsLoading(true)` on line 63 and only sets `setIsLoading(false)` on line 93 — with no try/catch and no finally. Any rejection in the awaits (network failure on the supabase queries at 66/77, or `Notifications.setBadgeCountAsync` on line 74 rejecting on-device) skips line 93 entirely, leaving `isLoading` permanently true. Additionally, `setupListeners()` on line 138 is invoked as a floating promise with no `.catch`, so the rejection is unhandled.",
-      "rootCause": "State cleanup (`setIsLoading(false)`) is on the happy path instead of in a `finally`, and the async function is fire-and-forget.",
-      "failureScenario": "On a 320dp low-RAM Android with flaky Iraqi mobile data, the app boots, userId resolves, setupListeners runs, setIsLoading(true). `Notifications.setBadgeCountAsync(nBadge)` on line 74 rejects (permission/OS quirk). Execution stops there; line 93 never runs. Any consumer gating on `isLoading` shows a spinner forever, and Metro logs an unhandled promise rejection.",
-      "fix": "Wrap the body in try/catch and move the loading reset into finally:\n```\nconst setupListeners = async () => {\n  setIsLoading(true);\n  try {\n    ... fetch + subscribe ...\n  } catch (e) {\n    console.error('setupListeners failed', e);\n  } finally {\n    if (!cancelled) setIsLoading(false);\n  }\n};\nsetupListeners();\n```\nAlso wrap `await Notifications.setBadgeCountAsync(...)` on lines 74 and 112 so a badge-API rejection can't abort the flow."
-    },
-    {
-      "sev": "S2",
-      "lines": "145, 55-136, 166-171",
-      "cat": "effect-deps churn / realtime resubscribe on every order view",
-      "whatsWrong": "The effect depends on `[userId, lastViewedOrdersTime]`. `markOrdersAsViewed` (line 168) updates `lastViewedOrdersTime`, which retears the ENTIRE effect: both realtime channels are removed (lines 142-143) and re-subscribed (lines 102-135), and both counts are refetched. lastViewedOrdersTime is in the deps only to keep the realtime closures fresh (lines 87, 128).",
-      "rootCause": "A frequently-changing value is used both as a subscription trigger and as closure data.",
-      "failureScenario": "Every time the user opens the Orders tab, markOrdersAsViewed fires -> lastViewedOrdersTime changes -> both Supabase channels are torn down and resubscribed, plus two count queries re-run. During the resubscribe gap, a realtime order/notification event can be missed (badge won't update until the next event). On flaky networks this repeated CHANNEL_ERROR/resubscribe churn wastes the realtime connection quota.",
-      "fix": "Hold lastViewedOrdersTime in a ref so the closures read the latest value without re-subscribing:\n```\nconst lastViewedRef = useRef(0);\n// in the loader from AsyncStorage and in markOrdersAsViewed, set both state and lastViewedRef.current\n// replace `lastViewedOrdersTime` reads on lines 87/128 with `lastViewedRef.current`\n```\nThen change the deps on line 145 to `[userId]` only."
-    }
-  ],
-  "src/services/LocalCartService.ts": [
-    {
-      "sev": "S1",
-      "lines": "16-46, 286-333, 338-365, 148-269",
-      "cat": "race-condition",
-      "whatsWrong": "Every mutator (addToCart, addVariationsToCart, updateQuantity, removeFromCart) is a non-atomic read-modify-write on ONE AsyncStorage key (getCart -> mutate in memory -> saveCart) with no serialization/mutex. Concurrent calls interleave and the last saveCart wins, silently dropping the other's change. CartContext guards addToCart/addVariations with isAddingToCart, but updateQuantity (CartContext line 361) and removeFromCart (line 380) have NO in-flight guard.",
-      "rootCause": "No per-user write serialization; overlapping async read-modify-write cycles clobber each other.",
-      "failureScenario": "On a slow low-RAM Android device, user double-taps the quantity '+' stepper on item A while the row is still showing qty=1. Two updateQuantity(...,2) calls fire; both getCart and read qty=1, both write {A:2}; final state is 2 not 3 — the increment is lost. Same with tap '+' on A while removing B: both read {A:1,B:1}; updateQuantity saves {A:2,B:1}; removeFromCart (using its stale read) saves {A:1} — A's increment vanishes.",
-      "fix": "Serialize all cart writes per userId with a promise chain: add `private static writeChains: Record<string, Promise<any>> = {};` and `private static enqueue<T>(userId: string, task: () => Promise<T>): Promise<T> { const next = (this.writeChains[userId] ?? Promise.resolve()).catch(() => {}).then(task); this.writeChains[userId] = next; return next; }` then wrap each mutator body: `return this.enqueue(userId, async () => { ...existing body... });`. Also add an isUpdating in-flight guard in CartContext's updateQuantity/removeFromCart."
-    },
-    {
-      "sev": "S2",
-      "lines": "129, 256, 323, 355, 421-426",
-      "cat": "money-wrong",
-      "whatsWrong": "calculateSubtotal(items, isVip=false) is always called WITHOUT isVip inside the mutators, so the persisted cart.subtotalUSD is computed with non-VIP unit prices. CartContext only recomputes with isVip during the guest->user merge (CartContext line 97); after addToCart/updateQuantity/removeFromCart it does setCart(updatedCart) directly, so a VIP sees the non-VIP subtotal.",
-      "rootCause": "isVip is not threaded through the mutator methods; the service silently defaults it to false while callers reuse the stored subtotal.",
-      "failureScenario": "A VIP user (vipPriceUSD or first-tier wholesale price applies) adds/updates an item. The cart summary reads cart.subtotalUSD which was computed at the regular price, so the VIP is quoted a HIGHER subtotal than what they actually qualify for until a full cart reload — a visible money discrepancy.",
-      "fix": "Thread VIP through: add `isVip: boolean = false` to addToCart/addVariationsToCart/updateQuantity/removeFromCart and change the subtotal lines to `cart.subtotalUSD = this.calculateSubtotal(cart.items, isVip);` then pass isVip from CartContext. (Or, minimally, have CartContext recompute `updatedCart.subtotalUSD = LocalCartService.calculateSubtotal(updatedCart.items, isVip)` after each mutation before setCart, as it already does at line 97.)"
-    },
-    {
-      "sev": "S2",
-      "lines": "83-95, 274-281, 99, 300, 351",
-      "cat": "inconsistent-matching",
-      "whatsWrong": "Two different optionsMatch implementations coexist. The inline one used by addToCart's merge (lines 83-95) is case-insensitive and trims whitespace ('Red' == 'red '). The private static one used by updateQuantity (300) and removeFromCart (351) is exact/case-sensitive/no-trim ('Red' !== 'red '). Add merges options that update/remove treat as distinct.",
-      "rootCause": "Duplicate, divergent comparison logic for the same selectedOptions concept.",
-      "failureScenario": "Item is added twice with color 'White' then 'white ' — addToCart merges them into one line stored as 'White'. UI/caller later invokes removeFromCart(productId, {color:'white '}); the exact static optionsMatch compares 'White' === 'white ' -> false, so nothing is filtered and the item cannot be removed (or updateQuantity throws 'Item not found in cart'). Also, update/remove ignore variationId entirely, so two variations that map to identical selectedOptions can only be told apart by options.",
-      "fix": "Delete the inline optionsMatch (lines 83-95) and make the single static one normalize, then use it everywhere: `const norm = (s?: string) => s?.trim().toLowerCase(); return norm(a.color)===norm(b.color) && norm(a.size)===norm(b.size) && norm(a.storage)===norm(b.storage);` — and in addToCart call `this.optionsMatch(...)`. For variation items, also compare variationId in update/remove."
-    }
-  ],
-  "src/services/cartService.ts": [
-    {
-      "sev": "S1",
-      "lines": "344, 347, 355",
-      "cat": "crash-on-null-server-data",
-      "whatsWrong": "For any cart containing a product whose shipping_rates JSONB has a rate with null/missing `city`, calculateShippingAsync throws 'Cannot read property trim of null'. This is the LIVE checkout path (getCartSummaryAsync → calculateShippingAsync, used by CartScreen:577, CheckoutScreen:427/676, OrderService:108).",
-      "rootCause": "calculateShippingAsync calls r.city.trim() on every shipping-rate element. mapProduct (productService.ts:42) guarantees shippingRates is an array but does NOT sanitize each element's `city`; a JSONB rate row saved with a null/absent city yields `null.trim()` → TypeError.",
-      "failureScenario": "Admin adds a shipping rate row with an empty/null city (or DB has a null). Customer adds that product and opens Checkout. CheckoutScreen's summary effect (427) catches the throw → cartSummary is never set → shipping/total never render; the order-placement path (676) throws → user cannot complete checkout at all while that item is in the cart. Same crash in the deprecated sync twin at lines 293/296/303.",
-      "fix": "Normalize city once and skip empty keys: replace every `rate.city.trim().toLowerCase()` with a guarded read, e.g. `const rateKey = (rate?.city ?? '').trim().toLowerCase(); if (!rateKey) return false;` inside each .find() predicate (lines 344, 346-349, 354-357), so null/whitespace cities are ignored instead of dereferenced."
-    },
-    {
-      "sev": "S2",
-      "lines": "636, 649",
-      "cat": "silent-data-loss",
-      "whatsWrong": "When getProduct returns a product with null/undefined stockQty, updatedItem.quantity becomes 0 (or NaN), so line 649's `> 0` check is false and the item is dropped from updatedItems AND the shrunken cart is persisted to Supabase via saveCart (664) and cache (665).",
-      "rootCause": "syncCartWithLatestData computes `quantity: Math.min(item.quantity, latestProduct.stockQty)`. mapProduct sets `stockQty: data.stock_qty` with no default, so a null stock_qty column coerces to 0 in Math.min (Math.min(5, null) === 0; Math.min(5, undefined) === NaN).",
-      "failureScenario": "User has a valid in-stock item in cart. They open CartScreen → the focus effect (CartScreen:446) calls syncCartWithLatestData. The product's stock_qty comes back null (partial/light query or a genuinely-null column). The item is silently removed, the reduced cart is written to the Supabase carts row, and refreshCart shows it gone — no error, no message. Data loss survives to next login via mergeLocalCart pulling the now-missing item.",
-      "fix": "Treat unknown stock as 'do not shrink': `const stock = Number.isFinite(latestProduct.stockQty) ? latestProduct.stockQty : item.quantity;` then `quantity: Math.min(item.quantity, stock)`. Only drop the item when stock is a real number <= 0."
-    },
-    {
-      "sev": "S2",
-      "lines": "28, 40-54, 56-65",
-      "cat": "stale-cache-poisoning",
-      "whatsWrong": "On a transient Supabase read failure, getCart returns an empty Cart and writes it to AsyncStorage `cart_<userId>` for 5 minutes, so subsequent getCart calls serve the fabricated empty cart from cache even after connectivity returns.",
-      "rootCause": "getCart treats any falsy `data` from `.single()` as 'cart does not exist' and unconditionally fabricates + caches an empty cart (5-min TTL via setCachedCart). It does not distinguish a genuine no-row result (PostgREST code PGRST116) from a transient network/DB error, which also returns data:null with a non-'no-rows' error (or throws into the 56 catch, which likewise caches an empty local cart).",
-      "failureScenario": "User on flaky Iraqi mobile network. A cart read fails transiently. getCart caches an empty cart (line 54/64). validateCart / mergeLocalCart / syncCartWithLatestData then operate on an empty cart for up to 5 minutes; mergeLocalCart at re-login can overwrite the real remote cart. The user's real cart appears empty despite nothing being removed.",
-      "fix": "Only create/cache an empty cart when the error is a true 'no rows' result: `if (error && error.code !== 'PGRST116') throw error;` before the create-empty block, and in the outer/inner catch return a local empty cart WITHOUT calling setCachedCart (or cache with a much shorter TTL) so a transient failure never poisons the 5-minute cache."
-    },
-    {
-      "sev": "S2",
-      "lines": "348, 356",
-      "cat": "wrong-shipping-match",
-      "whatsWrong": "A shipping rate with an empty (or whitespace) city matches the customer's city unconditionally, and because shipping is chosen via Math.max across items (367), a stray {city:'', price: high} rate silently inflates the shipping charge for all destinations.",
-      "rootCause": "Fuzzy shipping matching uses `normalizedCity.includes(rateKey) || rateKey.includes(normalizedCity)` (and the country variant) where rateKey = rate.city.trim().toLowerCase(). JS `anyString.includes('')` is always true, so an empty/whitespace-only city produces a rateKey of '' that matches every city and country.",
-      "failureScenario": "Admin accidentally saves a rate with a blank city and a high price. Every customer, regardless of city, gets that inflated shipping applied to their order total — a real overcharge that is hard to trace.",
-      "fix": "Guard against empty keys in the fuzzy predicates, e.g. `return !!rateKey && normalizedCity.length >= 3 && (normalizedCity.includes(rateKey) || rateKey.includes(normalizedCity));` (line 348) and require `rateKey` non-empty in the country branch (356). Fixing finding #1's `if (!rateKey) return false` guard also resolves this."
-    }
-  ],
-  "src/services/promoService.ts": [
-    {
-      "sev": "S1",
-      "lines": "74-118 (id at 87; read-modify-write at 76,79-96,112-114)",
-      "cat": "race-condition",
-      "whatsWrong": "save() and remove() each do an async readMock() -> mutate-in-memory -> writeMock() with no serialization and no in-flight guard. Two overlapping calls both await the SAME snapshot before either writes, so the second writeMock clobbers the first (lost update). Compounding this, new-promo ids are built only from `promo-${code}-${Date.now().toString(36)}` (line 87): two creates in the same millisecond with the same code produce an IDENTICAL id.",
-      "rootCause": "AsyncStorage read/modify/write is not atomic and is not serialized; id uniqueness relies solely on millisecond resolution.",
-      "failureScenario": "Admin taps Delete on promo X and Save-edit on promo Y within the same tick (or double-taps Save). Both call readMock() and receive [X, Y]. remove() writes [Y]; save() writes [X, Y'] a moment later — X is resurrected and the delete is silently lost. Alternatively a double-tapped 'Add' creates two rows with the same code+timestamp -> duplicate id -> findIndex on a later edit matches the wrong row and React list keys collide.",
-      "fix": "Serialize all mutations through a queue and add entropy to the id. e.g. add at module scope: `let q: Promise<unknown> = Promise.resolve(); const enqueue = <T,>(op: () => Promise<T>): Promise<T> => { const run = q.then(op, op); q = run.catch(() => {}); return run; };` then wrap the bodies of save/remove: `return enqueue(async () => { ...existing body... });`. And make the id collision-proof: `id: \\`promo-${code.toLowerCase().replace(/[^a-z0-9]+/g,'-')}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}\\`,`. (UI should also disable the Save/Delete button while a call is in flight.)"
-    },
-    {
-      "sev": "S2",
-      "lines": "42-44 (and 38)",
-      "cat": "silent-failure",
-      "whatsWrong": "writeMock swallows every setItem rejection with `.catch(() => {})`, so save()/remove() resolve as success even when nothing was persisted. The caller gets back the `created`/updated object and the UI reports success, but on next launch the change is gone.",
-      "rootCause": "Errors are swallowed at the persistence boundary instead of being propagated to the mutation caller that can surface them.",
-      "failureScenario": "On a 320dp low-RAM Android with nearly-full storage, AsyncStorage.setItem throws (quota/IO). The catch eats it, save() returns the new promo, the admin sees 'Saved', but the promo never hit disk. After a background/reopen the list reverts and the customer's code doesn't exist.",
-      "fix": "Let write failures reject so callers can show an error/rollback: `async function writeMock(promos: Promo[]): Promise<void> { await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(promos)); }` (remove the `.catch(() => {})`), and keep the swallow only for the best-effort seed write on line 38 where it's intentional."
-    },
-    {
-      "sev": "S2",
-      "lines": "31-40 (parse at 34)",
-      "cat": "unvalidated-shape",
-      "whatsWrong": "readMock returns `JSON.parse(raw)` cast implicitly to Promo[] without checking it's actually an array. The try/catch only catches parse *errors*, not a valid-JSON-but-wrong-shape payload. A stored value like `true`, `42`, `null`, or `{}` (schema migration, manual edit, partial/corrupt write) parses fine and flows to getAll().sort() (line 57) / getActive().filter() / findByCode().find() -> `x.sort is not a function` TypeError at data-load.",
-      "rootCause": "JSON.parse output is trusted for shape, not just for parseability.",
-      "failureScenario": "A prior build (or a truncated write) leaves `@asankary_promos_mock_v1` holding `\"{}\"`. On next launch getAll() calls `.sort` on the object -> throws, and because promo loading isn't wrapped anywhere upstream the promo list / checkout code path crashes instead of falling back to seed.",
-      "fix": "Validate before returning: `if (raw) { const parsed = JSON.parse(raw); if (Array.isArray(parsed)) return parsed; }` — then it falls through to the seed on any non-array payload."
-    }
-  ],
-  "src/services/authService.ts": [
-    {
-      "sev": "S1",
-      "lines": "208-222",
-      "cat": "logout-not-clearing-data",
-      "whatsWrong": "signOut() calls supabase.auth.signOut() (line 210) FIRST, then clears local AsyncStorage (lines 211-218). supabase's default signOut uses global scope and makes a network round-trip to revoke the token; on a slow/offline network it rejects. When it throws, execution jumps to the catch at 219 and lines 211-218 NEVER run, so user_data, cart, recent_searches, @asankary_user_profile, @user_theme and @user_language are left on disk.",
-      "rootCause": "Local-storage cleanup is sequenced after (and made conditional on) a network call that can fail.",
-      "failureScenario": "User taps 'Log out' while on a flaky Iraqi mobile connection. signOut() rejects with a network AuthApiError. The cached profile and the previous user's cart survive in AsyncStorage. On next app open getCurrentUser() may still read user_data, or a second person on a shared device sees the prior user's cart/addresses. The logout silently failed to purge local data.",
-      "fix": "Always purge local storage regardless of the network result:\n\nstatic async signOut(): Promise<void> {\n  try {\n    await supabase.auth.signOut();\n  } finally {\n    await AsyncStorage.multiRemove([\n      'user_data','cart','recent_searches','@asankary_user_profile','@user_theme','@user_language',\n    ]);\n  }\n}"
-    },
-    {
-      "sev": "S2",
-      "lines": "563-626",
-      "cat": "lost-update-race",
-      "whatsWrong": "addAddress, updateAddress and removeAddress each do a read-modify-write on the JSON `addresses` array: getCurrentUserFresh() fetches the current list from the server, mutates it in memory, then writes the whole array back with .update(). There is no in-flight guard and no atomicity, so concurrent invocations clobber each other (classic lost update).",
-      "rootCause": "Whole-array overwrite of a JSON column from a client-side read-modify-write, with no serialization or optimistic-concurrency check.",
-      "failureScenario": "User double-taps 'Save address', or adds an address on one screen while a background refresh writes elsewhere. Call A reads addresses=[X], call B reads addresses=[X]. A writes [X, newA]; B writes [X, newB]. B's write overwrites A's, so newA is silently lost — the user sees their just-added address vanish. Same pattern lets a delete resurrect an address whose add was still in flight.",
-      "fix": "Serialize these mutations (single-flight guard / queue) OR make the update atomic server-side. Preferred: a SECURITY DEFINER RPC that appends/removes within the DB (e.g. supabase.rpc('add_user_address', { p_user: userId, p_address: address })) so the read-modify-write happens inside one transaction and cannot lose concurrent writes. At minimum, add an isMutatingAddresses in-flight flag to reject overlapping calls."
-    },
-    {
-      "sev": "S2",
-      "lines": "224-232",
-      "cat": "auth-check-noop",
-      "whatsWrong": "changePassword(currentPassword, newPassword) accepts `currentPassword` but never uses it — supabase.auth.updateUser({ password: newPassword }) only sets the new password and does NOT verify the old one. The 'current password' field the UI collects is therefore decorative; any open session can change the password without knowing the existing one.",
-      "rootCause": "The current-password parameter is passed but never validated against Supabase Auth before the update.",
-      "failureScenario": "A phone is left unlocked with the app open (session active). Someone opens Settings > Change Password, types anything in 'Current password' and a new password, and it succeeds — locking the real owner out. The current-password gate the UI implies simply isn't enforced.",
-      "fix": "Re-authenticate before updating:\n\nconst { data: { user } } = await supabase.auth.getUser();\nif (!user?.email) throw new Error('Cannot verify current password');\nconst { error: verifyErr } = await supabase.auth.signInWithPassword({ email: user.email, password: currentPassword });\nif (verifyErr) throw new Error('Current password is incorrect');\nconst { error } = await supabase.auth.updateUser({ password: newPassword });\nif (error) throw error;\n\n(For phone-only accounts, verify via the same login Edge Function used elsewhere.)"
-    }
-  ],
-  "src/utils/currency.ts": [
-    {
-      "sev": "S1",
-      "lines": "316-323",
+      "sev": "S0",
+      "lines": "186, 147-158, 176",
       "cat": "crash-undefined-access",
-      "whatsWrong": "formatDimensions destructures `const { length, width, height } = dimensions;` with no null/undefined guard. The TS type says the object is required, but at runtime Supabase/mock data commonly returns `dimensions: null` (or omits it) for products that have no shipping dimensions. `const { length } = null` throws `TypeError: Cannot destructure property 'length' of 'null' as it is null`.",
-      "rootCause": "Type annotation assumes a well-formed object; runtime data from the server is not validated before destructuring.",
-      "failureScenario": "A mobile-accessory product row has `dimensions` null. The product-spec / details screen calls formatDimensions(product.dimensions) during render → uncaught TypeError → the whole screen (or ErrorBoundary fallback) blanks out. Same class of crash exists in formatPercentage (line 303): formatPercentage(undefined) → `undefined.toFixed` TypeError when a discount/percentage field is missing.",
-      "fix": "export const formatDimensions = (dimensions?: { length: number; width: number; height: number } | null): string => {\n  if (!dimensions) return '';\n  const { length, width, height } = dimensions;\n  return `${length} × ${width} × ${height} cm`;\n};  // and in formatPercentage: if (!Number.isFinite(value)) return '';"
+      "whatsWrong": "maskIdentifier(method, identifier) is called unconditionally during render. `identifier` comes from `route.params || {}` (L176), so it can be undefined. In maskIdentifier, the phone branch does `identifier.length` (L149) and the else/email branch does `identifier.split('@')` (L154) with no null guard — both throw TypeError on undefined, crashing the screen before any UI renders. The `|| {}` fallback shows the author expects params can be absent, but the crash site is not protected.",
+      "rootCause": "No validation of required route params (method, identifier) before use; maskIdentifier assumes a defined string.",
+      "failureScenario": "React Navigation restores persisted navigation state on a cold start (or a deep link / notification / a future caller) lands on Password with params dropped or partial. `identifier` is undefined → L149 `undefined.length` (method 'phone') or L154 `undefined.split('@')` (method undefined/'email') throws 'Cannot read property length/split of undefined' → white screen / hard crash instead of the login form.",
+      "fix": "Guard before use, e.g. right after L176: `if (!method || !identifier) { navigation.goBack(); return null; }` — and/or make the helper null-safe: `const maskIdentifier = (method, identifier = '') => { if (!identifier) return ''; ... }`."
     },
     {
       "sev": "S2",
-      "lines": "336-338",
-      "cat": "ignored-parameter-wrong-currency",
-      "whatsWrong": "formatCurrency(amount, currency = 'USD') accepts a `currency` argument but never references it — the body unconditionally calls formatCurrencyUSD. So formatCurrency(50, 'IQD') returns \"$50.00\", not an IQD-formatted value.",
-      "rootCause": "Alias was written for backward compatibility but the second parameter was declared and forgotten; nothing routes 'IQD' to the IQD formatter/conversion.",
-      "failureScenario": "In an Iraqi store the user switches currency to IQD. A screen still using the legacy alias calls formatCurrency(price, 'IQD') expecting dinars; it silently shows US-dollar amounts/symbol — wrong currency and wrong magnitude (no 1500x conversion), a serious commerce correctness bug that no type error catches.",
-      "fix": "export const formatCurrency = (amount: number, currency: 'USD' | 'IQD' = 'USD'): string => {\n  return formatPrice(amount, currency);\n};"
+      "lines": "189-202",
+      "cat": "wrong-prefill-race",
+      "whatsWrong": "The mount effect calls CredentialStorage.getCredentials(), which returns a single globally-stored credential (not keyed to the current identifier), then blindly setPassword(credentials.password) and setRememberMe(true) regardless of which account this screen is for. It never compares credentials.email to the current `identifier`. Because the read is async and the field autoFocuses (keyboard already up), a slow SecureStore/AsyncStorage read can also resolve after the user starts typing and overwrite their input.",
+      "rootCause": "Credential storage is a single global slot and the screen does not match the stored account to the current identifier before prefilling.",
+      "failureScenario": "User enabled Remember Me for account A (a@x.com), logs out, then opens Password to sign in as account B (b@y.com). The effect prefills account A's password (hidden behind dots) and force-enables rememberMe. User taps Sign in → login fails, failCount++ shows 'Incorrect password'; after 3 (phone) an OTP fallback alert appears — all despite the user never having entered anything wrong for B.",
+      "fix": "Only prefill when it matches: `const c = await CredentialStorage.getCredentials(); if (c && c.email === identifier) { setPassword(c.password); setRememberMe(true); }` and avoid clobbering non-empty input (guard on current password being empty)."
     },
     {
       "sev": "S2",
-      "lines": "18-41",
-      "cat": "non-finite-money-display",
-      "whatsWrong": "formatCurrencyUSD has no guard for non-finite input. `Math.abs(undefined)` → NaN, and `NaN.toFixed(2)` → \"NaN\", so the function returns the literal string \"$NaN\". The identical defect exists in formatCurrencyIQD (lines 120,131 → \"IQD NaN\") and therefore in formatPrice. (Note: null coerces to 0 → \"$0.00\", so only undefined/NaN produce the garbage string.)",
-      "rootCause": "Amount is trusted to be a finite number; a missing or NaN field from the API (or a NaN computed total like `undefined * qty`) flows straight into toFixed.",
-      "failureScenario": "Server omits `price` on one cart line (field undefined), or a total is computed from it as NaN. The cart/product card renders \"$NaN\" (or \"IQD NaN\") to the user — looks broken and blocks purchase confidence. Hostile 'server sends garbage' path.",
-      "fix": "At the top of formatCurrencyUSD and formatCurrencyIQD: `const safe = Number.isFinite(amount) ? amount : 0;` then use `safe` for isNegative/absAmount. Also guard convertUSDToIQD: `if (!Number.isFinite(amountUSD)) return 0;`."
+      "lines": "232-268 (240, 253)",
+      "cat": "error-misclassification",
+      "whatsWrong": "`await refreshUser()` (L240) runs inside the same try whose catch (L253) assumes any thrown error means an incorrect password. If loginWithPhone/loginWithEmail succeeds but refreshUser throws (transient network / Supabase hiccup), the catch increments failCount and sets 'Incorrect password. Please try again.', misreporting a successful authentication as a credential failure.",
+      "rootCause": "Post-login side effect (refreshUser) shares the wrong-password error boundary.",
+      "failureScenario": "Correct password entered, login call succeeds, network drops right after → refreshUser rejects → user sees 'Incorrect password' though credentials were valid; on flaky networks repeated attempts push failCount to 3 (phone) and trigger the false 'Too many attempts / use a code' alert.",
+      "fix": "Keep only the loginWith* call in the wrong-password try; treat refreshUser failure as non-fatal: `if (method==='phone') await loginWithPhone(...); else await loginWithEmail(...); try { await refreshUser(); } catch(e){ console.log(e); } ` then proceed to save creds + handleSuccessfulLogin."
     }
   ],
-  "src/screens/ProductDetailsScreen.tsx": [
+  "src/screens/ChatbotScreen.tsx": [
     {
       "sev": "S1",
-      "lines": "144",
+      "lines": "271-273 (setInterval) + no unmount cleanup effect anywhere; recorder started at 265",
+      "cat": "leak / setState-after-unmount",
+      "whatsWrong": "If the component unmounts while isRecording is true, the 1-second interval keeps firing setRecordingDuration forever and the microphone/audio session stays open. Both the header back button (797) and the bottom tab bar remain tappable during recording, so this is easily reachable.",
+      "rootCause": "recordingTimerRef interval and the live audioRecorder are cleared ONLY inside cancelRecording (291) and stopAndSendRecording (305), both user-triggered. There is no useEffect(() => cleanup, []) that clears the interval or stops the recorder on unmount.",
+      "failureScenario": "User taps the mic and starts recording, then taps another bottom tab (or the header back arrow). ChatbotScreen unmounts: the interval at 271 is never cleared and runs indefinitely calling setRecordingDuration on an unmounted component; the mic stays hot (battery drain) and setAudioModeAsync({allowsRecording:true}) is never reverted, which can wedge audio playback elsewhere in the app.",
+      "fix": "Add: useEffect(() => { return () => { if (recordingTimerRef.current) clearInterval(recordingTimerRef.current); isRecordingIntentRef.current = false; audioRecorder.stop().catch(() => {}); }; }, [audioRecorder]);"
+    },
+    {
+      "sev": "S2",
+      "lines": "299-337 (setIsRecording(false) at 304, await audioRecorder.stop() at 308, setIsUploadingVoice(true) not until 337); startRecording 220",
+      "cat": "race / missing in-flight guard",
+      "whatsWrong": "The composer visibly flickers back for a frame during send, and a fast user can tap the re-appearing mic to launch a SECOND recording while stopAndSendRecording is still in flight, corrupting recording state.",
+      "rootCause": "Between setIsRecording(false) (304) and setIsUploadingVoice(true) (337) there is an `await audioRecorder.stop()`. During that awaited yield React re-renders with BOTH flags false, so renderInputArea (612) falls through to the normal composer and shows the mic button again. startRecording (220) has no `if (isRecording || isUploadingVoice || isLoading) return` guard.",
+      "failureScenario": "User taps send on a voice note, then immediately taps the mic that flashes back on screen. A new recording + timer starts (232, 271) while the previous send's finally block (383-387) later flips isLoading/isUploadingVoice false, leaving isRecording true with a mismatched/duplicate timer.",
+      "fix": "Set the in-flight flag synchronously before awaiting: move setIsUploadingVoice(true) to immediately after setIsRecording(false) (before the await at 308), and add `if (isRecording || isUploadingVoice || isLoading) return;` as the first line of startRecording."
+    }
+  ],
+  "src/screens/FavoritesScreen.tsx": [
+    {
+      "sev": "S1",
+      "lines": "44-61, 188-208",
+      "cat": "missing-error-state",
+      "whatsWrong": "ProductService.getProductsByIds is confirmed to NEVER throw: on a network/DB error with no cache it internally catches and returns [] (productService.ts:329-332). So fetchFavoriteProducts's own try/catch (lines 51-60) is dead code for real failures — a cold-launch network error sets products=[]. The render then hits the products.length===0 branch (line 188) and shows the 'You have no favorites yet' empty state EVEN WHEN favorites.length>0. Worse, the empty branch (lines 188-208) renders no FlatList and therefore has NO RefreshControl, so there is no pull-to-refresh recovery — the user is stranded on a false-empty screen until they toggle a favorite or re-navigate. The header simultaneously shows the trash/clear-all button (line 178, gated on favorites.length>0), directly contradicting the 'empty' body.",
+      "rootCause": "Empty-state condition keys off products.length (fetch result) instead of distinguishing 'no favorites saved' from 'favorites exist but failed/returned nothing to load', and the empty branch has no refresh affordance.",
+      "failureScenario": "Low-RAM Android on a subway with no signal opens Favorites with 12 saved items and a cold cache. getProductsByIds returns []. Screen shows 'You have no favorites yet' + a Start Browsing button, while the header still shows the red trash icon. User believes their entire wishlist was wiped; there is no retry control.",
+      "fix": "Branch on favorites.length first: `{favorites.length === 0 ? (<GenuineEmptyState/>) : products.length === 0 ? (<View style={styles.emptyContainer}><Text>{t('favorites.loadError')}</Text><TouchableOpacity onPress={() => fetchFavoriteProducts(true)}><Text>{t('common.retry')}</Text></TouchableOpacity></View>) : (<>{count + FlatList}</>)}`. This shows a retry when IDs exist but products didn't load, and only shows the true empty state when there are genuinely no saved IDs."
+    },
+    {
+      "sev": "S2",
+      "lines": "54-55",
+      "cat": "race-condition",
+      "whatsWrong": "fetchFavoriteProducts awaits getProductsByIds and then unconditionally setProducts(validProducts) with no ordering/cancellation guard. Concurrent invocations (the [favorites] effect firing while a previous fetch is still in flight, or overlapping with handleRefresh) can resolve out of order, so a slower earlier response overwrites a newer one, leaving products stale.",
+      "rootCause": "No request-sequence guard; the last promise to resolve wins regardless of which is newest.",
+      "failureScenario": "On a slow connection the initial fetch for favorites [1,2,3] is in flight. User removes item 2 (favorites -> [1,3]); a second fetch fires and returns quickly with [1,3]. The first (slow) fetch then resolves and calls setProducts([1,2,3]), re-displaying the just-removed item 2. Tapping it may navigate to a product the user no longer has favorited.",
+      "fix": "Add a monotonic request id: `const reqId = useRef(0);` then inside the callback `const id = ++reqId.current;` before the await, and after it `if (id === reqId.current) setProducts(validProducts);` (guard the finally's setIsLoading the same way). This discards stale out-of-order results and also fixes the setState-after-unmount case."
+    }
+  ],
+  "src/screens/QiCardPaymentScreen.tsx": [
+    {
+      "sev": "S1",
+      "lines": "156-162, 177-186",
+      "cat": "broken-error-handling",
+      "whatsWrong": "On a SUCCESS result the code sets resultStatus('success') then does `await clearCart()` INSIDE the same try block. clearCart() re-throws on any failure (CartContext.tsx:459 — CartUtils.clearAllCartData hits AsyncStorage/Supabase). If it rejects, control jumps to the catch, which sets resultStatus('timeout') and shows 'Could not confirm payment status', AND the navigation timer (160-162) is never scheduled — so a genuinely successful, already-confirmed, already-charged payment is reported to the user as an unknown/failed outcome and they are never taken to OrderConfirmation.",
+      "rootCause": "Best-effort cart cleanup is coupled to the success path's control flow instead of being isolated.",
+      "failureScenario": "User pays successfully on a flaky Iraqi mobile connection. pollForCompletion returns SUCCESS. clearCart() tries to clear the server cart, the network drops, it throws. Screen flips to the orange 'Couldn't Confirm Payment' timeout screen; user thinks payment failed and may pay again, while the cart is also left un-cleared.",
+      "fix": "Isolate clearCart so its failure cannot affect the settled success outcome:\n  if (result.status === 'SUCCESS') {\n    setResultStatus('success');\n    try { await clearCart(); } catch (e) { /* payment succeeded; cart clear is best-effort */ }\n    successTimerRef.current = setTimeout(() => {\n      navigation.replace('OrderConfirmation', { orderId, orderNumber });\n    }, 2000);\n  }"
+    },
+    {
+      "sev": "S2",
+      "lines": "410-426",
+      "cat": "webview-race",
+      "whatsWrong": "onError and onHttpError call setResultStatus('failed') with no guard against the payment already being in-flight or settled. Their only filter is `!nativeEvent.url?.startsWith('asankary://')` (and statusCode >= 400). A transient main-frame error, a 4xx on an intermediate QiCard/3DS redirect page, or a late error event that arrives after handlePaymentComplete has already started polling can flip an in-progress verification — or even a set 'success' state — to a false 'failed', tearing down the flow and telling the user the payment failed after they may already have been charged.",
+      "rootCause": "Error callbacks don't respect the completion state machine; once interception/polling has begun, WebView errors are no longer authoritative.",
+      "failureScenario": "QiCard's 3DS redirect chain returns a transient HTTP 4xx on one hop, or the WebView emits a late onError right as onShouldStartLoadWithRequest intercepts the asankary:// redirect and starts the poll. setResultStatus('failed') overrides the processing/success UI; the user sees 'Payment failed' and retries a payment that actually succeeded.",
+      "fix": "Add a completion ref and bail early: at the top of both handlers `if (paymentCompletedRef.current) return;`, and only react to true main-frame failures (e.g. ignore unless nativeEvent.url is the main document / matches formUrl). Also keep the existing asankary:// guard."
+    },
+    {
+      "sev": "S2",
+      "lines": "147-150, 190-212",
+      "cat": "double-fire-guard",
+      "whatsWrong": "handlePaymentComplete's re-entry guard reads the `paymentCompleted` STATE (`if (paymentCompleted) return;`). State updates are asynchronous, so two callbacks that fire in the same tick both observe the stale `false`. Both onShouldStartLoadWithRequest (203-212) and onNavigationStateChange (190-200) match the same redirect, and onNavigationStateChange itself fires repeatedly (loadstart/loadend) for one URL — any two landing before a re-render each pass the guard, causing double pollForCompletion, double clearCart, and two navigation timers.",
+      "rootCause": "Using async React state as a synchronous mutex.",
+      "failureScenario": "The finish redirect fires onShouldStartLoadWithRequest and onNavigationStateChange back-to-back; both see paymentCompleted===false, both start a 24s poll and both call clearCart(), doubling network load and racing two navigation.replace timers.",
+      "fix": "Use a ref: `const completingRef = useRef(false); ... if (completingRef.current) return; completingRef.current = true; setPaymentCompleted(true); setIsProcessingResult(true);`"
+    }
+  ],
+  "src/screens/SearchScreen.tsx": [
+    {
+      "sev": "S1",
+      "lines": "205, 227, 232, 242",
       "cat": "crash-undefined-access",
-      "whatsWrong": "`const { productId } = route.params;` destructures route.params with no default. ProductDetails is a registered deep link (`product/:productId`, AppNavigator line 295). If the screen is reached by any `navigation.navigate('ProductDetails')` without params, or a malformed universal/`asankary://` link that resolves the route but not the param, route.params is undefined and destructuring throws `Cannot destructure property 'productId' of 'route.params' as it is undefined` before the first render. CheckoutScreen (line 111) already defends with `route.params || {}`; this screen does not.",
-      "rootCause": "No fallback for the untyped runtime shape of route.params; @ts-nocheck hides that params is possibly-undefined.",
-      "failureScenario": "A push notification or a `asankary://product/` deep link (empty id), or a mis-wired internal navigate lands on ProductDetails with no params → white-screen crash caught by the root ErrorBoundary instead of a graceful 'product not found'.",
-      "fix": "`const { productId } = route.params ?? {};` and early-out: if `!productId`, render the existing not-found branch (or `navigation.goBack()` / navigate Home) rather than proceeding to load with undefined."
+      "whatsWrong": "scoreProductForVisualSearch trusts the VisualAnalysis object's sub-fields to always be present, but this object arrives from route.params (produced by the Gemini/AI Cloud Function) with ZERO runtime validation. L205 does analysis.primaryQuery.toLowerCase(); L227/232/242 do `for (const x of analysis.keywords/compatibleModels/alternativeNames)`. If the LLM omits a field or returns null for it (very common with generative JSON), .toLowerCase() throws on null and for-of throws 'undefined is not iterable'.",
+      "rootCause": "VisualAnalysis interface declares fields as required, but the data is untrusted AI output; the function dereferences/iterates them without defaults.",
+      "failureScenario": "User does a visual (photo) search. Gemini returns {primaryQuery:'phone case', category:'accessories'} but omits the `keywords` array. isVisualSearch+visualAnalysis+debouncedQuery are all truthy, so the filter effect (L254-259) calls scoreProductForVisualSearch for the first product, hits `for (const keyword of analysis.keywords)` with keywords===undefined, and throws 'undefined is not iterable', crashing the screen to the red/blank error boundary.",
+      "fix": "Default every field before use: `const primaryWords = (analysis.primaryQuery || '').toLowerCase().split(/\\s+/)...`; `for (const keyword of (analysis.keywords || []))`; `for (const model of (analysis.compatibleModels || []))`; `for (const altName of (analysis.alternativeNames || []))`. (Or normalize the whole object once at the top: const A = { primaryQuery:'', keywords:[], compatibleModels:[], alternativeNames:[], ...analysis } and read from A.)"
     },
     {
       "sev": "S1",
-      "lines": "2095, 2113, 2210",
+      "lines": "443",
       "cat": "crash-undefined-access",
-      "whatsWrong": "`colorVar.colorValue.toLowerCase()` (used as a backgroundColor fallback at 2095 and to build a translation key at 2113) and `color.toLowerCase()` at 2210 assume colorValue is always a non-null string. colorVariations/options.colors come from admin-entered DB JSON. A variation row with a missing/null colorValue makes `.toLowerCase()` throw during render, taking down the whole screen (not just the section).",
-      "rootCause": "Unguarded string method on possibly-null API data; masked by @ts-nocheck.",
-      "failureScenario": "Admin saves a color variation with an empty color name (or server returns a row with colorValue: null). Opening that product throws `Cannot read property 'toLowerCase' of undefined` during render → ErrorBoundary fallback for the product page.",
-      "fix": "Coalesce first: `const cv = colorVar.colorValue || ''; ... backgroundColor: colorVar.colorHex || cv.toLowerCase() || '#ccc'` and `t(\\`product.colors.${cv.toLowerCase()}\\`, cv)`. At 2210 use `(color || '').toLowerCase()` (and skip rows where the value is empty)."
+      "whatsWrong": "renderAIBanner reads `visualAnalysis.compatibleModels.length` (and then .slice) directly. Unlike brand/category/partNumber above it (L440-442) which are guarded by mere truthiness, `.length` dereferences the array. If compatibleModels is null/undefined from the AI payload, this throws during RENDER (worse than an effect — it takes down the whole screen immediately, before any list shows).",
+      "rootCause": "Same untrusted-AI-shape problem, but in the render path where a throw is unrecoverable without an error boundary.",
+      "failureScenario": "Visual search returns a VisualAnalysis without `compatibleModels`. The banner renders on mount, evaluates `visualAnalysis.compatibleModels.length > 0`, throws 'Cannot read properties of undefined (reading length)', and the screen never paints.",
+      "fix": "Use optional chaining: `if ((visualAnalysis.compatibleModels?.length || 0) > 0) badges.push({ icon: 'car-sport', label: (visualAnalysis.compatibleModels || []).slice(0, 3).join(', ') });`"
     },
-    {
-      "sev": "S2",
-      "lines": "1144, 1218 (live paths); dead correct-path at 629-646",
-      "cat": "wrong-money",
-      "whatsWrong": "Storage price delta is silently dropped from every real order/cart write. For a phone product with product.storageOptions, the UI shows base+delta everywhere (hero price line 1409, totalPriceNumber lines 1056-1057, and calculatedTotalPrice passed to the sheet line 2761/2801). But the ONLY reachable add-to-cart handlers, handleAddToCartFromSheet (line 1144) and handleConfirmOrder (line 1218), call `addToCart(product.id, orderData.quantity, product)` with the RAW product — no storageDelta baked in and no selectedOptions passed. The code that correctly bakes the delta (`productForCart` with priceUSD+storageDelta, lines 640-646) and passes selectedOptions (lines 629-637) lives only in handleAddToCart, which is dead: it is called solely by addCurrentSelectionToCart (line 1083), and grep confirms addCurrentSelectionToCart is never invoked anywhere. selectedStorageId is screen-only state never sent to the sheet, so the cart line persists product.priceUSD (base).",
-      "rootCause": "The 'correct' price-baking path (handleAddToCart) was orphaned during the Alibaba bottom-sheet refactor; the live sheet handlers were never updated to bake storageDelta or forward selectedOptions.",
-      "failureScenario": "User opens an iPhone priced $799 base, selects 512GB (+$200). Screen and the Start Order sheet both display $999. User confirms → CartContext.addToCart stores the base product → cart/checkout charges $799. Store loses $200 per unit on every storage upsell.",
-      "fix": "In BOTH handleAddToCartFromSheet and handleConfirmOrder, mirror handleAddToCart before writing: `const productForCart = storageDelta > 0 ? { ...product, priceUSD: product.priceUSD + storageDelta, vipPriceUSD: typeof product.vipPriceUSD === 'number' ? product.vipPriceUSD + storageDelta : undefined } : product;` then `await addToCart(product.id, orderData.quantity, productForCart, selectedOptions);` passing the same selectedOptions object built at lines 629-637. (And delete the dead handleAddToCart/addCurrentSelectionToCart, or route the sheet through it.)"
-    }
-  ],
-  "src/screens/main/HomeScreen.tsx": [
     {
       "sev": "S1",
-      "lines": "258-267",
-      "cat": "stale-closure",
-      "whatsWrong": "onRefresh is memoized with an empty dependency array (line 267) but its body calls loadData() (line 265). It therefore permanently captures the FIRST render's loadData, which in turn captures the first render's tenantId via loadNewArrivals (line 187) and loadBrands (line 160). The code itself documents that tenantId 'resolves in stages' (line 170) and the mount effect re-runs on tenantId change (line 132-134), so the live tenantId diverges from the captured one.",
-      "rootCause": "useCallback([]) freezes a closure that transitively depends on tenantId.",
-      "failureScenario": "App opens: tenantId is null on first render, so the first-render loadData closes over tenantId=undefined. TenantContext then resolves tenantId to 'storeA'; the [tenantId] effect re-runs and correctly loads storeA products. User pulls to refresh -> onRefresh runs the stale first-render loadData -> loadNewArrivals/loadBrands fire ProductService.getProducts(..., undefined) and brandService.getActiveBrands(undefined). Refresh replaces the correct storeA feed with the wrong/global/empty tenant result. In a multi-tenant app this is a data-correctness/leak bug.",
-      "fix": "Call the latest loadData via a ref: const loadDataRef = useRef(loadData); loadDataRef.current = loadData; then in onRefresh do 'await loadDataRef.current();' (keep deps []). Or drop the useCallback and define onRefresh inline so it re-binds each render."
+      "lines": "357-360",
+      "cat": "crash-null-localeCompare",
+      "whatsWrong": "Default sort is by name (filters.sortBy defaults to 'name', L125), so `a.name.localeCompare(b.name)` runs in the filter effect on EVERY non-visual-search load for the full product list. mapProduct assigns `name: data.name` with NO default (confirmed L19 of productService), so a DB row with a null name yields product.name===null. `null.localeCompare(...)` throws (the receiver being null crashes; the argument being null is coerced to 'null' and is fine).",
+      "rootCause": "Product.name is typed `string` but mapProduct does not defend against null DB data, and the sort assumes non-null.",
+      "failureScenario": "Supabase returns any product row whose `name` column is null/missing (bad import, partially-created product). On screen open, loadProducts populates products, the filter effect sorts by name (default), hits `a.name.localeCompare(b.name)` with a.name===null, throws 'Cannot read properties of null (reading localeCompare)', crashing the search screen for ALL users until that row is fixed.",
+      "fix": "Guard both operands: `? (a.name || '').localeCompare(b.name || '') : (b.name || '').localeCompare(a.name || '')`. (Ideally also default name in mapProduct.)"
     },
     {
       "sev": "S2",
-      "lines": "132-197",
-      "cat": "race-condition",
-      "whatsWrong": "The mount effect (deps [tenantId], line 132-134) invokes loadData with no request cancellation or generation guard. loadNewArrivals unconditionally does setNewArrivals(products || []) (line 197). When tenantId changes while a previous load is still in flight, two loadData calls run concurrently and whichever RESOLVES last wins — not whichever started last.",
-      "rootCause": "No per-request sequence token guarding the setState against out-of-order responses.",
-      "failureScenario": "On launch tenantId=undefined -> loadData(undefined) starts (slow network). tenantId resolves to 'storeA' -> effect re-runs -> loadData('storeA') starts and returns first (served from cache). Then the slower loadData(undefined) resolves and its setNewArrivals overwrites storeA's products with the undefined-tenant result. User sees the wrong tenant's catalogue with no error.",
-      "fix": "Add a monotonic guard: const loadSeq = useRef(0); at the top of loadNewArrivals capture 'const seq = ++loadSeq.current;' and before every setNewArrivals check 'if (seq !== loadSeq.current) return;'. Do the same for loadBrands/loadBanners (or use an AbortController keyed to tenantId)."
-    },
-    {
-      "sev": "S2",
-      "lines": "215-256",
-      "cat": "double-fetch",
-      "whatsWrong": "loadMoreProducts guards only on paginationRef.current.hasMore and the global 'loading' flag (line 216) — there is no in-flight guard for pagination itself. FlatList's onEndReached (line 641) is known to fire multiple times during a single momentum fling / before content grows past the threshold, so two loadMoreProducts can run concurrently.",
-      "rootCause": "'loading' is the initial/refresh flag (false during scroll), so it does not gate concurrent pagination.",
-      "failureScenario": "User flings the grid fast near the bottom: onEndReached fires twice before the first response returns. Both calls read paginationRef.current.page = N and fetch page N+1. Two identical network requests hit ProductService for the same page; the second's items are all dropped by the id dedup (line 229-231) — wasted bandwidth/latency on a slow Iraqi mobile connection, and both write paginationRef.current.page=N+1 redundantly.",
-      "fix": "Add a dedicated flag: const loadingMoreRef = useRef(false); guard 'if (!paginationRef.current.hasMore || loading || loadingMoreRef.current) return;' then set loadingMoreRef.current=true at the start and reset it in a finally block."
-    },
-    {
-      "sev": "S2",
-      "lines": "280-308",
-      "cat": "double-tap",
-      "whatsWrong": "handleCartSheetConfirm has no in-flight guard. Between the tap and the awaited addToCart (line 301) completing, the StartOrderBottomSheet stays visible (setCartSheetVisible(false) only runs AFTER the await, line 302), so a second tap on the confirm button re-enters and calls addToCart again.",
-      "rootCause": "No guard flag protecting the async submit path; the sheet is dismissed only after the network call resolves.",
-      "failureScenario": "On a slow connection the user double-taps 'Add to cart' on the bottom sheet. addToCart(product.id, quantity) fires twice before the sheet closes, adding double the quantity (or two line entries) to the cart. User is surprised by 2x items at checkout.",
-      "fix": "Add const submittingRef = useRef(false); at the top of the callback: 'if (!cartSheetProduct || submittingRef.current) return; submittingRef.current = true;' and reset it in a finally block. Ideally also setCartSheetVisible(false) optimistically before the await."
+      "lines": "145-146, 632, 769",
+      "cat": "missing-error-state",
+      "whatsWrong": "loadProducts' catch only console.error's (L146); it sets no error state. On failure isLoading→false and products stays []. The skeleton (L632) only shows while isLoading, so after a failed load the user drops to the ListEmptyComponent which says 'No results / Clear filters' (L774-784). There is no retry, no pull-to-refresh (FlashList has no refreshing/onRefresh), and 'Clear filters' calls resetFilters which does NOT re-run loadProducts — so the user is stuck on a misleading empty screen with no way to recover without leaving and re-entering.",
+      "rootCause": "Error is logged but not surfaced as state; no retry affordance and the empty state is indistinguishable from a genuine zero-result set.",
+      "failureScenario": "User opens Search on a flaky/no connection. getProducts rejects, catch swallows it, screen shows 'No results found — try adjusting filters'. User taps 'Clear filters' (the only button), nothing reloads; they conclude the store is empty.",
+      "fix": "Add `const [error, setError] = useState(false)`; in catch set setError(true) (clear it at start of loadProducts); render a distinct error view with a Retry button that calls loadProducts when error && products.length===0, and/or add `refreshing={isLoading} onRefresh={loadProducts}` to the FlashList."
     }
   ],
-  "src/screens/ProfileScreen.tsx": [
+  "src/screens/auth/ForgotPasswordScreen.tsx": [
     {
       "sev": "S1",
-      "lines": "92-113, 342, 423, 496",
-      "cat": "wrong-state",
-      "whatsWrong": "The guest-vs-authenticated decision is gated entirely on the locally-fetched `user` state (line 342 'Welcome, Guest!', line 423 `{!user &&` guest Sign In/Register buttons, line 496 `{user &&` account section), NOT on `contextUser` from AuthContext. loadUserData() swallows all errors silently (lines 108-109 `// Silently fail`) and, on failure, leaves `user` as null. AuthService.getCurrentUserFresh() also resolves to null on a cache miss (line 100 else-branch sets user=null).",
-      "rootCause": "Auth identity (contextUser) and profile-detail fetch (user) are conflated into one render gate; transient fetch failure is treated as 'not logged in'.",
-      "failureScenario": "A logged-in user opens Profile on slow/no network (explicitly in scope). getCurrentUserFresh() throws or returns null; the catch is silent, `user` stays null while `contextUser` is still a valid session. The screen renders the full GUEST experience — 'Welcome, Guest!', 'Sign In' + 'Create Account' buttons — and hides the entire Account section (Profile, Addresses, Delete, Logout). The real logged-in user is told to sign in again and loses all account actions, with no error message or retry.",
-      "fix": "Gate guest UI on auth state, not the fetch result, and stop swallowing the error. Use `const isAuthed = !!contextUser;` and a display fallback `const displayUser = user ?? contextUser;`, then replace the `!user` / `user &&` render gates with `!isAuthed` / `isAuthed`, reading details from `displayUser`. In loadUserData's catch, keep the previous user (don't reset to null) and surface a non-blocking error/retry (e.g. a small banner) instead of the empty `// Silently fail`."
+      "lines": "289-353, 497-501",
+      "cat": "race-double-submit",
+      "whatsWrong": "handleContinue is an async submit handler whose only re-entrancy guard is the button's disabled={loading} prop. loading is React state, so the native view's disabled flag only flips a frame AFTER setLoading(true) commits and re-renders. A fast double-tap (two touch events dispatched to JS within ~1 frame, the exact 320dp low-RAM scenario) fires handleContinue twice while the button is still natively enabled. In the email branch this calls sendPasswordResetEmail(email) twice -> the user receives TWO reset emails and TWO stacked success Alerts; in the phone branch it fires two isPhoneRegistered network calls and can push VerifyPhone twice.",
+      "rootCause": "No synchronous in-flight guard; reliance on async state (loading) to gate a synchronous tap.",
+      "failureScenario": "Arabic user on a slow network double-taps 'Send Code' with a valid email. Both taps pass validation before the first render commits disabled=true, so sendPasswordResetEmail runs twice: two emails, two 'Password reset email sent' alerts to dismiss.",
+      "fix": "Add a synchronous ref guard. Import useRef, then: const inFlight = useRef(false); at the top of handleContinue add `if (inFlight.current) return; inFlight.current = true;`, and in the finally block add `inFlight.current = false;` alongside setLoading(false). (Also add an early `if (loading) return;` as belt-and-suspenders.)"
     },
     {
       "sev": "S2",
-      "lines": "149-158",
-      "cat": "stale-closure",
-      "whatsWrong": "handleNotificationSettingChange builds `updated` and reverts on error from the render-captured `notificationSettings` object instead of a functional updater. `setNotificationSettings(updated)` (line 152) and the revert `setNotificationSettings(notificationSettings)` (line 156) both use the stale snapshot.",
-      "rootCause": "Object state mutated via a captured snapshot rather than `prev =>` functional update.",
-      "failureScenario": "User toggles 'Order Updates' then rapidly toggles 'Promotions' within the same render batch (fast double-tap across the two switches). The second handler captured `notificationSettings` from a render that still has orderUpdates=old, so its `{ ...notificationSettings, promotions: value }` overwrites the first toggle back to its old value — the orderUpdates change is silently lost and the persisted settings drift out of sync with the UI.",
-      "fix": "Use functional updates: `setNotificationSettings(prev => ({ ...prev, [setting]: value }))` for the optimistic set, build `updated` for the API call from the same merge, and on error revert with `setNotificationSettings(prev => ({ ...prev, [setting]: !value }))`."
+      "lines": "303-304",
+      "cat": "unsafe-undefined-access",
+      "whatsWrong": "const countryInfo = getCountryInfo(selectedCountry); then countryInfo.dialCode. getCountryInfo is typed to return CountryInfo (non-optional) but its body is `return countries[code]`, which is undefined for any code not in the map. selectedCountry is seeded from useUserRegion(), which does `setRegion(parsed.code as CountryCode)` — an unchecked cast of AsyncStorage JSON. If 'user_region' holds a legacy/corrupt/garbage code, countryInfo is undefined and countryInfo.dialCode throws a TypeError, crashing the phone-reset flow. TypeScript hides this because the return type lies.",
+      "rootCause": "getCountryInfo's declared return type omits undefined; the region value is cast, never validated.",
+      "failureScenario": "Legacy build stored {\"code\":\"UK\"} (not a valid ISO code; UK should be GB) in user_region. On this screen the user picks the Phone tab, enters a number, taps Send -> getCountryInfo('UK') is undefined -> `${countryInfo.dialCode}` throws -> screen crashes (caught only if wrapped, but this line is before any per-field guard and inside the try, so it surfaces as the generic 'Failed to process request' at best or an unhandled crash if error.message access also fails).",
+      "fix": "Guard it: const countryInfo = getCountryInfo(selectedCountry); if (!countryInfo) { setSelectedCountry('IQ'); Alert.alert(t('auth.error'), t('auth.errors.invalidCountry', { defaultValue: 'Please select a valid country' })); setLoading(false); return; } — or fall back: const countryInfo = getCountryInfo(selectedCountry) ?? getCountryInfo('IQ')."
     }
   ],
-  "src/components/MasonryProductCard.tsx": [
+  "src/screens/auth/RegisterScreen.tsx": [
     {
       "sev": "S1",
-      "lines": "65-66, 194, 203-215",
-      "cat": "recycling-state",
-      "whatsWrong": "The imageError / thumbFailed useState flags are never reset when the component is recycled onto a different product. In SearchScreen the card is rendered inside a Shopify FlashList (masonry), which reuses the same React component instance across data items instead of remounting per key. FlatList screens are safe (state is keyed by keyExtractor), but FlashList carries local state over. recyclingKey={product.id} on line 210 only resets expo-image's internal loader — it does NOT reset these React flags that gate whether <Image> is even rendered (line 194).",
-      "rootCause": "Transient per-image failure state is stored in component-local useState with no reactivity to product.id, violating FlashList's recycling contract.",
-      "failureScenario": "User searches in SearchScreen. Product A's thumbnail 404s, so imageError flips true and the card shows the grey image-off placeholder. User scrolls; FlashList recycles that exact cell instance to render Product B, which has a perfectly valid image. Because imageError is still true, the branch on line 194 keeps rendering the broken-image placeholder for Product B (and it never recovers, since nothing sets it back to false). Random valid products appear broken.",
-      "fix": "Reset the flags when the card lands on a new product. Add: useEffect(() => { setImageError(false); setThumbFailed(false); }, [product.id]); — or, to avoid a one-frame flash, do a render-phase reset: const [lastId, setLastId] = useState(product.id); if (lastId !== product.id) { setLastId(product.id); setImageError(false); setThumbFailed(false); }"
-    }
-  ],
-  "src/contexts/CurrencyContext.tsx": [
+      "lines": "285-287",
+      "cat": "crash-undefined-access",
+      "whatsWrong": "handleContinue's phone branch does `const countryInfo = getCountryInfo(selectedCountry)` then reads `countryInfo.dialCode`. getCountryInfo (phoneUtils.ts line 435-437) returns `countries[code]` with NO fallback and is typed to return CountryInfo but actually returns `undefined` for any code not in the map. `selectedCountry` is seeded from `userRegion`, which useUserRegion produces via `parsed.code as CountryCode` (useUserRegion.ts line 21) — an unchecked cast of whatever JSON sits in AsyncStorage `user_region`. A legacy/garbage stored code (e.g. 'UK' instead of 'GB', a lowercase 'iq', or a full country name from an older build) is a valid string but absent from `countries`, so getCountryInfo returns undefined and `.dialCode` throws. Phone is the DEFAULT method (line 230), so this is the primary path.",
+      "rootCause": "Unsafe `as CountryCode` cast on persisted data + getCountryInfo has no undefined guard (contrast getCountryFlag line 449-451 which uses `countries[code]?.flag || '...'`), and the screen dereferences the result immediately.",
+      "failureScenario": "Device has a stale/corrupted `user_region` value like `{\"code\":\"UK\"}` in AsyncStorage (old build, migrated data). User opens Register (phone method), types a number, taps Continue → getCountryInfo('UK') returns undefined → `undefined.dialCode` → TypeError → red-screen/native crash on every Continue tap.",
+      "fix": "Guard with a valid fallback: `const countryInfo = getCountryInfo(selectedCountry) || getCountryInfo('IQ');` (IQ is always present in the map, so `countryInfo.dialCode` on line 287 is then safe). Ideally also make getCountryInfo return `CountryInfo | undefined` so callers are forced to handle it."
+    },
     {
       "sev": "S2",
-      "lines": "24,32,26-36 vs 44-63",
+      "lines": "274, 478-482",
+      "cat": "double-submit-race",
+      "whatsWrong": "The Continue button relies solely on `disabled={isDisabled}` (isDisabled = loading) to prevent re-entry, but handleContinue itself has no in-flight guard. `disabled` is bound to state that is only committed on the next render; two taps dispatched in the same gesture frame (before React commits loading=true) both execute the full handler, since neither checks `loading` at entry.",
+      "rootCause": "State-based disable has a sub-frame race; the async handler never short-circuits on an already-in-flight call.",
+      "failureScenario": "Fast double-tap on Continue (common on 320dp low-RAM Android where the first render lags). In mock mode isPhoneRegistered resolves near-instantly, so both invocations pass the exists check and both call navigation.navigate('VerifyPhone', ...) → two VerifyPhone screens pushed on the stack (user must press back twice), plus a duplicate network/registration check.",
+      "fix": "Add a guard at the very top of handleContinue: `if (loading) return;` (before line 275). A `useRef(false)` in-flight flag set/cleared around the async work is even more robust against the render-timing race."
+    }
+  ],
+  "src/screens/auth/RegisterSuccessScreen.tsx": [
+    {
+      "sev": "S1",
+      "lines": "82-89",
+      "cat": "leak / navigation-after-unmount",
+      "whatsWrong": "The auto-continue setTimeout (lines 82-84) is never captured and the useEffect returns no cleanup function (line 89). The 2s timer therefore keeps running after the component unmounts. Concrete failure: user taps 'Continue' at t=0.5s -> handleContinue() runs navigation.reset to 'Main' and this screen unmounts; the pending timer is still alive and at t=2s fires handleContinue() again, dispatching a SECOND navigation.reset({index:0}) onto the root. Anything the user did in the 1.5s after landing on Main (opened a product, scrolled into a category) is wiped by the delayed reset. Backgrounding the app mid-timer produces the same stray reset when it fires.",
+      "rootCause": "setTimeout handle not stored; effect has no return () => clearTimeout(...).",
+      "failureScenario": "Land on success screen -> tap Continue at 0.5s (reset to Main) -> navigate into a product on Main -> at 2s the un-cleared timer fires handleContinue() -> navigation.reset wipes the Main stack out from under the user.",
+      "fix": "Capture and clear the timer, and abort if unmounted:\n\nuseEffect(() => {\n  let timer: ReturnType<typeof setTimeout> | undefined;\n  let cancelled = false;\n  Animated.sequence([ ... ]).start();\n  const doRefreshAndContinue = async () => {\n    try { await refreshUser(); } catch (e) {}\n    if (cancelled) return;\n    timer = setTimeout(() => { handleContinue(); }, 2000);\n  };\n  doRefreshAndContinue();\n  return () => { cancelled = true; if (timer) clearTimeout(timer); };\n  // eslint-disable-next-line react-hooks/exhaustive-deps\n}, []);"
+    },
+    {
+      "sev": "S1",
+      "lines": "91-93",
+      "cat": "double-tap / double-navigation",
+      "whatsWrong": "handleContinue() has no in-flight guard, so navigation.reset can be dispatched multiple times. Two concrete triggers: (a) the auto-timer AND a manual button tap both call it (even with the timer cleanup above, a tap that fires in the same frame the timer resolves races it), and (b) an impatient user double-taps 'Continue' (line 119-121) on a slow 320dp Android before the first reset re-renders, firing reset({index:0, routes:[Main]}) twice. Duplicate root resets can flash/rebuild the Main navigator twice and drop transient state.",
+      "rootCause": "No hasNavigated ref/flag gating the single-shot navigation action.",
+      "failureScenario": "User double-taps Continue quickly on a slow device -> handleContinue runs twice -> navigation.reset dispatched twice, rebuilding the Main tab navigator a second time.",
+      "fix": "Guard with a ref so it only navigates once:\n\nconst hasNavigated = useRef(false);\nconst handleContinue = () => {\n  if (hasNavigated.current) return;\n  hasNavigated.current = true;\n  navigation.reset({ index: 0, routes: [{ name: 'Main' as any }] });\n};"
+    }
+  ],
+  "src/screens/auth/SetNewPasswordScreen.tsx": [
+    {
+      "sev": "S1",
+      "lines": "385-393 (handleSkip 186-208, handleSubmit 118)",
+      "cat": "race-condition / double-submit",
+      "whatsWrong": "The 'Not now' skip TouchableOpacity has no disabled={loading} prop and handleSkip has no in-flight guard, while the primary submit button IS disabled during loading. Both handlers call registerWithPhone + navigate.",
+      "rootCause": "Only the primary button was given a loading guard; the skip path was overlooked. setLoading(true) is async, so it cannot stop synchronous re-entry either.",
+      "failureScenario": "On slow Iraqi mobile network, user taps 'Create password' (handleSubmit sets loading=true, registerWithPhone in flight, primary button greys out). Impatient user taps 'Not now' -> handleSkip fires concurrently, calling registerWithPhone AGAIN with the same phone/name and then navigating to RegisterSuccess before the first request resolves. Two concurrent registration attempts + premature navigation. Separately, two fast taps on 'Not now' both enter handleSkip before the first setLoading re-renders, double-registering.",
+      "fix": "Add disabled={loading} to the skip TouchableOpacity (line 385) and add an early guard `if (loading) return;` at the top of both handleSubmit and handleSkip. e.g.\n<TouchableOpacity onPress={handleSkip} disabled={loading} style={[styles.quietButton, loading && { opacity: 0.5 }]} activeOpacity={0.6}>"
+    },
+    {
+      "sev": "S2",
+      "lines": "189-201",
+      "cat": "broken-flow / wrong-behavior",
+      "whatsWrong": "handleSkip only registers when `mode === 'register' && method === 'phone' && name`. For an email registration (method === 'email'), it skips registration entirely yet still calls setRegistrationInProgress(false), refreshUser(), and navigate('RegisterSuccess').",
+      "rootCause": "The skip button visibility gate (line 383: isRegister && mode !== 'partner-register') shows the button for email-register, but handleSkip's guard excludes email, so it becomes a no-op-then-navigate.",
+      "failureScenario": "User picks email signup in AboutYouScreen (navigates here with mode:'register', method:'email'). On the password screen they tap 'Not now'. No account is created (email has no passwordless path), but they are sent to the RegisterSuccess screen as if registered. They later cannot sign in — a ghost account that never existed.",
+      "fix": "Hide skip for email register (change line 383 gate to `isRegister && mode !== 'partner-register' && method === 'phone'`), or in handleSkip block/branch email: if method === 'email' and no password was set, do not navigate to success — surface an error or require a password."
+    }
+  ],
+  "src/screens/auth/VerifyPhoneScreen.tsx": [
+    {
+      "sev": "S1",
+      "lines": "239-241, 285-289",
+      "cat": "global-state-not-cleared",
+      "whatsWrong": "For mode register/admin-register/partner-register the screen calls setRegistrationInProgress(true) at line 240 BEFORE verifying the code, but the catch block (285-289) that runs when verification fails only sets the error, clears the boxes and refocuses — it never resets the flag back to false. This flag is a module-level ref in AuthContext (registrationInProgressRef); while it is true, AuthContext's onAuthStateChanged handler (line 155-158) returns early on EVERY auth event and never calls setUser. So a failed OTP during registration permanently disables the global auth listener.",
+      "rootCause": "The registration gate is opened on the optimistic (pre-verify) path but only ever closed by downstream success screens; the error path has no compensating reset.",
+      "failureScenario": "Iraqi user picks Register, requests OTP, mistypes the 6-digit code (or SMS arrives late / network blips). AuthService.verifyPhoneCode throws, catch runs, registrationInProgress stays true. User gives up, taps 'Use a different phone/email' (line 507) -> SignIn, logs in with an existing email+password successfully. onAuthStateChanged fires with a real Supabase session, but line 155 sees the flag still true and returns early -> setUser is never called -> the app stays on the auth stack showing a logged-out UI despite a valid session. Only a full app restart recovers.",
+      "fix": "Reset the gate in the catch block (NOT finally — on success it must stay set until the downstream screen consumes it):\n} catch (error: any) {\n  if (mode === 'register' || mode === 'admin-register' || mode === 'partner-register') {\n    setRegistrationInProgress(false);\n  }\n  setError(error.message || t('auth.verifyFailed', { defaultValue: 'Verification failed. Try again.' }));\n  setCode(['', '', '', '', '', '']);\n  focusBox(0);\n}"
+    }
+  ],
+  "src/screens/messenger/ChatThreadScreen.tsx": [
+    {
+      "sev": "S1",
+      "lines": "69-98",
+      "cat": "keyboard-covers-input / Android double-shift",
+      "whatsWrong": "The keyboard effect animates translateY to -keyboardHeight on BOTH platforms, but Android is configured with windowSoftInputMode=\"adjustResize\" (AndroidManifest.xml:42, app.json:48). Under adjustResize the OS already shrinks the window when the keyboard opens, so the position:absolute bottom:0 composer is ALREADY sitting exactly on top of the keyboard. The extra Animated translateY of -keyboardHeight (fired on keyboardDidShow, i.e. AFTER the resize) then lifts the composer a full keyboard-height ABOVE the keyboard, leaving a huge empty gap and floating the input box into the middle of the screen the instant the user starts typing.",
+      "rootCause": "Same manual keyboard-avoidance path applied to a platform that already does it natively via adjustResize.",
+      "failureScenario": "Android user taps the composer -> keyboard opens -> window resizes composer above keyboard -> keyboardDidShow fires -> composer jumps up ~300dp, detaching from the keyboard with a large blank gap; on a 320dp low-RAM phone the input can land behind the header. iOS is unaffected (iOS does not auto-resize, so the translate is needed there).",
+      "fix": "Skip the manual translate on Android: `useEffect(() => { if (Platform.OS === 'android') return; const onShow = (e:any) => Animated.timing(translateY,{toValue:-(e?.endCoordinates?.height??0),duration:240,useNativeDriver:true}).start(); const onHide = () => Animated.timing(translateY,{toValue:0,duration:220,useNativeDriver:true}).start(); const s = Keyboard.addListener('keyboardWillShow', onShow); const h = Keyboard.addListener('keyboardWillHide', onHide); return () => { s.remove(); h.remove(); }; }, [translateY]);` (leave translateY at 0 on Android; adjustResize positions the composer)."
+    },
+    {
+      "sev": "S1",
+      "lines": "127-141",
+      "cat": "lost-input / no-error-feedback / unhandled-rejection",
+      "whatsWrong": "onSend clears the input with setText('') at line 132 BEFORE awaiting sendMessage, and the try block has a finally but NO catch. sendMessage (chatService.ts:398-401) re-throws on any failure. So on a thrown send the user's typed text is already gone, there is zero error UI, and because onSend is an async fn invoked from onPress without await, the rejection becomes an unhandled promise rejection.",
+      "rootCause": "Optimistic clear with no rollback and no catch on a promise that rejects.",
+      "failureScenario": "On slow/no network, or when the seller has blocked the thread (chatService throws 'This conversation is blocked'), or 'Conversation not found': user types a long message, taps send, the field clears, the spinner flips back off — and the message silently vanishes with no toast/retry. The user believes it was sent. Plus a redbox in dev / unhandled-rejection log in prod.",
+      "fix": "Add a catch that restores the text and notifies: `try { await sendMessage(conversationId, trimmed, user.uid, 'user'); requestAnimationFrame(() => listRef.current?.scrollToOffset({ offset: 0, animated: true })); } catch (e) { setText((prev) => prev || trimmed); Alert.alert(t('chat.sendFailed', { defaultValue: 'Message failed to send. Tap send to retry.' })); } finally { setSending(false); }` (import Alert from react-native)."
+    },
+    {
+      "sev": "S2",
+      "lines": "129-136",
+      "cat": "double-submit race (stale guard)",
+      "whatsWrong": "The in-flight guard uses the `sending` state value captured in the render-time closure, and `disabled` (line 300) is likewise driven by render-time state. Neither updates until React commits the setSending(true) re-render. Two fast taps landing in the same frame both execute the same onSend closure where `sending===false` and `text===trimmed`, so both call sendMessage and a duplicate message is inserted.",
+      "rootCause": "State-based guard is asynchronous; it does not block re-entry within the same frame.",
+      "failureScenario": "On a 320dp low-RAM Android device where a render can lag several frames, an impatient double-tap on Send posts the same message twice to the conversation.",
+      "fix": "Add a synchronous ref guard: `const sendingRef = useRef(false);` then in onSend `if (!trimmed || sendingRef.current || !user?.uid) return; sendingRef.current = true; setSending(true); ...` and in finally `sendingRef.current = false; setSending(false);`."
+    }
+  ],
+  "src/screens/messenger/ConversationsScreen.tsx": [
+    {
+      "sev": "S1",
+      "lines": "390-404",
+      "cat": "logout-not-clearing-user-data",
+      "whatsWrong": "When user?.uid becomes falsy (logout, or switch to guest), the effect early-returns after setLoading(false)/setRefreshing(false) but never clears `items`. The subscription callback is the ONLY writer of `items`, and it does not fire in the logged-out branch, so the previous account's full conversation list (store names + last-message text) stays in state and on screen.",
+      "rootCause": "The `!user?.uid` guard handles the spinner but omits resetting list state; because this screen is guest-aware (isGuest/LoginGate on line 610) it stays mounted across auth transitions rather than being unmounted, so stale state persists.",
+      "failureScenario": "User A signs in, opens Messenger (loads 12 private supplier chats), signs out to guest. AuthContext.user goes null, the effect re-runs, unsubscribes, and returns without clearing items. User A's private conversations and last messages remain fully visible to whoever now holds the device (guest / next user) until a new subscription overwrites them.",
+      "fix": "Clear the list in the logged-out branch:\n  if (!user?.uid) {\n    setItems([]);\n    setLoading(false);\n    setRefreshing(false);\n    return;\n  }"
+    }
+  ],
+  "src/screens/profile/ChangePasswordScreen.tsx": [
+    {
+      "sev": "S1",
+      "lines": "358-370, 597",
+      "cat": "double-submit",
+      "whatsWrong": "handleResendOTP only guards on `if (cooldown > 0) return`, and the button is `disabled={cooldown > 0}` — neither checks `loading`. When cooldown hits 0 the button becomes enabled, and `setCooldown(30)` only runs AFTER `await sendOTP(...)` resolves, so for the entire network round-trip cooldown stays 0 and the button stays enabled.",
+      "rootCause": "The in-flight state (`loading`) is not part of the guard/disabled condition; the cooldown that would block re-taps is set only after the awaited request completes.",
+      "failureScenario": "On the OTP screen the 30s cooldown expires. User taps 'Resend code'; nothing visibly changes for ~1-2s on a slow Iraqi mobile connection, so they tap it again. Both taps pass `cooldown > 0 === false`, firing two `sendOTP(userPhone)` calls → two real SMS sent (telco cost) and `verificationId` overwritten twice; the code from the first SMS may no longer match the stored verificationId, confusing the user.",
+      "fix": "Guard on loading in both places: `const handleResendOTP = async () => { if (cooldown > 0 || loading) return; ... }` and `<TouchableOpacity onPress={handleResendOTP} disabled={cooldown > 0 || loading} ...>`."
+    },
+    {
+      "sev": "S2",
+      "lines": "477, 518-522, 537-541",
+      "cat": "double-submit",
+      "whatsWrong": "The 'Forgot password?' link and the phone/email method cards fire `handleSendPhoneOTP` / `handleSendEmailReset`, which set `loading=true` inside their try block. The only guard is `disabled={loading}`, which relies on a React re-render to take effect.",
+      "rootCause": "No synchronous in-flight ref; the guard becomes effective only after the loading state flushes to the UI, leaving a window where two queued touch events both dispatch.",
+      "failureScenario": "On a low-RAM 320dp Android with a laggy JS thread, two rapid taps on the phone method card queue before React flushes the first `setLoading(true)`. Both invocations of `handleSendPhoneOTP` run, sending two OTP SMS (or two password-reset emails), each a real billable side effect.",
+      "fix": "Add a synchronous guard, e.g. `const inFlight = useRef(false);` at the top of each network handler: `if (inFlight.current) return; inFlight.current = true; try { ... } finally { inFlight.current = false; setLoading(false); }`. Do the same in the primary change/set/verify handlers for defense in depth."
+    }
+  ],
+  "src/screens/profile/MyAddressScreen.tsx": [
+    {
+      "sev": "S1",
+      "lines": "297, 365 (dead: 330)",
+      "cat": "crash",
+      "whatsWrong": "The map block is gated only by a truthy check `address.coordinates &&` (line 297). `coordinates` comes straight from a Supabase jsonb column with NO validation (addressService.mapDbToAddress: `coordinates: data.coordinates`). The overlay at line 365 then calls `address.coordinates.latitude.toFixed(6)` and `.longitude.toFixed(6)` directly. If the DB row holds a truthy-but-partial/garbage object — `{}`, `{latitude: 33}`, `{latitude: null, longitude: null}` (partial save, migration artifact, or manual/garbage data) — the truthy check passes and `.toFixed` is called on `undefined`/`null`, throwing 'Cannot read property toFixed of undefined' during render. This throws for the WHOLE screen (every card re-renders), so one bad address blanks the entire address list via ErrorBoundary, not just its own card.",
+      "rootCause": "Truthy object check instead of numeric-field validation; unvalidated jsonb passthrough in the service.",
+      "failureScenario": "A user has an address whose jsonb `coordinates` was saved as `{latitude: 33.31}` (longitude missing) or `{}`. On opening My Addresses, line 297 truthy-check passes, line 365 evaluates `.longitude.toFixed(6)` on undefined -> TypeError thrown in render -> entire MyAddressScreen crashes to the error boundary; user cannot see or manage ANY of their addresses.",
+      "fix": "Guard on the actual numeric fields, both at the map condition (line 297) and the no-coordinates condition (line 373). Add a helper: `const hasCoords = (a: Address) => typeof a.coordinates?.latitude === 'number' && !isNaN(a.coordinates.latitude) && typeof a.coordinates?.longitude === 'number' && !isNaN(a.coordinates.longitude);` then use `{hasCoords(address) && (` at 297 and `{!hasCoords(address) && (` at 373. (SafeMapView already does this internally for iOS at its line 72; the screen's own overlay at 365 does not.)"
+    },
+    {
+      "sev": "S2",
+      "lines": "58, 69-73, 420",
+      "cat": "broken-refresh",
+      "whatsWrong": "`loadAddresses` unconditionally calls `setLoading(true)` on line 58, and `if (loading)` (line 420) returns a FULL-SCREEN centered spinner that replaces the entire list+ScrollView+RefreshControl. Because `loadAddresses` runs on every `useFocusEffect` (line 78) and inside `onRefresh` (line 71): (a) every time the user returns to this screen (e.g. after AddEditAddress) the already-rendered list is torn down and flashes the full-screen loader; (b) pull-to-refresh is visibly broken — as soon as the fetch starts, `loading` flips true, the ScrollView (and thus the RefreshControl spinner the user is looking at) is unmounted and replaced by the full-screen loader, so the pull-to-refresh spinner vanishes mid-gesture.",
+      "rootCause": "Single `loading` flag reused for initial load, focus-refetch, and pull-to-refresh; full-screen loading branch not distinguished from background refresh.",
+      "failureScenario": "User pulls to refresh: the RefreshControl spinner appears, then instantly the whole list disappears and a centered 'Loading' spinner takes over, then the list pops back. Also: user taps a saved address to edit, hits back — instead of seeing their list, the screen blanks to a full-screen spinner every single time.",
+      "fix": "Only show the full-screen loader on the very first load. E.g. gate line 58 with `if (addresses.length === 0 && !refreshing) setLoading(true);` (and keep the `finally` setLoading(false)). This keeps the list mounted during focus-refetch and pull-to-refresh so the RefreshControl handles its own spinner."
+    }
+  ],
+  "src/screens/profile/PaymentMethodsScreen.tsx": [
+    {
+      "sev": "S1",
+      "lines": "83-103, 173-180",
+      "cat": "logout-not-clearing-data / cross-account leak",
+      "whatsWrong": "loadExchangerInfo only ever CALLS setSavedExchangerInfo when data exists (line 95-97); it never resets it to null. The `!user?.uid` early-return (line 84-86) also fails to clear it. The mount effect re-runs on `[user?.uid]` change. So when the auth user changes to null (logout / session expiry / token-refresh failure while the screen stays mounted) or switches from a user WHO HAS saved info to one who has NONE, savedExchangerInfo retains the previous user's private financial data — exchange office name/phone and receiver name/phone — and keeps rendering it in the 'Saved Money Exchanger' card (lines 464-563).",
+      "rootCause": "Load function treats 'no data' as 'do nothing' instead of 'clear', so stale per-user state survives an account change.",
+      "failureScenario": "User A saves exchanger info (receiver name + phone). Session expires and AuthContext sets user to null (screen still mounted); effect re-runs, hits `!user?.uid`, returns without clearing. User B logs in with no saved info; loadExchangerInfo fetches null, so the `if (data?.money_exchanger_info)` guard is false and setSavedExchangerInfo is never called — User B now sees User A's receiver name and phone number auto-filling at checkout.",
+      "fix": "Clear the state on every path that lacks data:\n\nconst loadExchangerInfo = useCallback(async () => {\n  if (!user?.uid) {\n    setSavedExchangerInfo(null);   // clear on logout / no user\n    setExchangerLoading(false);\n    return;\n  }\n  try {\n    const { data } = await supabase.from('users').select('money_exchanger_info').eq('id', user.uid).single();\n    if (data?.money_exchanger_info) {\n      setSavedExchangerInfo(data.money_exchanger_info as SavedMoneyExchangerInfo);\n    } else {\n      setSavedExchangerInfo(null); // clear when this user has none\n    }\n  } catch { /* ignore */ } finally {\n    setExchangerLoading(false);\n  }\n}, [user?.uid]);"
+    },
+    {
+      "sev": "S2",
+      "lines": "96, 497-521",
+      "cat": "unvalidated-cast / render-crash",
+      "whatsWrong": "money_exchanger_info is a free-form JSONB column cast blindly with `as SavedMoneyExchangerInfo` (line 96). The saved-card maps its fields directly into <Text> children (lines 499-503 -> 517). If any stored field is an object or array (corruption, a different writer, or a schema change), `<Text>{item.value}</Text>` throws React's 'Objects are not valid as a React child' and the screen crashes on render.",
+      "rootCause": "`as` cast asserts a shape the DB does not guarantee for a JSONB column.",
+      "failureScenario": "A row where money_exchanger_info was written as `{ officeName: { name: 'X' }, ... }` (or an admin/import script stored a nested object). On open, savedExchangerInfo is truthy, the saved card renders, and line 517 tries to render the object child -> hard crash, no error boundary recovery for this screen's content.",
+      "fix": "Coerce/validate after fetch. Minimal: render `value: typeof savedExchangerInfo.officeName === 'string' ? savedExchangerInfo.officeName : String(savedExchangerInfo.officeName ?? '')` (repeat per field), or normalize once in loadExchangerInfo by mapping each field through String()/'' and dropping non-object shapes. Stop trusting the raw JSONB via `as`."
+    }
+  ],
+  "src/screens/profile/UpdatePhoneScreen.tsx": [
+    {
+      "sev": "S1",
+      "lines": "162-203, 297-312, 319",
+      "cat": "double-submit-race",
+      "whatsWrong": "handleVerify has no in-flight guard. It is auto-invoked the moment the 6th digit is entered (L142 paste path, L150 single-digit path). During the network round-trip loading=true disables the Confirm button (L320) but NOT the OTP TextInputs, which also have selectTextOnFocus (L310). A nervous/fast user tapping a filled box selects its digit; typing replaces it, fires handleOTPChange, all-6-filled is still true, and handleVerify runs a SECOND time with the same token. The second supabase.auth.verifyOtp for type 'phone_change' fails (token already consumed), lands in catch, matches /invalid|expired|token|otp/, sets 'Incorrect or expired code.' and clears the code array (L198) — even though the FIRST call already succeeded and is about to update the profile. The user sees a false error over a successful verification.",
+      "rootCause": "Async submit handler with no re-entrancy guard, plus OTP inputs left interactive during loading.",
+      "failureScenario": "User types the 6th digit → auto-verify starts (slow network) → user impatiently taps a box and re-types a digit → second verifyOtp fires, fails on the reused token → 'Incorrect or expired code.' flashes and all boxes clear, contradicting the success Alert that may also appear.",
+      "fix": "Add `if (loading) return;` as the first line of handleVerify (and handleResend, L205, which is likewise unguarded and only gated by cooldown). Optionally add `editable={!loading}` to the OTP TextInputs (L298) so they can't be retriggered while a verify is in flight."
+    },
+    {
+      "sev": "S1",
+      "lines": "177-197",
+      "cat": "partial-success-inconsistency",
+      "whatsWrong": "After supabase.auth.verifyOtp succeeds (L177-178) the phone is already changed and verified on the Supabase auth user, but updateUserProfile (L181) and refreshUser (L182) are awaited afterward with no separation. If either throws (flaky network, RLS hiccup on public.users), control jumps to the catch block which shows a generic/'already in use'/'incorrect code' error AND clears the code array (L198). The user believes the whole operation failed and will re-enter or resend — but the OTP was already consumed, so verify/resend behave inconsistently, and auth.phone is now out of sync with public.users.phone (the row the app actually reads).",
+      "rootCause": "Auth-side change and app-side mirror are in the same try; a failure in the mirror step is reported as a total failure with no compensation or distinct messaging.",
+      "failureScenario": "verifyOtp succeeds, then refreshUser() fails on a dropped connection → user sees 'Something went wrong. Please try again.', code clears, they tap Resend → new SMS but the number is already changed at auth → confusing loop, and the app's users row still shows the old number.",
+      "fix": "Separate the two phases: after a successful verifyOtp, wrap the mirror in its own try/catch that does NOT clear the code or claim the code was wrong — e.g. still show the success Alert but log/queue a retry of updateUserProfile/refreshUser, or show a distinct 'Phone verified — finishing sync…' message. Only the verifyOtp failure path should reset the code."
+    }
+  ],
+  "src/screens/store/StoreCompanyTab.tsx": [
+    {
+      "sev": "S1",
+      "lines": "230, 239-244, 64-72",
+      "cat": "correctness",
+      "whatsWrong": "The Location card, its initialRegion, and openMap all gate only on `profile.location` being truthy — they never verify latitude/longitude are finite numbers. `mapDbToProfile` assigns `location: data.location` with zero validation, so a DB row with `location: {}` or a partial `{latitude: 33.3}` (missing longitude) flows straight through as a truthy object. SafeMapView guards coordinates internally ONLY on iOS (`hasCoords = lat != null && !isNaN(lat)`); on Android it forwards `initialRegion={{ latitude: undefined, longitude: undefined, ... }}` directly to the native react-native-maps MapView.",
+      "rootCause": "Truthiness check on an object instead of validating its numeric fields; Android path in SafeMapView has no coordinate guard.",
+      "failureScenario": "Server returns a store whose `location` JSON is present but incomplete (e.g. `{}` or only a latitude). On a 320dp Android device the native MapView receives undefined/NaN coordinates in initialRegion -> map renders blank / at 0,0 or emits a native error; tapping 'Open in Maps' or 'Directions' builds `geo:undefined,undefined` / `maps:undefined,undefined` which never resolves.",
+      "fix": "Compute a validated flag once and use it everywhere: `const hasGeo = profile.location && Number.isFinite(profile.location.latitude) && Number.isFinite(profile.location.longitude);` then render the card with `{hasGeo && (...)}` and early-return in `openMap` unless `hasGeo`."
+    },
+    {
+      "sev": "S2",
+      "lines": "64-72",
+      "cat": "error-handling",
+      "whatsWrong": "`openMap` calls `Linking.openURL(url || '')` with NO `.catch()`, unlike the sibling `openUrl` helper (line 61) which correctly swallows rejections. `Platform.select` only defines ios/android, and the iOS scheme `maps:${lat},${lng}` (no `//?ll=`) is malformed. Any of: no maps app installed (Android), unsupported scheme, or an empty/undefined url causes openURL to reject with no handler.",
+      "rootCause": "Missing .catch on a Linking.openURL promise and a non-standard iOS URL scheme.",
+      "failureScenario": "User on an Android phone with no geo-capable app (or iOS where `maps:33.3,44.4` isn't recognized) taps 'Directions' / 'Open in Maps'. openURL's promise rejects unhandled -> dev red-box 'Possible unhandled promise rejection', and in production the button silently does nothing with no user feedback.",
+      "fix": "Mirror `openUrl`: `Linking.openURL(url || '').catch(() => {});` and use a valid iOS URL, e.g. `ios: \\`https://maps.apple.com/?ll=${lat},${lng}\\``."
+    }
+  ],
+  "src/screens/CategoryProductsScreen.tsx": [
+    {
+      "sev": "S2",
+      "lines": "46-64, 155-162",
+      "cat": "missing-error-state",
+      "whatsWrong": "The catch block (L60-62) swallows every fetch error and just sets products to []. There is no distinct error state — a network/server failure renders the exact same 'No products available' empty view (L155-162) as a genuinely empty category, with no retry button. On a slow/no-network Iraqi device, getProductsByCategory throws, the user sees 'No products available', concludes the category is truly empty, and leaves — when the data merely failed to load. The only recovery (pull-to-refresh) is unsignposted.",
+      "rootCause": "Error and empty are conflated into one state (products.length === 0); no error flag is tracked and no retry affordance is rendered.",
+      "failureScenario": "User on subway (no network) taps a category tile. getProductsByCategory() rejects -> catch sets products=[] -> screen shows 'No products available'. User believes the category is empty and never learns it was a network error.",
+      "fix": "Add `const [error, setError] = useState(false);`. In load(): `setError(false)` at the start of try, and in catch do `setProducts([]); setError(true);`. Then branch ListEmptyComponent (or the container) on `error` to show a distinct message + a retry TouchableOpacity that calls `load()`, e.g. `{error ? <ErrorRetry onRetry={load}/> : <EmptyState/>}`."
+    }
+  ],
+  "src/screens/ChatScreen.tsx": [
+    {
+      "sev": "S2",
+      "lines": "1709, 1312, 1326-1354",
+      "cat": "leak/setState-after-unmount",
+      "whatsWrong": "The recording timer interval (recordingTimerRef, created at 1709) is only cleared inside cancelRecording (1729) and stopAndSendRecording (1743). There is no unmount cleanup: the isRecording effect at 1326 only returns `pulse.stop()` and no other effect clears the timer or stops audioRecorder. If the user starts a voice recording then navigates back (component unmounts) or the screen is popped, the setInterval keeps firing setRecordingDuration on an unmounted component forever and audioRecorder.record() keeps the mic hot / file open.",
+      "rootCause": "Missing component-unmount cleanup for recordingTimerRef and audioRecorder.",
+      "failureScenario": "User taps mic to record a voice message, then taps the back arrow (or a deep-link navigates away) mid-recording. The 1s interval leaks and keeps calling setState indefinitely; the microphone/recorder is never stopped, so the mic indicator stays on and the temp audio file is never released. Repeat a few times on a 320dp low-RAM Android and you accumulate live intervals + orphaned recorders.",
+      "fix": "Add an unmount-only effect: `useEffect(() => () => { if (recordingTimerRef.current) clearInterval(recordingTimerRef.current); audioRecorder?.stop?.().catch(() => {}); isRecordingIntentRef.current = false; }, []);`"
+    },
+    {
+      "sev": "S2",
+      "lines": "2664, 1526-1570",
+      "cat": "double-tap/duplicate-send",
+      "whatsWrong": "The preview-modal send button (TouchableOpacity at 2664) has no disabled/in-flight guard, and handleSendPreviewImage's early `if (!previewUri) return` (1527) does not protect against a synchronous double-invocation: setPreviewUri(null)/setPreviewVisible(false) are async, so two taps in the same frame both read the still-set previewUri and each run a full upload + sendMessage.",
+      "rootCause": "No synchronous in-flight guard on the image-send path (unlike onSend which guards on `sending`).",
+      "failureScenario": "On a slow network the send button stays on screen for a moment; an impatient user double-taps it. Both taps pass the previewUri check before React flushes the null, producing two uploads of the same image and two duplicate image messages in the thread (and two optimistic bubbles).",
+      "fix": "Guard synchronously with a ref or state: at the top of handleSendPreviewImage add `if (!previewUri || sendingPreviewRef.current) return; sendingPreviewRef.current = true;` and reset it in a finally block; optionally also set `disabled={sendingPreviewRef.current}` on the button."
+    }
+  ],
+  "src/screens/NotificationsScreen.tsx": [
+    {
+      "sev": "S2",
+      "lines": "93-105",
+      "cat": "race-condition / wasteful-refetch",
+      "whatsWrong": "The realtime-subscription effect lists selectedFilter and showOnlyUnread in its dependency array. Every filter-tab tap and unread-toggle therefore tears down the Supabase channel (cleanup at line 104) and builds a brand-new one, and NotificationService.subscribeToNotifications internally issues a FORCED network fetch (getUserNotifications(true), service line 292) on every re-subscribe. Worse, the old subscription's in-flight `getUserNotifications(true).then(callback)` can still resolve AFTER its channel was removed and invoke the OLD callback, which runs setNotifications + filterNotifications(data, OLD selectedFilter, OLD showOnlyUnread) — overwriting the list handleFilterChange just set with the NEW filter.",
+      "rootCause": "Filter values are captured into the subscription closure via deps to avoid a stale closure, but that couples subscription lifecycle to filter state and reruns the forced refetch.",
+      "failureScenario": "On a slow Iraqi 2G connection the user taps All -> Orders -> Promos -> System. Four channel teardown/creates and four forced refetches fire. The 'Orders' refetch resolves after the 'System' tap and applies the stale 'order' filter, so the list flashes the wrong subset before settling. Repeated rapid tapping also spams the network and flickers the list.",
+      "fix": "Subscribe once. Keep filter values in refs and read them inside the callback: `const filterRef = useRef({selectedFilter, showOnlyUnread}); useEffect(()=>{filterRef.current={selectedFilter,showOnlyUnread};});` then in the effect use `[filterNotifications]` deps only and call `filterNotifications(updated, filterRef.current.selectedFilter, filterRef.current.showOnlyUnread)`. This keeps one channel for the screen's life and re-filters cheaply on the client."
+    }
+  ],
+  "src/screens/auth/LegacyEmailLoginScreen.tsx": [
+    {
+      "sev": "S2",
+      "lines": "37-62, 156-160",
+      "cat": "double-submit-race",
+      "whatsWrong": "handleLogin has no in-flight guard at its top; it validates and then awaits loginWithEmail. The only protection is `disabled={loading}` on the button, but setLoading(true) is asynchronous, so a fast double-tap can fire onPress twice before the disabled re-render commits, issuing two concurrent loginWithEmail() calls and stacking two 'Welcome back' Alerts.",
+      "rootCause": "Guard relies on async React state (disabled={loading}) that has not committed yet when the second synchronous onPress fires; there is no synchronous re-entrancy check.",
+      "failureScenario": "On a slow low-RAM Android the re-render after setLoading(true) is delayed tens of ms; a user impatiently double-taps Login, both taps pass validation and both call AuthService.signInWithIdentifier concurrently — two auth requests race, the second can overwrite the session, and two success Alerts stack on screen.",
+      "fix": "Add a synchronous re-entrancy guard as the first line of handleLogin: `if (loading) return;` (place it before the validation block so the second tap short-circuits immediately, independent of the async disabled prop)."
+    }
+  ],
+  "src/screens/auth/OnboardingScreen.tsx": [
+    {
+      "sev": "S2",
+      "lines": "51-82",
+      "cat": "layout-scroll-owner",
+      "whatsWrong": "The <ScrollView> (line 51) has NO `flex: 1` (only `contentContainerStyle`). In a React Native flex column (SafeAreaView flex:1 with the footer as a sibling), the ScrollView's default flexBasis is `auto`, so its own frame collapses to its CONTENT height instead of filling the available space. Two consequences: (1) the intended vertical centering never happens — `contentContainerStyle.justifyContent:'center'` (line 104) has no extra space to center within, so on a tall/large screen the hero content clusters near the top and the footer/CTA floats mid-screen instead of pinned to the bottom; (2) because the ScrollView is sized to its content, it is NOT height-constrained and therefore CANNOT scroll when content exceeds the viewport.",
+      "rootCause": "ScrollView is given contentContainerStyle but no `style={{flex:1}}`/`flex:1`, so it is not bounded by its parent and collapses to intrinsic content height; `flexGrow:1` on the content container only affects the inner content view, not the ScrollView's outer frame.",
+      "failureScenario": "320dp low-RAM Android at max OS font size with Arabic/Kurdish (which wraps the 3 bullet points onto more lines): logo(88) + margins + title(28pt, multi-line) + subtitle + three wrapped points exceed the short viewport. The ScrollView grows to that content height and pushes the footer (the ONLY 'Get Started' button — the sole exit from this full-screen zIndex:9998 overlay) below the screen edge. Since the ScrollView isn't height-constrained it does not scroll, so the user cannot reach 'Get Started' and is trapped on onboarding with no way into the app.",
+      "fix": "Constrain the ScrollView's height so it fills the parent and becomes scrollable: add a style. Change `<ScrollView contentContainerStyle={styles.content} ...>` to `<ScrollView style={styles.scroll} contentContainerStyle={styles.content} ...>` and add `scroll: { flex: 1 }` to the StyleSheet. This pins the footer to the bottom, makes the `justifyContent:'center'` centering actually work, and lets tall content scroll so the CTA is always reachable."
+    }
+  ],
+  "src/screens/profile/AddEditAddressScreen.tsx": [
+    {
+      "sev": "S2",
+      "lines": "485-492, 1223-1224, 1291-1298",
       "cat": "race-condition",
-      "whatsWrong": "Two independent effects both write `setExchangeRateIQD` from separate async continuations with no ordering guarantee. Effect 1 (26-36) applies the cached rate when its `AsyncStorage.getItem` resolves; effect 2's `fetchRate` (52-63) applies the fresh server rate when the Supabase query resolves. If the cache read resolves AFTER the network fetch, the STALE cached value clobbers the FRESH server value. The `rateLoadedFromCache` ref (declared line 24, set line 32) is written but NEVER read anywhere — a half-implemented guard proving the author knew ordering mattered but never wired it up.",
-      "rootCause": "No coordination/ordering between the cache-hydration effect and the network-fetch effect; both mutate the same state and the intended guard ref is dead.",
-      "failureScenario": "Cold start: the provider tree (Cart/Favorites/Notification providers) floods AsyncStorage's single native queue, so the cache `getItem` for 'cached_exchangeRateIQD' is queued behind other reads. The `global_settings/business_info` HTTPS fetch returns first and sets rate = 1300 (admin's real rate). The late `getItem` then resolves with the previously cached '1500' and calls `setExchangeRateIQD(1500)`. A user viewing IQD prices now sees every price computed at 1500 instead of 1300 until the next realtime push or app restart — wrong money shown to real customers.",
-      "fix": "Wire the existing ref as a real guard so the cache read never overwrites a value the server already applied. In effect 2's `applyRate`, set a ref when the server value lands; in effect 1, only apply the cache if the server hasn't answered yet:\n\n// module/provider scope\nconst serverRateApplied = useRef(false);\n\n// effect 2 applyRate:\nconst applyRate = (rate: unknown) => {\n  const n = Number(rate);\n  if (n > 0) {\n    serverRateApplied.current = true;\n    setExchangeRateIQD(n);\n    AsyncStorage.setItem(EXCHANGE_RATE_CACHE_KEY, String(n)).catch(() => {});\n  }\n};\n\n// effect 1:\nif (!isNaN(parsed) && parsed > 0 && !serverRateApplied.current) {\n  setExchangeRateIQD(parsed);\n}\n\nAlternatively collapse both effects into one that awaits the cache first, then fetches."
-    }
-  ],
-  "src/components/ThemeProvider.tsx": [
-    {
-      "sev": "S2",
-      "lines": "35, 40-65, 100-103",
-      "cat": "correctness-desync",
-      "whatsWrong": "The legacy-fallback branch calls setThemeModeState(savedTheme) but never updates currentCustomTheme. Because `theme` (line 40) is derived from currentCustomTheme whenever it is non-null (it always is), and `isDark` (line 35) is derived partly from themeMode, setting themeMode alone desyncs the two: isDark can be true while the rendered theme is the light Amber palette.",
-      "rootCause": "themeMode and currentCustomTheme are two independent sources of truth for darkness, and only currentCustomTheme actually drives `theme`; the migration path updates only the former.",
-      "failureScenario": "A user upgrades from an older app build that persisted CACHE_KEYS.THEME='dark' (confirmed: current code only READS this key at line 100, never writes it — so it can only come from an old version). On launch, savedCustomization is null, so the else-branch runs: themeMode becomes 'dark' but currentCustomTheme stays the seeded Amber-Retail LIGHT preset (isDark:false). Result at render: isDark===true (themeMode==='dark') while theme.dark===false and all colors are light. Any consumer that branches on isDark (StatusBar barStyle, dark-only chrome) renders dark UI over a light theme — visibly broken until the user manually re-picks a theme.",
-      "fix": "Route the legacy value through the full setter so currentCustomTheme is updated in tandem (and it migrates the value into the new storage): replace `setThemeModeState(savedTheme as ThemeMode);` at line 102 with `setThemeMode(savedTheme as ThemeMode);` (setThemeMode is defined at 118 and is initialized by the time this async fn runs post-mount). More robustly, also make `theme` honor isDark on mismatch, e.g. fall back to `isDark ? darkTheme : lightTheme` when `currentCustomTheme.isDark !== isDark`."
+      "whatsWrong": "handleSave has no synchronous in-flight guard. The only protection against a second invocation is the Button's `disabled={loading}` (Button.tsx l190), which is driven by async React state — it only takes effect after setLoading(true) causes a re-render. A rage-tap / very fast double-tap (and the isDefault checkbox row at l1223 is a second, separately-tappable trigger path only for that field, not this) can pass the `if (!user?.uid) return` and reach addressService.addAddress twice.",
+      "rootCause": "Guard relies on async `loading` state instead of a synchronous ref; addAddress has no idempotency key.",
+      "failureScenario": "On a 320dp low-RAM Android under GC pause, user taps 'Add Address' twice within one frame before the re-render disables the button. addressService.addAddress runs twice; it is not idempotent (INSERT with no dedupe, addressService.ts l100-104). Both calls also independently compute isFirstAddress→isDefault=true (addressService l72-81), so the user gets TWO identical addresses, both flagged default.",
+      "fix": "Add a ref guard at the top of handleSave: `const savingRef = React.useRef(false); ... if (savingRef.current) return; savingRef.current = true;` and reset it in the finally block (`savingRef.current = false;`) alongside setLoading(false)."
     },
     {
       "sev": "S2",
-      "lines": "87, 90-91, 40-64",
-      "cat": "crash-unvalidated-persisted-shape",
-      "whatsWrong": "The object returned by JSON.parse at line 87 is assigned straight into state via setCurrentCustomThemeState(customization.customTheme) (line 91) with no shape validation. The theme useMemo (lines 40-64) then dereferences currentCustomTheme.colors.primary during render, outside the try/catch.",
-      "rootCause": "Trusting persisted JSON to match the current CustomTheme shape; the deref happens in render where the surrounding try/catch cannot protect it.",
-      "failureScenario": "A cross-version schema drift or partial/corrupted write leaves a THEME_CUSTOMIZATION entry whose `customTheme` is present but lacks the nested `colors` object (e.g. an older custom-theme shape, or a truncated write when the app was backgrounded mid-setItem). JSON.parse succeeds (so the try/catch at 105 does NOT fire), state is set to the malformed object, and the very next render evaluates `currentCustomTheme.colors.primary` → 'Cannot read property primary of undefined' → red screen / crash loop on every launch, because the bad value is re-loaded from storage each time.",
-      "fix": "Validate before setting, e.g. `const ct = customization.customTheme; if (ct && ct.colors && ct.spacing && ct.borderRadius && ct.typography) { setCurrentCustomThemeState(ct); } else if (customization.selectedPresetId) { const p = getPresetById(customization.selectedPresetId); if (p) setCurrentCustomThemeState(p.theme); }`. Additionally harden the memo mapping with optional chaining and a preset fallback so a bad value can never crash render."
-    }
-  ],
-  "src/navigation/AppNavigator.tsx": [
-    {
-      "sev": "S2",
-      "lines": "214-222, 432",
-      "cat": "navigation-name-collision",
-      "whatsWrong": "The name 'Cart' is registered twice inside the SAME mounted guest navigator tree: once as a bottom-tab screen nested in Main (line 214, WrappedCartScreen) and once as a top-level stack screen (line 432, CartScreen). React Navigation resolves navigate('Cart') to the nearest navigator that owns the name, so the identical call produces two different results depending on where it is fired.",
-      "rootCause": "Duplicate route name across an outer stack and its nested tab navigator — React Navigation's name-resolution footgun. navigate('Cart') from a Main-tab screen switches to the Cart TAB; from a pushed stack screen it PUSHES a separate full-screen Cart.",
-      "failureScenario": "Confirmed against real callers: HomeScreen.tsx:319 (a Home-tab screen) calls navigate('Cart') and gets the tabbed Cart WITH the floating tab bar; but ProductDetailsScreen.tsx:1088, CategoryProductsScreen.tsx:118, and ChatbotScreen.tsx:454 are top-level stack screens, so their navigate('Cart') pushes a full-screen Cart with NO bottom tab bar and a different back-stack. Same button intent, inconsistent UI and back behavior — user adds an item from a product page, taps cart, loses the tab bar and lands in a dead-end push.",
-      "fix": "Eliminate the collision. Simplest: delete the standalone stack screen (remove line 432 `<Stack.Screen name=\"Cart\" component={CartScreen} />`) and make every caller target the tab explicitly, e.g. `navigation.navigate('Main', { screen: 'Cart' })` in ProductDetailsScreen/CategoryProductsScreen/ChatbotScreen/HomeScreen. If a distinct full-screen cart is genuinely wanted, instead rename the stack screen to a unique name (e.g. `CartFull`) and point those callers at it — never share the name with the tab."
-    }
-  ],
-  "src/services/productService.ts": [
-    {
-      "sev": "S2",
-      "lines": "195, 203-214",
-      "cat": "correctness-inconsistency",
-      "whatsWrong": "Deactivated/hidden products (is_active = false) are returned in customer search results.",
-      "rootCause": "searchProducts builds its query (line 195) with no .eq('is_active', true) and its client-side filter (lines 203-214) matches only on name/brand/etc. — it never filters out inactive products, unlike getProducts (line 160 .filter(p => p.isActive !== false)), getProductsByTenantId (line 335), getFeaturedProducts (line 264) and getProductsByCategory (line 367).",
-      "failureScenario": "An admin deactivates a discontinued phone (sets is_active=false). It correctly vanishes from the home list, category screen and featured rail, but a customer typing its name into search still sees it, taps it, and tries to order a product the store deliberately pulled.",
-      "fix": "Filter inactive rows in searchProducts to match the other methods. After the .map(mapProduct) at line 203 add the same guard: `let searchResults = (data || []).map(mapProduct).filter((p: any) => p.isActive !== false).filter((p: any) => { ... })`, or add `.eq('is_active', true)` to the query on line 195."
-    },
-    {
-      "sev": "S2",
-      "lines": "426-430",
-      "cat": "stale-data-race",
-      "whatsWrong": "The realtime subscription re-serves stale cached products instead of the updated data, defeating the purpose of the live subscription for the duration of the cache window.",
-      "rootCause": "The realtime handler responds to a DB change by calling this.getProducts(...), but getProducts (lines 123-124) returns cached data whenever the cache entry is younger than CACHE_EXPIRATION.PRODUCTS. So a change event resolves to stale cache instead of the fresh row that just changed.",
-      "failureScenario": "A customer is on a live product list. Admin marks an item out-of-stock; Postgres emits a change; the handler calls getProducts, which returns the still-fresh cached page showing the item as in-stock. The customer keeps seeing the wrong stock/price until the cache TTL expires (minutes later), even though realtime 'updated'.",
-      "fix": "Bypass the cache on realtime refresh. Add an optional `forceRefresh = false` parameter to getProducts that skips the `if (cached && !this.isCacheExpired(...)) return cached.data` read when true, then call it from the handler: `const result = await this.getProducts(filters, { page: 1, limit: 50, total: 0, hasMore: true }, tenantId, true);`. Also wrap the handler body in try/catch so a network error inside getProducts (which re-throws at line 177) doesn't become an unhandled rejection in the subscription callback."
-    },
-    {
-      "sev": "S2",
-      "lines": "218",
-      "cat": "correctness-inconsistency",
-      "whatsWrong": "When the customer applies the 'in stock' filter in search, products whose stock is held in size/color variations are wrongly filtered out even though they are actually purchasable.",
-      "rootCause": "The inStock filter here uses raw p.stockQty, but getProducts was explicitly fixed (comment lines 161-162) to use the computed p.inStock precisely because variation products carry stock_qty=0 while real stock lives per-variation (see mapProduct lines 55-58).",
-      "failureScenario": "A phone case sold only via color variations (stock_qty=0, red variation has 20 units) is in stock. Customer searches its name with the in-stock filter on -> the case disappears from results, so a sellable item looks sold-out only in search.",
-      "fix": "Use the computed field to match getProducts: change line 218 to `if (filters.inStock) searchResults = searchResults.filter(p => p.inStock);`"
-    },
-    {
-      "sev": "S2",
-      "lines": "326-327",
-      "cat": "missing-mock-guard",
-      "whatsWrong": "In mock mode (USE_MOCK_DATA=true) this method still hits the live Supabase client instead of returning mock data.",
-      "rootCause": "getProductsByTenantId is the only public fetch method missing the `if (USE_MOCK_DATA) return mock...()` guard that every sibling has (getProducts:120, searchProducts:187, getProduct:229, getFeaturedProducts:254, getProductsByIds:287, getProductsByCategory:357, getCategories:386). Its own comment says it 'powers Search & Store screens'.",
-      "failureScenario": "Running the app in mock/demo mode with no Supabase env configured: getProductsByTenantId calls supabase, the request throws, the catch at line 349 returns the empty cache fallback -> the Store and Search screens render blank in a mode that is supposed to be fully offline/mock. (Even if Supabase is reachable, mock mode inconsistently mixes real tenant data with mock data everywhere else.)",
-      "fix": "Add a guard at the top of the method (line 327), e.g. `if (USE_MOCK_DATA) { const res = await mockGetProducts({}, { page: 1, limit: 200, total: 0, hasMore: true }); return res.products; }` (reusing the already-imported mockGetProducts), or import/add a dedicated mockGetByTenantId."
-    }
-  ],
-  "src/services/discountService.ts": [
-    {
-      "sev": "S2",
-      "lines": "390, 394-411",
-      "cat": "wrong-value",
-      "whatsWrong": "getPotentialDiscounts computes subtotal from the raw base price item.product.priceUSD (line 390) and calls isDiscountApplicableToItems(items, discount) WITHOUT isVip (line 394, defaulting to false). Every other path in this file — lineSubtotal, calculateDiscountAmountForItems, getBestDiscountForCart — computes off the actually-charged tiered/VIP price via LocalCartService.getTieredPrice, exactly as the file's own header comment (lines 5-7) demands. This method is the sole exception, and its caller (CartScreen.tsx:524) also never passes isVip.",
-      "rootCause": "getEffectiveUnitPrice returns vipPriceUSD (VIP) or the wholesale tier price, both below priceUSD. Using priceUSD here overstates the subtotal for VIP/wholesale carts and makes the whole method VIP-unaware.",
-      "failureScenario": "VIP user, product priceUSD=$100 with vipPriceUSD=$80, buys 1; a discount needs minPurchase=$90. Real charged subtotal (getBestDiscountForCart, isVip=true) = $80 < $90 -> discount NOT applied (correct). But getPotentialDiscounts sees subtotal=$100: at line 404 '$100 < $90' is false so it never pushes a 'spend $10 more to unlock' opportunity, and at line 394 the isVip=false applicability check also sees $100 >= $90 -> applicable -> 'continue' (line 395) skips it. Net: the VIP user gets neither the discount nor the hint, and any missingAmount that IS shown (line 405) is computed off the wrong base price. Also, if item.product.priceUSD is undefined (server garbage) subtotal becomes NaN and all threshold branches silently fail.",
-      "fix": "Give the method an isVip param and use the same charged-price basis as the rest of the file: `async getPotentialDiscounts(cart: Cart, isVip: boolean = false)`, replace line 390 with `const subtotal = lineSubtotal(items, isVip);`, and pass isVip into the applicability check on line 394: `this.isDiscountApplicableToItems(items, discount, isVip)`. Update the caller CartScreen.tsx:524 to `getPotentialDiscounts(cart, isVip)`."
-    },
-    {
-      "sev": "S2",
-      "lines": "343-352, 345-347, 49-50, 72",
+      "lines": "232-243",
       "cat": "race-condition",
-      "whatsWrong": "incrementUsageCount is the only place usage_count is bumped, but (1) grep shows it has ZERO callers anywhere in the app — no order/checkout flow invokes it — so usageLimit is never actually enforced; and (2) even if called it is a non-atomic read-modify-write (read via getDiscountById line 345, then updateDiscount with discount.usageCount + 1 line 347) that also never invalidates this.tenantCache.",
-      "rootCause": "Read-modify-write with a 5-minute cache (CACHE_TTL, line 18) instead of an atomic DB increment; usageLimit is checked against usageCount in getActiveDiscountsByTenant (line 72) and isDiscountApplicableToItems (line 256), both of which read the cached/stale count.",
-      "failureScenario": "A promo limited to usageLimit=100 is applied by every customer without bound because usage_count is never incremented from the app. If a caller were added: two customers checking out simultaneously (or one double-tapping / backgrounding mid-request) both read usageCount=99 and both write 100, so the 100-use cap is silently exceeded; and because tenantCache is not cleared after the write, a limit-reached discount keeps being offered and applied for up to 5 minutes.",
-      "fix": "Increment atomically server-side (Supabase RPC / `update ... set usage_count = usage_count + 1`) instead of read-then-write, invalidate the cache after success with `delete this.tenantCache[tenantId]` (use the currently-unused tenantId param, or derive it), and actually call incrementUsageCount from the order-placement flow after a discount is applied."
+      "whatsWrong": "The mount effect's loadDefaults() does a functional setFormData that carefully preserves user input with `prev.x || default` for every field EXCEPT coordinates (l240: `coordinates: resolvedCoordinates`), which is written unconditionally and with no isMounted/latest-write check. Its own resolvedCoordinates comes from a getCurrentPositionAsync(Balanced) started at l169 that can resolve seconds later, racing handleGetCurrentLocation (l403, High accuracy).",
+      "rootCause": "Unconditional overwrite inside an otherwise merge-preserving async update, with no cancellation or 'already set' guard.",
+      "failureScenario": "New-address screen opens with location permission already granted → loadDefaults starts a slow Balanced GPS fix. The user immediately taps the prominent 'Use current location' button (handleGetCurrentLocation), which resolves first and sets precise High-accuracy coordinates. The still-pending loadDefaults fix then resolves and its setFormData at l240 overwrites the user's coordinates with the older/less-accurate Balanced fix (out-of-order write). If loadDefaults had NO permission, resolvedCoordinates is undefined and l240 can wipe coordinates the user just set back to undefined.",
+      "fix": "Guard coordinates like the other fields: `coordinates: prev.coordinates || resolvedCoordinates,` (and/or bail out of loadDefaults' setFormData if isMountedRef.current is false)."
     }
   ],
-  "src/utils/pricingUtils.ts": [
+  "src/screens/profile/EditProfileScreen.tsx": [
     {
       "sev": "S2",
-      "lines": "90",
-      "cat": "correctness-money",
-      "whatsWrong": "getEffectiveUnitPrice returns the flat vipPriceUSD whenever it is a number > 0, WITHOUT checking that it is below the base priceUSD. This contradicts hasVipPrice (line 106), which only treats vipPriceUSD as a real VIP price when `vipPriceUSD < product.priceUSD`. On garbage/mis-entered data where vipPriceUSD >= priceUSD, a VIP is charged MORE than a normal user, and because hasVipPrice returns false, no VIP badge is shown to explain the higher price.",
-      "rootCause": "Line 90's guard (`vipPriceUSD > 0`) is looser than hasVipPrice's guard (`vipPriceUSD < priceUSD`); the two functions disagree on what a valid VIP price is.",
-      "failureScenario": "Admin/server sends product { priceUSD: 10, vipPriceUSD: 12 } (data-entry error, or a stale VIP price after the base price was lowered). A logged-in VIP opens the product: getDisplayUnitPrice -> getEffectiveUnitPrice(product,1,true) hits line 90 (12 > 0) and returns 12. A normal user pays 10. The VIP silently pays 12 — 20% more than a non-VIP — and hasVipPrice returns false so nothing on the UI signals why.",
-      "fix": "Tighten line 90 to match hasVipPrice: `if (isVip && typeof product.vipPriceUSD === 'number' && product.vipPriceUSD > 0 && product.vipPriceUSD < product.priceUSD) { return product.vipPriceUSD; }`. This guarantees the flat VIP path can never charge a VIP above base; it then falls through to calculateTieredPrice (which returns basePrice for qty 1 with no qualifying tier)."
+      "lines": "366-370",
+      "cat": "wrong-date-parsing",
+      "whatsWrong": "`new Date(user.createdAt).getFullYear()` is rendered with no validity check. In this hybrid Firebase/Supabase app `user` is `any` and createdAt's shape is unverified. A Firestore Timestamp object ({seconds,nanoseconds}) or malformed string produces Invalid Date -> getFullYear() = NaN, rendering 'Member since NaN'. If createdAt is Unix seconds (e.g. 1700000000) instead of ms, `new Date(seconds)` is interpreted as ms since epoch -> 'Member since 1970'. Either way the user sees a wrong/garbage year.",
+      "rootCause": "Unguarded Date construction on untyped API data plus ambiguous seconds-vs-ms units.",
+      "failureScenario": "Backend returns createdAt as a Firebase Timestamp object or seconds-based number; the profile hero shows 'Member since NaN' / 'Member since 1970'.",
+      "fix": "Guard for validity before rendering: `{(() => { const d = user?.createdAt ? new Date(user.createdAt) : null; if (!d || isNaN(d.getTime())) return null; return (<Text allowFontScaling={false} style={{ fontSize: 13, color: labelColor, marginTop: 4 }}>{t('profile.memberSince', { defaultValue: 'Member since {{year}}', year: d.getFullYear() })}</Text>); })()}` — and normalize the unit upstream (multiply seconds by 1000, or unwrap Timestamp) so the year is correct."
     }
   ],
-  "src/screens/CartScreen.tsx": [
+  "src/screens/profile/HelpSupportScreen.tsx": [
     {
       "sev": "S2",
-      "lines": "129-164, 317-322",
-      "cat": "null-data-corruption",
-      "whatsWrong": "When availableStock is null, the typed-quantity branch in onChangeText does `num > availableStock` → `num > null` → `num > 0`, so ANY entered quantity is treated as exceeding stock. It calls `setLocalQuantity(availableStock)` and `setLocalQtyText(String(availableStock))` (lines 318-319) — String(null) is the literal text 'null', which the TextInput renders — then after 500ms dispatches `handleQuantityChange(null)` → `updateQuantity(productId, null)`. The cart item quantity becomes null and every downstream total (discountedTotal line 198, cartSummary) computes NaN, so formatPrice renders '$NaN'.",
-      "rootCause": "Product.stockQty is typed `number` but productService.ts:28 maps it as `stockQty: data.stock_qty` with no default, so a null/unset DB column flows through as null; variation stockQuantity is equally untrusted. The memo's final fallback (line 163) `return item.product.stockQty` then returns null.",
-      "failureScenario": "Admin sets a product's stock to null (or field unset); syncCartWithLatestData (line 446) refreshes the cached product; user opens cart, taps the qty box and types '3' → the box shows the word 'null' and the order total shows '$NaN'.",
-      "fix": "Coerce to a finite number at every return of the memo and before comparisons, e.g. in the memo `const n = item.product.stockQty; return typeof n === 'number' && Number.isFinite(n) ? n : 0;` (and the same for sizeVar/colorVar.stockQuantity), then compare typed input against that numeric value."
-    },
+      "lines": "323-326",
+      "cat": "broken-feature",
+      "whatsWrong": "The screen's single support CTA ('Chat on WhatsApp') calls openWhatsApp(BRAND.contactPhone, ...), but BRAND.contactPhone is the hardcoded placeholder 'TODO_CONTACT_PHONE' (config.ts:7, no env override). openWhatsApp strips non-digits to '' and opens whatsapp://send?phone=&text=... (and wa.me/?text=... fallback) with NO recipient. openWhatsApp's trailing .catch(()=>{}) swallows every failure, so the button gives zero feedback. There is no guard against an empty/invalid phone before firing.",
+      "rootCause": "Config placeholder (documented 'until finalized') combined with the screen offering no fallback or guard when the number is not a real phone.",
+      "failureScenario": "User with an unanswered question taps the only support button. WhatsApp opens to a blank 'no contact' state (or wa.me shows an invalid-number error), then nothing. They believe the app is broken and cannot reach support. Even after launch, if contactPhone is ever misconfigured/empty, the button silently no-ops.",
+      "fix": "Guard before opening and give feedback, e.g.: `const phone = BRAND.contactPhone.replace(/\\D/g, ''); if (!phone) { Alert.alert(t('helpSupport.title'), t('helpSupport.contactUnavailable', { defaultValue: 'Support contact is not available yet.' })); return; } openWhatsApp(phone, t(...));` — and/or hide the button when no real number is configured. (Also replace the placeholder in config.ts before release.)"
+    }
+  ],
+  "src/screens/profile/UpdateEmailScreen.tsx": [
     {
       "sev": "S2",
-      "lines": "501-532, 569-585",
-      "cat": "race-condition",
-      "whatsWrong": "loadDiscounts and loadCartSummary can have multiple overlapping requests in flight. Responses are applied in resolution order, not request order, so an older response can overwrite the newer one (out-of-order write), and either can setState after the screen unmounts.",
-      "rootCause": "Both effects call setState after awaiting a (potentially networked) service call, with no ignore/cancellation flag, while `cart` — which changes on every quantity edit — is in their dependency arrays.",
-      "failureScenario": "On a slow Iraqi mobile connection the user bumps quantity 1→2→3 quickly; getCartSummaryAsync for qty=1 (which fetches shipping rates) resolves after the qty=3 call and setCartSummary overwrites the correct total with the qty=1 total. Or the user leaves the Cart mid-fetch and setCartSummary/setAppliedDiscount fire on an unmounted component.",
-      "fix": "Add a per-effect guard: `let ignore = false; ...; if (!ignore) setCartSummary(summary); return () => { ignore = true; };` and the same for setAppliedDiscount / setOpportunities in loadDiscounts."
-    },
+      "lines": "123-127, 153",
+      "cat": "double-tap-no-guard",
+      "whatsWrong": "handleDone has no in-flight guard and the Done TouchableOpacity (L153) has no disabled prop. handleDone awaits reloadUser() (a supabase.auth.getUser() network round-trip). A user who double-taps Done on a slow/low-RAM device fires handleDone twice; both invocations eventually call navigation.goBack(), popping TWO screens instead of one (e.g. skipping the Profile screen straight back to Home).",
+      "rootCause": "Async handler triggered by a button with no disabled/loading guard, and goBack() is not idempotent when dispatched twice before the transition settles.",
+      "failureScenario": "On 3G, user taps 'Done' on the success screen; the reloadUser() await takes ~1s; during that second the user taps 'Done' again out of impatience. Two goBack() dispatches fire and the navigator pops past the intended parent screen, dumping the user an extra level back.",
+      "fix": "Guard the handler and disable the button, e.g.: `const handleDone = async () => { if (loading) return; setLoading(true); await reloadUser(); refreshUser(); navigation.goBack(); };` and on the button `disabled={loading}` (or use a `useRef(false)` in-flight flag if you don't want the button to visually change)."
+    }
+  ],
+  "src/screens/store/StoreProductsTab.tsx": [
     {
       "sev": "S2",
-      "lines": "492-498, 748-752",
-      "cat": "double-tap-navigation",
-      "whatsWrong": "A fast double-tap invokes requireAuth → navigation.navigate('Checkout') twice before the navigation state updates, pushing two Checkout screens onto the stack.",
-      "rootCause": "handleCheckout has no in-flight guard and the checkout TouchableOpacity is never disabled.",
-      "failureScenario": "Low-RAM Android with a busy JS thread: user double-taps Checkout and lands on Checkout stacked twice, having to press back twice to return.",
-      "fix": "Guard with a ref: `const navigatingRef = useRef(false); if (navigatingRef.current) return; navigatingRef.current = true;` inside the requireAuth callback, resetting it on screen focus/blur — or check `navigation.isFocused()` before navigating."
+      "lines": "143-145",
+      "cat": "wrong-result",
+      "whatsWrong": "The 'New' filter does `filtered = [...filtered].reverse()` as a proxy for recency. The products array arrives NEWEST-FIRST from the service (getProductsByTenantId orders `.order('created_at', { ascending: false })`, productService.ts:349), and that same order is what 'All' renders. Reversing a newest-first list produces OLDEST-first, so tapping 'New' surfaces the store's oldest inventory — the exact opposite of the chip's meaning.",
+      "rootCause": "reverse() assumes the source array is oldest-first, but the backend returns newest-first.",
+      "failureScenario": "Admin adds a brand-new product today; store is on Supabase. Customer taps the 'New' chip expecting newest arrivals and instead sees the oldest products in the catalog first; the new item lands at the very bottom.",
+      "fix": "Data is already newest-first, so drop the reverse. Either remove the branch entirely, or sort explicitly by date: `} else if (activeFilter === 'New') { filtered = [...filtered].sort((a, b) => new Date(b.createdAt as any).getTime() - new Date(a.createdAt as any).getTime()); }` — note createdAt is a raw ISO string from Supabase (mapProduct sets `createdAt: data.created_at`) despite the Timestamp type, so `.toMillis()` would throw; use `new Date(...)`."
     }
   ]
 }

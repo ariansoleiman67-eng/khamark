@@ -74,6 +74,10 @@ const ChangePasswordScreen = () => {
   const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const styles = useMemo(() => createStyles(colors, isRTL, isDark), [colors, isRTL, isDark]);
   const reauthRef = useRef<ReauthModalHandle>(null);
+  // Synchronous in-flight guard for async network actions (OTP SMS / reset email are
+  // billable). State-based `disabled`/`loading` guards only take effect after a
+  // re-render, leaving a window where two queued taps both fire the side effect.
+  const inFlightRef = useRef(false);
 
   // ─── Step state ────────────────────────────────────────
   const [step, setStep] = useState<Step>('change');
@@ -278,6 +282,8 @@ const ChangePasswordScreen = () => {
 
   // ─── Phone OTP path ───────────────────────────────────
   const handleSendPhoneOTP = async () => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     try {
       setLoading(true);
       setErrorMessage('');
@@ -288,12 +294,15 @@ const ChangePasswordScreen = () => {
     } catch (error: any) {
       setErrorMessage(error.message || t('profile.passwordScreen.errors.failedSendCode'));
     } finally {
+      inFlightRef.current = false;
       setLoading(false);
     }
   };
 
   // ─── Email reset path ─────────────────────────────────
   const handleSendEmailReset = async () => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     try {
       setLoading(true);
       setErrorMessage('');
@@ -302,6 +311,7 @@ const ChangePasswordScreen = () => {
     } catch (error: any) {
       setErrorMessage(error.message || t('profile.passwordScreen.errors.failedSendEmail'));
     } finally {
+      inFlightRef.current = false;
       setLoading(false);
     }
   };
@@ -356,7 +366,11 @@ const ChangePasswordScreen = () => {
   };
 
   const handleResendOTP = async () => {
-    if (cooldown > 0) return;
+    // Guard on cooldown AND the synchronous in-flight ref: cooldown is only set to 30
+    // AFTER `await sendOTP` resolves, so during the round-trip it stays 0 and the button
+    // stays enabled — two taps would otherwise fire two billable SMS.
+    if (cooldown > 0 || inFlightRef.current) return;
+    inFlightRef.current = true;
     try {
       setLoading(true);
       const result = await sendOTP(userPhone);
@@ -365,6 +379,7 @@ const ChangePasswordScreen = () => {
     } catch (error: any) {
       setErrorMessage(error.message || t('profile.passwordScreen.errors.failedResend'));
     } finally {
+      inFlightRef.current = false;
       setLoading(false);
     }
   };
@@ -594,7 +609,7 @@ const ChangePasswordScreen = () => {
                 {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text allowFontScaling={false} style={styles.primaryButtonText}>{t('profile.passwordScreen.confirm')}</Text>}
               </TouchableOpacity>
 
-              <TouchableOpacity onPress={handleResendOTP} disabled={cooldown > 0} style={styles.resendButton} activeOpacity={0.6}>
+              <TouchableOpacity onPress={handleResendOTP} disabled={cooldown > 0 || loading} style={styles.resendButton} activeOpacity={0.6}>
                 <Text allowFontScaling={false} style={[styles.resendText, cooldown > 0 && { color: colors.textSecondary }]}>
                   {cooldown > 0 ? t('profile.passwordScreen.resendCodeIn', { seconds: String(cooldown).padStart(2, '0') }) : t('profile.passwordScreen.resendCode')}
                 </Text>

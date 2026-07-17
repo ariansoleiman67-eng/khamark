@@ -91,24 +91,13 @@ export const OrdersScreen: React.FC = () => {
   // GOLDEN TEMPLATE: Auth gate - guests MUST NOT access Orders
   const { isAuthenticated, needsAuth } = useAuthGate();
   
-  // If guest, redirect to LoginGate immediately
-  if (needsAuth()) {
-    // Navigate to LoginGate with reason
-    navigation.navigate('LoginGate', { reason: 'orders' });
-    
-    // Return a loading state while navigating
-    return (
-      <SafeAreaView 
-        style={{ flex: 1, backgroundColor: theme.colors.background }} 
-        edges={['top', 'left', 'right']}
-      >
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          {/* ALIBABA: Static skeleton instead of spinner */}
-          <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: theme.colors.text, opacity: isDark ? 0.2 : 0.12 }} />
-        </View>
-      </SafeAreaView>
-    );
-  }
+  // If guest, redirect to LoginGate. Done in an effect (never during render),
+  // WITHOUT an early return, so the hook order below is identical every render.
+  useEffect(() => {
+    if (needsAuth()) {
+      navigation.navigate('LoginGate', { reason: 'orders' });
+    }
+  }, [needsAuth, navigation]);
   
   const ORDER_STATUSES: Array<{ key: OrderStatus | 'all' | 'cancelled' }> = [
     { key: 'all' },
@@ -173,23 +162,29 @@ export const OrdersScreen: React.FC = () => {
 
   const isRTL = i18n?.language ? getDirection(i18n.language) === 'rtl' : false;
 
-  // Load orders
+  // Ref (not state) so loadOrders stays referentially stable; the focus effect
+  // depends on loadOrders and must not be recreated on every filter/keystroke.
+  const hasLoadedRef = useRef(false);
+
+  // Load orders (fetch only — filtering is handled reactively below)
   const loadOrders = useCallback(async (refresh = false) => {
     try {
-      if (refresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-
       // Auth is already gated at screen entry
       if (!isAuthenticated) {
         return;
       }
 
+      if (refresh) {
+        setRefreshing(true);
+      } else if (!hasLoadedRef.current) {
+        // Only show the full-screen skeleton on the first cold load; later
+        // focus refreshes happen silently over the already-rendered list.
+        setLoading(true);
+      }
+
       const userOrders = await OrderService.getUserOrders(refresh);
       setOrders(userOrders);
-      filterOrders(userOrders, selectedStatus, selectedDateFilter, searchQuery);
+      hasLoadedRef.current = true;
     } catch (error) {
       console.error('Error loading orders:', error);
       Alert.alert(t('common.error'), t('orders.loadError'));
@@ -197,7 +192,7 @@ export const OrdersScreen: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [selectedStatus, selectedDateFilter, searchQuery, t]);
+  }, [isAuthenticated, t]);
 
   // Filter function
   const filterOrders = useCallback((
@@ -244,9 +239,9 @@ export const OrdersScreen: React.FC = () => {
     if (search) {
       const searchLower = search.toLowerCase();
       filtered = filtered.filter(order =>
-        order.orderNumber.toLowerCase().includes(searchLower) ||
-        order.items.some(item =>
-          item.productName.toLowerCase().includes(searchLower) ||
+        (order.orderNumber || '').toLowerCase().includes(searchLower) ||
+        (order.items || []).some(item =>
+          item.productName?.toLowerCase().includes(searchLower) ||
           item.partNumber?.toLowerCase().includes(searchLower)
         )
       );
@@ -254,6 +249,15 @@ export const OrdersScreen: React.FC = () => {
 
     setFilteredOrders(filtered);
   }, []);
+
+  // Re-filter reactively whenever the source list or any filter/search value
+  // changes. Fetch (loadOrders) and filtering are decoupled — loadOrders only
+  // populates `orders`, and this effect derives `filteredOrders` from it — so a
+  // cold load actually surfaces the orders (the FlatList reads filteredOrders)
+  // and focus refreshes / search keystrokes never recreate loadOrders.
+  useEffect(() => {
+    filterOrders(orders, selectedStatus, selectedDateFilter, searchQuery);
+  }, [orders, selectedStatus, selectedDateFilter, searchQuery, filterOrders]);
 
   useFocusEffect(
     useCallback(() => {
@@ -425,7 +429,13 @@ export const OrdersScreen: React.FC = () => {
 
     const displayCurrency = (order.currency || currentCurrency) as 'USD' | 'IQD';
     const displayExchangeRate = order.exchangeRate || exchangeRateIQD;
-    
+
+    // Defensive: Supabase order rows can carry a null items JSONB / order_number
+    // (OrderService casts DB data to Order without normalizing these). Guard once
+    // so the render body never dereferences null.
+    const items = Array.isArray(order.items) ? order.items : [];
+    const orderNumber = order.orderNumber || '';
+
     return (
       <View
         style={{
@@ -480,7 +490,7 @@ export const OrdersScreen: React.FC = () => {
                   letterSpacing: -0.2,
                 }}
               >
-                {t('order.order', { defaultValue: 'Order' })} {order.orderNumber.replace(/ORD/g, '').replace(/#/g, '').replace(/-/g, '')}
+                {t('order.order', { defaultValue: 'Order' })} {orderNumber.replace(/ORD/g, '').replace(/#/g, '').replace(/-/g, '')}
               </Text>
               <Text allowFontScaling={false}
                 style={{
@@ -567,10 +577,10 @@ export const OrdersScreen: React.FC = () => {
                 marginBottom: SPACING.md,
               }}
             >
-              {t('orders.itemsCount', { count: order.items.length })}
+              {t('orders.itemsCount', { count: items.length })}
             </Text>
-            
-            {order.items.slice(0, isExpanded ? order.items.length : 2).map((item, itemIndex) => (
+
+            {items.slice(0, isExpanded ? items.length : 2).map((item, itemIndex) => (
               <View
                 key={itemIndex}
                 style={{
@@ -642,7 +652,7 @@ export const OrdersScreen: React.FC = () => {
               </View>
             ))}
             
-            {!isExpanded && order.items.length > 2 && (
+            {!isExpanded && items.length > 2 && (
               <TouchableOpacity
                 onPress={() => toggleOrderExpansion(order.id)}
                 style={{
@@ -657,7 +667,7 @@ export const OrdersScreen: React.FC = () => {
                     fontWeight: '500',
                   }}
                 >
-                  {t('orders.moreItems', { count: order.items.length - 2 })}
+                  {t('orders.moreItems', { count: items.length - 2 })}
                 </Text>
               </TouchableOpacity>
             )}
