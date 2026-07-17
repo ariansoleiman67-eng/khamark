@@ -329,7 +329,10 @@ export class ProductService {
     } catch (error: any) {
       console.error('Error fetching products by ids:', error);
       const cached = await this.getCachedData(cacheKey);
-      return cached ? ordered(cached.data) : [];
+      if (cached) return ordered(cached.data);
+      // No cache to fall back on — surface the failure so the caller can show a
+      // retry state instead of an empty list that looks like "no favorites".
+      throw error;
     }
   }
 

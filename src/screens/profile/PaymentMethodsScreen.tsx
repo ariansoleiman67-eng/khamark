@@ -111,10 +111,13 @@ const PaymentMethodsScreen: React.FC = () => {
         .eq('id', user.uid)
         .single();
 
-      if (data?.money_exchanger_info) {
+      if (error) {
+        // Transient read error (postgrest resolves network failures as {data:null,error}
+        // WITHOUT throwing) — keep whatever is on screen instead of wiping saved info.
+      } else if (data?.money_exchanger_info) {
         setSavedExchangerInfo(normalizeExchangerInfo(data.money_exchanger_info));
       } else {
-        setSavedExchangerInfo(null); // this user has no saved info — clear any stale state
+        setSavedExchangerInfo(null); // confirmed empty — this user has no saved info
       }
     } catch (error) {
       // silently fail

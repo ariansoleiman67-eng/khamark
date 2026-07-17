@@ -36,6 +36,8 @@ const FavoritesScreen: React.FC = () => {
   
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // True only on a genuine fetch failure (not merely empty results).
+  const [loadFailed, setLoadFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -62,9 +64,12 @@ const FavoritesScreen: React.FC = () => {
       const validProducts = await ProductService.getProductsByIds(favorites, force);
       if (reqId === reqIdRef.current) {
         setProducts(validProducts);
+        setLoadFailed(false);
       }
     } catch {
-      // Silently handle fetch errors
+      // A genuine fetch error — surface the retry state (empty results alone are NOT
+      // an error: favorited products may simply have been deleted from the catalog).
+      if (reqId === reqIdRef.current) setLoadFailed(true);
     } finally {
       if (reqId === reqIdRef.current) {
         setIsLoading(false);
@@ -218,10 +223,10 @@ const FavoritesScreen: React.FC = () => {
             <Text allowFontScaling={false} style={styles.shopButtonText}>{t('favorites.startBrowsing')}</Text>
           </TouchableOpacity>
         </View>
-      ) : products.length === 0 ? (
-        /* Favorites exist but products could not be loaded (offline / cold cache).
-           getProductsByIds swallows fetch errors and returns [], so offer an explicit retry
-           instead of falsely claiming the wishlist is empty. */
+      ) : loadFailed ? (
+        /* Genuine fetch failure (offline / server error, no cache). Empty results
+           alone are NOT an error — favorited products may have been deleted — so we
+           only show retry when the fetch actually failed. */
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIconContainer}>
             <Ionicons

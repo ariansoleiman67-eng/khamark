@@ -122,7 +122,6 @@ export const OrdersScreen: React.FC = () => {
   
   // State
   const [orders, setOrders] = useState<Order[]>([]);
-  const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus | 'all'>('all');
@@ -247,17 +246,16 @@ export const OrdersScreen: React.FC = () => {
       );
     }
 
-    setFilteredOrders(filtered);
+    return filtered;
   }, []);
 
-  // Re-filter reactively whenever the source list or any filter/search value
-  // changes. Fetch (loadOrders) and filtering are decoupled — loadOrders only
-  // populates `orders`, and this effect derives `filteredOrders` from it — so a
-  // cold load actually surfaces the orders (the FlatList reads filteredOrders)
-  // and focus refreshes / search keystrokes never recreate loadOrders.
-  useEffect(() => {
-    filterOrders(orders, selectedStatus, selectedDateFilter, searchQuery);
-  }, [orders, selectedStatus, selectedDateFilter, searchQuery, filterOrders]);
+  // Derive filteredOrders SYNCHRONOUSLY from the source list + filters via useMemo.
+  // (A state+effect version lagged one commit behind `orders`, flashing the empty
+  // state for a frame right after a cold load resolved.)
+  const filteredOrders = useMemo(
+    () => filterOrders(orders, selectedStatus, selectedDateFilter, searchQuery),
+    [orders, selectedStatus, selectedDateFilter, searchQuery, filterOrders]
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -272,13 +270,12 @@ export const OrdersScreen: React.FC = () => {
   const handleStatusFilter = (status: OrderStatus | 'all') => {
     setSelectedStatus(status);
     setExpandedOrders(new Set());
-    filterOrders(orders, status, selectedDateFilter, searchQuery);
+    // filteredOrders re-derives from state via useMemo.
   };
 
   const handleDateFilter = (dateFilter: DateFilter) => {
     setSelectedDateFilter(dateFilter);
     setExpandedOrders(new Set());
-    filterOrders(orders, selectedStatus, dateFilter, searchQuery);
   };
 
   const toggleOrderExpansion = (orderId: string) => {
@@ -298,7 +295,6 @@ export const OrdersScreen: React.FC = () => {
     if (query.trim() !== searchQuery.trim()) {
       setExpandedOrders(new Set());
     }
-    filterOrders(orders, selectedStatus, selectedDateFilter, query);
   };
 
   const toggleSearch = () => {
