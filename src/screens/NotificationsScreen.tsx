@@ -52,11 +52,39 @@ export const NotificationsScreen: React.FC = () => {
     filterRef.current = { selectedFilter, showOnlyUnread };
   }, [selectedFilter, showOnlyUnread]);
 
+  // Mirror of `notifications` so the write handlers below can compute the next list
+  // after an await without capturing a stale array in their closure.
+  const notificationsRef = useRef<AppNotification[]>([]);
+  useEffect(() => {
+    notificationsRef.current = notifications;
+  }, [notifications]);
+
   // ALIBABA-STYLE: Clear badge on mount (user opened notifications)
   useEffect(() => {
     clearBadge();
   }, [clearBadge]);
+
+  // Monotonic id for loads. useFocusEffect re-runs whenever the load callback's
+  // identity changes while the screen is focused, and that identity depends on the
+  // filter — so tapping Orders then Promotions mid-flight left two loads racing, and
+  // whichever resolved last re-applied ITS OWN captured filter. The list then showed
+  // order notifications with the Promotions chip highlighted.
+  const loadReqIdRef = useRef(0);
+
+  // Apply a locally-computed list immediately. The write handlers below mutate only
+  // NotificationService's static cache, so without this the sole repaint path was the
+  // Supabase realtime echo — which this codebase itself documents as unreliable, and
+  // which for DELETE cannot match the `user_id=eq.` channel filter at all, because
+  // Postgres ships only the primary key in a DELETE's old record unless the table is
+  // REPLICA IDENTITY FULL (no such statement exists in this repo's SQL).
+  const applyLocal = useCallback((next: AppNotification[]) => {
+    setNotifications(next);
+    filterNotifications(next, filterRef.current.selectedFilter, filterRef.current.showOnlyUnread);
+  }, []);
+
   const loadNotifications = useCallback(async (refresh = false) => {
+    const reqId = ++loadReqIdRef.current;
+    const isLatest = () => reqId === loadReqIdRef.current;
     try {
       if (refresh) {
         setRefreshing(true);
@@ -65,14 +93,19 @@ export const NotificationsScreen: React.FC = () => {
       }
 
       const userNotifications = await NotificationService.getUserNotifications(refresh);
+      if (!isLatest()) return;
       setNotifications(userNotifications);
       filterNotifications(userNotifications, selectedFilter, showOnlyUnread);
     } catch (error) {
+      if (!isLatest()) return;
       console.error('Error loading notifications:', error);
       Alert.alert(t('common.error'), t('notifications.loadError'));
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      // A superseded call must not clear a newer call's loading/refreshing flags.
+      if (isLatest()) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [selectedFilter, showOnlyUnread, t]);
 
@@ -166,6 +199,7 @@ export const NotificationsScreen: React.FC = () => {
       // Mark as read if not already read
       if (!notification.read) {
         await NotificationService.markAsRead(notification.id);
+        applyLocal(notificationsRef.current.map((n) => (n.id === notification.id ? { ...n, read: true } : n)));
       }
 
       // Navigate based on notification type
@@ -207,6 +241,9 @@ export const NotificationsScreen: React.FC = () => {
   const handleNotificationDelete = async (notificationId: string) => {
     try {
       await NotificationService.deleteNotification(notificationId);
+      // Apply locally — the realtime DELETE echo cannot match the user_id channel
+      // filter, so nothing else repaints and the row appeared to survive deletion.
+      applyLocal(notificationsRef.current.filter((n) => n.id !== notificationId));
     } catch (error: any) {
       Alert.alert(t('common.error'), error.message);
     }
@@ -216,6 +253,9 @@ export const NotificationsScreen: React.FC = () => {
   const handleMarkAllAsRead = async () => {
     try {
       await NotificationService.markAllAsRead();
+      // The service swaps its cache for new read:true objects, but state still held
+      // the old read:false ones, so rows kept their bold titles and unread dots.
+      applyLocal(notificationsRef.current.map((n) => ({ ...n, read: true })));
       Alert.alert(t('notifications.success'), t('notifications.allMarkedRead'));
     } catch (error: any) {
       Alert.alert(t('common.error'), error.message);
@@ -235,6 +275,8 @@ export const NotificationsScreen: React.FC = () => {
           onPress: async () => {
             try {
               await NotificationService.clearAllNotifications();
+              // Without this the "all cleared" alert fired over a still-full list.
+              applyLocal([]);
               Alert.alert(t('notifications.success'), t('notifications.allCleared'));
             } catch (error: any) {
               Alert.alert(t('common.error'), error.message);

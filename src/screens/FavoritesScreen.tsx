@@ -45,6 +45,9 @@ const FavoritesScreen: React.FC = () => {
   // Monotonic request id: discards stale/out-of-order fetch results so a slow
   // earlier response can never overwrite a newer one (and avoids setState after unmount).
   const reqIdRef = useRef(0);
+  // First paint has completed — later fetches refresh in place instead of tearing
+  // the grid down to a skeleton.
+  const hasLoadedOnceRef = useRef(false);
 
   // Fetch products for favorite IDs
   const fetchFavoriteProducts = useCallback(async (force = false) => {
@@ -59,7 +62,15 @@ const FavoritesScreen: React.FC = () => {
     }
 
     try {
-      setIsLoading(true);
+      // The full-screen skeleton is for the first paint only. isLoading gates an
+      // early return that unmounts the whole grid (and its RefreshControl), so
+      // raising it on every fetch made two ordinary actions blank the screen:
+      //   - pull-to-refresh replaced the list mid-gesture, then restored it scrolled
+      //     back to the top;
+      //   - un-hearting an item changed `favorites`, which changes this callback's
+      //     identity and re-runs the effect; the cache key is derived from the id set
+      //     that just changed, so it always misses and hits the network.
+      if (!hasLoadedOnceRef.current) setIsLoading(true);
       // Single batched query (was one request per favorite — slow with many saves).
       const validProducts = await ProductService.getProductsByIds(favorites, force);
       if (reqId === reqIdRef.current) {
@@ -72,6 +83,7 @@ const FavoritesScreen: React.FC = () => {
       if (reqId === reqIdRef.current) setLoadFailed(true);
     } finally {
       if (reqId === reqIdRef.current) {
+        hasLoadedOnceRef.current = true;
         setIsLoading(false);
       }
     }
