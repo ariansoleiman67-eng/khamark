@@ -31,30 +31,59 @@ export const VerificationCodeModal: React.FC<VerificationCodeModalProps> = ({
   
   const inputRefs = useRef<(TextInput | null)[]>([]);
 
+  // Verifying an OTP is a write: it consumes the code and counts against the
+  // provider's attempt limits. `loading` cannot guard it — a state update only
+  // lands on the next render, so two calls in the same frame both get through.
+  // That is the normal case here, not an edge case: the auto-submit effect fires
+  // the moment the sixth digit lands, which is the same moment the Verify button
+  // stops being disabled.
+  const submittingRef = useRef(false);
+
+  // One owner for the countdown. Previously the open-effect and handleResend each
+  // created their own interval and only the open-effect's was ever cleaned up, so a
+  // resend left two intervals decrementing the same state (countdown ticking twice
+  // per second) and closing the modal mid-countdown leaked one that went on calling
+  // setCountdown after unmount.
+  const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearCountdown = () => {
+    if (countdownTimerRef.current) {
+      clearInterval(countdownTimerRef.current);
+      countdownTimerRef.current = null;
+    }
+  };
+
+  const startCountdown = () => {
+    clearCountdown(); // never stack a second interval on top of a running one
+    setCountdown(60);
+    setCanResend(false);
+    countdownTimerRef.current = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          setCanResend(true);
+          clearCountdown();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
 
   useEffect(() => {
     if (visible) {
       // Reset state when modal opens
       setCode(['', '', '', '', '', '']);
       setError('');
-      setCountdown(60);
-      setCanResend(false);
-      
-      // Start countdown timer
-      const timer = setInterval(() => {
-        setCountdown((prev) => {
-          if (prev <= 1) {
-            setCanResend(true);
-            clearInterval(timer);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+      submittingRef.current = false;
+      startCountdown();
 
-      return () => clearInterval(timer);
+      return () => clearCountdown();
     }
   }, [visible]);
+
+  // Belt-and-braces: the effect above only cleans up while `visible` is true, so an
+  // unmount that races the visibility flag would otherwise strand the interval.
+  useEffect(() => () => clearCountdown(), []);
 
   useEffect(() => {
     // Auto-submit when all fields are filled
@@ -100,11 +129,16 @@ export const VerificationCodeModal: React.FC<VerificationCodeModalProps> = ({
 
   const handleSubmit = async () => {
     const verificationCode = code.join('');
-    
+
     if (verificationCode.length !== 6) {
       setError('Please enter the complete 6-digit code');
       return;
     }
+
+    // Set synchronously, before the first await, so a second caller in the same
+    // frame is turned away.
+    if (submittingRef.current) return;
+    submittingRef.current = true;
 
     try {
       setLoading(true);
@@ -117,6 +151,7 @@ export const VerificationCodeModal: React.FC<VerificationCodeModalProps> = ({
       inputRefs.current[0]?.focus();
     } finally {
       setLoading(false);
+      submittingRef.current = false;
     }
   };
 
@@ -124,23 +159,10 @@ export const VerificationCodeModal: React.FC<VerificationCodeModalProps> = ({
     try {
       setResendLoading(true);
       await onResendCode();
-      
-      // Reset countdown
-      setCountdown(60);
-      setCanResend(false);
-      
-      // Start new countdown
-      const timer = setInterval(() => {
-        setCountdown((prev) => {
-          if (prev <= 1) {
-            setCanResend(true);
-            clearInterval(timer);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-      
+
+      // Restarts the single shared interval rather than adding another one.
+      startCountdown();
+
       Alert.alert('Success', 'Verification code sent successfully!');
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to resend code');
@@ -150,6 +172,11 @@ export const VerificationCodeModal: React.FC<VerificationCodeModalProps> = ({
   };
 
   const handleClose = () => {
+    // Every dismissal path (close button, hardware back / onRequestClose) is gated
+    // on the same ref: tearing the modal down mid-verification loses the result of a
+    // code that has already been consumed.
+    if (submittingRef.current) return;
+    clearCountdown();
     setCode(['', '', '', '', '', '']);
     setError('');
     onClose();
@@ -178,7 +205,14 @@ export const VerificationCodeModal: React.FC<VerificationCodeModalProps> = ({
         <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
           {/* Header */}
           <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
+            <TouchableOpacity
+              onPress={handleClose}
+              style={styles.closeButton}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+              accessibilityState={{ disabled: loading }}
+            >
               <Ionicons name="close" size={24} color={theme.colors.text} />
             </TouchableOpacity>
             <Text allowFontScaling={false} style={[styles.modalTitle, { color: theme.colors.text }]}>

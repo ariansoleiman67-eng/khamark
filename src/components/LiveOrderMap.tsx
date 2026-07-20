@@ -208,11 +208,23 @@ export const LiveOrderMap: React.FC<LiveOrderMapProps> = ({ orderId, trackingUrl
   const handleWebViewMessage = (event: WebViewMessageEvent) => {
     try {
       const messageData = JSON.parse(event.nativeEvent.data);
-      if (messageData.latitude && messageData.longitude) {
-        setOrderLocation({
-          latitude: messageData.latitude,
-          longitude: messageData.longitude,
-        });
+
+      // This payload comes from a third-party page, so it is untrusted input.
+      // Truthiness is the wrong test in both directions: it rejects a legitimate
+      // latitude of 0 (the equator), and it accepts a non-numeric string such as
+      // "abc", which would then be stored as the map coordinate. Coerce, require
+      // finite numbers, and range-check.
+      const latitude = Number(messageData?.latitude);
+      const longitude = Number(messageData?.longitude);
+
+      const isValid =
+        Number.isFinite(latitude) &&
+        Number.isFinite(longitude) &&
+        latitude >= -90 && latitude <= 90 &&
+        longitude >= -180 && longitude <= 180;
+
+      if (isValid) {
+        setOrderLocation({ latitude, longitude });
       }
     } catch {
       // Ignore parsing errors

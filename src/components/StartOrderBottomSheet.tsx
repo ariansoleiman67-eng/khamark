@@ -11,7 +11,7 @@
  * - QI Card (coming soon)
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -131,10 +131,15 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
   const slideAnim = useState(new Animated.Value(SHEET_MAX_HEIGHT))[0];
   const fadeAnim = useState(new Animated.Value(0))[0];
 
+  // Declared here rather than beside handleConfirm because the PanResponder below
+  // closes over it. A ref (not state) so it is readable and settable synchronously.
+  const submittingRef = useRef(false);
+
   // Swipe-to-dismiss PanResponder on drag handle
   const panResponder = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: (_, gestureState) => gestureState.dy > 5,
+    // Refuse to even claim the gesture while an order is being placed.
+    onStartShouldSetPanResponder: () => !submittingRef.current,
+    onMoveShouldSetPanResponder: (_, gestureState) => !submittingRef.current && gestureState.dy > 5,
     onPanResponderMove: (_, gestureState) => {
       if (gestureState.dy > 0) {
         slideAnim.setValue(gestureState.dy);
@@ -147,7 +152,7 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
           toValue: SHEET_MAX_HEIGHT,
           duration: 250,
           useNativeDriver: true,
-        }).start(() => onClose());
+        }).start(() => { if (!submittingRef.current) onClose(); });
       } else {
         // Snap back
         Animated.spring(slideAnim, {
@@ -310,23 +315,38 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
 
   const styles = useMemo(() => createStyles(theme, isDark, insets, isRTL), [theme, isDark, insets, isRTL]);
 
+  // Drop any address state belonging to the previous account the moment the
+  // signed-in user changes, so nothing can survive into the next session.
+  useEffect(() => {
+    setAddresses([]);
+    setSelectedAddress(null);
+  }, [user?.uid]);
+
   // Load addresses
   useEffect(() => {
+    let cancelled = false;
     const loadAddresses = async () => {
       if (!user?.uid) return;
       setAddressesLoading(true);
       try {
         const userAddresses = await addressService.getUserAddresses(user.uid);
+        if (cancelled) return;
         setAddresses(userAddresses);
         const defaultAddr = userAddresses.find(a => a.isDefault) || userAddresses[0];
-        if (defaultAddr) setSelectedAddress(defaultAddr);
+        // Assigned unconditionally. Guarding this with `if (defaultAddr)` meant that
+        // when the new user has no addresses the setter was skipped and the previous
+        // user's selection stayed in state — and because handleConfirm's "no address"
+        // check reads `!selectedAddress && addresses.length === 0`, a stale selection
+        // made it skip the guard entirely and ship to the previous user's address.
+        setSelectedAddress(defaultAddr ?? null);
       } catch (error) {
         // Silent fail
       } finally {
-        setAddressesLoading(false);
+        if (!cancelled) setAddressesLoading(false);
       }
     };
     if (visible && user?.uid) loadAddresses();
+    return () => { cancelled = true; };
   }, [visible, user?.uid]);
 
   // Animate in/out
@@ -449,6 +469,12 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
         stock: v.stockQuantity,
       }));
 
+    // Set synchronously before the first await. `isProcessing` is state, so it only
+    // takes effect on the next render and two taps in the same frame would both
+    // place an order.
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+
     setIsProcessing(true);
     try {
       await onConfirmOrder({
@@ -466,8 +492,17 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
       );
     } finally {
       setIsProcessing(false);
+      submittingRef.current = false;
     }
   };
+
+  // Every dismissal path routes through here so an in-flight order cannot be
+  // torn out from under itself: backdrop, close button, hardware back and the
+  // swipe-to-dismiss gesture all consult the same ref.
+  const handleDismiss = useCallback(() => {
+    if (submittingRef.current) return;
+    onClose();
+  }, [onClose]);
 
   const getProductName = () => {
     if (!product) return '';
@@ -483,15 +518,15 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
       visible={visible}
       transparent
       animationType="none"
-      onRequestClose={onClose}
+      onRequestClose={handleDismiss}
       statusBarTranslucent
     >
       {/* Backdrop */}
       <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]}>
         <TouchableOpacity 
-          style={styles.backdropTouchable} 
-          activeOpacity={1} 
-          onPress={onClose}
+          style={styles.backdropTouchable}
+          activeOpacity={1}
+          onPress={handleDismiss}
         />
       </Animated.View>
 
@@ -523,7 +558,14 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                   : t('startOrder.title', { defaultValue: 'Start Order' })
                 }
               </Text>
-              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <TouchableOpacity
+                onPress={handleDismiss}
+                style={styles.closeButton}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                accessibilityRole="button"
+                accessibilityLabel={t('common.close', { defaultValue: 'Close' })}
+                accessibilityState={{ disabled: isProcessing }}
+              >
                 <Ionicons name="close" size={24} color={theme.colors.textSecondary} />
               </TouchableOpacity>
             </View>

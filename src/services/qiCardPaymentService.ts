@@ -170,6 +170,12 @@ export class QiCardPaymentService {
    * Convert USD amount to IQD using the provided exchange rate.
    */
   static convertToIQD(amountUSD: number, exchangeRate: number): number {
+    // Written as !(x > 0) rather than x <= 0 on purpose: NaN fails every comparison,
+    // so `x <= 0` lets it straight through and Math.round(NaN * rate) yields NaN --
+    // a NaN amount posted to payment processing and rendered to the user as "$NaN".
+    if (!(amountUSD > 0) || !(exchangeRate > 0)) {
+      throw new Error('Invalid payment amount or exchange rate');
+    }
     return Math.round(amountUSD * exchangeRate);
   }
 }
