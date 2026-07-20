@@ -30,14 +30,27 @@ import Animated, {
 const { width: screenWidth } = Dimensions.get("window");
 
 // Fixed card size for the 2-column masonry grid + horizontal carousels.
-const CARD_MARGIN = 6;
+const CARD_MARGIN = 10;
 const NUM_COLUMNS = 2;
 const AVAILABLE_WIDTH = screenWidth - CARD_MARGIN * (NUM_COLUMNS + 1);
 const CARD_WIDTH = Math.floor(AVAILABLE_WIDTH / NUM_COLUMNS);
 const IMAGE_SIZE = CARD_WIDTH;
-// title(2 lines) + brand + price + pill CTA + padding
-const TEXT_CONTAINER_HEIGHT = 168;
+
+// Budget for the text block, derived rather than guessed, so the worst-case card
+// (2-line title + brand + price row + VIP hint + CTA) provably fits:
+//   paddingTop 10 + title 40 + brand 20 + variant row 20 + price row 24
+//   + VIP hint 16 + CTA 44 + CTA gap 10 + paddingBottom 12  =  196
+// 210 leaves ~14px of slack for font-scale and Android line-height variance.
+// The CTA is a flex child now, so if a future row is added the CTA gets pushed and
+// the overflow is visible in review instead of hiding under it.
+const TEXT_CONTAINER_HEIGHT = 210;
 const CARD_HEIGHT = IMAGE_SIZE + TEXT_CONTAINER_HEIGHT;
+
+// Fixed brand accents: these read as "VIP" and "sale" regardless of theme, and both
+// carry white text, so they must not follow the theme's surface colours.
+const MAX_SWATCHES = 4;
+const VIP_PURPLE = "#7C3AED";
+const SALE_RED = "#E53935";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -45,6 +58,14 @@ interface MasonryProductCardProps {
   product: Product;
   onPress: (productId: string, product: Product) => void;
   onAddToCart?: (productId: string, product: Product) => void;
+  /**
+   * Called instead of onAddToCart when the product has colour / storage / size
+   * options, so the customer picks them before anything reaches the cart. If a
+   * screen does not supply this, the card falls back to onPress (the detail screen,
+   * which always has the full pickers) rather than silently adding an unspecified
+   * variant.
+   */
+  onSelectOptions?: (productId: string, product: Product) => void;
   isFavorite?: boolean;
   onToggleFavorite?: (productId: string) => void;
   style?: StyleProp<ViewStyle>;
@@ -54,6 +75,7 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
   product,
   onPress,
   onAddToCart,
+  onSelectOptions,
   isFavorite = false,
   onToggleFavorite,
   style,
@@ -129,6 +151,21 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
     }
   };
 
+  // Products with colour / storage / size go through a picker first. Without this the
+  // behaviour was whatever each screen's handler happened to do — HomeScreen opened
+  // the sheet, Favorites routed to the detail screen, and CategoryProducts added the
+  // base product outright, so ordering an iPhone from that grid produced an order
+  // with no colour and no storage selected.
+  const handleCtaPress = () => {
+    if (!purchasable) return;
+    if (hasOptions) {
+      if (onSelectOptions) onSelectOptions(product.id, product);
+      else onPress(product.id, product);
+      return;
+    }
+    handleAddToCart();
+  };
+
   const getDisplayTitle = () => {
     if (i18n.language === "ar" && product.nameAr) return product.nameAr;
     if (i18n.language === "ku" && product.nameKu) return product.nameKu;
@@ -170,6 +207,32 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
   else if (isOnTheWay) ctaLabel = t("products.status.onTheWay", { defaultValue: "On the Way" });
   else if (!inStock) ctaLabel = t("product.outOfStock", { defaultValue: "Out of Stock" });
 
+  // ── Variant meta ────────────────────────────────────────────────────────────
+  const colorOptions = (product.colorVariations || []).filter(Boolean);
+  // colorHex is optional in the schema; only swatch the ones that actually carry a
+  // colour, and fall back to a count when none do.
+  const swatchable = colorOptions.filter((c) => !!c.colorHex);
+  const extraColors = colorOptions.length - Math.min(swatchable.length, MAX_SWATCHES);
+
+  // Sorted by priceDelta rather than array order: priceDelta 0 is the base tier, so
+  // this yields smallest→largest without trusting how the row was authored.
+  const storageLabels = [...(product.storageOptions || [])]
+    .sort((a, b) => (Number(a?.priceDelta) || 0) - (Number(b?.priceDelta) || 0))
+    .map((o) => o?.label)
+    .filter(Boolean) as string[];
+  const storageRange =
+    storageLabels.length > 1
+      ? `${storageLabels[0]}–${storageLabels[storageLabels.length - 1]}`
+      : storageLabels[0] || "";
+
+  const hasVariantMeta = colorOptions.length > 0 || !!storageRange;
+
+  // Anything that must be chosen before this can go in a cart.
+  const hasOptions =
+    colorOptions.length > 0 ||
+    storageLabels.length > 0 ||
+    (product.variations?.length ?? 0) > 0;
+
   const brandLine = product.brand || product.category || "";
 
   const imageUri = getProductImageUrl({
@@ -184,6 +247,21 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
       onPress={handlePress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
+      accessibilityRole="button"
+      // One spoken label for the whole card: name, brand and price as a single
+      // phrase, so a screen reader announces the product rather than reading four
+      // disconnected fragments as the user swipes through a grid.
+      accessibilityLabel={[
+        getDisplayTitle(),
+        brandLine,
+        getPriceDisplay(),
+        colorOptions.length > 0
+          ? t("product.colorCount", { count: colorOptions.length, defaultValue: `${colorOptions.length} colors` })
+          : "",
+        storageRange,
+      ]
+        .filter(Boolean)
+        .join(", ")}
       style={[
         styles.cardWrapper,
         style,
@@ -231,7 +309,14 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
         <Pressable
           style={({ pressed }) => [styles.favoriteButton, { opacity: pressed ? 0.85 : 1 }]}
           onPress={handleFavoritePress}
-          hitSlop={8}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityState={{ selected: isFavorite }}
+          accessibilityLabel={
+            isFavorite
+              ? t("favorites.remove", { defaultValue: "Remove from favorites" })
+              : t("favorites.add", { defaultValue: "Add to favorites" })
+          }
         >
           <Animated.View style={favoriteAnimatedStyle}>
             <Ionicons
@@ -281,64 +366,155 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
           </AppText>
         )}
 
-        <View style={styles.bottom}>
-          <View style={{ width: "100%" }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-              <AppNumber
-                value={getPriceDisplay()}
+        {/* Colour swatches + storage span. Sits above the price so the eye lands on
+            what varies before what it costs. Decorative to a screen reader — the same
+            information is already in the card's single spoken label. */}
+        {hasVariantMeta && (
+          <View
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={[styles.variantRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}
+          >
+            {swatchable.length > 0 ? (
+              <View style={[styles.swatchRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+                {swatchable.slice(0, MAX_SWATCHES).map((c) => (
+                  <View
+                    key={c.variationId}
+                    style={[
+                      styles.swatch,
+                      {
+                        backgroundColor: c.colorHex,
+                        // A hairline ring so white and near-white finishes stay visible
+                        // on the card surface in both themes.
+                        borderColor: isDark ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.18)",
+                      },
+                    ]}
+                  />
+                ))}
+                {extraColors > 0 && (
+                  <AppText fontSize={10} style={[styles.variantText, { color: theme.colors.textSecondary }]}>
+                    +{extraColors}
+                  </AppText>
+                )}
+              </View>
+            ) : (
+              <AppText
+                fontSize={10}
                 numberOfLines={1}
-                style={[styles.price, { color: vipActive ? "#7C3AED" : theme.colors.text, textAlign }]}
-              />
-              {vipActive && (
-                <View style={{ backgroundColor: "#7C3AED", borderRadius: 5, paddingHorizontal: 5, paddingVertical: 1 }}>
-                  <AppText fontSize={9} style={{ color: "#FFFFFF", fontWeight: "800", letterSpacing: 0.5 }}>VIP</AppText>
-                </View>
-              )}
-            </View>
-            {vipLocked && (
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 3, marginTop: 1 }}>
-                <Ionicons name="lock-closed" size={9} color={theme.colors.textSecondary} />
-                <AppText fontSize={9} style={{ color: theme.colors.textSecondary, fontWeight: "700" }}>
-                  {formatPrice(product.vipPriceUSD as number, currency, exchangeRateIQD, { symbol: true })} VIP
-                </AppText>
+                style={[styles.variantText, { color: theme.colors.textSecondary }]}
+              >
+                {t("product.colorCount", {
+                  count: colorOptions.length,
+                  defaultValue: `${colorOptions.length} colors`,
+                })}
+              </AppText>
+            )}
+
+            {!!storageRange && (
+              <AppText
+                fontSize={10}
+                numberOfLines={1}
+                style={[styles.storageText, { color: theme.colors.textSecondary }]}
+              >
+                {storageRange}
+              </AppText>
+            )}
+          </View>
+        )}
+
+        {/* Price. At most TWO rows: the hero price (with its comparison inline) and
+            an optional VIP hint. Previously the strikethrough and the discount badge
+            occupied a third row, which is what pushed this block into the CTA — and
+            three competing numbers made it genuinely unclear what the customer pays. */}
+        <View style={styles.priceBlock}>
+          <View style={[styles.priceRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+            {/* containerStyle, not style: AppNumber wraps its Text in a View, and THAT
+                View is the flex item here. Shrink rules passed via `style` land on the
+                inner Text and do nothing, so a long price (a big USD figure, or any
+                IQD amount) took its full intrinsic width and shoved the strikethrough
+                and the badge sideways. React Native defaults flex items to
+                flexShrink: 0, so this has to be explicit. */}
+            <AppNumber
+              value={getPriceDisplay()}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+              containerStyle={styles.priceShrink}
+              style={[styles.price, { color: vipActive ? VIP_PURPLE : theme.colors.text, textAlign }]}
+            />
+            {vipActive && (
+              <View style={[styles.tag, { backgroundColor: VIP_PURPLE }]}>
+                <AppText fontSize={9} style={styles.tagText}>VIP</AppText>
               </View>
             )}
+            {/* Inline with the price: the old price reads as a comparison rather than
+                as a second thing to parse, and the pair survives a narrow card because
+                both can shrink. */}
             {hasDiscount && !vipActive && (
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 2 }}>
-                <AppText fontSize={11} style={{ color: theme.colors.textSecondary, textDecorationLine: "line-through" }}>
+              <>
+                <AppText
+                  fontSize={11}
+                  numberOfLines={1}
+                  style={[styles.compareAt, { color: theme.colors.textSecondary }]}
+                >
                   {formatPrice(product.compareAtPriceUSD as number, currency, exchangeRateIQD)}
                 </AppText>
-                <View style={{ backgroundColor: "#E53935", borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1 }}>
-                  <AppText fontSize={9} style={{ color: "#FFFFFF", fontWeight: "800" }}>-{savePct}%</AppText>
+                <View style={[styles.tag, { backgroundColor: SALE_RED }]}>
+                  <AppText fontSize={9} style={styles.tagText}>-{savePct}%</AppText>
                 </View>
-              </View>
+              </>
             )}
           </View>
 
-          <View ref={addToCartRef} collapsable={false}>
-            <Pressable
-              disabled={!purchasable}
-              style={({ pressed }) => [
-                styles.cta,
-                {
-                  backgroundColor: purchasable ? theme.colors.primary : theme.colors.disabled,
-                  opacity: pressed && purchasable ? 0.85 : 1,
-                },
-              ]}
-              onPress={handleAddToCart}
-            >
+          {vipLocked && (
+            <View style={[styles.vipHintRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+              <Ionicons name="lock-closed" size={9} color={theme.colors.textSecondary} />
               <AppText
-                fontSize={14}
-                style={[
-                  styles.ctaText,
-                  { color: purchasable ? theme.colors.textOnPrimary : theme.colors.textSecondary },
-                ]}
+                fontSize={9}
                 numberOfLines={1}
+                style={[styles.vipHintText, { color: theme.colors.textSecondary }]}
               >
-                {ctaLabel}
+                {formatPrice(product.vipPriceUSD as number, currency, exchangeRateIQD, { symbol: true })} VIP
               </AppText>
-            </Pressable>
-          </View>
+            </View>
+          )}
+        </View>
+
+        {/* CTA sits in normal flow, pinned to the bottom by marginTop:auto. It used to
+            be position:absolute over a paddingBottom reservation, so any content that
+            ran past that reservation was silently covered by it — which is exactly what
+            happened to the discount row. In flow, the CTA can be pushed but never
+            overlapped. */}
+        <View ref={addToCartRef} collapsable={false} style={styles.ctaWrapper}>
+          <Pressable
+            disabled={!purchasable}
+            style={({ pressed }) => [
+              styles.cta,
+              {
+                backgroundColor: purchasable ? theme.colors.primary : theme.colors.disabled,
+                opacity: pressed && purchasable ? 0.85 : 1,
+              },
+            ]}
+            onPress={handleCtaPress}
+            accessibilityRole="button"
+            // The visible label already says why it is disabled (Out of Stock /
+            // Coming Soon), so it doubles as the accessible name.
+            accessibilityLabel={ctaLabel}
+            accessibilityState={{ disabled: !purchasable }}
+          >
+            <AppText
+              fontSize={13}
+              style={[
+                styles.ctaText,
+                { color: purchasable ? theme.colors.textOnPrimary : theme.colors.textSecondary },
+              ]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.85}
+            >
+              {ctaLabel}
+            </AppText>
+          </Pressable>
         </View>
       </View>
     </AnimatedPressable>
@@ -359,6 +535,12 @@ const arePropsEqual = (
   prevProps.product.status === nextProps.product.status &&
   prevProps.onPress === nextProps.onPress &&
   prevProps.onAddToCart === nextProps.onAddToCart &&
+  prevProps.onSelectOptions === nextProps.onSelectOptions &&
+  // Without these a recycled FlashList row would keep the previous product's
+  // swatches and storage span.
+  prevProps.product.colorVariations === nextProps.product.colorVariations &&
+  prevProps.product.storageOptions === nextProps.product.storageOptions &&
+  prevProps.product.variations === nextProps.product.variations &&
   prevProps.onToggleFavorite === nextProps.onToggleFavorite;
 
 const styles = StyleSheet.create({
@@ -425,13 +607,17 @@ const styles = StyleSheet.create({
   },
   textContainer: {
     flex: 1,
-    justifyContent: "flex-start",
     paddingHorizontal: 12,
     paddingTop: 10,
+    // No paddingBottom reservation for the CTA any more — the CTA is a flex child
+    // and reserves its own space, so the two can no longer collide.
     paddingBottom: 12,
   },
   title: {
     fontWeight: "700",
+    // Fixed 2-line reservation, not minHeight: it keeps the price rows and CTAs on
+    // the same baseline across a row of cards whether a title wraps to one line or
+    // two. numberOfLines={2} means it can never exceed this.
     height: 40,
     lineHeight: 20,
   },
@@ -439,23 +625,102 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     marginTop: 4,
   },
-  bottom: {
+  variantRow: {
+    alignItems: "center",
+    gap: 8,
+    marginTop: 6,
+    minHeight: 14,
+  },
+  swatchRow: {
+    alignItems: "center",
+    gap: 4,
+    flexShrink: 0,
+  },
+  swatch: {
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  variantText: {
+    fontWeight: "600",
+    includeFontPadding: false,
+  },
+  storageText: {
+    fontWeight: "600",
+    includeFontPadding: false,
+    // Yields to the swatches: colour is the visual differentiator, storage is a spec.
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  priceBlock: {
     marginTop: "auto",
+  },
+  priceRow: {
+    alignItems: "center",
+    gap: 5,
+  },
+  // Applied to AppNumber's OUTER View (via containerStyle) — that is the flex item.
+  // minWidth: 0 is required alongside flexShrink: a flex item will not shrink below
+  // its intrinsic text width without it, which is how an IQD price like
+  // "١٬٧٤٩٬٠٠٠ د.ع" would otherwise push everything else out of the row.
+  priceShrink: {
+    flexShrink: 1,
+    minWidth: 0,
   },
   price: {
     fontWeight: "800",
-    fontSize: 17,
-    marginBottom: 10,
+    fontSize: 16,
+  },
+  compareAt: {
+    textDecorationLine: "line-through",
+    // Shrinks before the price does and is capped, so the comparison never competes
+    // with the number the customer actually pays.
+    flexShrink: 2,
+    minWidth: 0,
+    maxWidth: "40%",
+  },
+  tag: {
+    borderRadius: 5,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    // Never let a badge be the thing that gets squeezed — it is the smallest and
+    // least legible element, so it holds its size and the prices shrink instead.
+    flexShrink: 0,
+  },
+  tagText: {
+    color: "#FFFFFF",
+    fontWeight: "800",
+    letterSpacing: 0.3,
+    includeFontPadding: false,
+  },
+  vipHintRow: {
+    alignItems: "center",
+    gap: 3,
+    marginTop: 3,
+  },
+  vipHintText: {
+    fontWeight: "700",
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  ctaWrapper: {
+    // Pinned to the bottom by auto margin rather than absolute positioning.
+    marginTop: 10,
   },
   cta: {
     alignItems: "center",
     borderRadius: 999,
-    height: 44,
+    // minHeight, not height: at large system font scales the label grows and a
+    // fixed height would clip it.
+    minHeight: 44,
     justifyContent: "center",
+    paddingHorizontal: 12,
     width: "100%",
   },
   ctaText: {
     fontWeight: "700",
+    includeFontPadding: false,
   },
 });
 

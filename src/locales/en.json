@@ -242,7 +242,9 @@
     "save": "Save",
     "sku": "Sku",
     "vipPrice": "VIP price",
-    "storage": "Storage"
+    "storage": "Storage",
+    "colorCount_one": "{{count}} color",
+    "colorCount_other": "{{count}} colors"
   },
   "auth": {
     "accountBlocked": "Account Blocked",

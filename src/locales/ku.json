@@ -551,7 +551,9 @@
     "save": "پاشەکەوت",
     "sku": "SKU",
     "vipPrice": "نرخی VIP",
-    "storage": "بیرگە"
+    "storage": "بیرگە",
+    "colorCount_one": "{{count}} ڕەنگ",
+    "colorCount_other": "{{count}} ڕەنگ"
   },
   "cart": {
     "title": "سەبەتەی کڕین",

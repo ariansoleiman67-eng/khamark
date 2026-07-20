@@ -242,7 +242,13 @@
     "save": "وفّر",
     "sku": "SKU",
     "vipPrice": "سعر VIP",
-    "storage": "السعة"
+    "storage": "السعة",
+    "colorCount_zero": "بدون ألوان",
+    "colorCount_one": "لون واحد",
+    "colorCount_two": "لونان",
+    "colorCount_few": "{{count}} ألوان",
+    "colorCount_many": "{{count}} لوناً",
+    "colorCount_other": "{{count}} لون"
   },
   "auth": {
     "accountBlocked": "الحساب محظور",

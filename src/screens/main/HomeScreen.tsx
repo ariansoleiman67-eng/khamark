@@ -407,6 +407,7 @@ const HomeScreen: React.FC = () => {
       product={item}
       onPress={handleProductPress}
       onAddToCart={handleAddToCartPress}
+      onSelectOptions={handleAddToCartPress}
       isFavorite={stableIsFavorite(item.id)}
       onToggleFavorite={stableToggleFavorite}
     />
@@ -421,7 +422,7 @@ const HomeScreen: React.FC = () => {
       <View>
         {/* a. Hero banner */}
         {bannerImages.length > 0 && (
-          <BannerCarousel images={bannerImages} />
+          <BannerCarousel images={bannerImages} activeDotColor={theme.colors.primary} />
         )}
 
         {/* b. Our Brands — horizontal 2-row rail (shows admin logo when uploaded) */}
@@ -471,7 +472,7 @@ const HomeScreen: React.FC = () => {
         {hasItems && <SectionHeader title={t('home.newArrivals')} />}
       </View>
     );
-  }, [bannerImages, isRTL, t, handleBrandsSeeAll, renderSpotlightCard]);
+  }, [bannerImages, isRTL, t, handleBrandsSeeAll, renderSpotlightCard, theme.colors.primary]);
 
   // Product card renderer — 2 column grid (memoized to prevent re-renders)
   const renderProduct = useCallback(({ item }: { item: Product }) => (
@@ -480,6 +481,7 @@ const HomeScreen: React.FC = () => {
         product={item}
         onPress={handleProductPress}
         onAddToCart={handleAddToCartPress}
+      onSelectOptions={handleAddToCartPress}
         // GOLDEN ESTIMATION: Pass pure props to avoid internal context hooks in list items
         isFavorite={isFavorites(item.id)}
         onToggleFavorite={toggleFavorite}
@@ -797,16 +799,16 @@ const styles = StyleSheet.create({
   },
   // Brand-spotlight horizontal carousel padding (aligns first card to the grid).
   spotlightList: {
-    paddingHorizontal: 13,
+    paddingHorizontal: 16,
     paddingVertical: 2,
   },
   // Product grid styles
   columnWrapper: {
     justifyContent: 'space-between',
-    paddingHorizontal: 3,
+    paddingHorizontal: 6,
   },
   productCardWrapper: {
-    marginBottom: 2,
+    marginBottom: 6,
   },
   // Empty state
   emptyState: {
