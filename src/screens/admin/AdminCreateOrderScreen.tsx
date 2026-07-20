@@ -306,6 +306,18 @@ const ProductGridCard = React.memo(function ProductGridCard({
   );
 });
 
+// Localized ar-IQ/ku numeric keypads emit Eastern-Arabic (٠-٩) or Persian (۰-۹) digits
+// and the Arabic decimal separator (٫). Without normalising them to ASCII first, the
+// `[^0-9.]` strip below removes every glyph the admin typed, parseFloat('') is NaN and
+// `|| 0` turns it into 0 — so a sale paid in full with cash entered as ٥٠ was written
+// as amount_paid_usd: 0 / payment_status: 'pending', and a discount typed the same way
+// was silently applied as $0. Same helper as AdminPartnerDashboardScreen.
+const normalizeDigits = (s: string): string =>
+  s
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06F0))
+    .replace(/٫/g, '.');
+
 const AdminCreateOrderScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
@@ -521,7 +533,7 @@ const AdminCreateOrderScreen: React.FC = () => {
   }, []);
 
   const setPrice = useCallback((id: string, value: string) => {
-    const n = parseFloat(value.replace(/[^0-9.]/g, ''));
+    const n = parseFloat(normalizeDigits(value).replace(/[^0-9.]/g, ''));
     setCart((prev) => (prev[id] ? { ...prev, [id]: { ...prev[id], price: isNaN(n) ? 0 : n, manual: true } } : prev));
   }, []);
 
@@ -546,6 +558,16 @@ const AdminCreateOrderScreen: React.FC = () => {
 
   // Guard against losing a built-up cart: review→browse first, then confirm before leaving.
   const handleBack = useCallback(() => {
+    // Blocked entirely while a sale is being written. The Create button is correctly
+    // disabled during the write, which left back as the only escape — and taking it
+    // was destructive: back once fell through to browse (looking like nothing
+    // happened), back again offered "Discard this sale?", and Discard wiped the cart
+    // and popped the screen while the insert was still in flight. The order then
+    // committed with stock deducted, the success navigation was dropped because the
+    // route was already gone, and the admin — having just been shown a discard
+    // confirmation — rang the same sale up again. The service's idempotency key is
+    // released in its finally, so the second sale went through.
+    if (creatingRef.current) return;
     if (step === 'review') { setStep('browse'); return; }
     if (Object.keys(cart).length > 0) {
       Alert.alert(
@@ -594,11 +616,11 @@ const AdminCreateOrderScreen: React.FC = () => {
   }, 0);
   const itemCount = lines.reduce((s, l) => s + l.quantity, 0);
   // Whole-sale discount (flat $ or %), final total, net profit, and cash/change due.
-  const discountInput = parseFloat(discountText.replace(/[^0-9.]/g, '')) || 0;
+  const discountInput = parseFloat(normalizeDigits(discountText).replace(/[^0-9.]/g, '')) || 0;
   const discountUSD = Math.max(0, Math.min(discountMode === 'percent' ? (subtotal * discountInput) / 100 : discountInput, subtotal));
   const total = Math.max(0, subtotal - discountUSD);
   const netProfit = profit - discountUSD;
-  const cashUSD = parseFloat(cashText.replace(/[^0-9.]/g, '')) || 0;
+  const cashUSD = parseFloat(normalizeDigits(cashText).replace(/[^0-9.]/g, '')) || 0;
   const changeDue = cashText.trim() ? cashUSD - total : 0;
 
   // If everything is removed while reviewing, slide back to browsing.

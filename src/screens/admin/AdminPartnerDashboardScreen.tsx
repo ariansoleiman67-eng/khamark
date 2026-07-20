@@ -79,12 +79,16 @@ export default function AdminPartnerDashboardScreen() {
   const totals = useMemo(() => {
     let stock = 0, invested = 0, wholesaleTotal = 0;
     for (const p of products as any[]) {
-      const remaining = effectiveStock(p);
-      const sold = soldById.get(p.id) || 0;
+      // Coerced at the call site as well as inside effectiveStock: purchasePrice and
+      // the sold count come from separate sources, and a single string term anywhere
+      // in this chain turns `remaining + sold` into string concatenation, which then
+      // multiplies into Total Invested and Wholesale Value on the partner's invoice.
+      const remaining = Number(effectiveStock(p)) || 0;
+      const sold = Number(soldById.get(p.id)) || 0;
       const received = remaining + sold;   // all units ever shared — STABLE as stock sells down
       stock += remaining;                  // current on-hand
-      invested += (p.purchasePrice || 0) * received;
-      wholesaleTotal += partnerWholesalePrice(p) * received;
+      invested += (Number(p.purchasePrice) || 0) * received;
+      wholesaleTotal += (Number(partnerWholesalePrice(p)) || 0) * received;
     }
     return { stock, invested, wholesaleTotal, count: products.length };
   }, [products, soldById]);

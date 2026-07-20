@@ -10,6 +10,40 @@ import { calculateTieredPrice, getEffectiveUnitPrice } from '../utils/pricingUti
 const CART_STORAGE_KEY = 'local_cart_';
 
 export class LocalCartService {
+  /** Coerce a JSONB-sourced stock value; anything unparseable counts as 0. */
+  private static toFiniteStock(n: unknown): number {
+    const v = Number(n);
+    return Number.isFinite(v) ? v : 0;
+  }
+
+  /**
+   * The real stock ceiling for a cart line.
+   *
+   * `product.stockQty` alone is the WRONG denominator: productService documents that
+   * variation products keep stock_qty = 0 because the real stock lives per-variation.
+   * Using it meant every variation product in the cart had a ceiling of 0, so any
+   * quantity failed `quantity > maxStock` and the stepper threw
+   * "Only 0 items available in stock" — CartScreen caught it and rolled the number
+   * back, leaving the +/- buttons permanently dead on those lines while the screen's
+   * own ceiling (which does resolve variation stock) happily showed them as enabled.
+   *
+   * ProductDetailsScreen and CartScreen already compute the ceiling correctly; this
+   * service — the authority the writes actually go through — did not.
+   */
+  private static maxStockFor(product: any, variationId?: string): number {
+    if (variationId) {
+      const v =
+        product?.variations?.find((x: any) => x?.variationId === variationId) ??
+        product?.colorVariations?.find((x: any) => x?.variationId === variationId);
+      if (v) return this.toFiniteStock(v.stockQuantity);
+    }
+    const sizeStock = (product?.variations ?? []).reduce(
+      (sum: number, v: any) => sum + this.toFiniteStock(v?.stockQuantity), 0);
+    const colorStock = (product?.colorVariations ?? []).reduce(
+      (sum: number, v: any) => sum + this.toFiniteStock(v?.stockQuantity), 0);
+    return this.toFiniteStock(product?.stockQty) + sizeStock + colorStock;
+  }
+
   /**
    * Per-user serialization of cart writes.
    *
@@ -122,7 +156,7 @@ export class LocalCartService {
         const existingItem = cart.items[existingItemIndex];
         const newQuantity = existingItem.quantity + quantity;
         
-        const maxStock = product.stockQty;
+        const maxStock = this.maxStockFor(product, (existingItem as any).variationId);
         if (newQuantity > maxStock) {
           throw new Error(`Cannot add more than ${maxStock} items`);
         }
@@ -133,6 +167,22 @@ export class LocalCartService {
         };
       } else {
         // Add new item (new product OR same product with different options)
+        //
+        // This branch had no stock check at all, and selectedOptions colour/size do
+        // NOT carry their own stock pool — only variations[]/colorVariations[] do,
+        // and those go through addVariationsToCart. So two lines for the same product
+        // with different selectedOptions both draw on the same pool: adding 5 of a
+        // 5-stock product as "Red" and 5 more as "Blue" put 10 units in the cart and
+        // the oversell carried through to checkout. Count what is already committed
+        // against this product across every line before allowing more.
+        const maxStock = this.maxStockFor(product);
+        const alreadyInCart = cart.items
+          .filter((i) => i.productId === productId && !(i as any).variationId)
+          .reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
+        if (alreadyInCart + quantity > maxStock) {
+          throw new Error(`Cannot add more than ${maxStock} items`);
+        }
+
         const newItem: CartItem = {
           productId,
           product,
@@ -361,7 +411,7 @@ export class LocalCartService {
 
       // Check stock limit
       const item = cart.items[itemIndex];
-      const maxStock = item.product.stockQty;
+      const maxStock = this.maxStockFor(item.product, (item as any).variationId);
       if (quantity > maxStock) {
         throw new Error(`Only ${maxStock} items available in stock`);
       }

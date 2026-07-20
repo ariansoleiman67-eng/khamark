@@ -20,10 +20,22 @@ const esc = (s: any): string =>
   );
 
 // Total sellable stock = main + size-variation + color-variation stock.
+//
+// Every term is Number()-coerced. variations / color_variations are JSONB, so a
+// website-written stockQuantity can be a string, and `0 + "05"` concatenates rather
+// than adding — this function then returned the STRING "0050" and the partner
+// dashboard concatenated it a second time computing `remaining + sold`. The damage
+// was not cosmetic: Total Invested and Wholesale Value came out roughly 10x high,
+// both are printed on the partner's invoice PDF, and itemReceivedCost uses the same
+// figure as the `amount` it writes to the partner ledger — so the inflated number was
+// persisted. (A non-numeric string went further still: the amount became NaN, and
+// addPartnerLedgerEntry's `!(entry.amount >= 0)` guard then silently dropped the
+// write while the product had already left the partner.)
 export const partnerEffectiveStock = (p: any): number => {
-  const main = p?.stockQty || 0;
-  const size = (p?.variations || []).reduce((s: number, v: any) => s + (v?.stockQuantity || 0), 0);
-  const color = (p?.colorVariations || []).reduce((s: number, v: any) => s + (v?.stockQuantity || 0), 0);
+  const n = (v: any) => Number(v) || 0;
+  const main = n(p?.stockQty);
+  const size = (p?.variations || []).reduce((s: number, v: any) => s + n(v?.stockQuantity), 0);
+  const color = (p?.colorVariations || []).reduce((s: number, v: any) => s + n(v?.stockQuantity), 0);
   return main + size + color;
 };
 
