@@ -121,6 +121,7 @@ const VerifyPhoneScreen: React.FC = () => {
   const inputRefs = useRef<(TextInput | null)[]>([]);
   const hasSentRef = useRef(false);
   const verifyingRef = useRef(false);     // hard guard against double-submit
+  const resendingRef = useRef(false);     // same, for the resend path
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const focusBox = useCallback((i: number) => {
@@ -186,6 +187,17 @@ const VerifyPhoneScreen: React.FC = () => {
   };
 
   const handleResendOTP = async () => {
+    // `resending` is state and only gates the button a render later, so two taps in
+    // one frame both send. The service-layer lock in otpService (module lock + 60s
+    // cooldown) does NOT cover this: it only applies to the Firebase path, and every
+    // mode except 'link' takes the Supabase path below, which has neither an
+    // in-flight lock nor a client cooldown. The result is either two SMS — where the
+    // newer code silently invalidates the one the user reads first — or a rate-limit
+    // rejection from the losing call painted next to a freshly restarted countdown,
+    // since setError('') below runs before the awaits and the winner never clears it.
+    if (resendingRef.current) return;
+    resendingRef.current = true;
+
     try {
       setResending(true);
       setError('');
@@ -211,6 +223,7 @@ const VerifyPhoneScreen: React.FC = () => {
       );
     } finally {
       setResending(false);
+      resendingRef.current = false;
     }
   };
 

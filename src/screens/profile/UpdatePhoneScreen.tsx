@@ -106,6 +106,17 @@ const UpdatePhoneScreen: React.FC = () => {
       return;
     }
 
+    // Same guard handleVerify and handleResend already use, and for the same reason
+    // this file documents above: `loading` is state and lands a render later, so two
+    // taps in one frame both reach updateUser({ phone }). That sends two SMS; the
+    // second is usually rejected by the 60s rate limit and its raw error paints a
+    // red "you can only request this after N seconds" on the OTP step the first tap
+    // just navigated to — beside a running countdown, while the SMS did arrive. If
+    // both succeed instead, only the newer code verifies and the first one the user
+    // reads is rejected as incorrect.
+    if (busyRef.current) return;
+    busyRef.current = true;
+
     try {
       setLoading(true);
       setErrorMessage('');
@@ -127,6 +138,7 @@ const UpdatePhoneScreen: React.FC = () => {
       );
     } finally {
       setLoading(false);
+      busyRef.current = false;
     }
   };
 

@@ -1,5 +1,5 @@
 /* eslint-disable react-native/no-inline-styles, react-native/no-color-literals */
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   TextInput,
@@ -179,6 +179,8 @@ const PasswordScreen: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  // Hard guard against double-submit; `loading` is state and lands a render later.
+  const submittingRef = useRef(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [failCount, setFailCount] = useState(0);
   const [rememberMe, setRememberMe] = useState(rememberMeParam ?? false);
@@ -239,6 +241,17 @@ const PasswordScreen: React.FC = () => {
       return;
     }
 
+    // `disabled={loading}` is the only other protection and it lands a render late,
+    // while signInWithIdentifier is a seconds-long multi-hop flow (RPC lookup ->
+    // native sign-in -> Cloud Function). Two taps in one frame therefore both run,
+    // and all three consequences are user-visible: both handlers close over the same
+    // failCount so the "3 attempts -> offer OTP" fallback is delayed; the provider
+    // rate limit is burned twice as fast; and on success handleSuccessfulLogin runs
+    // twice, which on the returnReason branch issues four navigation.goBack() calls
+    // and throws the user two screens past where they meant to land.
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+
     try {
       setLoading(true);
       if (method === 'phone') {
@@ -285,6 +298,7 @@ const PasswordScreen: React.FC = () => {
       }
     } finally {
       setLoading(false);
+      submittingRef.current = false;
     }
   };
 
