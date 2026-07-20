@@ -67,6 +67,13 @@ const AdminEditStoreLocationScreen = () => {
   const [saving, setSaving] = useState(false);
   const [gettingLocation, setGettingLocation] = useState(false);
   const mapRef = useRef<any>(null);
+  // Alert.alert is a native global modal with no lifecycle binding, and the header
+  // back button is not disabled during a write. getCurrentPositionAsync at High
+  // accuracy routinely runs 10-30s indoors, so backing out mid-request left its
+  // success/failure alert to fire over the store-locations list with no context —
+  // and after a save, announcing a write the admin never saw complete.
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   // Form state
   const [name, setName] = useState('');
@@ -115,7 +122,7 @@ const AdminEditStoreLocationScreen = () => {
       if (location) {
         // OWNERSHIP CHECK: Block editing if not owner
         if (location.createdByAdminId && currentAdminId && location.createdByAdminId !== currentAdminId) {
-          Alert.alert(
+          mountedRef.current && Alert.alert(
             t('admin.common.error'),
             t('admin.storeLocations.noPermission') || 'You do not have permission to edit this location'
           );
@@ -146,7 +153,7 @@ const AdminEditStoreLocationScreen = () => {
         }
       }
     } catch (error) {
-      Alert.alert(t('admin.common.error'), t('admin.storeLocations.loadFailed'));
+      mountedRef.current && Alert.alert(t('admin.common.error'), t('admin.storeLocations.loadFailed'));
       navigation.goBack();
     } finally {
       setLoading(false);
@@ -165,7 +172,7 @@ const AdminEditStoreLocationScreen = () => {
       // Request permission
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert(
+        mountedRef.current && Alert.alert(
           t('location.permissionDenied'),
           t('location.permissionRequired')
         );
@@ -193,13 +200,13 @@ const AdminEditStoreLocationScreen = () => {
         }, 500);
       }
 
-      Alert.alert(
+      mountedRef.current && Alert.alert(
         t('admin.common.success'),
         t('admin.storeLocations.locationAutoSet')
       );
     } catch (error) {
       console.error('Error getting location:', error);
-      Alert.alert(
+      mountedRef.current && Alert.alert(
         t('location.error'),
         t('location.failedToGetLocation')
       );
@@ -211,12 +218,12 @@ const AdminEditStoreLocationScreen = () => {
   const handleSave = async () => {
     const fullPhone = phoneDigits ? `${phoneDialCode}${phoneDigits}` : '';
     if (!name.trim() || !address.trim() || !fullPhone.trim() || !city.trim()) {
-      Alert.alert(t('admin.common.error'), t('admin.storeLocations.requiredFields'));
+      mountedRef.current && Alert.alert(t('admin.common.error'), t('admin.storeLocations.requiredFields'));
       return;
     }
 
     if (!currentAdminId) {
-      Alert.alert(t('admin.common.error'), t('admin.storeLocations.mustBeLoggedIn', { defaultValue: 'You must be logged in to save locations' }));
+      mountedRef.current && Alert.alert(t('admin.common.error'), t('admin.storeLocations.mustBeLoggedIn', { defaultValue: 'You must be logged in to save locations' }));
       return;
     }
 
@@ -242,19 +249,19 @@ const AdminEditStoreLocationScreen = () => {
       if (isEditing && locationId) {
         // OWNERSHIP: Pass adminId for ownership verification
         await locationService.updateLocation(locationId, locationData, currentAdminId);
-        Alert.alert(t('admin.common.success'), t('admin.storeLocations.updateSuccess'), [
+        mountedRef.current && Alert.alert(t('admin.common.success'), t('admin.storeLocations.updateSuccess'), [
           { text: t('common.ok'), onPress: () => navigation.goBack() }
         ]);
       } else {
         // OWNERSHIP: Pass adminId to bind createdByAdminId on creation
       // @ts-ignore - extended location properties
         await locationService.addLocation(locationData, currentAdminId);
-        Alert.alert(t('admin.common.success'), t('admin.storeLocations.addSuccess'), [
+        mountedRef.current && Alert.alert(t('admin.common.success'), t('admin.storeLocations.addSuccess'), [
           { text: t('common.ok'), onPress: () => navigation.goBack() }
         ]);
       }
     } catch (error: any) {
-      Alert.alert(t('admin.common.error'), error.message || t('admin.storeLocations.saveFailed'));
+      mountedRef.current && Alert.alert(t('admin.common.error'), error.message || t('admin.storeLocations.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -335,7 +342,15 @@ const AdminEditStoreLocationScreen = () => {
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: theme.colors.border, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <TouchableOpacity
+          onPress={() => { if (!saving) navigation.goBack(); }}
+          disabled={saving}
+          style={styles.backButton}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.back', { defaultValue: 'Back' })}
+          accessibilityState={{ disabled: saving }}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
           <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color={theme.colors.text} />
         </TouchableOpacity>
         <Text allowFontScaling={false} style={[styles.headerTitle, { color: theme.colors.text }]}>

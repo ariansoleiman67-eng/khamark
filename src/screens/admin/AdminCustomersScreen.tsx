@@ -74,6 +74,20 @@ const contactLabel = (c: { email?: string | null; phone?: string | null }): stri
   return '';
 };
 
+// Guard against truthy-but-partial jsonb coordinates (e.g. {} or a lat with no lng).
+// `addresses.coordinates` is JSONB and addressService passes it through raw, so a
+// legacy or website-written row can be truthy while carrying no usable numbers.
+// Without this the "View on Map" button renders, initialRegion receives undefined,
+// and the Open-in-Maps link builds `geo:0,0?q=undefined,undefined`.
+// Mirrors the identical helper in MyAddressScreen.
+const hasValidCoordinates = (
+  address: Address
+): address is Address & { coordinates: { latitude: number; longitude: number } } =>
+  typeof address.coordinates?.latitude === 'number' &&
+  !Number.isNaN(address.coordinates.latitude) &&
+  typeof address.coordinates?.longitude === 'number' &&
+  !Number.isNaN(address.coordinates.longitude);
+
 const AdminCustomersScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
   const { tenantId, isLoading: tenantLoading } = useTenant();
@@ -228,15 +242,15 @@ const AdminCustomersScreen: React.FC = () => {
   };
 
   const handleViewMap = (address: Address) => {
-    if (address.coordinates) {
+    if (hasValidCoordinates(address)) {
       // Close details modal first to avoid nested modal freeze
       setDetailsModalVisible(false);
 
       // Small delay to allow first modal to close before opening second
       setTimeout(() => {
         setSelectedLocation({
-          latitude: address.coordinates!.latitude,
-          longitude: address.coordinates!.longitude,
+          latitude: address.coordinates.latitude,
+          longitude: address.coordinates.longitude,
           title: address.title || t('admin.customers.location'),
         });
         setMapModalVisible(true);
@@ -418,7 +432,7 @@ const AdminCustomersScreen: React.FC = () => {
         </Text>
       )}
 
-      {address.coordinates && (
+      {hasValidCoordinates(address) && (
         <TouchableOpacity
           style={[styles.viewMapButton, { backgroundColor: theme.colors.primary }]}
           onPress={() => handleViewMap(address)}
