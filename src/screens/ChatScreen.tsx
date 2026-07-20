@@ -35,7 +35,6 @@ import * as Haptics from 'expo-haptics';
 import { useTheme } from '../components/ThemeProvider';
 import { useAuth } from '../contexts/AuthContext';
 import { markConversationAsRead, sendMessage, softDeleteConversation, toggleBlockUser, deleteMessage, subscribeToConversation, subscribeToMessages } from '../services/chatService';
-import { chatbotService } from '../services/chatbotService';
 import { SHADOW_STYLES } from '../constants/theme';
 import ImageViewerModal from '../components/ImageViewerModal';
 import AttachmentMenu from '../components/chat/AttachmentMenu';
@@ -855,11 +854,6 @@ const ChatScreen = (props: any) => {
   const lastTypingSentRef = useRef(0);
   const myUid = user?.uid || '';
 
-  // AI Chatbot Auto-Response
-  const aiTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const userMessageCountRef = useRef<number>(0);
-  const lastUserMsgRef = useRef<string>('');
-
   const [headerHeight, setHeaderHeight] = useState(0);
   const [adminTime, setAdminTime] = useState('');
   
@@ -900,15 +894,6 @@ const ChatScreen = (props: any) => {
     return () => {
       subShow.remove();
       subHide.remove();
-    };
-  }, []);
-
-  // Cleanup AI timer on unmount
-  useEffect(() => {
-    return () => {
-      if (aiTimerRef.current) {
-        clearTimeout(aiTimerRef.current);
-      }
     };
   }, []);
 
@@ -1154,15 +1139,6 @@ const ChatScreen = (props: any) => {
             });
           }
 
-          // Cancel AI timer if admin responded (message from senderType 'admin')
-          if (!isAdminView && list.length > 0) {
-            const latestMsg = list[0]; // Most recent
-            if (latestMsg.senderType === 'admin' && aiTimerRef.current) {
-              clearTimeout(aiTimerRef.current);
-              aiTimerRef.current = null;
-            }
-          }
-
           setMessages(list);
           setLoadingMessages(false);
 
@@ -1378,51 +1354,14 @@ const ChatScreen = (props: any) => {
 
   // ... existing onSend
 
-  // AI Auto-Response: First message = 3 seconds, subsequent = 8 minutes
-  const AI_FIRST_MSG_DELAY = 3000; // 3 seconds
-  // Using 8 minutes as requested (480000ms)
-  const AI_SUBSEQUENT_MSG_DELAY = 8 * 60 * 1000; 
-  const AI_RATE_LIMIT = 30000; // Minimum 30 seconds between AI responses
-  const lastAIResponseTimeRef = useRef<number>(0);
-
-  const triggerAIResponse = async (userMessage: string) => {
-    try {
-      // Rate limiting
-      const now = Date.now();
-      if (now - lastAIResponseTimeRef.current < AI_RATE_LIMIT) {
-        return; 
-      }
-
-      const aiResponse = await chatbotService.sendMessage(userMessage, i18n.language);
-      lastAIResponseTimeRef.current = Date.now();
-      
-      // Sending as 'user' type but with AI name to avoid Permission Errors
-      // (Since users can only create 'user' messages in Firestore rules)
-      await sendMessage(
-        conversationId,
-        `🤖 ${aiResponse}`,
-        myUid, // Send as myself (user)
-        'user', // senderType must be user to pass rules
-        'AI Assistant (Auto)',
-        null
-      );
-    } catch (e: any) {
-      // Fallback message
-      try {
-        await sendMessage(
-          conversationId,
-          `🤖 ${t('chat.aiAutoReply', { defaultValue: 'Thanks for your message! Our team will get back to you soon.' })}`,
-          myUid,
-          'user',
-          'AI Assistant (Auto)',
-          null
-        );
-        lastAIResponseTimeRef.current = Date.now();
-      } catch {
-        // Silent fail
-      }
-    }
-  };
+  // The legacy client-side AI auto-responder that used to live here has been
+  // removed. Its only call site was already commented out in onSend because
+  // server-side Cloud Functions handle AI auto-replies via the onMessageCreate
+  // trigger, and the client-side path burned an exposed API key. It also posted
+  // replies as the USER's own message (senderType 'user' with the display name
+  // "AI Assistant (Auto)") purely to get past the permission rules, so leaving it
+  // in place was an invitation to re-enable message impersonation along with the
+  // key leak. Deleted rather than left dormant.
 
   const onSend = async () => {
       if (!myUid) return;
@@ -1460,25 +1399,8 @@ const ChatScreen = (props: any) => {
         // Product visibility in chat list is now handled purely by lastMessage.type
         // (set by onMessageCreate cloud function) — no Firestore clearing needed
 
-        // AI Auto-Response Logic - DISABLED
-        // Server-side Cloud Functions already handle AI auto-replies via onMessageCreate trigger
-        // Client-side AI was causing "OpenAI API Quota Exceeded" errors with exposed key
-        /*
-        if (!isAdminView) {
-          if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
-
-          lastUserMsgRef.current = trimmed;
-          userMessageCountRef.current += 1;
-
-          const delay = userMessageCountRef.current === 1 
-            ? AI_FIRST_MSG_DELAY 
-            : AI_SUBSEQUENT_MSG_DELAY;
-
-          aiTimerRef.current = setTimeout(() => {
-             triggerAIResponse(lastUserMsgRef.current);
-          }, delay);
-        }
-        */
+        // AI auto-replies are handled server-side by the onMessageCreate Cloud
+        // Function trigger. There is deliberately no client-side auto-responder.
 
         // Sent OK → mark the optimistic bubble; the realtime re-fetch then
         // reconciles it with the real server row.
