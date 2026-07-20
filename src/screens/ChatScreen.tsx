@@ -2754,7 +2754,7 @@ const ChatScreen = (props: any) => {
                   <Text allowFontScaling={false} style={{ marginLeft: 12, fontSize: 15, color: theme.colors.text, flex: 1 }}>
                     {storeProfile.phone}
                   </Text>
-                  <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+                  <Ionicons name={isRTLLang ? 'chevron-back' : 'chevron-forward'} size={18} color={theme.colors.textSecondary} />
                 </TouchableOpacity>
               )}
 
@@ -2787,7 +2787,7 @@ const ChatScreen = (props: any) => {
                   <Text allowFontScaling={false} style={{ marginLeft: 12, fontSize: 15, color: theme.colors.text, flex: 1 }}>
                     WhatsApp: {storeProfile.whatsapp}
                   </Text>
-                  <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+                  <Ionicons name={isRTLLang ? 'chevron-back' : 'chevron-forward'} size={18} color={theme.colors.textSecondary} />
                 </TouchableOpacity>
               )}
 

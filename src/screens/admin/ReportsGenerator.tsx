@@ -1045,7 +1045,7 @@ export const ReportsGenerator = () => {
                       <Text allowFontScaling={false} style={{ fontSize: 15.5, fontWeight: '800', color: '#EF4444' }} numberOfLines={1}>${remaining.toFixed(2)}</Text>
                       <Text allowFontScaling={false} style={{ fontSize: 11, color: theme.colors.textSecondary, marginTop: 1 }} numberOfLines={1}>USD</Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} style={{ marginLeft: 6, opacity: 0.5 }} />
+                    <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={16} color={theme.colors.textSecondary} style={{ marginLeft: 6, opacity: 0.5 }} />
                   </TouchableOpacity>
                 );
               })}

@@ -2662,7 +2662,7 @@ const AdminOrdersScreen: React.FC = () => {
                 onPress={() => navigation.goBack()}
                 style={{ position: 'absolute', top: insets.top + 8, left: 12, zIndex: 20, width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: isDark ? theme.colors.surface : '#fff', elevation: 4 }}
               >
-                <Ionicons name="arrow-back" size={22} color={theme.colors.text} />
+                <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={22} color={theme.colors.text} />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => (navigation as any).navigate('AdminCreateOrder')}

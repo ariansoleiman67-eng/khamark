@@ -675,7 +675,7 @@ export default function AdminPartnerDashboardScreen() {
                         <Text allowFontScaling={false} style={{ color: theme.colors.text, fontWeight: '700', fontSize: 14 }} numberOfLines={1}>{p.name}</Text>
                         <Text allowFontScaling={false} style={{ color: theme.colors.textSecondary, fontSize: 12 }}>{effectiveStock(p)} {t('admin.partnerDashboard.inStockShort', { defaultValue: 'in stock' })} · {money(cost)}</Text>
                       </View>
-                      <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+                      <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={18} color={theme.colors.textSecondary} />
                     </TouchableOpacity>
                   );
                 })}
@@ -707,7 +707,7 @@ export default function AdminPartnerDashboardScreen() {
                   <Ionicons name="document-text-outline" size={17} color={ACCENT} />
                 </View>
                 <Text allowFontScaling={false} style={[styles.langOptionText, { color: theme.colors.text }]}>{label}</Text>
-                <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+                <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={18} color={theme.colors.textSecondary} />
               </TouchableOpacity>
             ))}
           </View>

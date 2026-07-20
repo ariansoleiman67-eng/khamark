@@ -526,7 +526,7 @@ const AdminDashboardScreen: React.FC = () => {
                 {t('admin.dashboard.pendingOrders', { count: stats?.pendingOrders || 0 })}
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+            <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={20} color={theme.colors.textSecondary} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -544,7 +544,7 @@ const AdminDashboardScreen: React.FC = () => {
                 {t('admin.inStore.subtitle', { defaultValue: 'Create a walk-in order & print invoice' })}
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+            <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={20} color={theme.colors.textSecondary} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -570,7 +570,7 @@ const AdminDashboardScreen: React.FC = () => {
                 {t('admin.dashboard.lowStock', { count: stats?.lowStockProducts || 0 })}
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+            <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={20} color={theme.colors.textSecondary} />
           </TouchableOpacity>
 
           <TouchableOpacity 
@@ -596,7 +596,7 @@ const AdminDashboardScreen: React.FC = () => {
                 {t('admin.dashboard.notifyAll')}
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+            <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={20} color={theme.colors.textSecondary} />
           </TouchableOpacity>
         </View>
       </View>

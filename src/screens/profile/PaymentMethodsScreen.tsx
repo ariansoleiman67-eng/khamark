@@ -13,6 +13,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  I18nManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -52,7 +53,11 @@ const PaymentMethodsScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
   const navigation = useNavigation();
   const { user } = useAuth();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // Directional icons must follow the reading direction. Global auto-RTL is
+  // disabled in App.tsx, so I18nManager.isRTL alone is always false here — the
+  // language check is what actually does the work.
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
 
   // State
   const [loading, setLoading] = useState(true);
@@ -314,7 +319,7 @@ const PaymentMethodsScreen: React.FC = () => {
               // Navigation error
             }
           }}>
-            <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+            <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color={theme.colors.text} />
           </TouchableOpacity>
           <Text allowFontScaling={false} style={{
             fontSize: 18,
@@ -477,7 +482,7 @@ const PaymentMethodsScreen: React.FC = () => {
 
                   {/* Arrow */}
                   <Ionicons
-                    name="chevron-forward"
+                    name={isRTL ? 'chevron-back' : 'chevron-forward'}
                     size={20}
                     color={theme.colors.textSecondary}
                   />
@@ -793,7 +798,7 @@ const PaymentMethodsScreen: React.FC = () => {
                       {t('payment.saveExchangerInfoDesc', { defaultValue: 'Save once, auto-fill every checkout' })}
                     </Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={18} color="#FF9800" />
+                  <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={18} color="#FF9800" />
                 </TouchableOpacity>
               )}
 

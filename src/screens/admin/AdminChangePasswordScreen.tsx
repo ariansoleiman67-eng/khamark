@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  I18nManager,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -23,7 +24,11 @@ const BUTTON_TEXT_COLOR = '#FFFFFF';
 const AdminChangePasswordScreen = () => {
   const navigation = useNavigation();
   const { theme } = useTheme();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // Directional icons must follow the reading direction. Global auto-RTL is
+  // disabled in App.tsx, so I18nManager.isRTL alone is always false here — the
+  // language check is what actually does the work.
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const [loading, setLoading] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -121,7 +126,7 @@ const AdminChangePasswordScreen = () => {
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
-          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+          <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color={theme.colors.text} />
         </TouchableOpacity>
         <Text allowFontScaling={false} style={[styles.headerTitle, { color: theme.colors.text }]}>{t('admin.changePassword.title')}</Text>
         <View style={styles.headerPlaceholder} />

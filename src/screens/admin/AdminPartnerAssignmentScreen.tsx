@@ -9,6 +9,7 @@ import {
   Alert,
   Image,
   TextInput,
+  I18nManager,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -24,7 +25,10 @@ import { useRoute, useNavigation } from '@react-navigation/native';
 export default function AdminPartnerAssignmentScreen() {
   const { theme, isDark } = useTheme();
   const { tenantId, isLoading: tenantLoading } = useTenant();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // Global auto-RTL is disabled in App.tsx, so I18nManager.isRTL alone is always
+  // false — the language check is what actually flips the chevron.
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const insets = useSafeAreaInsets();
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
@@ -186,7 +190,7 @@ export default function AdminPartnerAssignmentScreen() {
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + SPACING.sm, backgroundColor: theme.colors.surface }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="chevron-back" size={28} color={theme.colors.text} />
+          <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={28} color={theme.colors.text} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
           <Text allowFontScaling={false} style={[styles.headerTitle, { color: theme.colors.text }]}>{t('admin.partners.assignTitle', { defaultValue: 'Assign Products' })}</Text>

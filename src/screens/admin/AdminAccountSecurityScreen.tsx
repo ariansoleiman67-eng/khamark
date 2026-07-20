@@ -8,6 +8,7 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  I18nManager,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -120,7 +121,10 @@ const AdminAccountSecurityScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const insets = useSafeAreaInsets();
   const { user, refreshUser } = useAuth();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // Global auto-RTL is disabled in App.tsx, so I18nManager.isRTL alone is always
+  // false — the language check is what actually flips the chevron.
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const { theme, isDark } = useTheme();
   const reauthRef = useRef<ReauthModalHandle>(null);
 
@@ -202,7 +206,7 @@ const AdminAccountSecurityScreen: React.FC = () => {
       >
         {/* ── Back ── */}
         <TouchableOpacity style={[styles.backButton, isDark && { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]} onPress={handleBack} activeOpacity={0.7}>
-          <Ionicons name="chevron-back" size={20} color={isDark ? theme.colors.text : LUX.body} />
+          <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={20} color={isDark ? theme.colors.text : LUX.body} />
         </TouchableOpacity>
 
         {/* ── Title ── */}

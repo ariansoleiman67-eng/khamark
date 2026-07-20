@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Switch,
   Platform,
+  I18nManager,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -34,7 +35,11 @@ const AdminEditDiscountScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // Directional icons must follow the reading direction. Global auto-RTL is
+  // disabled in App.tsx, so I18nManager.isRTL alone is always false here — the
+  // language check is what actually does the work.
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   // Discounts are tenant-scoped: use the resolved tenantId (the store), NOT the
   // logged-in admin's own uid — otherwise discounts save under the wrong tenant
   // and never apply for customers (and co-admins couldn't manage them at all).
@@ -297,7 +302,7 @@ const AdminEditDiscountScreen: React.FC = () => {
           style={styles.headerGradient}
         >
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#fff" />
+            <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color="#fff" />
           </TouchableOpacity>
           
           <Text allowFontScaling={false} style={styles.headerTitle}>

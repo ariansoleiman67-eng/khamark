@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity, ViewStyle, TextStyle } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ViewStyle, TextStyle, I18nManager } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import AppText from './AppText';
 import { useTheme } from './ThemeProvider';
@@ -26,6 +27,10 @@ const Header: React.FC<HeaderProps> = ({
 }) => {
   const { theme } = useTheme();
   const navigation = useNavigation();
+  const { t, i18n } = useTranslation();
+  // Global auto-RTL is disabled in App.tsx, so I18nManager.isRTL alone is always
+  // false — the language check is what actually flips the arrow.
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
 
   const handleBack = () => {
     if (onBack) {
@@ -47,8 +52,14 @@ const Header: React.FC<HeaderProps> = ({
     ]}>
       <View style={styles.leftContainer}>
         {showBack && (
-          <TouchableOpacity onPress={handleBack} style={styles.backButton} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+          <TouchableOpacity
+            onPress={handleBack}
+            style={styles.backButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.back', { defaultValue: 'Back' })}
+          >
+            <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color={theme.colors.text} />
           </TouchableOpacity>
         )}
       </View>

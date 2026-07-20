@@ -8,6 +8,7 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  I18nManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -24,7 +25,11 @@ import { useTenant } from '../../contexts/TenantContext';
 const AdminCurrencySettingsScreen = () => {
   const { theme, isDark } = useTheme();
   const navigation = useNavigation();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // Directional icons must follow the reading direction. Global auto-RTL is
+  // disabled in App.tsx, so I18nManager.isRTL alone is always false here — the
+  // language check is what actually does the work.
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const { tenantId } = useTenant();
   
   const [loading, setLoading] = useState(false);
@@ -111,7 +116,7 @@ const AdminCurrencySettingsScreen = () => {
         {/* Header */}
         <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
           <Ionicons 
-            name="arrow-back" 
+            name={isRTL ? 'arrow-forward' : 'arrow-back'} 
             size={24} 
             color={theme.colors.text} 
             onPress={() => navigation.goBack()}

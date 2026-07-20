@@ -9,6 +9,7 @@ import {
   Switch,
   TextInput,
   Dimensions,
+  I18nManager,
 } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -40,7 +41,11 @@ interface ColorCustomizationItem {
 
 export const ThemeCustomizationScreen: React.FC = () => {
   const navigation = useNavigation();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // Directional icons must follow the reading direction. Global auto-RTL is
+  // disabled in App.tsx, so I18nManager.isRTL alone is always false here — the
+  // language check is what actually does the work.
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const { theme, setCustomTheme, currentCustomTheme } = useTheme();
   
   const COLOR_CUSTOMIZATION_ITEMS: ColorCustomizationItem[] = [
@@ -343,7 +348,7 @@ export const ThemeCustomizationScreen: React.FC = () => {
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
-          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+          <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color={theme.colors.text} />
         </TouchableOpacity>
         <Text allowFontScaling={false} style={[styles.headerTitle, { color: theme.colors.text }]}>
           {t('theme.title')}

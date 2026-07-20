@@ -1388,7 +1388,7 @@ const AdminStockReportScreen: React.FC = () => {
                       <Text allowFontScaling={false} style={{ fontSize: 11, color: theme.colors.textSecondary, marginRight: 4 }} adjustsFontSizeToFit numberOfLines={1}>
                         {t('admin.stockReport.viewOrders', { defaultValue: 'View' })}
                       </Text>
-                      <Ionicons name="chevron-forward" size={14} color={theme.colors.textSecondary} />
+                      <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={14} color={theme.colors.textSecondary} />
                     </View>
                   </View>
                 </TouchableOpacity>

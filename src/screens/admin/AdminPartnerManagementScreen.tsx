@@ -341,7 +341,7 @@ export default function AdminPartnerManagementScreen() {
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + SPACING.sm, backgroundColor: theme.colors.surface }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="chevron-back" size={28} color={theme.colors.text} />
+          <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={28} color={theme.colors.text} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
           <Text allowFontScaling={false} style={[styles.headerTitle, { color: theme.colors.text }]}>{t('admin.partners.title', { defaultValue: 'Partner Management' })}</Text>

@@ -1159,7 +1159,7 @@ const AddEditAddressScreen: React.FC = () => {
                         {t('addresses.locationHelpText')}
                       </Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={20} color={theme.colors.primary} />
+                    <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={20} color={theme.colors.primary} />
                   </TouchableOpacity>
                 )}
 

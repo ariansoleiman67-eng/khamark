@@ -154,6 +154,7 @@ const AdminSettingsScreen: React.FC = () => {
   const { tenantId, upgradeToAdmin, isLoading: tenantLoading } = useTenant();
   const navigation = useNavigation<any>();
   const { t, i18n } = useTranslation();
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const insets = useSafeAreaInsets();
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -585,7 +586,7 @@ const AdminSettingsScreen: React.FC = () => {
                 {upgrading ? (
                   <ActivityIndicator size="small" color="#DC2626" />
                 ) : (
-                  <Ionicons name="chevron-forward" size={18} color={isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)'} />
+                  <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={18} color={isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)'} />
                 )}
               </TouchableOpacity>
             </Animated.View>

@@ -787,7 +787,7 @@ const CategoriesScreen: React.FC = () => {
                 <Text allowFontScaling={false} style={styles.browseStoresText} adjustsFontSizeToFit minimumFontScale={0.8}>
                   {t('stores.browseStores', { defaultValue: 'Browse Stores' })}
                 </Text>
-                <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.8)" />
+                <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={18} color="rgba(255,255,255,0.8)" />
               </LinearGradient>
             </TouchableOpacity>
          )}
