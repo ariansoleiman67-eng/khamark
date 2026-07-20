@@ -8,12 +8,16 @@ import {
   Modal,
   StyleSheet,
   Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from './ThemeProvider';
 import { ColorPickerConfig } from '../types/theme';
 
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+// Window size is read per-render via useWindowDimensions, NOT frozen at module
+// scope: a module-level Dimensions.get() is evaluated once at import, so after a
+// rotation or a foldable/split-screen resize the view keeps its old size and is
+// clipped or leaves dead space.
 
 // Beautiful color presets
 const COLOR_PRESETS = [
@@ -45,6 +49,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
   onClose,
   onColorSelect,
 }) => {
+  const { height: windowHeight } = useWindowDimensions();
   const { theme } = useTheme();
   const [currentColor, setCurrentColor] = useState(config.defaultColor);
   const [hexInput, setHexInput] = useState(config.defaultColor);
@@ -69,7 +74,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
   return (
     <Modal visible={visible} animationType="slide" transparent>
       <View style={styles.modalContainer}>
-        <View style={[styles.modalContent, { backgroundColor: theme.colors.background }]}>
+        <View style={[styles.modalContent, { backgroundColor: theme.colors.background, height: windowHeight * 0.75 }]}>
           {/* Header */}
           <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
@@ -251,7 +256,6 @@ const styles = StyleSheet.create({
   modalContent: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    height: screenHeight * 0.75,
   },
   presetGrid: {
     flexDirection: 'row',

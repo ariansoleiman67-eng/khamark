@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,7 +18,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
+// Window size is read per-render via useWindowDimensions, NOT frozen at module
+// scope: a module-level Dimensions.get() is evaluated once at import, so after a
+// rotation or a foldable/split-screen resize the view keeps its old size and is
+// clipped or leaves dead space.
 
 interface ImageViewerModalProps {
   visible: boolean;
@@ -30,6 +34,7 @@ const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
   imageUrl,
   onClose,
 }) => {
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [saving, setSaving] = React.useState(false);
 
@@ -121,7 +126,7 @@ const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         >
           <Image
             source={{ uri: imageUrl }}
-            style={styles.image}
+            style={[styles.image, { width: windowWidth, height: windowHeight * 0.8 }]}
             contentFit="contain"
             transition={200}
           />
@@ -178,10 +183,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 44,
   },
-  image: {
-    height: SCREEN_H * 0.8,
-    width: SCREEN_W,
-  },
+  image: {},
   scrollContent: {
     alignItems: 'center',
     flex: 1,
