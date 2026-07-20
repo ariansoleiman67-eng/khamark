@@ -210,9 +210,19 @@ const AdminOrdersScreen: React.FC = () => {
 
   const handleUpdateAmountPaid = async () => {
     if (!tenantId || !selectedOrder || !propsUser?.uid) return;
+    if (orderWriteRef.current) return;
+    orderWriteRef.current = true;
     try {
       const isIQD = selectedOrder.currency === 'IQD';
       const inputVal = parseFloat(amountPaidInput) || 0;
+      // Overpayment was rejected below but there was no lower bound, so a pasted or
+      // typed "-500" went through: amount_paid_usd went negative and remainingOf's
+      // `total - (-500)` then INFLATED the outstanding balance by 500 across the
+      // Unpaid tab, the cash-owed tile and the invoice's Remaining Due.
+      if (!Number.isFinite(inputVal) || inputVal < 0) {
+        Alert.alert(t('admin.common.error', { defaultValue: 'Error' }), 'Enter a valid, non-negative amount.');
+        return;
+      }
       let newAmountUSD = inputVal;
 
       if (isIQD && selectedOrder.exchangeRate) {
@@ -248,12 +258,17 @@ const AdminOrdersScreen: React.FC = () => {
       Alert.alert(t('admin.common.error'), 'Failed to update payment');
     } finally {
       setUpdating(false);
+      orderWriteRef.current = false;
     }
   };
 
   // Process a return/refund: restock the chosen units + lower the order total/paid.
   const handleConfirmReturn = async () => {
     if (!tenantId || !selectedOrder) return;
+    // returnOrderItems is the one explicitly non-idempotent write here: it restocks,
+    // reduces line quantities and lowers total/amount_paid. Two same-frame taps both
+    // pass validation and both restock.
+    if (orderWriteRef.current) return;
     const orderItems = (selectedOrder.items || []) as any[];
     const returns = orderItems.map((it, i) => ({
       index: i,
@@ -263,6 +278,7 @@ const AdminOrdersScreen: React.FC = () => {
       priceUSD: it.priceUSD || 0,
     })).filter(r => r.quantity > 0);
     if (!returns.length) return;
+    orderWriteRef.current = true;
     try {
       setReturning(true);
       const service = createTenantAdminService(tenantId);
@@ -279,6 +295,7 @@ const AdminOrdersScreen: React.FC = () => {
       Alert.alert(t('admin.common.error', { defaultValue: 'Error' }), e?.message || 'Failed to process return');
     } finally {
       setReturning(false);
+      orderWriteRef.current = false;
     }
   };
 
@@ -570,6 +587,7 @@ const AdminOrdersScreen: React.FC = () => {
 
   const handleStatusUpdate = async (order: Order, newStatus: OrderStatus) => {
     if (!tenantId) return;
+    if (orderWriteRef.current) return;
 
     // GOLDEN: Special confirmation for cancellation with warning
     if (newStatus === 'cancelled_by_store') {
@@ -582,6 +600,8 @@ const AdminOrdersScreen: React.FC = () => {
             text: t('admin.orders.confirmCancel', { defaultValue: 'Yes, Cancel Order' }),
             style: 'destructive',
             onPress: async () => {
+              if (orderWriteRef.current) return;
+              orderWriteRef.current = true;
               setUpdating(true);
               try {
                 const service = createTenantAdminService(tenantId);
@@ -596,6 +616,7 @@ const AdminOrdersScreen: React.FC = () => {
                 Alert.alert(t('admin.common.error'), t('admin.orders.statusUpdateFailed'));
               } finally {
                 setUpdating(false);
+                orderWriteRef.current = false;
               }
             }
           },
@@ -604,6 +625,7 @@ const AdminOrdersScreen: React.FC = () => {
       return;
     }
 
+    orderWriteRef.current = true;
     setUpdating(true);
     try {
       const service = createTenantAdminService(tenantId);
@@ -665,6 +687,7 @@ const AdminOrdersScreen: React.FC = () => {
       Alert.alert(t('admin.common.error'), t('admin.orders.statusUpdateFailed'));
     } finally {
       setUpdating(false);
+      orderWriteRef.current = false;
     }
   };
 
@@ -828,6 +851,21 @@ const AdminOrdersScreen: React.FC = () => {
 
   // 🖨️ Print Invoice as PDF - with language support
   const printingRef = useRef(false);
+  // One lock across every order-mutating write on this screen.
+  //
+  // The status grid renders six sibling Touchables, each its own responder, so two
+  // simultaneous touches on DIFFERENT buttons both fire in one event batch and both
+  // clear a `disabled` that is still a render behind. Both calls then read the same
+  // stock_status:'pending' and both deduct — move_part_stock applies a signed
+  // RELATIVE delta, so inventory drops by twice the order — and the shipped branch
+  // sends the customer two 'Order has been SHIPPED!' messages.
+  //
+  // NOTE this only closes the single-device case. updateOrderStatus's stock_status
+  // check is a read-modify-write across two round trips, so two admin devices can
+  // still double-deduct. The durable fix is a compare-and-set inside a SECURITY
+  // DEFINER RPC that locks the order row and only moves stock when
+  // stock_status <> 'deducted' — cancel_my_order already does exactly this.
+  const orderWriteRef = useRef(false);
 
   const generateInvoiceHtml = (order: Order, lang: 'en' | 'ar' | 'ku', imageMap: Record<string, string> = {}) => {
     const isRTL = lang === 'ar' || lang === 'ku';
@@ -1285,6 +1323,10 @@ const AdminOrdersScreen: React.FC = () => {
 
   const handleUpdatePaymentStatus = async (order: Order, status: 'paid' | 'failed') => {
     if (!tenantId) return;
+    // Approve and Decline are separate buttons with no disabled prop at all; tapping
+    // both before the first resolves let arrival order decide the stored value.
+    if (orderWriteRef.current) return;
+    orderWriteRef.current = true;
     try {
       const service = createTenantAdminService(tenantId);
       await service.updateOrderPaymentStatus(order.id, status);
@@ -1302,6 +1344,8 @@ const AdminOrdersScreen: React.FC = () => {
     } catch (error) {
       console.error('Error updating payment status:', error);
       Alert.alert(t('admin.common.error'), t('admin.orders.updatePaymentFailed', { defaultValue: 'Failed to update payment status' }));
+    } finally {
+      orderWriteRef.current = false;
     }
   };
 
@@ -2172,8 +2216,19 @@ const AdminOrdersScreen: React.FC = () => {
                     />
                     <TouchableOpacity
                       style={[styles.saveTrackingButton, { backgroundColor: theme.colors.primary }]}
+                      disabled={updating}
+                      accessibilityState={{ disabled: updating }}
                       onPress={async () => {
                         if (!tenantId || !selectedOrder) return;
+                        // No guard and no disabled prop at all previously. The tracking
+                        // write itself is an absolute set and harmless twice, but the
+                        // same handler then appends to the customer's chat — so two taps
+                        // during the round trip sent two identical "shipped" messages,
+                        // and two concurrent createAdminInitiatedConversation calls could
+                        // mint duplicate conversations.
+                        if (orderWriteRef.current) return;
+                        orderWriteRef.current = true;
+                        setUpdating(true);
                         try {
                           const service = createTenantAdminService(tenantId);
                           await service.updateOrderTracking(selectedOrder.id, trackingUrl);
@@ -2211,6 +2266,9 @@ const AdminOrdersScreen: React.FC = () => {
                           Alert.alert(t('admin.common.success'), 'Tracking URL saved');
                         } catch (error) {
                           Alert.alert(t('admin.common.error'), 'Failed to save tracking URL');
+                        } finally {
+                          setUpdating(false);
+                          orderWriteRef.current = false;
                         }
                       }}
                     >
