@@ -18,6 +18,15 @@ export class OrderService {
   private static readonly CACHE_EXPIRY = 5 * 60 * 1000;
   private static cachedOrders: Order[] = [];
   private static lastCacheTime = 0;
+  /**
+   * Owner of `cachedOrders`. The cache outlives a session — it is a static field
+   * mirrored into AsyncStorage — so without an owner id a logout→login (or an app
+   * relaunch that restores the on-disk copy) hands account B the orders, addresses
+   * and phone numbers of account A. Must be checked on EVERY read path: the fresh
+   * read, the stale-while-revalidate path, the catch-block fallback, the by-id
+   * lookup, and the on-disk restore.
+   */
+  private static cachedUserId: string | null = null;
 
   static async createOrder(
     cartItems: OrderItem[],
@@ -43,22 +52,47 @@ export class OrderService {
     exchangeRate?: number,
     shouldClearCart: boolean = true
   ): Promise<{ orderId: string; orderNumber: string; totalUSD: number }> {
-    const { data: authData } = await supabase.auth.getSession();
-    if (!authData?.session?.user) {
-      throw new Error('User must be authenticated');
-    }
+    // Concurrent callers share one promise. A `useState` flag at the call site does
+    // not protect this: the state update only lands on the next render, so two taps
+    // in the same frame both get through, and there is an `await` on the session
+    // before any write begins for a second tap to slip past. Order numbers embed
+    // Date.now() plus a random suffix, so nothing collides into a unique-constraint
+    // rejection — both writes simply succeed and the customer is charged twice.
+    if (this.createOrderInFlight) return this.createOrderInFlight;
+
+    this.createOrderInFlight = (async () => {
+      const { data: authData } = await supabase.auth.getSession();
+      if (!authData?.session?.user) {
+        throw new Error('User must be authenticated');
+      }
+
+      try {
+        return await this.createOrderDirectly(
+          cartItems, shippingAddress, paymentMethod, notes, shippingCost,
+          appliedDiscount, shippingOfficeInfo, moneyExchangerInfo, currency, exchangeRate,
+          shouldClearCart
+        );
+      } catch (error: any) {
+        console.error('Order creation failed:', error);
+        throw new Error('Failed to create order: ' + (error.message || 'Unknown error'));
+      }
+    })();
 
     try {
-      return await this.createOrderDirectly(
-        cartItems, shippingAddress, paymentMethod, notes, shippingCost,
-        appliedDiscount, shippingOfficeInfo, moneyExchangerInfo, currency, exchangeRate,
-        shouldClearCart
-      );
-    } catch (error: any) {
-      console.error('Order creation failed:', error);
-      throw new Error('Failed to create order: ' + (error.message || 'Unknown error'));
+      return await this.createOrderInFlight;
+    } finally {
+      this.createOrderInFlight = null;
     }
   }
+
+  /**
+   * In-flight `createOrder` call, shared by every concurrent caller.
+   *
+   * Deliberately not keyed by arguments: this is a single-user mobile client where
+   * checkout is one screen, so overlapping calls are always the same order
+   * double-submitted, never two distinct orders placed at once.
+   */
+  private static createOrderInFlight: Promise<{ orderId: string; orderNumber: string; totalUSD: number }> | null = null;
 
   private static async createOrderDirectly(
     cartItems: OrderItem[],
@@ -196,7 +230,11 @@ export class OrderService {
       const userId = sessionData?.session?.user?.id;
       if (!userId) throw new Error('User must be authenticated to view orders');
 
-      if (!refresh && this.cachedOrders.length > 0) {
+      // A cache belonging to a different account is never usable — drop it rather
+      // than serving another user's orders.
+      if (this.cachedUserId && this.cachedUserId !== userId) this.clearCache();
+
+      if (!refresh && this.cachedOrders.length > 0 && this.cachedUserId === userId) {
         if (this.isCacheValid()) return this.cachedOrders;
         // Stale-while-revalidate: hand back the cached orders immediately and
         // refresh in the background. OrdersScreen re-fetches on focus, so the
@@ -207,7 +245,12 @@ export class OrderService {
 
       return await this.fetchAndCacheUserOrders(userId);
     } catch (error: any) {
-      if (this.cachedOrders.length > 0) return this.cachedOrders;
+      // Falling back to cache is only safe when it provably belongs to the
+      // account currently signed in.
+      const currentUserId = (await supabase.auth.getSession()).data?.session?.user?.id;
+      if (this.cachedOrders.length > 0 && this.cachedUserId && this.cachedUserId === currentUserId) {
+        return this.cachedOrders;
+      }
       throw new Error('Failed to fetch orders');
     }
   }
@@ -255,6 +298,7 @@ export class OrderService {
     })) as unknown as Order[];
 
     this.cachedOrders = orders;
+    this.cachedUserId = userId;
     this.lastCacheTime = Date.now();
     this.saveCacheToStorage();
 
@@ -267,8 +311,13 @@ export class OrderService {
       const userId = sessionData?.session?.user?.id;
       if (!userId) throw new Error('User must be authenticated');
 
-      const cachedOrder = this.cachedOrders.find(order => order.id === orderId);
-      if (cachedOrder) return cachedOrder;
+      // Two checks, not one: the cache as a whole must belong to this user, AND the
+      // individual row must too. The row check defends against a cache that was
+      // populated by a path that did not set the owner id.
+      if (this.cachedUserId === userId) {
+        const cachedOrder = this.cachedOrders.find(order => order.id === orderId);
+        if (cachedOrder && (cachedOrder as any).userId === userId) return cachedOrder;
+      }
 
       const { data, error } = await supabase.from('orders').select('*').eq('id', orderId).single();
       
@@ -625,6 +674,7 @@ export class OrderService {
 
   private static clearCache(): void {
     this.cachedOrders = [];
+    this.cachedUserId = null;
     this.lastCacheTime = 0;
     AsyncStorage.removeItem(this.CACHE_KEY);
   }
@@ -633,6 +683,7 @@ export class OrderService {
     try {
       const cacheData = {
         orders: this.cachedOrders,
+        userId: this.cachedUserId,
         timestamp: this.lastCacheTime,
       };
       await AsyncStorage.setItem(this.CACHE_KEY, JSON.stringify(cacheData));
@@ -644,12 +695,20 @@ export class OrderService {
       const cacheData = await AsyncStorage.getItem(this.CACHE_KEY);
       if (cacheData) {
         const parsed = JSON.parse(cacheData);
+        // A persisted cache with no recorded owner predates owner tracking and
+        // cannot be attributed to anyone — discard it rather than risk serving it
+        // to whoever signs in next.
+        if (!parsed.userId) {
+          await AsyncStorage.removeItem(this.CACHE_KEY);
+          return;
+        }
         if (Date.now() - parsed.timestamp < this.CACHE_EXPIRY) {
           this.cachedOrders = parsed.orders.map((order: any) => ({
             ...order,
             createdAt: new Date(order.createdAt),
             updatedAt: new Date(order.updatedAt),
           }));
+          this.cachedUserId = parsed.userId;
           this.lastCacheTime = parsed.timestamp;
         }
       }

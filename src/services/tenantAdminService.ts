@@ -8,6 +8,13 @@ import { OWNER_UIDS } from '../constants/config';
 // null = untried, true = present, false = not deployed → use the read-modify-write fallback.
 let rpcStockMoveAvailable: boolean | null = null;
 
+// In-flight in-store sales, keyed by the sale's identity rather than by a single
+// boolean, so a genuinely different second sale still goes through while a repeat of
+// the same one is rejected. Order numbers embed Date.now() plus a random suffix, so a
+// double-tap produces two distinct numbers and nothing collides into a unique-constraint
+// rejection — both inserts succeed, deducting stock twice and double-counting revenue.
+const inFlightManualOrders = new Set<string>();
+
 // Map a raw `parts` row to the admin product shape: the canonical camelCase
 // product (via mapProduct) plus admin-only fields the editor needs. Reusing
 // mapProduct guarantees the edit form pre-fills EVERY localized/tier/variation
@@ -560,42 +567,84 @@ export class TenantAdminService {
     const { data: { user } } = await supabase.auth.getUser();
     const creatorId = user?.id || this.tenantId;
 
-    const row: any = {
-      user_id: creatorId,                     // the admin who rang up the sale (satisfies RLS)
-      tenant_id: this.tenantId,
-      order_number: orderNumber,
-      items,
-      subtotal_usd: subtotalUSD,
-      shipping_usd: 0,
-      tax_usd: 0,
-      discount_usd: discountUSD,
-      total_usd: totalUSD,
-      amount_paid_usd: amountPaidUSD,
-      currency: params.currency || 'USD',
-      exchange_rate: params.exchangeRate || 1500,
-      payment_status: fullyPaid ? 'paid' : 'pending',
-      // In-store = a completed counter sale: mark delivered (so it counts as realized
-      // revenue) and deduct stock immediately below — the part already left the shelf.
-      status: 'delivered',
-      stock_status: 'deducted',
-      shipping_address: { fullName: customerName || 'In-Store Customer', phone: customerPhone, address: customerAddress, city: customerCity },
-      notes: params.notes || null,
-      extra_data: {
-        source: 'in-store',
-        customerName: customerName || null,
-        customerPhone: customerPhone || null,
-        isVip: !!params.isVip,
-        ...(params.partner?.uid ? { partnerId: params.partner.uid, partnerName: params.partner.name || null } : {}),
-      },
-    };
+    // Same tenant, same admin, same customer, same total, same basket = the same sale
+    // being submitted twice. A useState flag at the call site cannot cover this: the
+    // state update lands a render later, so two taps in the same frame both get past it.
+    const idempotencyKey = `${this.tenantId}|${creatorId}|${customerPhone}|${totalUSD.toFixed(2)}|${items.map((i) => `${i.productId || i.productName}:${i.quantity}`).join(',')}`;
+    if (inFlightManualOrders.has(idempotencyKey)) {
+      throw new Error('This sale is already being processed — please wait.');
+    }
+    inFlightManualOrders.add(idempotencyKey);
 
-    const { data, error } = await supabase.from('orders').insert([row]).select('id, order_number').single();
-    if (error) throw error;
+    try {
+      const row: any = {
+        user_id: creatorId,                     // the admin who rang up the sale (satisfies RLS)
+        tenant_id: this.tenantId,
+        order_number: orderNumber,
+        items,
+        subtotal_usd: subtotalUSD,
+        shipping_usd: 0,
+        tax_usd: 0,
+        discount_usd: discountUSD,
+        total_usd: totalUSD,
+        amount_paid_usd: amountPaidUSD,
+        currency: params.currency || 'USD',
+        exchange_rate: params.exchangeRate || 1500,
+        payment_status: fullyPaid ? 'paid' : 'pending',
+        // In-store = a completed counter sale: mark delivered (so it counts as realized
+        // revenue) and deduct stock immediately below — the part already left the shelf.
+        status: 'delivered',
+        // Insert as 'pending' and flip to 'deducted' only once the stock actually moved.
+        // Writing 'deducted' up front is a claim about something that has not happened
+        // yet, and moveStockForItems is best-effort: if it fails, the row still reads
+        // 'deducted', updateOrderStatus() skips it, and the inventory drift is permanent
+        // with no retry path.
+        stock_status: 'pending',
+        shipping_address: { fullName: customerName || 'In-Store Customer', phone: customerPhone, address: customerAddress, city: customerCity },
+        notes: params.notes || null,
+        extra_data: {
+          source: 'in-store',
+          customerName: customerName || null,
+          customerPhone: customerPhone || null,
+          isVip: !!params.isVip,
+          ...(params.partner?.uid ? { partnerId: params.partner.uid, partnerName: params.partner.name || null } : {}),
+        },
+      };
 
-    // The part left the shelf now: deduct stock immediately (variation-aware).
-    await this.moveStockForItems(items, 'deduct');
+      const { data, error } = await supabase.from('orders').insert([row]).select('id, order_number').single();
+      if (error) throw error;
 
-    return { orderId: data.id, orderNumber: data.order_number };
+      // Past this point the sale is committed. Everything below is follow-up work, and
+      // none of it may throw: a post-commit failure that propagates would be reported to
+      // the admin as "failed to create order" for a sale that actually succeeded, and
+      // they would ring it up again.
+      const stockMoved = await this.moveStockForItems(items, 'deduct');
+      if (stockMoved) {
+        // Retried once because this is the one genuinely dangerous failure here: the
+        // stock HAS moved, so a row left at 'pending' invites updateOrderStatus() to
+        // deduct it a second time on the next fulfilment transition.
+        let flipped = false;
+        for (let attempt = 0; attempt < 2 && !flipped; attempt++) {
+          try {
+            const { error: statusErr } = await supabase.from('orders').update({ stock_status: 'deducted' }).eq('id', data.id);
+            if (!statusErr) { flipped = true; break; }
+            console.warn(`Order created but stock_status flip failed (attempt ${attempt + 1}):`, statusErr.message);
+          } catch (statusErrCaught) {
+            console.warn(`Order created but stock_status flip threw (attempt ${attempt + 1}):`, statusErrCaught);
+          }
+        }
+        if (!flipped) {
+          console.warn('Stock was deducted but the order still reads stock_status=pending — a later status change may deduct it again:', data.id);
+        }
+      } else {
+        // Left as 'pending' on purpose so the deduction can still be retried.
+        console.warn('Order created but stock deduction was incomplete; stock_status left pending for retry:', data.id);
+      }
+
+      return { orderId: data.id, orderNumber: data.order_number };
+    } finally {
+      inFlightManualOrders.delete(idempotencyKey);
+    }
   }
 
   // Variation-aware stock movement shared by in-store creation and online fulfillment.
@@ -603,8 +652,15 @@ export class TenantAdminService {
   // back to a read-modify-write. For a line with variationId it moves that entry's
   // stockQuantity inside the variations / color_variations JSONB; otherwise the product-level
   // stock_qty. Best-effort per line — a failed stock write never throws to the caller.
-  private async moveStockForItems(items: any[], direction: 'deduct' | 'restore'): Promise<void> {
+  //
+  // Returns true only when every line that had stock to move actually moved it. Callers
+  // use this to decide whether an order may be recorded as `stock_status: 'deducted'`;
+  // claiming a deduction that silently failed strands the drift with no retry path,
+  // because updateOrderStatus() skips any order already marked deducted.
+  private async moveStockForItems(items: any[], direction: 'deduct' | 'restore'): Promise<boolean> {
+    let allMoved = true;
     for (const item of (items || [])) {
+      // Nothing to move for this line — not a failure.
       if (!item?.productId || !item?.quantity) continue;
       const qty = item.quantity;
 
@@ -623,9 +679,10 @@ export class TenantAdminService {
             rpcStockMoveAvailable = false;   // not deployed yet → fall through to manual (this session)
           } else {
             console.warn('move_part_stock RPC error', item.productId, rpcErr.message);
+            allMoved = false;
             continue;   // RPC present but errored on this row — don't also apply it manually
           }
-        } catch (e: any) { console.warn('move_part_stock threw', e?.message || e); }
+        } catch (e: any) { console.warn('move_part_stock threw', e?.message || e); allMoved = false; }
       }
 
       // Manual fallback (non-atomic; fine for a single-admin counter until the RPC is deployed).
@@ -637,7 +694,7 @@ export class TenantAdminService {
         };
         if (item.variationId) {
           const { data: p } = await supabase.from('parts').select('variations,color_variations').eq('id', item.productId).single();
-          if (!p) continue;
+          if (!p) { allMoved = false; continue; }
           let vChanged = false, cChanged = false;
           const variations = ((p as any).variations || []).map((v: any) => {
             if (v?.variationId === item.variationId) { vChanged = true; return move(v); }
@@ -654,18 +711,36 @@ export class TenantAdminService {
           if (cChanged) upd.color_variations = colorVariations;
           if (Object.keys(upd).length) {
             const { error: upErr } = await supabase.from('parts').update(upd).eq('id', item.productId).eq('tenant_id', this.tenantId);
-            if (upErr) console.warn('moveStockForItems: variation stock update failed', item.productId, item.variationId, upErr.message);
+            if (upErr) {
+              console.warn('moveStockForItems: variation stock update failed', item.productId, item.variationId, upErr.message);
+              allMoved = false;
+            }
+          } else {
+            // The line named a variationId that matches nothing on the product, so the
+            // intended move never happened.
+            console.warn('moveStockForItems: variation not found', item.productId, item.variationId);
+            allMoved = false;
           }
         } else {
           const { data: p } = await supabase.from('parts').select('stock_qty').eq('id', item.productId).single();
           if (p) {
             const cur = Number((p as any).stock_qty) || 0;
             const { error: upErr } = await supabase.from('parts').update({ stock_qty: direction === 'deduct' ? Math.max(0, cur - qty) : cur + qty }).eq('id', item.productId).eq('tenant_id', this.tenantId);
-            if (upErr) console.warn('moveStockForItems: stock_qty update failed', item.productId, upErr.message);
+            if (upErr) {
+              console.warn('moveStockForItems: stock_qty update failed', item.productId, upErr.message);
+              allMoved = false;
+            }
+          } else {
+            console.warn('moveStockForItems: product not found', item.productId);
+            allMoved = false;
           }
         }
-      } catch (e: any) { console.warn('moveStockForItems: stock write error', item?.productId, e?.message || e); }
+      } catch (e: any) {
+        console.warn('moveStockForItems: stock write error', item?.productId, e?.message || e);
+        allMoved = false;
+      }
     }
+    return allMoved;
   }
 
   async updateOrderStatus(

@@ -347,6 +347,26 @@ class ChatbotService {
   private productCache = new Map<string, CacheEntry<ProductRecord>>();
   private catalogCache: CacheEntry<ProductRecord[]> | null = null;
   private catalogInFlight: Promise<ProductRecord[]> | null = null;
+  private lastKnownUserId: string | null = null;
+
+  constructor() {
+    // `histories` is keyed by sessionId, which defaults to the literal 'default'
+    // for every caller that does not pass one (see resolveOptions) — i.e. a single
+    // shared bucket for every user of the device. This is a long-lived singleton,
+    // so without this listener a logout→login leaves the previous account's AI
+    // conversation readable through getHistory(). clearHistory() exists but is only
+    // wired to the user-initiated "clear" button in ChatbotScreen, never to sign-out.
+    supabase.auth.onAuthStateChange((event, session) => {
+      const userId = session?.user?.id ?? null;
+      if (event === 'SIGNED_OUT' || userId !== this.lastKnownUserId) {
+        // Clears histories and the product/catalog caches. The catalog is public
+        // data rather than PII, but dropping it costs one refetch on the next
+        // message and keeps the reset logic in one place.
+        this.clearHistory();
+      }
+      this.lastKnownUserId = userId;
+    });
+  }
 
   async sendMessage(message: string, language?: ChatLanguage | string): Promise<string>;
   async sendMessage(message: string, options?: SendMessageOptions): Promise<string>;

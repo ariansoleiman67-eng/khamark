@@ -26,6 +26,28 @@ import { Platform } from 'react-native';
 // populated before the derived UI matters.
 let cachedUser: any = null;
 
+// The cache outlives a session, so it must be tied to auth state or it leaks one
+// account's email, phone and linked providers into the next account's UI. An id
+// check at the read sites cannot cover this: getAuthState() runs synchronously
+// during render, before any async identity lookup could resolve, so the listener
+// has to own the invariant — cachedUser never belongs to anyone but the account
+// currently signed in.
+//
+// This also closes the window reloadUser() deliberately leaves open: it keeps the
+// last-known cache when a refresh fails, which without this listener means a failed
+// refresh right after switching accounts renders the previous user's details.
+supabase.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_OUT' || !session?.user) {
+    cachedUser = null;
+    return;
+  }
+  // Adopt the session user whenever the identity changes. Never keep the richer
+  // cached object across an identity switch — wrong data beats thin data here.
+  if (session.user.id !== cachedUser?.id) {
+    cachedUser = session.user;
+  }
+});
+
 const isInternalEmail = (email?: string | null): boolean =>
   !!email && (isSyntheticEmail(email) || email.includes('@asankaryapp.'));
 
