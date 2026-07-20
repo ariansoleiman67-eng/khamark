@@ -26,7 +26,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   assetBundlePatterns: ["**/*"],
 
-  runtimeVersion: "1.0.0",
+  // Fingerprint policy: runtime identity is derived from the actual native surface
+  // (native deps, config plugins, native project state), so an OTA bundle can never
+  // be delivered to a binary it was not built against. A static string makes every
+  // build advertise the same identity and turns the compatibility check into a no-op.
+  runtimeVersion: { policy: "fingerprint" },
   updates: {
     // Phase 2: set to the new EAS updates URL after `eas init` under the Asankary account.
     url: "https://u.expo.dev/REPLACE_WITH_ASANKARY_EAS_PROJECT_ID"
