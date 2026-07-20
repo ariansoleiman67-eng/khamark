@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -38,14 +38,31 @@ export default function AdminPartnerAssignmentScreen() {
   const [originalSelectedIds, setOriginalSelectedIds] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
 
+  // Monotonic id: loadProducts is a useCallback dependency of the effect below, so
+  // the effect refires whenever its identity changes — potentially faster than
+  // getAllProducts() resolves. A boolean flag cannot tell a superseded response from
+  // the current one.
+  const reqIdRef = useRef(0);
+  // The editable selection is seeded from the server only on first load for a given
+  // partner. Re-seeding on every load would discard checkboxes the admin has ticked
+  // while a refresh was in flight, silently reverting their pending edits.
+  const seededRef = useRef(false);
+
+  useEffect(() => {
+    seededRef.current = false;
+  }, [tenantId, userId]);
+
   const loadProducts = useCallback(async () => {
     if (!tenantId) {
       setLoading(false);
       return;
     }
+    const reqId = ++reqIdRef.current;
+    const isLatest = () => reqId === reqIdRef.current;
     try {
       const service = createTenantAdminService(tenantId);
       const productsData = await service.getAllProducts();
+      if (!isLatest()) return;
       setProducts(productsData as Product[]);
 
       const initialSelected = new Set<string>();
@@ -54,12 +71,18 @@ export default function AdminPartnerAssignmentScreen() {
           initialSelected.add(p.id);
         }
       });
-      setSelectedProductIds(initialSelected);
+      // originalSelectedIds is the server baseline used to compute the diff on save,
+      // so it always tracks the latest response.
       setOriginalSelectedIds(new Set(initialSelected));
+      if (!seededRef.current) {
+        seededRef.current = true;
+        setSelectedProductIds(initialSelected);
+      }
     } catch (error) {
+      if (!isLatest()) return;
       Alert.alert(t('admin.common.error', { defaultValue: 'Error' }), t('admin.partners.loadProductsFailed', { defaultValue: 'Failed to load products' }));
     } finally {
-      setLoading(false);
+      if (isLatest()) setLoading(false);
     }
   }, [tenantId, userId, t]);
 

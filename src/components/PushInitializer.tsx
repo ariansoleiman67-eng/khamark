@@ -39,7 +39,9 @@ export function PushInitializer() {
             target.screen === 'ChatScreen' && isAdmin ? 'AdminChatScreen' : target.screen;
           navigation.navigate(screen, target.params);
         }
-      });
+      // This is the only caller that can actually navigate, so it is the only one
+      // allowed to consume the one-shot getInitialNotification() value.
+      }, { consumeInitialNotification: true });
       return cleanup;
     } catch (error) {
       // FCM not available (Expo Go) - silent fail

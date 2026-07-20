@@ -63,13 +63,11 @@ export class NotificationService {
       let getMessagingFn;
       let onMessageFn;
       let onNotificationOpenedAppFn;
-      let getInitialNotificationFn;
       try {
         const firebaseMessaging = require('@react-native-firebase/messaging');
         getMessagingFn = firebaseMessaging.getMessaging;
         onMessageFn = firebaseMessaging.onMessage;
         onNotificationOpenedAppFn = firebaseMessaging.onNotificationOpenedApp;
-        getInitialNotificationFn = firebaseMessaging.getInitialNotification;
       } catch (e) {
         console.log('Native Firebase messaging not available (Expo Go)');
         return;
@@ -92,11 +90,10 @@ export class NotificationService {
         this.handleRemoteMessageTap(remoteMessage);
       });
 
-      getInitialNotificationFn(msg).then((remoteMessage: any) => {
-        if (remoteMessage) {
-          this.handleRemoteMessageTap(remoteMessage);
-        }
-      });
+      // Deliberately NOT reading getInitialNotification() here. It is a one-shot
+      // native value and handleRemoteMessageTap only logs — reading it would steal
+      // the quit-state push from PushInitializer, the one consumer that actually
+      // navigates, and the app would silently open on Home instead of the target.
     } catch (error) {
       console.error('Error setting up native listeners:', error);
     }

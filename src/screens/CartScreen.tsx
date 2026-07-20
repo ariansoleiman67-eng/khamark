@@ -447,18 +447,26 @@ const CartScreen: React.FC = () => {
 
   // Auto-sync: Refresh product data when cart opens
   useEffect(() => {
+    let cancelled = false;
+
     const syncCartData = async () => {
       if (!user?.uid || !cart?.items?.length) return;
-      
+
       try {
         await CartService.syncCartWithLatestData(user.uid);
+        // refreshCart is captured from a context callback keyed to the user who was
+        // signed in when this effect ran. Without this check, a sync that resolves
+        // after a sign-out or account switch calls the frozen copy and repopulates
+        // the cart from the previous user's id.
+        if (cancelled) return;
         await refreshCart();
       } catch {
         // Silent fail - cart will show cached data
       }
     };
-    
+
     syncCartData();
+    return () => { cancelled = true; };
   }, [user?.uid]);
 
   const handleUpdateQuantity = useCallback(async (
@@ -641,7 +649,11 @@ const CartScreen: React.FC = () => {
         <AppText style={styles.shopButtonText}>{t('orders.startShopping')}</AppText>
       </TouchableOpacity>
     </View>
-  ), [t, navigation]);
+    // theme and cartAccent are read in the body above, so they must be dependencies.
+    // The sibling renderCartItem already lists theme; omitting it here meant a theme
+    // change while the Cart tab stayed mounted (it is a tab with freezeOnBlur, not
+    // unmountOnBlur) left the empty state rendering the previous theme's colours.
+  ), [t, navigation, theme, cartAccent]);
 
   // Loading skeleton
   if (isLoading && !cart) {

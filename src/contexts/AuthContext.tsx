@@ -118,6 +118,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       if (userData) {
+        // Re-check the session before committing. The seq guard above only makes
+        // fetchUser latest-wins against ANOTHER fetchUser — it does not know that the
+        // identity being fetched for has since been signed out. Without this, a slow
+        // profile read that resolves after logout puts the user straight back into the
+        // authenticated stack with no Supabase session behind it (every later request
+        // 401s), and re-persists their profile to device storage.
+        const { data: sessionCheck } = await supabase.auth.getSession();
+        if (seq !== fetchSeq.current) return;
+        if (!sessionCheck.session) return;
         setUser(userData);
       } else {
         await clearUserIfNoSession();
@@ -207,8 +216,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const signOut = useCallback(async () => {
     try {
       setIsLoading(true);
+      // Supersede any fetchUser already in flight, then again after the awaits to
+      // catch one that started during them. Otherwise its response lands after
+      // setUser(null) and resurrects the account that just signed out.
+      fetchSeq.current++;
       await OrderService.clearAllCache?.(); // Handle optional method during migration
       await AuthService.signOut();
+      fetchSeq.current++;
       setUser(null);
     } catch (error) {
       console.error('Sign out error:', error);
@@ -225,8 +239,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     try {
       setIsLoading(true);
+      // Same reasoning as signOut — and worse here, since the restored user has no
+      // row left at all.
+      fetchSeq.current++;
       await OrderService.clearAllCache?.();
-      
+
       // Full deletion (auth identity + profile) runs server-side. Do NOT fall
       // back to a client `from('users').delete()` — that left the auth user
       // orphaned (credential stuck) while still cascade-deleting the data, and
@@ -235,6 +252,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (error) throw new Error(error.message || 'Account deletion failed. Please try again.');
 
       await AuthService.signOut();
+      fetchSeq.current++;
       setUser(null);
     } catch (error: any) {
       setIsLoading(false);

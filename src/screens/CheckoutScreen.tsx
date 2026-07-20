@@ -151,6 +151,9 @@ const CheckoutScreen: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   // Ref-based guard: blocks instantly on first tap (state updates are async and can miss rapid taps)
   const isSubmittingRef = useRef(false);
+  // Monotonic id for address loads, so a superseded response cannot overwrite the
+  // address the user has since chosen. See loadUserAddresses.
+  const addressReqIdRef = useRef(0);
   const processingSpinAnim = useRef(new RNAnimated.Value(0)).current;
   // Use preselected payment method if provided (from StartOrderBottomSheet)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>(preselectedPaymentMethod || 'cash_on_delivery');
@@ -253,6 +256,14 @@ const CheckoutScreen: React.FC = () => {
       return;
     }
 
+    // This is re-invoked on every screen focus (the useFocusEffect below returns no
+    // cleanup) and can refire faster than an 8s-timeout request resolves, so a plain
+    // boolean is not enough — a monotonic request id is needed to drop superseded
+    // responses. Without it a slow earlier fetch lands last and overwrites the
+    // address the user just picked, silently changing where the order ships.
+    const reqId = ++addressReqIdRef.current;
+    const isLatest = () => reqId === addressReqIdRef.current;
+
     try {
       setAddressesLoading(true);
       // Race against timeout to prevent infinite loading
@@ -260,8 +271,9 @@ const CheckoutScreen: React.FC = () => {
         addressService.getUserAddresses(user.uid),
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Address fetch timeout')), 8000)),
       ]);
+      if (!isLatest()) return;
       setUserAddresses(addresses);
-      
+
       // Check if a preselected address was passed from StartOrderBottomSheet
       if (preselectedAddressId) {
         const preselected = addresses.find(addr => addr.id === preselectedAddressId);
@@ -271,7 +283,7 @@ const CheckoutScreen: React.FC = () => {
           return;
         }
       }
-      
+
       // Fallback: use default address or first available
       const defaultAddress = addresses.find(addr => addr.isDefault);
       if (defaultAddress) {
@@ -285,9 +297,10 @@ const CheckoutScreen: React.FC = () => {
         setUseManualAddress(false);
       }
     } catch (error) {
+      if (!isLatest()) return;
       console.error('Error loading addresses:', error);
     } finally {
-      setAddressesLoading(false);
+      if (isLatest()) setAddressesLoading(false);
     }
   }, [user?.uid, preselectedAddressId]);
 

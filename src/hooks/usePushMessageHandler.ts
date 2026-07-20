@@ -56,9 +56,19 @@ export function isNativePushHandlerAvailable(): boolean {
 /**
  * Initialize push message handlers
  * Call this once at app startup (in App.tsx or index.ts)
+ *
+ * `consumeInitialNotification` MUST be opted into, and only by a caller whose
+ * onNavigate can genuinely navigate. getInitialNotification() is a one-shot native
+ * read — RNFB nulls the stored message once it resolves (Android nulls
+ * initialNotification / marks initialNotificationMap; iOS copies then nils
+ * _initialNotification) — so whichever caller reads it first wins and every later
+ * caller gets null. The module-scope call in App.tsx runs before any React render
+ * and cannot navigate, so if it read the value it would swallow the quit-state push
+ * tap and the app would open on Home instead of the target screen.
  */
 export function initializePushHandlers(
-  onNavigate?: (type: string, data: PushMessageData) => void
+  onNavigate?: (type: string, data: PushMessageData) => void,
+  options?: { consumeInitialNotification?: boolean }
 ): () => void {
   if (!isNativeAvailable || !getMessagingFn) {
     // eslint-disable-next-line no-console
@@ -106,21 +116,29 @@ export function initializePushHandlers(
   );
 
   // Notification opened app from quit state
-  getInitialNotificationFn!(msg)
-    .then((remoteMessage: any) => {
-      if (remoteMessage) {
-        // eslint-disable-next-line no-console
-        console.log('App opened from push (quit):', remoteMessage);
+  let quitNavTimer: ReturnType<typeof setTimeout> | null = null;
+  if (onNavigate && options?.consumeInitialNotification) {
+    getInitialNotificationFn!(msg)
+      .then((remoteMessage: any) => {
+        if (remoteMessage) {
+          // eslint-disable-next-line no-console
+          console.log('App opened from push (quit):', remoteMessage);
 
-        const data = remoteMessage.data as PushMessageData;
-        if (onNavigate && data?.type) {
-          // Small delay to ensure navigation is ready
-          setTimeout(() => {
-            onNavigate(data.type!, data);
-          }, 500);
+          const data = remoteMessage.data as PushMessageData;
+          if (data?.type) {
+            // Small delay to ensure navigation is ready. Owned by a handle so the
+            // cleanup below can cancel it — otherwise it fires into a navigator that
+            // has already been torn down (AppNavigator swaps NavigationContainers on
+            // auth changes, remounting PushInitializer).
+            if (quitNavTimer) clearTimeout(quitNavTimer);
+            quitNavTimer = setTimeout(() => {
+              quitNavTimer = null;
+              onNavigate(data.type!, data);
+            }, 500);
+          }
         }
-      }
-    });
+      });
+  }
 
   // Notification opened app from background
   const unsubscribeOpened = onNotificationOpenedAppFn!(msg,
@@ -139,6 +157,10 @@ export function initializePushHandlers(
   return () => {
     unsubscribeForeground();
     unsubscribeOpened();
+    if (quitNavTimer) {
+      clearTimeout(quitNavTimer);
+      quitNavTimer = null;
+    }
   };
 }
 

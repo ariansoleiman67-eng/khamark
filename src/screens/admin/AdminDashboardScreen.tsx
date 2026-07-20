@@ -116,6 +116,15 @@ const AdminDashboardScreen: React.FC = () => {
   // Tracks the currently-selected tenant so late/in-flight loadData responses
   // from a previous tenant can be discarded instead of overwriting current state.
   const activeTenantRef = useRef(tenantId);
+  // activeTenantRef tracks tenant identity but never mount state, and on logout the
+  // whole admin tree unmounts (AuthContext setUser(null)) before TenantContext's
+  // setTenantId(null) lands in a later commit — so the [tenantId] effect never runs
+  // with null and activeTenantRef stays pinned to the old tenant. The tenant guards
+  // below then all read as "still current" and a failed in-flight request fires
+  // Alert.alert, a native global modal with no lifecycle binding, on top of the
+  // login screen seconds after the admin logged out.
+  const isMountedRef = useRef(true);
+  useEffect(() => () => { isMountedRef.current = false; }, []);
 
   // Handle logo upload directly from dashboard
   const handleLogoUpload = async () => {
@@ -234,13 +243,13 @@ const AdminDashboardScreen: React.FC = () => {
       setRecentOrders(mappedOrders);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
-      if (reqTenant === activeTenantRef.current) {
+      if (isMountedRef.current && reqTenant === activeTenantRef.current) {
         Alert.alert(t('admin.common.error'), t('admin.dashboard.loadFailed'));
       }
     } finally {
       // Only clear the spinner for the tenant currently on screen; a stale
       // response must not flip the loading state for a newer tenant's load.
-      if (reqTenant === activeTenantRef.current) {
+      if (isMountedRef.current && reqTenant === activeTenantRef.current) {
         setLoading(false);
       }
     }
