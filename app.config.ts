@@ -7,6 +7,9 @@ const colors = {
   secondary: "#2B2B2B",
   background: "#F4F4F6",
   surface: "#FFFFFF",
+  // Canvas the app icon artwork was drawn on, per the brand export's
+  // ic_launcher_background.xml. Deliberately not the amber primary.
+  iconBackground: "#F7F1F9",
 };
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
@@ -79,7 +82,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   android: {
     adaptiveIcon: {
       foregroundImage: "./assets/adaptive-icon.png",
-      backgroundColor: colors.primary,
+      // The icon's own background, NOT the brand amber. The logo's gradient starts at
+      // #FFC21C, so on the amber primary the top of the "A" all but disappears — and
+      // this is the value the brand export itself declares
+      // (android/res/values/ic_launcher_background.xml). The splash keeps the amber.
+      backgroundColor: colors.iconBackground,
     },
     package: "com.asankary.app",
     versionCode: 1,
