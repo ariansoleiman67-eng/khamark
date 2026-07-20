@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { isSyntheticEmail, isPhoneAuthEmail } from '../../utils/hashUtils';
 import {
   View,
@@ -133,7 +133,7 @@ const AdminCustomersScreen: React.FC = () => {
 
       setCustomers(mappedCustomers);
     } catch (error) {
-      Alert.alert(t('admin.common.error'), t('admin.customers.failedToLoad'));
+      mountedRef.current && Alert.alert(t('admin.common.error'), t('admin.customers.failedToLoad'));
     } finally {
       setLoading(false);
     }
@@ -197,19 +197,33 @@ const AdminCustomersScreen: React.FC = () => {
     return searchTerms.every((term, index) => matchesTerm(term, index));
   });
 
+  // Sequence token for the per-customer address lookup, and a mount flag so a
+  // rejected request cannot fire Alert.alert — a native global modal with no
+  // lifecycle binding — over whatever screen the admin backed out to.
+  const addressReqIdRef = useRef(0);
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
+
   const handleCustomerPress = async (customer: User) => {
     setSelectedCustomer(customer);
     setDetailsModalVisible(true);
     setLoadingAddresses(true);
     setSelectedCustomerAddresses([]);
 
+    // Address lookup is a real network round trip and closing the modal cannot
+    // cancel it. Without this token, opening customer A (slow), closing, then
+    // opening customer B rendered A's full name, street address, phone and a live
+    // "View on Map" button pinning A's home inside B's open modal.
+    const reqId = ++addressReqIdRef.current;
+
     try {
       const addresses = await addressService.getUserAddresses(customer.uid);
+      if (reqId !== addressReqIdRef.current) return;
       setSelectedCustomerAddresses(addresses);
     } catch (error) {
       // Error handled silently - addresses may not exist
     } finally {
-      setLoadingAddresses(false);
+      if (reqId === addressReqIdRef.current) setLoadingAddresses(false);
     }
   };
 
@@ -240,7 +254,7 @@ const AdminCustomersScreen: React.FC = () => {
     });
     if (url) {
       Linking.openURL(url).catch(() =>
-        Alert.alert(t('admin.common.error'), t('admin.customers.mapUnavailable', { defaultValue: 'Map unavailable' }))
+        mountedRef.current && Alert.alert(t('admin.common.error'), t('admin.customers.mapUnavailable', { defaultValue: 'Map unavailable' }))
       );
     }
   };
@@ -562,17 +576,17 @@ const AdminCustomersScreen: React.FC = () => {
                       {selectedCustomer.role === 'vip' ? (
                         <TouchableOpacity
                           style={[styles.roleButton, { backgroundColor: theme.colors.textSecondary }]}
-                          disabled={updatingRole}
+                          disabled={updatingRole || isTogglingBlock}
                           onPress={async () => {
                             setUpdatingRole(true);
                             try {
                               await safeCallFunction('verifyAdminActionPassword', { password: gatedPassword, action: 'assign_vip_role', targetUserId: selectedCustomer.uid, newRole: 'customer', tenantId });
                               const updated = { ...selectedCustomer, role: 'customer' } as User;
-                              setSelectedCustomer(updated);
+                              setSelectedCustomer(prev => (prev?.uid === updated.uid ? updated : prev));
                               setCustomers(prev => prev.map(c => c.uid === selectedCustomer.uid ? updated : c));
-                              Alert.alert(t('admin.common.success'), t('admin.customers.roleUpdatedCustomer'));
+                              mountedRef.current && Alert.alert(t('admin.common.success'), t('admin.customers.roleUpdatedCustomer'));
                             } catch (e: any) {
-                              Alert.alert(t('admin.common.error'), e.message || t('admin.customers.failedUpdateRole'));
+                              mountedRef.current && Alert.alert(t('admin.common.error'), e.message || t('admin.customers.failedUpdateRole'));
                             } finally {
                               setUpdatingRole(false);
                             }
@@ -583,17 +597,17 @@ const AdminCustomersScreen: React.FC = () => {
                       ) : (
                         <TouchableOpacity
                           style={[styles.roleButton, { backgroundColor: '#FFD700' }]}
-                          disabled={updatingRole}
+                          disabled={updatingRole || isTogglingBlock}
                           onPress={async () => {
                             setUpdatingRole(true);
                             try {
                               await safeCallFunction('verifyAdminActionPassword', { password: gatedPassword, action: 'assign_vip_role', targetUserId: selectedCustomer.uid, newRole: 'vip', tenantId });
                               const updated = { ...selectedCustomer, role: 'vip' } as User;
-                              setSelectedCustomer(updated);
+                              setSelectedCustomer(prev => (prev?.uid === updated.uid ? updated : prev));
                               setCustomers(prev => prev.map(c => c.uid === selectedCustomer.uid ? updated : c));
-                              Alert.alert(t('admin.common.success'), t('admin.customers.roleUpdatedVip'));
+                              mountedRef.current && Alert.alert(t('admin.common.success'), t('admin.customers.roleUpdatedVip'));
                             } catch (e: any) {
-                              Alert.alert(t('admin.common.error'), e.message || t('admin.customers.failedUpdateRole'));
+                              mountedRef.current && Alert.alert(t('admin.common.error'), e.message || t('admin.customers.failedUpdateRole'));
                             } finally {
                               setUpdatingRole(false);
                             }
@@ -613,17 +627,17 @@ const AdminCustomersScreen: React.FC = () => {
                       {selectedCustomer.isBlocked ? (
                         <TouchableOpacity
                           style={[styles.roleButton, { backgroundColor: theme.colors.success }]}
-                          disabled={isTogglingBlock}
+                          disabled={isTogglingBlock || updatingRole}
                           onPress={async () => {
                             setIsTogglingBlock(true);
                             try {
                               await safeCallFunction('verifyAdminActionPassword', { password: gatedPassword, action: 'toggle_user_block', targetUserId: selectedCustomer.uid, isBlocked: false, tenantId });
                               const updated = { ...selectedCustomer, isBlocked: false } as User;
-                              setSelectedCustomer(updated);
+                              setSelectedCustomer(prev => (prev?.uid === updated.uid ? updated : prev));
                               setCustomers(prev => prev.map(c => c.uid === selectedCustomer.uid ? updated : c));
-                              Alert.alert(t('admin.common.success'), t('admin.customers.unblockSuccess', { defaultValue: 'Account unblocked successfully' }));
+                              mountedRef.current && Alert.alert(t('admin.common.success'), t('admin.customers.unblockSuccess', { defaultValue: 'Account unblocked successfully' }));
                             } catch (e: any) {
-                              Alert.alert(t('admin.common.error'), e.message || t('admin.customers.failedUnblock', { defaultValue: 'Failed to unblock' }));
+                              mountedRef.current && Alert.alert(t('admin.common.error'), e.message || t('admin.customers.failedUnblock', { defaultValue: 'Failed to unblock' }));
                             } finally {
                               setIsTogglingBlock(false);
                             }
@@ -634,17 +648,17 @@ const AdminCustomersScreen: React.FC = () => {
                       ) : (
                         <TouchableOpacity
                           style={[styles.roleButton, { backgroundColor: theme.colors.error }]}
-                          disabled={isTogglingBlock}
+                          disabled={isTogglingBlock || updatingRole}
                           onPress={async () => {
                             setIsTogglingBlock(true);
                             try {
                               await safeCallFunction('verifyAdminActionPassword', { password: gatedPassword, action: 'toggle_user_block', targetUserId: selectedCustomer.uid, isBlocked: true, tenantId });
                               const updated = { ...selectedCustomer, isBlocked: true } as User;
-                              setSelectedCustomer(updated);
+                              setSelectedCustomer(prev => (prev?.uid === updated.uid ? updated : prev));
                               setCustomers(prev => prev.map(c => c.uid === selectedCustomer.uid ? updated : c));
-                              Alert.alert(t('admin.common.success'), t('admin.customers.blockSuccess', { defaultValue: 'Account blocked successfully' }));
+                              mountedRef.current && Alert.alert(t('admin.common.success'), t('admin.customers.blockSuccess', { defaultValue: 'Account blocked successfully' }));
                             } catch (e: any) {
-                              Alert.alert(t('admin.common.error'), e.message || t('admin.customers.failedBlock', { defaultValue: 'Failed to block' }));
+                              mountedRef.current && Alert.alert(t('admin.common.error'), e.message || t('admin.customers.failedBlock', { defaultValue: 'Failed to block' }));
                             } finally {
                               setIsTogglingBlock(false);
                             }

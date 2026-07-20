@@ -21,6 +21,7 @@ import { Image } from 'expo-image';
 
 import { useTheme } from '../components/ThemeProvider';
 import { useAuthGate } from '../hooks/useAuthGate';
+import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import { Order, OrderStatus } from '../types';
 import { OrderService } from '../services/OrderService';
@@ -90,6 +91,9 @@ export const OrdersScreen: React.FC = () => {
 
   // GOLDEN TEMPLATE: Auth gate - guests MUST NOT access Orders
   const { isAuthenticated, needsAuth } = useAuthGate();
+  // useAuthGate exposes only a boolean, which cannot distinguish an A -> B account
+  // switch (both authenticated). The uid is what the reset/staleness guards key on.
+  const { user } = useAuth();
   
   // If guest, redirect to LoginGate. Done in an effect (never during render),
   // WITHOUT an early return, so the hook order below is identical every render.
@@ -165,11 +169,34 @@ export const OrdersScreen: React.FC = () => {
   // depends on loadOrders and must not be recreated on every filter/keystroke.
   const hasLoadedRef = useRef(false);
 
+  // Monotonic load id, bumped on every identity change so a load started by the
+  // previous account cannot commit into this one.
+  const reqIdRef = useRef(0);
+  // In-flight guard for reorder; mirrors OrderDetailScreen's reorderingRef.
+  const reorderingRef = useRef(false);
+
+  // This tab is never unmounted by signing out — logout does no navigation.reset
+  // and no tab sets unmountOnBlur — so without this the previous account's orders
+  // stayed in state. Worse, hasLoadedRef also survived, so the skeleton was skipped
+  // and the next user saw A's order numbers, product names, thumbnails and totals
+  // rendered immediately on opening the tab. If B's own fetch then failed, the catch
+  // only alerts and never clears, so A's list stayed on screen indefinitely.
+  useEffect(() => {
+    reqIdRef.current++;
+    if (!isAuthenticated) {
+      setOrders([]);
+      hasLoadedRef.current = false;
+    }
+  }, [isAuthenticated, user?.uid]);
+
   // Load orders (fetch only — filtering is handled reactively below)
   const loadOrders = useCallback(async (refresh = false) => {
+    const reqId = ++reqIdRef.current;
+    const isLatest = () => reqId === reqIdRef.current;
     try {
       // Auth is already gated at screen entry
       if (!isAuthenticated) {
+        setOrders([]);
         return;
       }
 
@@ -182,16 +209,20 @@ export const OrdersScreen: React.FC = () => {
       }
 
       const userOrders = await OrderService.getUserOrders(refresh);
+      if (!isLatest()) return;
       setOrders(userOrders);
       hasLoadedRef.current = true;
     } catch (error) {
+      if (!isLatest()) return;
       console.error('Error loading orders:', error);
       Alert.alert(t('common.error'), t('orders.loadError'));
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (isLatest()) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
-  }, [isAuthenticated, t]);
+  }, [isAuthenticated, user?.uid, t]);
 
   // Filter function
   const filterOrders = useCallback((
@@ -338,6 +369,14 @@ export const OrdersScreen: React.FC = () => {
         {
           text: t('orders.reorder.confirm'),
           onPress: async () => {
+            // OrderService.reorder makes one serial product lookup per line item, so
+            // it runs for seconds with no spinner and no disabled state after the
+            // alert dismisses. Tapping Reorder again in that window adds every item a
+            // second time — the per-item stock cap does not catch it, because
+            // getProductQuantityInCart is called with a hardcoded null cart and so
+            // always reports 0 already in the cart.
+            if (reorderingRef.current) return;
+            reorderingRef.current = true;
             try {
               const result = await OrderService.reorder(order.id);
               await refreshCart();
@@ -358,6 +397,8 @@ export const OrdersScreen: React.FC = () => {
               );
             } catch (error: any) {
               Alert.alert(t('common.error'), error.message);
+            } finally {
+              reorderingRef.current = false;
             }
           },
         },

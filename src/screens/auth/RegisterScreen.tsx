@@ -248,7 +248,14 @@ const RegisterScreen: React.FC = () => {
     setSelectedCountry(userRegion);
   }, [userRegion]);
 
+  // Shared by both providers — the buttons gate only on state, which commits a
+  // render after the tap, so two presses both run and the loser's finally clears
+  // the loading flag while the first attempt is still open.
+  const socialSignInRef = useRef(false);
+
   const handleGoogleSignIn = async () => {
+    if (socialSignInRef.current) return;
+    socialSignInRef.current = true;
     try {
       setGoogleLoading(true);
       await signInWithGoogle();
@@ -259,10 +266,13 @@ const RegisterScreen: React.FC = () => {
       }
     } finally {
       setGoogleLoading(false);
+      socialSignInRef.current = false;
     }
   };
 
   const handleAppleSignIn = async () => {
+    if (socialSignInRef.current) return;
+    socialSignInRef.current = true;
     try {
       setAppleLoading(true);
       await signInWithApple();
@@ -272,6 +282,7 @@ const RegisterScreen: React.FC = () => {
       }
     } finally {
       setAppleLoading(false);
+      socialSignInRef.current = false;
     }
   };
 

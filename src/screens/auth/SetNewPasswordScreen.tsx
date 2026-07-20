@@ -1,5 +1,5 @@
 /* eslint-disable react-native/no-inline-styles, react-native/no-color-literals */
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -88,6 +88,10 @@ const SetNewPasswordScreen: React.FC = () => {
   // `loading` is async state, so it cannot block same-frame double taps or
   // cross-handler concurrency (submit in flight while "Not now" is tapped).
   const busyRef = useRef(false);
+  // Screen liveness. Alert.alert is a native global modal with no lifecycle binding,
+  // so an alert resolving after the user backed out fires over an unrelated screen.
+  const aliveRef = useRef(true);
+  useEffect(() => () => { aliveRef.current = false; }, []);
 
   const isRegister = mode === 'register' || mode === 'admin-register' || mode === 'partner-register';
 
@@ -175,10 +179,18 @@ const SetNewPasswordScreen: React.FC = () => {
         navigation.navigate('RegisterSuccess' as any, { method: 'phone' });
       } else if (mode === 'reset') {
         await resetPasswordAfterOTP(phone, password);
+        // Alert.alert is a native global modal that outlives this screen, so if the
+        // user backed out during the reset it fires over whatever they landed on.
+        if (!aliveRef.current) return;
         Alert.alert(
           t('auth.success'),
           t('auth.setPassword.resetSuccess'),
-          [{ text: 'OK', onPress: () => navigation.navigate('SignIn') }]
+          // reset, not navigate. The reset stack is
+          // [SignIn, Password, ForgotPassword, VerifyPhone, SetNewPassword], so SignIn
+          // is never the top and navigate() PUSHES a second copy — on the happy path,
+          // not just under a race. Back from there returned the user to the OTP screen
+          // holding a code they had already consumed.
+          [{ text: 'OK', onPress: () => navigation.reset({ index: 0, routes: [{ name: 'SignIn' as never }] }) }]
         );
       }
     } catch (error: any) {

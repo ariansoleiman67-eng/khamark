@@ -445,7 +445,16 @@ const SignInScreen: React.FC = () => {
     }
   };
 
-  const handleGoogleSignIn = async () => {
+    // One ref shared by every social provider. The buttons gate on state that
+  // commits a render late, so two taps both run; the native SDK rejects the
+  // second with IN_PROGRESS, whose message is surfaced as an alert over the
+  // account picker — and the loser's finally clears the loading flag while the
+  // first attempt is still open, re-enabling every button mid-flight.
+  const socialSignInRef = useRef(false);
+
+const handleGoogleSignIn = async () => {
+    if (socialSignInRef.current) return;
+    socialSignInRef.current = true;
     try {
       setGoogleLoading(true);
       await signInWithGoogle();
@@ -457,10 +466,13 @@ const SignInScreen: React.FC = () => {
       }
     } finally {
       setGoogleLoading(false);
+      socialSignInRef.current = false;
     }
   };
 
   const handleFacebookSignIn = async () => {
+    if (socialSignInRef.current) return;
+    socialSignInRef.current = true;
     try {
       setFacebookLoading(true);
       await signInWithFacebook();
@@ -471,10 +483,13 @@ const SignInScreen: React.FC = () => {
       }
     } finally {
       setFacebookLoading(false);
+      socialSignInRef.current = false;
     }
   };
 
   const handleAppleSignIn = async () => {
+    if (socialSignInRef.current) return;
+    socialSignInRef.current = true;
     try {
       setAppleLoading(true);
       await signInWithApple();
@@ -485,6 +500,7 @@ const SignInScreen: React.FC = () => {
       }
     } finally {
       setAppleLoading(false);
+      socialSignInRef.current = false;
     }
   };
 

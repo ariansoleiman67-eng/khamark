@@ -284,6 +284,11 @@ const ForgotPasswordScreen: React.FC = () => {
   // fast double-tap can fire handleContinue twice (two reset emails / duplicate
   // nav) before the button's disabled prop commits. This ref blocks that.
   const inFlight = useRef(false);
+  // Screen liveness. Alert.alert is a native global modal with no lifecycle
+  // binding, and goBack() pops whatever is on top rather than this screen — so
+  // an alert firing after the user navigated away could pop an unrelated screen.
+  const aliveRef = useRef(true);
+  useEffect(() => () => { aliveRef.current = false; }, []);
 
   // Sync selectedCountry when userRegion loads from AsyncStorage
   useEffect(() => {
@@ -341,6 +346,13 @@ const ForgotPasswordScreen: React.FC = () => {
 
         setLoading(true);
         await sendPasswordResetEmail(email.trim());
+
+        // If the user backed out during the SMTP round trip, this alert would fire
+        // over whatever screen they landed on — and its OK handler calls goBack(),
+        // which pops whatever is on TOP rather than this screen (React Navigation
+        // ignores the source key when no target is set), dumping them a screen further
+        // back than they asked for.
+        if (!aliveRef.current) return;
 
         Alert.alert(
           t('auth.success'),
