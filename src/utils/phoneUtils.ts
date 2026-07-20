@@ -274,28 +274,84 @@ const countries: Record<CountryCode, CountryInfo> = {
 };
 
 /**
+ * True when the user actually typed a leading "+".
+ *
+ * MUST be computed from the raw input, before non-digits are stripped — that is the
+ * only signal distinguishing "this is an international number" from "these digits
+ * happen to begin with a country's dial code".
+ */
+const startsWithPlus = (phone: string): boolean => (phone || '').trim().startsWith('+');
+
+/**
+ * Iraqi/European local numbers are written with a trunk "0" that is dropped in E.164.
+ * Users routinely type it after the country code too ("+964 0750 ..."), so strip it
+ * before length-checking or re-emitting.
+ */
+const stripTrunkZero = (local: string): string => (local.startsWith('0') ? local.slice(1) : local);
+
+interface DialCodeMatch {
+  country: CountryInfo;
+  /** Subscriber digits, trunk zero removed. */
+  local: string;
+  /** Whether `local` fits the country's exact [minLength, maxLength]. */
+  fits: boolean;
+}
+
+/**
+ * Resolve a digits-only number against the dial-code table.
+ *
+ * A dial code is only accepted when the user explicitly typed "+", OR when the
+ * remaining digits fit that country's length range exactly. Short dial codes (+7
+ * Russia/Kazakhstan, +1 NANP) are prefixes of ordinary local subscriber numbers, so
+ * matching on prefix alone binds an Iraqi mobile typed the natural way
+ * ("750 215 3223" → cleaned "7502153223") to Russia and then formats and validates
+ * it against Russian rules.
+ *
+ * Note the length test is deliberately exact rather than the ±2 tolerance the old
+ * validatePhone used: with a ±2 window, Russia (10-10) still accepts the 9 digits
+ * left after consuming "7", which is precisely the mismatch being fixed. The
+ * tolerance is retained only for the default-country fallback, where there is no
+ * ambiguity about which country's rules apply.
+ *
+ * Every function that walks the table by dial-code prefix goes through here, so
+ * formatPhone and validatePhone cannot drift apart — that drift is how the original
+ * bug survived a partial fix.
+ */
+const matchDialCode = (cleaned: string, hasPlus: boolean): DialCodeMatch | undefined => {
+  for (const country of Object.values(countries)) {
+    const dialCodeDigits = country.dialCode.replace('+', '');
+    if (!cleaned.startsWith(dialCodeDigits)) continue;
+
+    const local = stripTrunkZero(cleaned.slice(dialCodeDigits.length));
+    const fits = local.length >= country.minLength && local.length <= country.maxLength;
+
+    if (hasPlus || fits) return { country, local, fits };
+  }
+  return undefined;
+};
+
+/**
  * Format phone number to international format (E.164)
  * Example: "0780 123 4567" → "+9647801234567"
  */
 export const formatPhone = (phone: string, defaultCountry: CountryCode = 'IQ'): string => {
   try {
+    const hasPlus = startsWithPlus(phone);
     // Remove all non-digit characters
     const cleaned = phone.replace(/\D/g, '');
-    
+
     // Check if it starts with a country code
-    for (const country of Object.values(countries)) {
-      const dialCodeDigits = country.dialCode.replace('+', '');
-      if (cleaned.startsWith(dialCodeDigits)) {
-        return `+${cleaned}`;
-      }
+    const match = matchDialCode(cleaned, hasPlus);
+    if (match) {
+      return `${match.country.dialCode}${match.local}`;
     }
-    
+
     // If starts with 0, assume it's local number
     if (cleaned.startsWith('0')) {
       const localNumber = cleaned.slice(1);
       return `${countries[defaultCountry].dialCode}${localNumber}`;
     }
-    
+
     // If no country code, add default
     return `${countries[defaultCountry].dialCode}${cleaned}`;
   } catch (error) {
@@ -308,23 +364,19 @@ export const formatPhone = (phone: string, defaultCountry: CountryCode = 'IQ'): 
  */
 export const validatePhone = (phone: string, defaultCountry: CountryCode = 'IQ'): boolean => {
   try {
+    const hasPlus = startsWithPlus(phone);
     const cleaned = phone.replace(/\D/g, '');
-    
+
     // Basic length check - at least 7 digits for any phone
     if (cleaned.length < 7) return false;
-    
+
     // Check if starts with a known country code
-    for (const country of Object.values(countries)) {
-      const dialCodeDigits = country.dialCode.replace('+', '');
-      if (cleaned.startsWith(dialCodeDigits)) {
-        const localNumber = cleaned.slice(dialCodeDigits.length);
-        return localNumber.length >= country.minLength - 2 && localNumber.length <= country.maxLength + 2;
-      }
-    }
-    
+    const match = matchDialCode(cleaned, hasPlus);
+    if (match) return match.fits;
+
     // For local numbers, use default country validation
     const defaultInfo = countries[defaultCountry];
-    const localNumber = cleaned.startsWith('0') ? cleaned.slice(1) : cleaned;
+    const localNumber = stripTrunkZero(cleaned);
     return localNumber.length >= defaultInfo.minLength - 2 && localNumber.length <= defaultInfo.maxLength + 2;
   } catch {
     return false;
@@ -337,19 +389,17 @@ export const validatePhone = (phone: string, defaultCountry: CountryCode = 'IQ')
  */
 export const displayPhone = (phone: string): string => {
   try {
+    const hasPlus = startsWithPlus(phone);
     const cleaned = phone.replace(/\D/g, '');
-    
+
     // Find matching country
-    for (const country of Object.values(countries)) {
-      const dialCodeDigits = country.dialCode.replace('+', '');
-      if (cleaned.startsWith(dialCodeDigits)) {
-        const localNumber = cleaned.slice(dialCodeDigits.length);
-        // Generic formatting: group by 3s
-        const formatted = localNumber.replace(/(\d{3})(?=\d)/g, '$1 ').trim();
-        return `${country.dialCode} ${formatted}`;
-      }
+    const match = matchDialCode(cleaned, hasPlus);
+    if (match) {
+      // Generic formatting: group by 3s
+      const formatted = match.local.replace(/(\d{3})(?=\d)/g, '$1 ').trim();
+      return `${match.country.dialCode} ${formatted}`;
     }
-    
+
     // Default formatting
     return phone;
   } catch {
@@ -363,16 +413,10 @@ export const displayPhone = (phone: string): string => {
  */
 export const getCountryFromPhone = (phone: string): CountryCode | undefined => {
   try {
+    const hasPlus = startsWithPlus(phone);
     const cleaned = phone.replace(/\D/g, '');
-    
-    for (const country of Object.values(countries)) {
-      const dialCodeDigits = country.dialCode.replace('+', '');
-      if (cleaned.startsWith(dialCodeDigits)) {
-        return country.code;
-      }
-    }
-    
-    return undefined;
+
+    return matchDialCode(cleaned, hasPlus)?.country.code;
   } catch {
     return undefined;
   }
