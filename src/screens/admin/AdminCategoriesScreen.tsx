@@ -14,6 +14,11 @@ import { SPACING } from '../../constants/theme';
 
 const emptyForm = (): Partial<TenantCategory> => ({ name: '', nameAr: '', nameKu: '', imageUrl: '', isActive: true });
 
+// Tenants whose first-run category seed has been claimed. Module scope on purpose:
+// the seed is a long run of un-cancellable INSERTs, so the claim has to outlive the
+// component or remounting during the seed starts a second, duplicating pass.
+const seededTenants = new Set<string>();
+
 export default function AdminCategoriesScreen() {
   const { theme } = useTheme();
   const { t, i18n } = useTranslation();
@@ -29,6 +34,16 @@ export default function AdminCategoriesScreen() {
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
+
+  // Every dismissal path consults this, so a save in flight cannot be abandoned:
+  // closing the sheet mid-write let the admin open a fresh one and start typing,
+  // and the resolving write then slammed that sheet shut and blanked the list.
+  const dismissModal = useCallback(() => {
+    if (savingRef.current) return;
+    setModalOpen(false);
+  }, []);
 
   const load = useCallback(async () => {
     if (!tenantId) { setLoading(false); return; }
@@ -36,7 +51,18 @@ export default function AdminCategoriesScreen() {
     try {
       let list = await svc.getCategories();
       // First-run seed: no categories yet -> create one per distinct product category.
-      if (list.length === 0) {
+      //
+      // Claimed at module scope, before the first await, and never released. The seed
+      // is a multi-second run of sequential INSERTs into a table with no unique
+      // constraint on (tenant_id, name), and nothing here survives unmount — so
+      // without the claim, backing out mid-seed and reopening the screen started a
+      // second pass while the first was still inside getProductsByTenantId, and every
+      // category ended up duplicated permanently, removable only by hand. The same
+      // re-entry happened without any navigation at all: `t` is in this callback's
+      // deps and changes identity on an i18next languageChanged/loaded event, which
+      // re-runs the effect below.
+      if (list.length === 0 && !seededTenants.has(tenantId)) {
+        seededTenants.add(tenantId);
         const products = await ProductService.getProductsByTenantId(tenantId);
         const names = Array.from(new Set(
           (products || []).map((p: any) => (p.category || '').trim()).filter(Boolean)
@@ -49,11 +75,15 @@ export default function AdminCategoriesScreen() {
         }
         if (names.length) list = await svc.getCategories();
       }
+      if (!mountedRef.current) return;
       setCats(list);
     } catch {
+      // Alert.alert is a native global modal with no lifecycle binding, so without
+      // this check it fires over whatever screen the admin backed out to.
+      if (!mountedRef.current) return;
       Alert.alert(t('common.error', 'Error'), t('admin.categories.loadError', 'Could not load categories'));
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }, [tenantId, t]);
 
@@ -152,7 +182,7 @@ export default function AdminCategoriesScreen() {
         />
       )}
 
-      <Modal visible={modalOpen} transparent animationType="slide" onRequestClose={() => setModalOpen(false)}>
+      <Modal visible={modalOpen} transparent animationType="slide" onRequestClose={dismissModal}>
         <View style={styles.backdrop}>
           <View style={[styles.sheet, { backgroundColor: theme.colors.surface }]}>
             <ScrollView keyboardShouldPersistTaps="handled">
@@ -187,7 +217,7 @@ export default function AdminCategoriesScreen() {
               </View>
 
               <View style={[styles.actions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                <TouchableOpacity style={[styles.btn, { backgroundColor: theme.colors.border }]} onPress={() => setModalOpen(false)}>
+                <TouchableOpacity style={[styles.btn, { backgroundColor: theme.colors.border }]} onPress={dismissModal} disabled={saving}>
                   <Text allowFontScaling={false} style={{ color: theme.colors.text, fontWeight: '600' }}>{t('common.cancel', 'Cancel')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.btn, { backgroundColor: theme.colors.primary }]} onPress={save} disabled={saving}>

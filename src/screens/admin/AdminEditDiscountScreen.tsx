@@ -131,6 +131,21 @@ const AdminEditDiscountScreen: React.FC = () => {
     }
   };
 
+  // Parse a numeric form field. Normalises Arabic-Indic (٠-٩) and Eastern-Arabic
+  // (۰-۹) digits and a comma decimal separator to ASCII first, since JS number
+  // parsing accepts ASCII only — on an Arabic or Kurdish keyboard the natural input
+  // would otherwise silently become NaN. Returns NaN for anything unparseable, so
+  // callers must test with a positive-form guard or Number.isFinite.
+  const num = (raw: string): number => {
+    const ascii = String(raw ?? '')
+      .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+      .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
+      .replace(/,/g, '.')
+      .trim();
+    if (!ascii) return NaN;
+    return Number(ascii);
+  };
+
   const validateForm = (): boolean => {
     if (!name.trim()) {
       Alert.alert(t('common.error'), t('admin.discounts.nameRequired'));
@@ -139,22 +154,29 @@ const AdminEditDiscountScreen: React.FC = () => {
 
     // Bundle deals don't use the `value` field (they validate quantity/price
     // below); it is forced to 1 on save. Only require `value` for the other types.
-    if (type !== 'bundle' && (!value || parseFloat(value) <= 0)) {
+    // Positive-form guards throughout. `parseFloat(x) <= 0` lets NaN straight past —
+    // NaN fails every comparison — and NaN then reached the insert, where
+    // JSON.stringify turns it into null. The result was a discount that reported
+    // success, appeared in the list, and applied nothing to any customer, forever,
+    // with no error anywhere. `num()` also normalises Arabic-Indic digits, which is
+    // not hypothetical in an app shipped to Iraq in Arabic and Kurdish: parseFloat
+    // accepts ASCII digits only, so typing ٢٠ on an Arabic keyboard yields NaN.
+    if (type !== 'bundle' && !(num(value) > 0)) {
       Alert.alert(t('common.error'), t('admin.discounts.valueRequired'));
       return false;
     }
 
-    if (type === 'percentage' && parseFloat(value) > 100) {
+    if (type === 'percentage' && !(num(value) <= 100)) {
       Alert.alert(t('common.error'), t('admin.discounts.percentageMax'));
       return false;
     }
 
     if (type === 'bundle') {
-      if (!bundleQuantity || parseInt(bundleQuantity) <= 0) {
+      if (!(num(bundleQuantity) > 0)) {
         Alert.alert(t('common.error'), t('admin.discounts.bundleQuantityRequired'));
         return false;
       }
-      if (!bundlePrice || parseFloat(bundlePrice) <= 0) {
+      if (!(num(bundlePrice) > 0)) {
         Alert.alert(t('common.error'), t('admin.discounts.bundlePriceRequired'));
         return false;
       }
@@ -177,7 +199,7 @@ const AdminEditDiscountScreen: React.FC = () => {
       const discountData: Record<string, any> = {
         name: name.trim(),
         type,
-        value: type === 'bundle' ? 1 : parseFloat(value),
+        value: type === 'bundle' ? 1 : num(value),
         is_active: isActive,
         start_date: startDate.toISOString(),
         end_date: endDate.toISOString(),
@@ -187,12 +209,20 @@ const AdminEditDiscountScreen: React.FC = () => {
       if (nameAr.trim()) discountData.name_ar = nameAr.trim();
       if (nameKu.trim()) discountData.name_ku = nameKu.trim();
       if (description.trim()) discountData.description = description.trim();
-      if (type === 'bundle' && bundleQuantity) discountData.bundle_quantity = parseInt(bundleQuantity);
-      if (type === 'bundle' && bundlePrice) discountData.bundle_price = parseFloat(bundlePrice);
-      if (minPurchase) discountData.min_purchase = parseFloat(minPurchase);
-      if (minQuantity) discountData.min_quantity = parseInt(minQuantity);
-      if (maxDiscount) discountData.max_discount = parseFloat(maxDiscount);
-      if (usageLimit) discountData.usage_limit = parseInt(usageLimit);
+      // Only write finite values. Previously each of these parsed straight into the
+      // payload with no guard, so any unparseable input became NaN -> null in the row.
+      const put = (key: string, raw: string, asInt = false) => {
+        const n = num(raw);
+        if (Number.isFinite(n)) discountData[key] = asInt ? Math.trunc(n) : n;
+      };
+      if (type === 'bundle') {
+        put('bundle_quantity', bundleQuantity, true);
+        put('bundle_price', bundlePrice);
+      }
+      put('min_purchase', minPurchase);
+      put('min_quantity', minQuantity, true);
+      put('max_discount', maxDiscount);
+      put('usage_limit', usageLimit, true);
       if (selectedProductIds.length > 0) discountData.product_ids = selectedProductIds;
 
       if (!tenantId) {

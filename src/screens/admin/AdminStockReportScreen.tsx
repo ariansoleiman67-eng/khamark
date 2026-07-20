@@ -28,10 +28,24 @@ import { LOGO_BASE64 } from '../../constants/logoBase64';
 import { formatPrice } from '../../utils/currency';
 
 // Calculate effective stock (Main + Size + Color variations)
+//
+// Every term is Number()-coerced: variations / color_variations are JSONB and reach
+// here unmapped, so a website-written stockQuantity can be a string and `sum + "0"`
+// concatenates. This matters most on this screen. A variation product (which keeps
+// stock_qty = 0 by design) with one string "0" variation produced the string "0000",
+// and because the filters use strict equality, `"0000" === 0` is false and `"0000" > 0`
+// is false — the product vanished from Out of Stock, In Stock and Low Stock alike,
+// appearing only under All Products. The admin then sent the supplier a reorder
+// invoice with a genuinely out-of-stock item silently missing.
+//
+// The Number()-coerced version of this helper already exists in AdminProductsScreen
+// and ReportsGenerator; this copy was the one that was missed.
 const getEffectiveStock = (p: any) => {
-  const mainStock = p.stockQty || 0;
-  const sizeStock = p.variations?.reduce((sum: number, v: any) => sum + (v.stockQuantity || 0), 0) || 0;
-  const colorStock = p.colorVariations?.reduce((sum: number, v: any) => sum + (v.stockQuantity || 0), 0) || 0;
+  const mainStock = Number(p?.stockQty) || 0;
+  const sizeStock = (Array.isArray(p?.variations) ? p.variations : [])
+    .reduce((sum: number, v: any) => sum + (Number(v?.stockQuantity) || 0), 0);
+  const colorStock = (Array.isArray(p?.colorVariations) ? p.colorVariations : [])
+    .reduce((sum: number, v: any) => sum + (Number(v?.stockQuantity) || 0), 0);
   return mainStock + sizeStock + colorStock;
 };
 

@@ -407,12 +407,23 @@ export class CartService {
       const uniqueProductIds = Array.from(new Set(updatedCart.items.map(item => item.productId)));
       const productsMap = new Map<string, any>();
       
+      // Products we could not reach at all, as distinct from products that were
+      // fetched and came back absent. getProduct returns null only for a genuine
+      // PGRST116 not-found and rethrows network errors, so collapsing both into
+      // "missing" (which the bare catch below used to do) turns a flaky connection
+      // into "this product is no longer available" — and the item is then spliced
+      // out and that truncation is persisted.
+      const unreachable = new Set<string>();
+
       await Promise.all(
         uniqueProductIds.map(async (pId) => {
           try {
             const prod = await ProductService.getProduct(pId);
             if (prod) productsMap.set(pId, prod);
-          } catch (e) {}
+          } catch (e) {
+            unreachable.add(pId);
+            console.warn('validateCart: product fetch failed, leaving item untouched', pId, e);
+          }
         })
       );
 
@@ -420,8 +431,12 @@ export class CartService {
         const item = updatedCart.items[i];
         if (!item) continue;
 
+        // Could not verify this one — leave it exactly as the user had it rather
+        // than deleting it on the strength of a failed request.
+        if (unreachable.has(item.productId)) continue;
+
         const latestProduct = productsMap.get(item.productId);
-        
+
         if (!latestProduct || !latestProduct.isActive) {
           errors.push(`Product ${item.product.name} is no longer available`);
           updatedCart.items.splice(i, 1);
@@ -430,8 +445,16 @@ export class CartService {
           continue;
         }
 
-        let availableStock = latestProduct.stockQty;
-        
+        // variations / colorVariations are JSONB, so stockQuantity is whatever the
+        // writer stored — the website can send a string, or omit the key entirely.
+        // Returns null for "unknown", which must never be treated as zero.
+        const toStock = (v: any): number | null => {
+          const n = Number(v);
+          return Number.isFinite(n) ? n : null;
+        };
+
+        let availableStock = toStock(latestProduct.stockQty);
+
         const itemSize = item.selectedOptions?.size?.trim().toLowerCase();
         const itemColor = item.selectedOptions?.color?.trim().toLowerCase();
         
@@ -442,10 +465,10 @@ export class CartService {
           const colorVar = latestProduct.colorVariations?.find((v: any) => v.variationId === item.variationId);
           
           if (sizeVar) {
-             availableStock = sizeVar.stockQuantity;
+             availableStock = toStock(sizeVar.stockQuantity);
              variationFound = true;
           } else if (colorVar) {
-             availableStock = colorVar.stockQuantity;
+             availableStock = toStock(colorVar.stockQuantity);
              variationFound = true;
           }
         }
@@ -453,7 +476,7 @@ export class CartService {
         if (!variationFound && itemSize) {
           const v = latestProduct.variations?.find((v: any) => v.sizeValue?.trim().toLowerCase() === itemSize);
           if (v) {
-             availableStock = v.stockQuantity;
+             availableStock = toStock(v.stockQuantity);
              variationFound = true;
           }
         }
@@ -461,13 +484,23 @@ export class CartService {
         if (!variationFound && itemColor) {
           const v = latestProduct.colorVariations?.find((v: any) => v.colorValue?.trim().toLowerCase() === itemColor);
           if (v) {
-             availableStock = v.stockQuantity;
+             availableStock = toStock(v.stockQuantity);
              variationFound = true;
           }
         }
 
-        if (availableStock < item.quantity) {
-          if (availableStock <= 0) {
+        // `availableStock === null` means we could not determine the stock level, which
+        // is NOT the same as zero — never remove or clamp on it.
+        //
+        // Before the coercion above this comparison ran on the raw JSONB value, and it
+        // failed three different ways. `undefined < quantity` is false, so the whole
+        // block was skipped and the order went through for more units than exist — a
+        // silent oversell, the NaN-fails-every-comparison hole. `null <= 0` is true, so
+        // unknown stock deleted the item as "out of stock". And a string "3" clamped
+        // quantity to the string itself, after which getCartItemCount's `0 + "3"`
+        // produced "03" in the checkout summary.
+        if (availableStock !== null && availableStock < item.quantity) {
+          if (!(availableStock > 0)) {
             errors.push(`Product ${latestProduct.name} is out of stock`);
             updatedCart.items.splice(i, 1);
             hasUpdates = true;

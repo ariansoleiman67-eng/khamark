@@ -460,16 +460,44 @@ export class ProductService {
     };
   }
 
+  /**
+   * Upper bound on memoryCache entries.
+   *
+   * Cache keys embed JSON.stringify(filters) + page, and getProductsByIds keys on the
+   * entire id set (`products_by_ids_${ids.sort().join(',')}`). FavoritesScreen refetches
+   * on every favorites change, so each add/remove mints a brand-new key holding a full
+   * product list and nothing ever evicted the old one — 50 toggles retained 50 lists.
+   *
+   * The second-order effect is worse than the memory: setCachedData mirrors every key
+   * to AsyncStorage, whose Android default is 6 MB. Exhausting it makes setItem throw
+   * process-wide, and LocalCartService.saveCart only logs its failure — so the user's
+   * cart silently stops persisting.
+   */
+  private static readonly MEMORY_CACHE_MAX = 100;
+
+  // delete-then-set so re-inserting moves the key to the end; Map iterates in insertion
+  // order, making the first key the least recently used.
+  private static touchCache(key: string, value: { data: any; timestamp: number }): void {
+    this.memoryCache.delete(key);
+    this.memoryCache.set(key, value);
+    while (this.memoryCache.size > this.MEMORY_CACHE_MAX) {
+      const oldest = this.memoryCache.keys().next().value;
+      if (oldest === undefined) break;
+      this.memoryCache.delete(oldest);
+    }
+  }
+
   private static async getCachedData(key: string): Promise<any> {
     try {
       const mem = this.memoryCache.get(key);
-      if (mem && mem.timestamp) return mem;
+      // Refresh recency on a hit so a hot key is not evicted ahead of a cold one.
+      if (mem && mem.timestamp) { this.touchCache(key, mem); return mem; }
 
       const cached = await AsyncStorage.getItem(`cache_${key}`);
       if (cached) {
         const parsed = JSON.parse(cached);
         if (parsed && parsed.timestamp) {
-          this.memoryCache.set(key, parsed);
+          this.touchCache(key, parsed);
           return parsed;
         }
       }
@@ -482,7 +510,7 @@ export class ProductService {
   private static async setCachedData(key: string, data: any): Promise<void> {
     try {
       const cacheData = { data, timestamp: Date.now() };
-      this.memoryCache.set(key, cacheData);
+      this.touchCache(key, cacheData);
       try {
         await AsyncStorage.setItem(`cache_${key}`, JSON.stringify(cacheData));
       } catch {}
