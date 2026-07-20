@@ -152,7 +152,11 @@ const LegacyEmailLoginScreen: React.FC = () => {
               autoCapitalize="none"
               autoCorrect={false}
             />
-            <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+            <TouchableOpacity onPress={() => setShowPassword(!showPassword)}
+              accessibilityRole="button"
+              accessibilityLabel={showPassword ? t('common.hidePassword', { defaultValue: 'Hide password' }) : t('common.showPassword', { defaultValue: 'Show password' })}
+              accessibilityState={{ selected: showPassword }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <Ionicons 
                 name={showPassword ? 'eye-off-outline' : 'eye-outline'} 
                 size={20} 

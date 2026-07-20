@@ -1633,7 +1633,10 @@ const AdminProductsScreen: React.FC = () => {
                 scrollEnabled={false}
               />
               {searchQuery.length > 0 && (
-                <TouchableOpacity onPress={() => setSearchQuery('')} activeOpacity={0.7}>
+                <TouchableOpacity onPress={() => setSearchQuery('')} activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.clear', { defaultValue: 'Clear' })}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                   <Ionicons name="close-circle" size={20} color={isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)'} />
                 </TouchableOpacity>
               )}

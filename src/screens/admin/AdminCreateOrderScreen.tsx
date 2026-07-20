@@ -710,7 +710,10 @@ const AdminCreateOrderScreen: React.FC = () => {
           style={[styles.searchInput, { color: C.text, textAlign: isRTL ? 'right' : 'left' }]}
         />
         {search ? (
-          <TouchableOpacity onPress={() => setSearch('')}><Ionicons name="close-circle" size={18} color={C.textSecondary} /></TouchableOpacity>
+          <TouchableOpacity onPress={() => setSearch('')}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.clear', { defaultValue: 'Clear' })}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}><Ionicons name="close-circle" size={18} color={C.textSecondary} /></TouchableOpacity>
         ) : null}
       </View>
 
@@ -845,7 +848,9 @@ const AdminCreateOrderScreen: React.FC = () => {
                 {customerCity || t('admin.inStore.selectCity', { defaultValue: 'Select city (optional)' })}
               </Text>
               {customerCity ? (
-                <TouchableOpacity onPress={() => setCustomerCity('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <TouchableOpacity onPress={() => setCustomerCity('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.clear', { defaultValue: 'Clear' })}>
                   <Ionicons name="close-circle" size={18} color={C.textSecondary} />
                 </TouchableOpacity>
               ) : (
@@ -1080,7 +1085,10 @@ const AdminCreateOrderScreen: React.FC = () => {
                 style={[styles.searchInput, { color: C.text }]}
               />
               {countrySearch ? (
-                <TouchableOpacity onPress={() => setCountrySearch('')}><Ionicons name="close-circle" size={18} color={C.textSecondary} /></TouchableOpacity>
+                <TouchableOpacity onPress={() => setCountrySearch('')}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.clear', { defaultValue: 'Clear' })}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}><Ionicons name="close-circle" size={18} color={C.textSecondary} /></TouchableOpacity>
               ) : null}
             </View>
             <FlatList
@@ -1133,7 +1141,10 @@ const AdminCreateOrderScreen: React.FC = () => {
                 style={[styles.searchInput, { color: C.text }]}
               />
               {citySearch ? (
-                <TouchableOpacity onPress={() => setCitySearch('')}><Ionicons name="close-circle" size={18} color={C.textSecondary} /></TouchableOpacity>
+                <TouchableOpacity onPress={() => setCitySearch('')}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.clear', { defaultValue: 'Clear' })}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}><Ionicons name="close-circle" size={18} color={C.textSecondary} /></TouchableOpacity>
               ) : null}
             </View>
             <FlatList

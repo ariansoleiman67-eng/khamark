@@ -107,7 +107,11 @@ const AdminChangePasswordScreen = () => {
         <TouchableOpacity
           style={styles.eyeIcon}
           onPress={() => setShowPass(!showPass)}
-        >
+        
+              accessibilityRole="button"
+              accessibilityLabel={showPass ? t('common.hidePassword', { defaultValue: 'Hide password' }) : t('common.showPassword', { defaultValue: 'Show password' })}
+              accessibilityState={{ selected: showPass }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Ionicons
             name={showPass ? 'eye-off-outline' : 'eye-outline'}
             size={24}

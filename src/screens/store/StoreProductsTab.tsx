@@ -256,7 +256,10 @@ const StoreProductsTab: React.FC<StoreProductsTabProps> = ({ products }) => {
               <TouchableOpacity 
                 style={styles.clearButton}
                 onPress={() => { setSearchQuery(''); Keyboard.dismiss(); }}
-              >
+              
+              accessibilityRole="button"
+              accessibilityLabel={t('common.clear', { defaultValue: 'Clear' })}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                 <Ionicons name="close-circle" size={20} color={theme.colors.textSecondary} />
               </TouchableOpacity>
             )}

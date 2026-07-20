@@ -128,9 +128,12 @@ export default function AppTextInput({
           <View style={styles.rightIconContainer}>
             {rightIcon}
             {showPasswordToggle && (
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={() => setIsPasswordVisible(!isPasswordVisible)}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                accessibilityRole="button"
+                accessibilityLabel={isPasswordVisible ? 'Hide password' : 'Show password'}
+                accessibilityState={{ selected: isPasswordVisible }}
               >
                 <Ionicons 
                   name={isPasswordVisible ? "eye-off-outline" : "eye-outline"} 

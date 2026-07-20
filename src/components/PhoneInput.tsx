@@ -331,7 +331,10 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
                 autoCorrect={false}
               />
               {searchQuery.length > 0 && (
-                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <TouchableOpacity onPress={() => setSearchQuery('')}
+              accessibilityRole="button"
+              accessibilityLabel={'Clear'}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                   <Ionicons name="close-circle" size={18} color={COLORS.textGray} />
                 </TouchableOpacity>
               )}

@@ -435,7 +435,11 @@ const ChangePasswordScreen = () => {
           autoCorrect={false}
           autoFocus={autoFocus}
         />
-        <TouchableOpacity onPress={() => setShow(!show)} style={styles.eyeButton} activeOpacity={0.6}>
+        <TouchableOpacity onPress={() => setShow(!show)} style={styles.eyeButton} activeOpacity={0.6}
+              accessibilityRole="button"
+              accessibilityLabel={show ? t('common.hidePassword', { defaultValue: 'Hide password' }) : t('common.showPassword', { defaultValue: 'Show password' })}
+              accessibilityState={{ selected: show }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Ionicons name={show ? 'eye-off-outline' : 'eye-outline'} size={18} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>

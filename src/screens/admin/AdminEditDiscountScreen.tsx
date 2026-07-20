@@ -574,7 +574,10 @@ const AdminEditDiscountScreen: React.FC = () => {
               onChangeText={setProductSearchQuery}
             />
             {productSearchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setProductSearchQuery('')}>
+              <TouchableOpacity onPress={() => setProductSearchQuery('')}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.clear', { defaultValue: 'Clear' })}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                 <Ionicons name="close-circle" size={18} color={theme.colors.textSecondary} />
               </TouchableOpacity>
             )}

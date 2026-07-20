@@ -220,7 +220,9 @@ export default function AdminPartnerAssignmentScreen() {
           style={[styles.searchInput, { color: theme.colors.text }]}
         />
         {query ? (
-          <TouchableOpacity onPress={() => setQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <TouchableOpacity onPress={() => setQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.clear', { defaultValue: 'Clear' })}>
             <Ionicons name="close-circle" size={18} color={theme.colors.textSecondary} />
           </TouchableOpacity>
         ) : null}

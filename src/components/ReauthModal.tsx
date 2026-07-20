@@ -255,7 +255,11 @@ const ReauthModal = forwardRef<ReauthModalHandle>((_, ref) => {
                   returnKeyType="done"
                   onSubmitEditing={handlePasswordSubmit}
                 />
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}
+              accessibilityRole="button"
+              accessibilityLabel={showPassword ? t('common.hidePassword', { defaultValue: 'Hide password' }) : t('common.showPassword', { defaultValue: 'Show password' })}
+              accessibilityState={{ selected: showPassword }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                   <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={18} color={mutedColor} />
                 </TouchableOpacity>
               </View>
