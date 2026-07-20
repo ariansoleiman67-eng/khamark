@@ -59,6 +59,18 @@ type AddEditAddressRouteProp = RouteProp<{
   };
 }, 'AddEditAddress'>;
 
+// Guard against truthy-but-partial jsonb coordinates (e.g. {} or a lat with no lng).
+// `addresses.coordinates` is JSONB and addressService passes it through raw, while the
+// Address type declares latitude/longitude as numbers — a runtime lie for a JSONB
+// column, which is why TypeScript flagged nothing here. A bare truthiness check let
+// `{}` through and `undefined.toFixed(6)` threw, killing the whole screen into the
+// ErrorBoundary: the row rendered fine in My Addresses (which HAS this guard) but
+// could not be opened for editing at all. Mirrors MyAddressScreen's helper.
+const hasValidCoords = (
+  c?: { latitude?: number; longitude?: number } | null
+): c is { latitude: number; longitude: number } =>
+  Number.isFinite(c?.latitude) && Number.isFinite(c?.longitude);
+
 const AddEditAddressScreen: React.FC = () => {
   const { theme } = useTheme();
   const { t, i18n } = useTranslation();
@@ -148,7 +160,9 @@ const AddEditAddressScreen: React.FC = () => {
         region: address.region,
         phone: address.phone,
         isDefault: address.isDefault,
-        coordinates: address.coordinates,
+        // Drop a malformed blob at the boundary rather than carrying it into the
+        // form, where handleSave would write it straight back to Postgres.
+        coordinates: hasValidCoords(address.coordinates) ? address.coordinates : undefined,
       });
     } else {
       // Set default country and city for new addresses from onboarding
@@ -412,24 +426,29 @@ const AddEditAddressScreen: React.FC = () => {
         longitude: currentPosition.coords.longitude,
       };
 
-      let newCountry = formData.countryCode;
-      let newCity = formData.cityCode;
-      let newStreet = formData.address;
-      let newPhone = formData.phone;
+      // Only what reverse-geocoding actually resolves. These used to be seeded from
+      // formData BEFORE the awaits and then written back unconditionally, which
+      // defeated the functional updater below: anything the user typed during the GPS
+      // fix (seconds, indoors) was overwritten with the pre-await snapshot — and when
+      // geocoding returned no usable street parts, `address` was written back as ''.
+      let geoCountry = '';
+      let geoCity = '';
+      let geoStreet = '';
+      let geoPhoneCode = '';
       
       try {
         const geocode = await Location.reverseGeocodeAsync(resolvedCoordinates);
         if (geocode && geocode.length > 0) {
           const g = geocode[0];
-          if (g.country) newCountry = g.country;
-          if (g.city || g.subregion) newCity = g.city || g.subregion || '';
+          if (g.country) geoCountry = g.country;
+          if (g.city || g.subregion) geoCity = g.city || g.subregion || '';
           
-          // Try to update phone code if missing or empty
+          // Suggested dial code from the resolved country. Whether it is actually
+          // applied is decided in the updater below, against the CURRENT phone value
+          // rather than a pre-await snapshot.
           if (g.isoCountryCode) {
             const locCountry = getCountryByCode(g.isoCountryCode);
-            if (locCountry && (!newPhone || newPhone.trim() === '')) {
-              newPhone = locCountry.phoneCode;
-            }
+            if (locCountry) geoPhoneCode = locCountry.phoneCode;
           }
 
           // Build a more descriptive street address
@@ -441,24 +460,32 @@ const AddEditAddressScreen: React.FC = () => {
           ].filter(Boolean);
           
           if (addressParts.length > 0) {
-            newStreet = addressParts.join(', ');
+            geoStreet = addressParts.join(', ');
           } else if (g.name && g.name !== g.city && g.name !== g.country) {
-            newStreet = g.name;
+            geoStreet = g.name;
           } else if ((g as any).formattedAddress) {
-            newStreet = (g as any).formattedAddress;
+            geoStreet = (g as any).formattedAddress;
           }
         }
       } catch (e) {
         console.warn('Reverse geocode failed', e);
       }
 
+      // The screen may be gone: getCurrentPositionAsync at high accuracy routinely
+      // runs for seconds, and Alert is a native global modal that would otherwise pop
+      // "Location Set" over My Addresses.
+      if (!isMountedRef.current) return;
+
       setFormData(prev => ({
         ...prev,
         coordinates: resolvedCoordinates,
-        countryCode: newCountry,
-        cityCode: newCity,
-        address: newStreet,
-        phone: newPhone,
+        // Fall back to prev, never to a pre-await snapshot, so typing during the fix
+        // survives and an unresolved field is left as the user left it.
+        countryCode: geoCountry || prev.countryCode,
+        cityCode: geoCity || prev.cityCode,
+        address: geoStreet || prev.address,
+        // Only fill the dial code when the field is genuinely empty right now.
+        phone: prev.phone?.trim() ? prev.phone : (geoPhoneCode || prev.phone),
       }));
 
       Alert.alert(
@@ -468,6 +495,7 @@ const AddEditAddressScreen: React.FC = () => {
       );
     } catch (error) {
       console.error('Error getting location:', error);
+      if (!isMountedRef.current) return;
       Alert.alert(
         t('location.error'),
         t('location.failedToGetLocation')
@@ -1032,7 +1060,7 @@ const AddEditAddressScreen: React.FC = () => {
                   {t('addresses.location')} {t('common.optional')}
                 </Text>
 
-                {formData.coordinates ? (
+                {hasValidCoords(formData.coordinates) ? (
                   <View style={{
                     borderWidth: 1,
                     borderColor: theme.colors.success,
@@ -1164,7 +1192,7 @@ const AddEditAddressScreen: React.FC = () => {
                 )}
 
                 {/* Map Picker - Show when coordinates are available */}
-                {formData.coordinates && (
+                {hasValidCoords(formData.coordinates) && (
                   <View style={{ marginTop: SPACING.md }}>
                     <SimpleMapPicker
                       latitude={formData.coordinates.latitude}

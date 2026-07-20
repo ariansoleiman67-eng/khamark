@@ -56,8 +56,25 @@ const MyAddressScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const isMountedRef = React.useRef(true);
+  // Generation token for address loads. isMountedRef was declared and maintained
+  // but never actually read, so loadAddresses committed unconditionally: a
+  // pull-to-refresh in flight when the user deleted a row resolved afterwards with
+  // the pre-delete list and put the deleted address back on screen. Tapping Edit on
+  // it then opened a row that no longer exists, and saving silently matched zero
+  // rows. Mutations bump this so a write always supersedes an in-flight read.
+  const reqIdRef = React.useRef(0);
+  // Serializes default-address changes. setDefaultAddress is two non-atomic
+  // statements (clear the others, then set this one), so two overlapping taps
+  // interleaved as clear/clear/set/set and left TWO rows with is_default = true —
+  // after which getDefaultAddress (.limit(1)) returns whichever Postgres orders
+  // first, so checkout could preselect the address the user did not choose.
+  const mutatingRef = React.useRef(false);
+  // Mirror of the list so the focus effect can read the current length without
+  // capturing it (see the useCallback note below).
+  const addressesRef = React.useRef<Address[]>([]);
 
   const loadAddresses = async (isRefresh = false) => {
+    const reqId = ++reqIdRef.current;
     if (!user?.uid) {
       // Production: console.warn removed
       setLoading(false);
@@ -68,16 +85,22 @@ const MyAddressScreen: React.FC = () => {
       // Only show the full-screen loader on the first cold load. Focus-refetch
       // and pull-to-refresh keep the existing list mounted (RefreshControl owns
       // its own spinner) instead of flashing the centered loader.
-      if (!isRefresh && addresses.length === 0) {
+      // Read through the ref: the focus effect below memoizes this function with an
+      // empty dep list, so the captured `addresses` is forever the first render's []
+      // and this condition was always true — the full-screen loader replaced the list
+      // on every single focus, which is the opposite of the stated intent.
+      if (!isRefresh && addressesRef.current.length === 0) {
         setLoading(true);
       }
       const userAddresses = await addressService.getUserAddresses(user.uid);
+      if (!isMountedRef.current || reqId !== reqIdRef.current) return;
       setAddresses(userAddresses);
     } catch (error) {
+      if (!isMountedRef.current || reqId !== reqIdRef.current) return;
       console.error('Error loading addresses:', error);
       Alert.alert(t('common.error'), t('addresses.failedToLoad'));
     } finally {
-      setLoading(false);
+      if (isMountedRef.current && reqId === reqIdRef.current) setLoading(false);
     }
   };
 
@@ -86,6 +109,8 @@ const MyAddressScreen: React.FC = () => {
     await loadAddresses(true);
     setRefreshing(false);
   };
+
+  useEffect(() => { addressesRef.current = addresses; }, [addresses]);
 
   useFocusEffect(
     useCallback(() => {
@@ -103,8 +128,14 @@ const MyAddressScreen: React.FC = () => {
       return;
     }
 
+    if (mutatingRef.current) return;
+    mutatingRef.current = true;
+
     try {
       await addressService.setDefaultAddress(user.uid, addressId);
+      // Supersede any load already in flight, so it cannot restore the previous
+      // default over the change just made.
+      reqIdRef.current++;
 
       // Update local state
       setAddresses(prev => prev.map(addr => ({
@@ -116,6 +147,8 @@ const MyAddressScreen: React.FC = () => {
     } catch (error) {
       console.error('Error setting default address:', error);
       Alert.alert(t('common.error'), t('addresses.failedToUpdateDefault'));
+    } finally {
+      mutatingRef.current = false;
     }
   };
 
@@ -135,6 +168,9 @@ const MyAddressScreen: React.FC = () => {
               await addressService.deleteAddress(addressId);
 
               // Update local state
+              // Supersede any in-flight load, which would otherwise resolve with the
+              // pre-delete list and put this address back on screen.
+              reqIdRef.current++;
               setAddresses(prev => prev.filter(addr => addr.id !== addressId));
               Alert.alert(t('common.success'), t('addresses.addressDeleted'));
             } catch (error) {
