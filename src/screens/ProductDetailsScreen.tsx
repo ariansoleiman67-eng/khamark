@@ -662,9 +662,9 @@ export const ProductDetailsScreen: React.FC = () => {
       // Build selectedOptions object (only include properties that have values)
       const storageLabel = storageOptions.find((s) => s.id === effectiveStorageId && s.priceDelta >= 0)?.label;
       const selectedOptions: { color?: string; size?: string; storage?: string } | undefined =
-        selectedColor || selectedSize || (storageLabel && storageOptions.length > 0)
+        effectiveColor || selectedSize || (storageLabel && storageOptions.length > 0)
           ? {
-              ...(selectedColor && { color: selectedColor }),
+              ...(effectiveColor && { color: effectiveColor }),
               ...(selectedSize && { size: selectedSize }),
               ...(storageOptions.length > 0 && storageLabel && { storage: storageLabel }),
             }
@@ -997,8 +997,8 @@ export const ProductDetailsScreen: React.FC = () => {
 
   // Gallery images from product. When a colour with its own image is selected,
   // that image leads the gallery so the hero swaps to the chosen colour.
-  const selectedColorImg = selectedColor
-    ? product.colorVariations?.find((c) => c.colorValue === selectedColor)?.imageUrl
+  const selectedColorImg = effectiveColor
+    ? product.colorVariations?.find((c) => c.colorValue === effectiveColor)?.imageUrl
     : undefined;
   const baseGallery = product.imageUrls || [];
   const galleryImages = selectedColorImg
@@ -1049,6 +1049,35 @@ export const ProductDetailsScreen: React.FC = () => {
   // Storage options (capacity) — selection adds a price delta to the base price.
   const storageOptions = product.storageOptions || [];
   const effectiveStorageId = selectedStorageId ?? (storageOptions[0]?.id ?? null);
+
+  // Which variant UI this product gets.
+  //
+  // The consumer selector (single-select colour swatches + storage chips) used to be
+  // gated on storageOptions existing, so a phone with colours but no storage rows fell
+  // through to the Alibaba per-colour quantity table — a bulk-ordering matrix shown to
+  // someone buying one handset. Storage often lives only in the description text, so
+  // that gate decided the entire purchase UX on a data-entry detail.
+  //
+  // The table exists for genuine bulk buying, so it now keys on the actual bulk signal
+  // this schema has: quantity-based price tiers. Everything else gets the consumer flow.
+  const isBulkProduct = (product.priceTiers?.length ?? 0) > 0;
+  const hasColorVariants = !!(product.colorVariations && product.colorVariations.length > 0);
+  // Storage is never bulk-gated: a wholesale product with storage tiers still needs a
+  // storage selector, it just picks colours through the quantity table instead of
+  // swatches. Gating the whole block on !isBulkProduct would have left that
+  // combination with no way to choose storage at all.
+  const showConsumerColors = hasColorVariants && !isBulkProduct;
+  const showConsumerVariants = showConsumerColors || storageOptions.length > 0;
+  const showBulkColorTable = isBulkProduct && hasColorVariants;
+
+  // Colour defaults to the first in-stock option, mirroring what storage already does
+  // via effectiveStorageId. The bulk table made a colourless order impossible (you had
+  // to enter a quantity against a specific colour); the swatch path does not, and
+  // selectedColor starts null with nothing enforcing a choice — so without this a
+  // customer could add a phone to the cart with no colour recorded at all.
+  const effectiveColor =
+    selectedColor ??
+    (product.colorVariations?.find((c) => (c.stockQuantity ?? 0) > 0)?.colorValue ?? null);
   const storageDelta = storageOptions.find((s) => s.id === effectiveStorageId)?.priceDelta ?? 0;
 
   // Calculate total price:
@@ -1192,9 +1221,9 @@ export const ProductDetailsScreen: React.FC = () => {
         // so the correct price + selection persist (mirrors handleAddToCart).
         const storageLabel = storageOptions.find((s) => s.id === effectiveStorageId && s.priceDelta >= 0)?.label;
         const selectedOptions: { color?: string; size?: string; storage?: string } | undefined =
-          selectedColor || selectedSize || (storageLabel && storageOptions.length > 0)
+          effectiveColor || selectedSize || (storageLabel && storageOptions.length > 0)
             ? {
-                ...(selectedColor && { color: selectedColor }),
+                ...(effectiveColor && { color: effectiveColor }),
                 ...(selectedSize && { size: selectedSize }),
                 ...(storageOptions.length > 0 && storageLabel && { storage: storageLabel }),
               }
@@ -1284,9 +1313,9 @@ export const ProductDetailsScreen: React.FC = () => {
         // cosmetic options so the correct price + selection persist (mirrors handleAddToCart).
         const storageLabel = storageOptions.find((s) => s.id === effectiveStorageId && s.priceDelta >= 0)?.label;
         const selectedOptions: { color?: string; size?: string; storage?: string } | undefined =
-          selectedColor || selectedSize || (storageLabel && storageOptions.length > 0)
+          effectiveColor || selectedSize || (storageLabel && storageOptions.length > 0)
             ? {
-                ...(selectedColor && { color: selectedColor }),
+                ...(effectiveColor && { color: effectiveColor }),
                 ...(selectedSize && { size: selectedSize }),
                 ...(storageOptions.length > 0 && storageLabel && { storage: storageLabel }),
               }
@@ -2058,17 +2087,17 @@ export const ProductDetailsScreen: React.FC = () => {
               )}
 
               {/* Consumer variant selector (phone-style): single-select colour + storage */}
-              {storageOptions.length > 0 && (
+              {showConsumerVariants && (
                 <View style={styles.section}>
-                  {product.colorVariations && product.colorVariations.length > 0 && (
+                  {showConsumerColors && (
                     <>
                       <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
                         {t('product.color', { defaultValue: 'Color' })}
-                        {selectedColor ? <Text style={{ color: theme.colors.textSecondary, fontWeight: '500' }}>{'  •  ' + selectedColor}</Text> : null}
+                        {effectiveColor ? <Text style={{ color: theme.colors.textSecondary, fontWeight: '500' }}>{'  •  ' + effectiveColor}</Text> : null}
                       </Text>
                       <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', flexWrap: 'wrap', gap: 12, marginTop: 10, marginBottom: 6 }}>
                         {product.colorVariations.map((cv) => {
-                          const sel = selectedColor === cv.colorValue;
+                          const sel = effectiveColor === cv.colorValue;
                           const soldOut = (cv.stockQuantity ?? 0) <= 0;
                           return (
                             <TouchableOpacity
@@ -2091,6 +2120,8 @@ export const ProductDetailsScreen: React.FC = () => {
                     </>
                   )}
 
+                  {storageOptions.length > 0 && (
+                  <>
                   <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left', marginTop: 14 }]}>
                     {t('product.storage', { defaultValue: 'Storage' })}
                   </Text>
@@ -2120,11 +2151,13 @@ export const ProductDetailsScreen: React.FC = () => {
                       );
                     })}
                   </View>
+                  </>
+                  )}
                 </View>
               )}
 
               {/* ALIBABA VARIATION: Table-style color variation selector */}
-              {product.colorVariations && product.colorVariations.length > 0 && !(product.storageOptions && product.storageOptions.length > 0) ? (
+              {showBulkColorTable ? (
                 <View style={styles.section}>
                   <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text, marginBottom: 0 }]}>
