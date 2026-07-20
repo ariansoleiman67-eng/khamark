@@ -133,11 +133,26 @@ const OrderDetailScreen: React.FC = () => {
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
 
   // Load order details
+  // orderId can change on a MOUNTED instance: tapping an order push while this
+  // screen is focused routes through navigation.navigate('OrderDetail', { orderId }),
+  // which replaces params in place rather than remounting. Two loads then overlap,
+  // and they can resolve out of order because getOrderById returns synchronously from
+  // the in-memory cache for a cached order but goes to the network otherwise.
+  //
+  // If the older one lands last, `order` describes a different order than `orderId`,
+  // and the two are used together: handleCancelOrder gates on order.status but calls
+  // cancelOrder(orderId), so the user could cancel an order other than the one they
+  // are looking at. Same split in handleReorder and in <LiveOrderMap orderId=… />.
+  const loadReqIdRef = useRef(0);
+
   useEffect(() => {
-    loadOrderDetails();
+    const reqId = ++loadReqIdRef.current;
+    loadOrderDetails(reqId);
+    return () => { loadReqIdRef.current++; };
   }, [orderId]);
 
-  const loadOrderDetails = async () => {
+  const loadOrderDetails = async (reqId: number) => {
+    const isLatest = () => reqId === loadReqIdRef.current;
     if (!orderId) {
       setError(t('orders.orderNotFound'));
       setLoading(false);
@@ -147,17 +162,20 @@ const OrderDetailScreen: React.FC = () => {
       setLoading(true);
       setError(null);
       const orderData = await OrderService.getOrderById(orderId);
+      if (!isLatest()) return;
       setOrder(orderData);
-      
+
       // Fetch tenant contact info for WhatsApp support
       if (orderData?.items) {
         const contact = await getOrderSupportContact(orderData.items);
+        if (!isLatest()) return;
         setTenantContact(contact);
       }
     } catch (err: any) {
+      if (!isLatest()) return;
       setError(err.message || t('orders.loadError'));
     } finally {
-      setLoading(false);
+      if (isLatest()) setLoading(false);
     }
   };
 
@@ -351,7 +369,7 @@ ${t('orders.messagePrompt', { defaultValue: 'Hi, I have a question about this or
               try {
                 await OrderService.cancelOrder(orderId);
                 Alert.alert(t('orders.cancel.success'), t('orders.cancel.successMessage'));
-                loadOrderDetails();
+                loadOrderDetails(++loadReqIdRef.current);
               } catch (cancelError: any) {
                 if (cancelError.message?.includes('cannot be cancelled')) {
                   Alert.alert(
@@ -504,7 +522,7 @@ ${t('orders.messagePrompt', { defaultValue: 'Hi, I have a question about this or
           <Ionicons name="alert-circle-outline" size={64} color={theme.colors.error} />
           <Text allowFontScaling={false} style={styles.errorTitle}>{t('orders.errorLoadingOrder')}</Text>
           <Text allowFontScaling={false} style={styles.errorText}>{error || t('orders.orderNotFound')}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={loadOrderDetails}>
+          <TouchableOpacity style={styles.retryButton} onPress={() => loadOrderDetails(++loadReqIdRef.current)}>
             <Text allowFontScaling={false} style={styles.retryButtonText}>{t('common.retry')}</Text>
           </TouchableOpacity>
         </View>

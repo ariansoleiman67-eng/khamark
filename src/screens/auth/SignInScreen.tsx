@@ -301,6 +301,13 @@ const SignInScreen: React.FC = () => {
   const [loginMethod, setLoginMethod] = useState<LoginMethod>('phone');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  // Mirrors of the two inputs. The credential-prefill effect below is mount-only, so
+  // its closure holds the initial empty strings forever — reading the state directly
+  // there would never see what the user has typed since.
+  const phoneRef = useRef(phone);
+  const emailRef = useRef(email);
+  useEffect(() => { phoneRef.current = phone; }, [phone]);
+  useEffect(() => { emailRef.current = email; }, [email]);
   const [selectedCountry, setSelectedCountry] = useState<CountryCode>(userRegion);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -321,9 +328,19 @@ const SignInScreen: React.FC = () => {
 
   // Load saved Remember Me preference on mount
   React.useEffect(() => {
+    let cancelled = false;
     const loadSaved = async () => {
       try {
         const credentials = await CredentialStorage.getCredentials();
+        if (cancelled) return;
+        // getCredentials awaits AsyncStorage and then SecureStore — an Android
+        // Keystore decrypt that routinely takes hundreds of ms on a cold start,
+        // while this screen also spins up eight Reanimated loops on the same JS
+        // thread. The inputs are interactive throughout, so without these checks a
+        // user who starts typing immediately has their digits overwritten when the
+        // read lands — or, if the saved credential is an email, has the segmented
+        // control flipped to Email and the typed phone discarded outright.
+        if (phoneRef.current || emailRef.current) return;
         if (credentials) {
           if (credentials.email.includes('@')) {
             setLoginMethod('email');
@@ -348,6 +365,11 @@ const SignInScreen: React.FC = () => {
       }
     };
     loadSaved();
+    return () => { cancelled = true; };
+    // Intentionally mount-only: the prefill is a one-shot. The dirty-field check
+    // goes through refs rather than state precisely because this closure never
+    // re-runs; listing phone/email as deps would re-fire the prefill on every
+    // keystroke instead.
   }, []);
 
   // Secret admin access
