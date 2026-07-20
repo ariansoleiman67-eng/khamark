@@ -203,7 +203,7 @@ const ProductRow = React.memo(function ProductRow({
   // Variation products keep stock in their variations, not stock_qty — sum it for display.
   const variantProduct = hasVariations(item);
   const effStock = variantProduct
-    ? ((item as any).variations || []).reduce((s: number, v: any) => s + (v.stockQuantity || 0), 0) + ((item as any).colorVariations || []).reduce((s: number, v: any) => s + (v.stockQuantity || 0), 0)
+    ? ((item as any).variations || []).reduce((s: number, v: any) => s + (Number(v?.stockQuantity) || 0), 0) + ((item as any).colorVariations || []).reduce((s: number, v: any) => s + (Number(v?.stockQuantity) || 0), 0)
     : (item.stockQty ?? 0);
   const badgeLabel = status === 'coming_soon'
     ? t('product.comingSoon', { defaultValue: 'Coming soon' })
@@ -259,7 +259,7 @@ const ProductGridCard = React.memo(function ProductGridCard({
   const canAdd = (item as any).inStock !== false;
   const variantProduct = hasVariations(item);
   const effStock = variantProduct
-    ? ((item as any).variations || []).reduce((s: number, v: any) => s + (v.stockQuantity || 0), 0) + ((item as any).colorVariations || []).reduce((s: number, v: any) => s + (v.stockQuantity || 0), 0)
+    ? ((item as any).variations || []).reduce((s: number, v: any) => s + (Number(v?.stockQuantity) || 0), 0) + ((item as any).colorVariations || []).reduce((s: number, v: any) => s + (Number(v?.stockQuantity) || 0), 0)
     : (item.stockQty ?? 0);
   const badgeLabel = status === 'coming_soon'
     ? t('product.comingSoon', { defaultValue: 'Coming soon' })
@@ -437,7 +437,10 @@ const AdminCreateOrderScreen: React.FC = () => {
                 if (!vv) continue; // variation no longer exists → drop the line
                 const kind: 'size' | 'color' = sizeV ? 'size' : 'color';
                 const label = sizeV ? `${vv.sizeValue || ''}${vv.sizeUnit ? ' ' + vv.sizeUnit : ''}`.trim() : (vv.colorValue || '');
-                const priceUSD = (typeof vv.priceUSD === 'number' && vv.priceUSD > 0) ? vv.priceUSD : (p.priceUSD || 0);
+                // Same JSONB coercion as addVariation — a string price here would
+                // restore the draft at the wrong (base) price.
+                const vvPriceNum = Number(vv.priceUSD);
+                const priceUSD = Number.isFinite(vvPriceNum) && vvPriceNum > 0 ? vvPriceNum : (Number(p.priceUSD) || 0);
                 restored[it.key || `${p.id}__${it.variationId}`] = { product: p, price: it.price ?? priceUSD, manual: it.manual, quantity: it.quantity || 1, variation: { variationId: it.variationId, label, priceUSD, stockQuantity: vv.stockQuantity ?? 0, kind } };
               } else {
                 restored[it.key || it.id] = { product: p, price: it.price ?? (p.priceUSD || 0), manual: it.manual, quantity: it.quantity || 1 };
@@ -493,7 +496,12 @@ const AdminCreateOrderScreen: React.FC = () => {
   const addVariation = useCallback((p: TenantProduct, variationId: string, label: string, vPrice: number | undefined, stockQuantity: number, kind: 'size' | 'color') => {
     if (!p.id) return;
     const key = `${p.id}__${variationId}`;
-    const priceUSD = (typeof vPrice === 'number' && vPrice > 0) ? vPrice : (p.priceUSD || 0);
+    // Coerce, don't type-test. variations/color_variations are JSONB, so a
+    // website-written priceUSD can be the string "25" — which fails
+    // `typeof === 'number'` and silently fell back to the BASE product price, so
+    // the picker showed $10 for a $25 variant and the sale rang at $10.
+    const vPriceNum = Number(vPrice);
+    const priceUSD = Number.isFinite(vPriceNum) && vPriceNum > 0 ? vPriceNum : (Number(p.priceUSD) || 0);
     setCart((prev) => {
       const line = prev[key];
       return { ...prev, [key]: {
@@ -944,8 +952,11 @@ const AdminCreateOrderScreen: React.FC = () => {
               customLabel={t('admin.inStore.custom', { defaultValue: 'custom' })}
               oversellLabel={(() => {
                 // Variation lines check their own SKU stock; simple products check stock_qty.
-                const stk = l.variation ? l.variation.stockQuantity : (hasVariations(l.product) ? null : l.product.stockQty);
-                return typeof stk === 'number' && l.quantity > stk
+                const rawStk = l.variation ? l.variation.stockQuantity : (hasVariations(l.product) ? null : l.product.stockQty);
+                // Coerced for the same reason: `typeof "5" === 'number'` is false, which
+                // suppressed the oversell warning entirely on string-stock rows.
+                const stk = rawStk === null || rawStk === undefined ? null : (Number(rawStk) || 0);
+                return stk !== null && l.quantity > stk
                   ? t('admin.inStore.onlyInStock', { n: stk, defaultValue: `Only ${stk} in stock` })
                   : '';
               })()}

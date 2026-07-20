@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -111,9 +111,23 @@ export default function AdminPartnerDashboardScreen() {
   const netEarned = Math.max(0, realizedProfit - ledgerOut); // sales profit kept after payouts, floored at 0
                                                              // (never show a "negative earnings" figure)
 
+  // Generation token for loads. The 10s poll's load(true) issues its ledger read
+  // AFTER two earlier round trips, so there is a ~0.3-0.5s window in which a
+  // just-saved money entry can be overwritten by the poll's older, pre-write list:
+  // the payout visibly disappears and "You paid out" drops back. Nothing dedupes
+  // ledger rows (the id is Date.now()_random), so the owner re-enters it and the
+  // ledger permanently double-counts — corrupting netEarned and the payout cap.
+  const loadRunIdRef = useRef(0);
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
+
   const reloadLedger = async () => {
     const ownerTenant = (products[0] as any)?.tenantId || OWNER_STORE_TENANT_ID;
-    if (ownerTenant && viewUid) setLedger(await createTenantAdminService(ownerTenant).getPartnerLedger(viewUid));
+    if (!ownerTenant || !viewUid) return;
+    // Bump first: a write must always supersede any read already in flight.
+    const run = ++loadRunIdRef.current;
+    const fresh = await createTenantAdminService(ownerTenant).getPartnerLedger(viewUid);
+    if (mountedRef.current && run === loadRunIdRef.current) setLedger(fresh);
   };
 
   const handleAddMoney = async () => {
@@ -252,9 +266,12 @@ export default function AdminPartnerDashboardScreen() {
   // so the list updates in place (e.g. stock dropping after a sale) without flashing.
   const load = useCallback(async (silent = false) => {
     if (!viewUid) return;
+    const run = ++loadRunIdRef.current;
+    const fresh = () => mountedRef.current && run === loadRunIdRef.current;
     try {
       if (!silent) setLoading(true);
       const assigned = await getAssignedProducts(viewUid);
+      if (!fresh()) return;
       setProducts(assigned as Product[]);
       // Earned profit + units-sold per product, from delivered orders. Recomputed on EVERY
       // load (incl. the live poll) so stock and sold always move together — keeping Total
@@ -293,20 +310,25 @@ export default function AdminPartnerDashboardScreen() {
                 }
               }
             }
+            if (!fresh()) return;
             setRealizedProfit(earned);
             setSoldById(sold);
           } else {
+            if (!fresh()) return;
             setRealizedProfit(0);
             setSoldById(new Map());
           }
           // Money ledger (deposits in / payouts out / returned items) — loads regardless of product count.
-          try { setLedger(await svc.getPartnerLedger(viewUid as string)); } catch { /* ignore */ }
+          try {
+            const rows = await svc.getPartnerLedger(viewUid as string);
+            if (fresh()) setLedger(rows);
+          } catch { /* ignore */ }
         }
       } catch { /* no order-read access (e.g. partner's own view) → leave as-is */ }
     } catch (error) {
       console.error('Failed to load assigned products:', error);
     } finally {
-      if (!silent) setLoading(false);
+      if (!silent && fresh()) setLoading(false);
     }
   }, [viewUid]);
 
