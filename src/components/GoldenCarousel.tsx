@@ -22,16 +22,17 @@
  * Architecture:
  * - Horizontal FlatList with pagingEnabled (single scroll owner)
  * - Media tabs at bottom of carousel (absolute positioned)
- * - Auto-advance every 3s using Animated.timing
- * - Manual swipe resets progress via onViewableItemsChanged
+ * - NO auto-advance. This is a product gallery, not a promo banner: the customer is
+ *   studying the back of a phone, and sliding it away after 3s is hostile. Navigation
+ *   is entirely user-driven via swipe or the thumbnail strip.
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   FlatList,
+  I18nManager,
   TouchableOpacity,
-  Animated,
   Dimensions,
   StyleSheet,
   ViewToken,
@@ -44,7 +45,6 @@ import { useTheme } from '../components/ThemeProvider';
 import { useTranslation } from 'react-i18next';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const AUTO_ADVANCE_DURATION = 3000; // 3 seconds per image
 
 interface GoldenCarouselProps {
   images: string[];
@@ -64,7 +64,6 @@ const GoldenCarousel: React.FC<GoldenCarouselProps> = ({
   const [activeIndex, setActiveIndex] = useState(0);
   const [mediaTab, setMediaTab] = useState<'images' | 'video'>('images');
   const activeIndexRef = useRef(0);
-  const progress = useRef(new Animated.Value(0)).current;
   const flatListRef = useRef<FlatList>(null);
   const videoPlayerSource = videoUrl || '';
   const videoPlayer = useVideoPlayer(videoPlayerSource, (p) => {
@@ -96,32 +95,15 @@ const GoldenCarousel: React.FC<GoldenCarouselProps> = ({
       animated: true,
     });
     
-    // Start progress for next image
-    progress.setValue(0);
-    Animated.timing(progress, {
-      toValue: 1,
-      duration: AUTO_ADVANCE_DURATION,
-      useNativeDriver: false,
-    }).start(({ finished }) => {
-      if (finished && !isUserInteracting.current) {
-        goToNext();
-      }
-    });
-  }, [images.length, onIndexChange, progress]);
+  }, [images.length, onIndexChange]);
 
-  // Start progress animation
-  const startProgress = useCallback(() => {
-    progress.setValue(0);
-    Animated.timing(progress, {
-      toValue: 1,
-      duration: AUTO_ADVANCE_DURATION,
-      useNativeDriver: false,
-    }).start(({ finished }) => {
-      if (finished && !isUserInteracting.current) {
-        goToNext();
-      }
-    });
-  }, [progress, goToNext]);
+  // Jump straight to an image from the thumbnail strip.
+  const goToIndex = useCallback((index: number) => {
+    activeIndexRef.current = index;
+    setActiveIndex(index);
+    onIndexChange?.(index);
+    flatListRef.current?.scrollToIndex({ index, animated: true });
+  }, [onIndexChange]);
 
   // Handle viewable items changed
   const onViewableItemsChanged = useCallback(
@@ -132,47 +114,29 @@ const GoldenCarousel: React.FC<GoldenCarouselProps> = ({
           activeIndexRef.current = newIndex;
           setActiveIndex(newIndex);
           onIndexChange?.(newIndex);
-          progress.stopAnimation();
-          startProgress();
         }
       }
     },
-    [onIndexChange, progress, startProgress]
+    [onIndexChange]
   );
 
   const viewableItemsChangedRef = useRef(onViewableItemsChanged);
   viewableItemsChangedRef.current = onViewableItemsChanged;
-
-  // Start auto-advance on mount (only for images mode)
-  useEffect(() => {
-    if (images.length <= 1 || mediaTab !== 'images') return;
-    
-    startProgress();
-    
-    return () => {
-      progress.stopAnimation();
-    };
-  }, [images.length, mediaTab]);
 
   // Handle tab change - play/pause video
   useEffect(() => {
     if (!videoPlayer) return;
     if (mediaTab === 'video' && hasVideo) {
       videoPlayer.play();
-      progress.stopAnimation();
     } else {
       videoPlayer.pause();
-      if (images.length > 1) {
-        startProgress();
-      }
     }
   }, [mediaTab, hasVideo]);
 
   // Handle scroll begin
   const onScrollBeginDrag = useCallback(() => {
     isUserInteracting.current = true;
-    progress.stopAnimation();
-  }, [progress]);
+  }, []);
 
   // Handle scroll end
   const onScrollEndDrag = useCallback(() => {
@@ -207,12 +171,6 @@ const GoldenCarousel: React.FC<GoldenCarouselProps> = ({
       <Ionicons name="image-outline" size={64} color={theme.colors.textSecondary} />
     </View>
   );
-
-  // Progress bar width
-  const progressWidth = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0%', '100%'],
-  });
 
   // Edge case: 0 images and no video
   if (images.length === 0 && !hasVideo) {
@@ -272,36 +230,56 @@ const GoldenCarousel: React.FC<GoldenCarouselProps> = ({
 
       {/* Bottom Overlay - Progress bars + Media Tabs (Alibaba style) */}
       <View style={styles.bottomOverlay} pointerEvents="box-none">
-        {/* Progress Bar Row - Only for images */}
+        {/* Thumbnail strip.
+            Replaces the auto-advance progress bar, which represented nothing once the
+            gallery stopped moving on its own. A counter tells you there are three
+            images somewhere; this shows you what they are, which one you are on, and
+            lets you jump straight to the shot you want — and it makes the colour ->
+            image link legible, since picking a colour reorders this strip. */}
         {mediaTab === 'images' && images.length > 1 && (
-          <View style={styles.progressBarRow} pointerEvents="none">
-            {images.map((_, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.progressSegment,
-                  { backgroundColor: 'rgba(0,0,0,0.15)' },
-                ]}
-              >
-                {index < activeIndex && (
-                  <View
-                    style={[
-                      styles.progressFill,
-                      { backgroundColor: 'rgba(0,0,0,0.5)', width: '100%' },
-                    ]}
+          <FlatList
+            data={images}
+            horizontal
+            keyExtractor={(uri, index) => `${uri}-${index}`}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.thumbStrip}
+            // The strip mirrors in RTL along with the pager it controls.
+            inverted={I18nManager.isRTL}
+            renderItem={({ item, index }) => {
+              const active = index === activeIndex;
+              return (
+                <TouchableOpacity
+                  onPress={() => goToIndex(index)}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  accessibilityLabel={t('product.imageNOfM', {
+                    current: index + 1,
+                    total: images.length,
+                    defaultValue: `Image ${index + 1} of ${images.length}`,
+                  })}
+                  style={[
+                    styles.thumb,
+                    {
+                      borderColor: active ? theme.colors.primary : 'rgba(255,255,255,0.55)',
+                      borderWidth: active ? 2 : 1,
+                      // Inactive thumbs recede rather than disappear — still legible
+                      // enough to preview, clearly secondary to the active one.
+                      opacity: active ? 1 : 0.6,
+                    },
+                  ]}
+                >
+                  <Image
+                    source={{ uri: item }}
+                    style={styles.thumbImage}
+                    contentFit="cover"
+                    transition={0}
+                    cachePolicy="memory-disk"
                   />
-                )}
-                {index === activeIndex && (
-                  <Animated.View
-                    style={[
-                      styles.progressFill,
-                      { backgroundColor: 'rgba(0,0,0,0.5)', width: progressWidth },
-                    ]}
-                  />
-                )}
-              </View>
-            ))}
-          </View>
+                </TouchableOpacity>
+              );
+            }}
+          />
         )}
 
         {/* Media Type Tabs - Alibaba style at bottom */}
@@ -396,21 +374,22 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
-  progressBarRow: {
-    flexDirection: 'row',
-    gap: 4,
-    marginBottom: 8,
+  thumbStrip: {
+    gap: 8,
     paddingHorizontal: 16,
+    paddingBottom: 8,
   },
-  progressFill: {
-    borderRadius: 1.5,
-    height: '100%',
-  },
-  progressSegment: {
-    borderRadius: 2,
-    flex: 1,
-    height: 4,
+  thumb: {
+    width: 48,
+    height: 48,
+    borderRadius: 10,
     overflow: 'hidden',
+    // Backs the thumb so a light product shot still reads against a light photo.
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  thumbImage: {
+    width: '100%',
+    height: '100%',
   },
   tab: {
     paddingHorizontal: 16,

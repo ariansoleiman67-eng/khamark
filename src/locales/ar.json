@@ -254,7 +254,8 @@
     "unitsLeft_two": "قطعتان متبقيتان",
     "unitsLeft_few": "{{count}} قطع متبقية",
     "unitsLeft_many": "{{count}} قطعة متبقية",
-    "unitsLeft_other": "{{count}} متبقية"
+    "unitsLeft_other": "{{count}} متبقية",
+    "imageNOfM": "صورة {{current}} من {{total}}"
   },
   "auth": {
     "accountBlocked": "الحساب محظور",

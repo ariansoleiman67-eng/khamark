@@ -246,7 +246,8 @@
     "colorCount_one": "{{count}} color",
     "colorCount_other": "{{count}} colors",
     "unitsLeft_one": "{{count}} left",
-    "unitsLeft_other": "{{count}} left"
+    "unitsLeft_other": "{{count}} left",
+    "imageNOfM": "Image {{current}} of {{total}}"
   },
   "auth": {
     "accountBlocked": "Account Blocked",

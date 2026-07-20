@@ -555,7 +555,8 @@
     "colorCount_one": "{{count}} ڕەنگ",
     "colorCount_other": "{{count}} ڕەنگ",
     "unitsLeft_one": "{{count}} ماوە",
-    "unitsLeft_other": "{{count}} ماوە"
+    "unitsLeft_other": "{{count}} ماوە",
+    "imageNOfM": "وێنەی {{current}} لە {{total}}"
   },
   "cart": {
     "title": "سەبەتەی کڕین",
