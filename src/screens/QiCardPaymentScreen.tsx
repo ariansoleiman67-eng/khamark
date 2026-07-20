@@ -205,8 +205,13 @@ const QiCardPaymentScreen: React.FC = () => {
     (navState: WebViewNavigation) => {
       const { url } = navState;
 
-      // Intercept the finishPaymentUrl redirect
-      if (url && (url.startsWith('asankary://payment-complete') || url.includes('payment-complete'))) {
+      // Match the redirect target exactly. The previous unanchored
+      // `url.includes('payment-complete')` would also fire on any intermediate 3DS
+      // hop that merely CONTAINS that string — e.g. carrying it as a return_url query
+      // parameter — which unmounts the WebView mid-authentication (isProcessingResult
+      // short-circuits the render), so the payment can never complete and the poll
+      // spins to a "couldn't confirm" timeout.
+      if (url && url.startsWith('asankary://payment-complete')) {
         handlePaymentComplete();
       }
     },
@@ -216,7 +221,8 @@ const QiCardPaymentScreen: React.FC = () => {
   // Also intercept via onShouldStartLoadWithRequest for immediate interception
   const handleShouldStartLoad = useCallback(
     (request: { url: string }) => {
-      if (request.url.startsWith('asankary://') || request.url.includes('payment-complete')) {
+      // Exact redirect target only — see the note in handleNavigationStateChange.
+      if (request.url.startsWith('asankary://payment-complete')) {
         handlePaymentComplete();
         return false; // Prevent WebView from loading this URL
       }
@@ -236,6 +242,21 @@ const QiCardPaymentScreen: React.FC = () => {
           text: t('common.yes', { defaultValue: 'Yes' }),
           style: 'destructive',
           onPress: async () => {
+            // Alert is a native dialog: it is not part of the React tree and is NOT
+            // dismissed when the payment settles behind it. The WebView keeps running
+            // underneath, so QiCard can redirect to asankary://payment-complete, the
+            // status poll can return SUCCESS, and the cart can be cleared — all while
+            // this confirmation is still on screen. Tapping "Yes" then cancelled an
+            // order that had already been charged: the customer's card is debited,
+            // payment_status is 'paid', the order flips to cancelled_by_user, the cart
+            // is gone, and they never reach OrderConfirmation. cancel_my_order permits
+            // 'confirmed', so nothing downstream stops it.
+            //
+            // Claim the ref as well as checking it, so a redirect arriving during this
+            // handler cannot race the cancellation from the other side.
+            if (paymentCompletedRef.current) return;
+            paymentCompletedRef.current = true;
+
             // Cancel the orphaned awaiting_payment order (best-effort; a real
             // late payment is still reconciled by the re-verifying webhook).
             try { await OrderService.cancelOrder(orderId); } catch { /* ignore */ }
