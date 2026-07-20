@@ -145,6 +145,8 @@ export const ProductDetailsScreen: React.FC = () => {
 
   // State
   const [product, setProduct] = useState<Product | null>(null);
+  // Monotonic id for product loads — see the effect that calls loadProductData.
+  const loadReqIdRef = useRef(0);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [addingToCart, setAddingToCart] = useState(false);
@@ -208,9 +210,21 @@ export const ProductDetailsScreen: React.FC = () => {
     return categoryName;
   }, [t, i18n.language]);
 
-  // Load product data
+  // Load product data.
+  //
+  // productId genuinely changes on a MOUNTED instance: ProductDetails is registered
+  // as a top-level linking route (product/:productId) and React Navigation v7 reuses
+  // the focused route and replaces its params when navigating to the same route
+  // name, so opening a shared product link while this screen is up swaps the id in
+  // place. The effect then refires and can resolve out of order — a cached hit for
+  // the new id can land before a cold round trip for the old one, leaving the
+  // previous product's name, price, stock and images rendered under the new id.
+  // Hence a monotonic request id rather than a boolean.
   useEffect(() => {
-    loadProductData();
+    const requestId = ++loadReqIdRef.current;
+    loadProductData(requestId);
+    // Invalidate anything still in flight when the id changes or we unmount.
+    return () => { loadReqIdRef.current++; };
   }, [productId]);
 
   // GOLDEN TEMPLATE: Reset options when product changes
@@ -538,7 +552,9 @@ export const ProductDetailsScreen: React.FC = () => {
     );
   };
 
-  const loadProductData = async () => {
+  const loadProductData = async (requestId: number) => {
+    const isLatest = () => requestId === loadReqIdRef.current;
+
     // Guard against a missing/empty productId (e.g. a malformed deep link or a
     // navigate('ProductDetails') without params). Fall through to the "not found"
     // branch instead of fetching with an undefined id.
@@ -552,8 +568,13 @@ export const ProductDetailsScreen: React.FC = () => {
 
       // Fetch product directly by ID from the `parts` table (mapped snake_case→camelCase).
       const product = await ProductService.getProduct(productId);
+      if (!isLatest()) return;
 
       if (!product) {
+        // getProduct returns null (it does not throw) for a deleted row. Without the
+        // guard above, opening a product that the seller has since deleted and then
+        // navigating back popped a context-free "Product not found" alert over
+        // whatever screen the user had returned to.
         Alert.alert(t('errors.error'), t('errors.productNotFound'));
         if (navigation.canGoBack()) {
             navigation.goBack();
@@ -583,10 +604,13 @@ export const ProductDetailsScreen: React.FC = () => {
         setStoreInfo(null);
       }
 
-      // Fetch related products in background (same category)
+      // Fetch related products in background (same category). Note this is still in
+      // flight after setLoading(false) above by design, so it stays pending for the
+      // whole interactive window — all the more reason to re-check before writing.
       try {
         if (product.category) {
           const relatedAll = await ProductService.getProductsByCategory(product.category);
+          if (!isLatest()) return;
           const related = relatedAll
             .filter((p) => p.id !== productId)
             .slice(0, 10)
@@ -599,9 +623,11 @@ export const ProductDetailsScreen: React.FC = () => {
           setRelatedProducts([]);
         }
       } catch (e) {
+        if (!isLatest()) return;
         setRelatedProducts([]);
       }
       } catch (error: any) {
+        if (!isLatest()) return;
         console.error('Error loading product:', error);
         Alert.alert(t('errors.error'), t('errors.failedToLoadProduct') + ': ' + error.message);
         setLoading(false); // Ensure loading is disabled on error
@@ -701,7 +727,19 @@ export const ProductDetailsScreen: React.FC = () => {
 
 
   const updateQuantity = (delta: number) => {
-    const newQuantity = Math.max(1, Math.min(quantity + delta, product?.stockQty || 1));
+    // Must clamp against the SAME ceiling the +/- buttons and the text input gate on
+    // (effective stock = main + size + colour), not product.stockQty alone. They
+    // diverge for a product that has storageOptions AND colourVariations: the has*
+    // flags are suppressed by hasStorageOptions so the plain stepper renders, while
+    // stockQty is 0 for variation products. The + button then looked enabled
+    // (1 >= 15 is false) but clamped to `0 || 1` = 1, so quantity was frozen at 1
+    // while typing into the adjacent box worked — the two controls contradicted each
+    // other and the customer could not buy more than one.
+    const sizeStockNow = product?.variations?.reduce((sum, v) => sum + (Number(v?.stockQuantity) || 0), 0) || 0;
+    const colorStockNow = product?.colorVariations?.reduce((sum, v) => sum + (Number(v?.stockQuantity) || 0), 0) || 0;
+    const maxStockNow = ((Number(product?.stockQty) || 0) + sizeStockNow + colorStockNow) || 1;
+
+    const newQuantity = Math.max(1, Math.min(quantity + delta, maxStockNow));
     setQuantity(newQuantity);
     setQtyText(String(newQuantity));
   };

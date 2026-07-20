@@ -86,10 +86,16 @@ const PRODUCT_COLOR_OPTIONS = [
 type ProductColor = typeof PRODUCT_COLOR_OPTIONS[number]['key'];
 
 // Calculate effective stock for stats (Main + Size + Color)
+// Number()-coerce every term: variations/colorVariations are JSONB, so a row written
+// by the website can carry stockQuantity as a string. Without coercion `sum + "5"`
+// concatenates — one such variation turns the total into "050", which makes the
+// low-stock test ("050" <= 5) never fire, inflates the inventory valuations tenfold,
+// and worst, feeds the historical-stock auto-calc that PERSISTS the bad value back.
+// tenantAdminService already coerces for exactly this reason.
 const getEffectiveStock = (p: Product) => {
-  const mainStock = p.stockQty || 0;
-  const sizeStock = p.variations?.reduce((sum, v) => sum + (v.stockQuantity || 0), 0) || 0;
-  const colorStock = p.colorVariations?.reduce((sum, v) => sum + (v.stockQuantity || 0), 0) || 0;
+  const mainStock = Number(p.stockQty) || 0;
+  const sizeStock = p.variations?.reduce((sum, v) => sum + (Number(v?.stockQuantity) || 0), 0) || 0;
+  const colorStock = p.colorVariations?.reduce((sum, v) => sum + (Number(v?.stockQuantity) || 0), 0) || 0;
   return mainStock + sizeStock + colorStock;
 };
 
@@ -297,7 +303,19 @@ const AdminProductsScreen: React.FC = () => {
     setRefreshing(false);
   };
 
+  // Identifies the edit session a given async continuation was started in. Media
+  // uploads and the bulk save take many seconds, the modal's close button is not
+  // disabled while they run, and resetForm/openEditModal do not clear the uploading
+  // flags — so without this token an upload started on product X resolves after the
+  // admin has opened product Y and commits X's image or video into Y's form, which
+  // the next Save then persists onto Y.
+  const editSessionRef = useRef(0);
+  const isSameEditSession = (session: number) => editSessionRef.current === session;
+
   const resetForm = () => {
+    editSessionRef.current++;
+    setUploadingImage(false);
+    setUploadingVideo(false);
     setFormData({
       name: '', nameAr: '', nameKu: '', partNumber: '', category: '',
       priceUSD: '', purchasePrice: '', stockQty: '', historicalStockQty: '', initialStock: '', shippingCost: '', description: '', brand: '', status: 'available',
@@ -469,6 +487,10 @@ const AdminProductsScreen: React.FC = () => {
   }, []);
 
   const handleSave = async (force = false) => {
+    // Edit session this save belongs to; the tail of this function must not act on
+    // a form the admin has since replaced.
+    const session = editSessionRef.current;
+
     // Sanitize price strings (e.g. strip $). Defined here so the validation
     // below can use it too — it was previously declared inside the try block,
     // which made the `status === 'available'` price check throw a ReferenceError
@@ -651,8 +673,14 @@ const AdminProductsScreen: React.FC = () => {
         }
       }
 
-      setModalVisible(false);
-      resetForm();
+      // The apply-to-all loop above updates the whole catalogue one row at a time,
+      // which takes tens of seconds. If the admin closed the modal and started
+      // editing a different product meanwhile, closing and resetting here would slam
+      // that product's modal shut and wipe what they had typed.
+      if (isSameEditSession(session)) {
+        setModalVisible(false);
+        resetForm();
+      }
       await loadProducts();
     } catch (error) {
       Alert.alert(t('admin.common.error'), t('admin.products.saveFailed'));
@@ -667,11 +695,18 @@ const AdminProductsScreen: React.FC = () => {
       return;
     }
 
+    const session = editSessionRef.current;
+
     try {
       setUploadingImage(true);
       const imageUri = await ImageService.showImagePicker();
+      if (!isSameEditSession(session)) return;
       if (imageUri) {
         const result = await ImageService.uploadImage(imageUri);
+        // The admin may have closed this product and opened another while the
+        // upload ran; appending here would put this image in the other product's
+        // gallery.
+        if (!isSameEditSession(session)) return;
         if (result.success && result.url) {
           setImageUrls(prev => [...prev, result.url as string]);
         } else {
@@ -679,9 +714,10 @@ const AdminProductsScreen: React.FC = () => {
         }
       }
     } catch (error) {
+      if (!isSameEditSession(session)) return;
       Alert.alert(t('admin.common.error'), t('admin.products.failedToAddImage'));
     } finally {
-      setUploadingImage(false);
+      if (isSameEditSession(session)) setUploadingImage(false);
     }
   };
 
@@ -729,12 +765,15 @@ const AdminProductsScreen: React.FC = () => {
   };
 
   const pickAndUploadVideo = async () => {
+    const session = editSessionRef.current;
+
     try {
       setUploadingVideo(true);
       setVideoUploadProgress(0);
 
       // Pick video
       const video = await VideoService.pickVideoFromGallery();
+      if (!isSameEditSession(session)) return;
       if (!video) {
         setUploadingVideo(false);
         return;
@@ -742,6 +781,7 @@ const AdminProductsScreen: React.FC = () => {
 
       // Validate size on client
       const validation = await VideoService.validateVideo(video.uri);
+      if (!isSameEditSession(session)) return;
       if (!validation.valid) {
         Alert.alert(t('admin.common.error'), validation.error || t('admin.products.form.videoValidationFailed', { defaultValue: 'Video validation failed' }));
         setUploadingVideo(false);
@@ -764,20 +804,29 @@ const AdminProductsScreen: React.FC = () => {
       }
 
       // For EXISTING products: upload immediately AND save to Firestore
+      // Captured so the DB write below targets the product this upload was started
+      // for, even if the admin has since opened a different one.
+      const uploadTargetId = editingProduct.id;
       const result = await VideoService.uploadProductVideo(
         video.uri,
-        editingProduct.id,
-        (progress) => setVideoUploadProgress(progress)
+        uploadTargetId,
+        (progress) => { if (isSameEditSession(session)) setVideoUploadProgress(progress); }
       );
 
       if (result.success && result.videoUrl) {
-        setVideoUrl(result.videoUrl);
-        setVideoUri(null);
-        
+        // The DB write is still correct for uploadTargetId and must happen either
+        // way, but the local form state belongs to whichever product is open now —
+        // committing it blindly would attach this video to that other product and
+        // the next Save would persist it there.
+        if (isSameEditSession(session)) {
+          setVideoUrl(result.videoUrl);
+          setVideoUri(null);
+        }
+
         // AUTO-SAVE: Immediately persist videoUrl to Firestore so it's not lost
         try {
           const service = createTenantAdminService(tenantId!);
-          await service.updateProduct(editingProduct.id, { videoUrl: result.videoUrl });
+          await service.updateProduct(uploadTargetId, { videoUrl: result.videoUrl });
           Alert.alert(t('admin.common.success'), t('admin.products.form.videoUploadedSaved', { defaultValue: 'Video uploaded and saved!' }));
         } catch (saveError) {
           console.error('Failed to save video URL:', saveError);
@@ -785,14 +834,16 @@ const AdminProductsScreen: React.FC = () => {
         }
       } else {
         Alert.alert(t('admin.common.error'), result.error || t('admin.products.form.videoUploadFailed', { defaultValue: 'Video upload failed' }));
-        setVideoUri(null);
+        if (isSameEditSession(session)) setVideoUri(null);
       }
     } catch (error) {
       Alert.alert(t('admin.common.error'), t('admin.products.form.videoUploadFailed', { defaultValue: 'Failed to upload video' }));
-      setVideoUri(null);
+      if (isSameEditSession(session)) setVideoUri(null);
     } finally {
-      setUploadingVideo(false);
-      setVideoUploadProgress(0);
+      if (isSameEditSession(session)) {
+        setUploadingVideo(false);
+        setVideoUploadProgress(0);
+      }
     }
   };
 
@@ -895,15 +946,30 @@ const AdminProductsScreen: React.FC = () => {
 
   // Per-card actions menu — replaces the one-tap trash so a stray scroll-tap can't delete.
   const openProductActions = useCallback((product: Product) => {
+    // Android renders at most three buttons: RN's Alert does buttons.slice(0, 3),
+    // so a fourth "Cancel" was silently dropped — and Android defaults to
+    // cancelable: false, which blocks the BACK key and outside taps too. The menu
+    // therefore appeared on Android as Edit / Duplicate / Delete with no way out,
+    // forcing the admin to pick one of three actions with the destructive one
+    // promoted to the primary slot.
+    //
+    // Android gets three buttons plus dismissability; iOS keeps an explicit Cancel,
+    // because an iOS alert cannot be dismissed by tapping outside — dropping the
+    // button there would strand the user instead.
+    const buttons: Parameters<typeof Alert.alert>[2] = [
+      { text: t('admin.products.form.edit', { defaultValue: 'Edit' }), onPress: () => openEditModal(product) },
+      { text: t('admin.products.duplicate', { defaultValue: 'Duplicate' }), onPress: () => handleDuplicate(product) },
+      { text: t('admin.common.delete'), style: 'destructive', onPress: () => handleDelete(product) },
+    ];
+    if (Platform.OS === 'ios') {
+      buttons!.push({ text: t('admin.common.cancel'), style: 'cancel' });
+    }
+
     Alert.alert(
       product.name || t('admin.products.title', { defaultValue: 'Product' }),
       undefined,
-      [
-        { text: t('admin.products.form.edit', { defaultValue: 'Edit' }), onPress: () => openEditModal(product) },
-        { text: t('admin.products.duplicate', { defaultValue: 'Duplicate' }), onPress: () => handleDuplicate(product) },
-        { text: t('admin.common.delete'), style: 'destructive', onPress: () => handleDelete(product) },
-        { text: t('admin.common.cancel'), style: 'cancel' },
-      ]
+      buttons,
+      { cancelable: true, onDismiss: () => {} }
     );
   }, [t, openEditModal, handleDuplicate, handleDelete]);
 
@@ -1727,7 +1793,12 @@ const AdminProductsScreen: React.FC = () => {
         visible={modalVisible}
         transparent={false}
         animationType="none"
-        onRequestClose={() => setModalVisible(false)}
+        onRequestClose={() => {
+          // Android hardware back — same guard as the close button.
+          if (saving || uploadingImage || uploadingVideo) return;
+          setModalVisible(false);
+          resetForm();
+        }}
       >
         <View style={[styles.modalContainer, { backgroundColor: pageBg, paddingTop: insets.top }]}>
           {/* Luxury Modal Header */}
@@ -1744,7 +1815,15 @@ const AdminProductsScreen: React.FC = () => {
               {editingProduct ? t('admin.products.editProduct') : t('admin.products.addProduct')}
             </Text>
             <TouchableOpacity
-              onPress={() => { setModalVisible(false); resetForm(); }}
+              // Blocked while work is in flight: closing mid-save/mid-upload is what
+              // let a completion land on the next product the admin opened.
+              onPress={() => {
+                if (saving || uploadingImage || uploadingVideo) return;
+                setModalVisible(false);
+                resetForm();
+              }}
+              disabled={saving || uploadingImage || uploadingVideo}
+              accessibilityState={{ disabled: saving || uploadingImage || uploadingVideo }}
               activeOpacity={0.7}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               style={{
@@ -2596,9 +2675,18 @@ const AdminProductsScreen: React.FC = () => {
                           <Text allowFontScaling={false} style={{ color: theme.colors.text, fontSize: 14, flex: 1 }}>
                             {rate.city}
                           </Text>
-                          <Text allowFontScaling={false} style={{ color: rate.price === 0 ? theme.colors.success : theme.colors.primary, fontSize: 14, fontWeight: '600', marginRight: SPACING.sm }}>
-                            {rate.price === 0 ? t('admin.products.form.free', { defaultValue: 'Free' }) : `$${rate.price.toFixed(2)}`}
-                          </Text>
+                          {/* shipping_rates is JSONB and passes through mapProduct raw, so
+                              price is whatever the writer stored. A string "5" fails
+                              === 0, reaches .toFixed and throws, taking down the whole
+                              edit-modal render. Coerce once. */}
+                          {(() => {
+                            const ratePrice = Number(rate.price) || 0;
+                            return (
+                              <Text allowFontScaling={false} style={{ color: ratePrice === 0 ? theme.colors.success : theme.colors.primary, fontSize: 14, fontWeight: '600', marginRight: SPACING.sm }}>
+                                {ratePrice === 0 ? t('admin.products.form.free', { defaultValue: 'Free' }) : `$${ratePrice.toFixed(2)}`}
+                              </Text>
+                            );
+                          })()}
                           <TouchableOpacity
                             onPress={() => {
                               setShippingRates(shippingRates.filter((_, i) => i !== index));
