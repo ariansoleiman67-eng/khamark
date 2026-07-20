@@ -248,7 +248,13 @@
     "colorCount_two": "لونان",
     "colorCount_few": "{{count}} ألوان",
     "colorCount_many": "{{count}} لوناً",
-    "colorCount_other": "{{count}} لون"
+    "colorCount_other": "{{count}} لون",
+    "unitsLeft_zero": "نفدت الكمية",
+    "unitsLeft_one": "قطعة واحدة متبقية",
+    "unitsLeft_two": "قطعتان متبقيتان",
+    "unitsLeft_few": "{{count}} قطع متبقية",
+    "unitsLeft_many": "{{count}} قطعة متبقية",
+    "unitsLeft_other": "{{count}} متبقية"
   },
   "auth": {
     "accountBlocked": "الحساب محظور",

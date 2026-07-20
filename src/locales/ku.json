@@ -553,7 +553,9 @@
     "vipPrice": "نرخی VIP",
     "storage": "بیرگە",
     "colorCount_one": "{{count}} ڕەنگ",
-    "colorCount_other": "{{count}} ڕەنگ"
+    "colorCount_other": "{{count}} ڕەنگ",
+    "unitsLeft_one": "{{count}} ماوە",
+    "unitsLeft_other": "{{count}} ماوە"
   },
   "cart": {
     "title": "سەبەتەی کڕین",

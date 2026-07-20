@@ -50,6 +50,16 @@ import StartOrderBottomSheet from '../components/StartOrderBottomSheet';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+// Matches the low-stock cue used on the product cards, so "only a few left" means
+// the same thing everywhere in the app.
+const LOW_STOCK_THRESHOLD = 5;
+
+// How far the white info sheet is pulled up over the bottom of the hero image. Any
+// control anchored to the image bottom has to clear this, so both the sheet and the
+// cart FAB derive from it rather than each hard-coding a number that can drift apart —
+// which is exactly how the FAB ended up with its lower edge sliced off by the sheet.
+const SHEET_OVERLAP = 28;
+
 // Alibaba-style bottom bar is shorter than the old CTA.
 // Keep this close to the real bar height (excluding safe-area inset).
 const CTA_BAR_HEIGHT = 80;
@@ -1020,9 +1030,27 @@ export const ProductDetailsScreen: React.FC = () => {
   // ======================================================
   // Storage-option (phone-style) products use the simple single-select selector and
   // behave as a normal product for quantity/total — NOT the per-colour wholesale grid.
+  // Which variant UI this product gets. Declared here because the bottom-bar quantity
+  // maths below depends on it.
+  //
+  // The consumer selector (single-select colour swatches + storage chips) used to be
+  // gated on storageOptions existing, so a phone with colours but no storage rows fell
+  // through to the Alibaba per-colour quantity table — a bulk-ordering matrix shown to
+  // someone buying one handset. Storage often lives only in the description text, so
+  // that gate decided the entire purchase UX on a data-entry detail.
+  //
+  // The table exists for genuine bulk buying, so it keys on the actual bulk signal this
+  // schema has: quantity-based price tiers. Everything else gets the consumer flow.
+  const isBulkProduct = (product.priceTiers?.length ?? 0) > 0;
+  const hasColorVariants = !!(product.colorVariations && product.colorVariations.length > 0);
+  const showConsumerColors = hasColorVariants && !isBulkProduct;
+  const showBulkColorTable = isBulkProduct && hasColorVariants;
+
   const hasStorageOptions = !!(product.storageOptions && product.storageOptions.length > 0);
   const hasSizeVariations = !hasStorageOptions && !!(product.variations && product.variations.length > 0);
-  const hasColorVariations = !hasStorageOptions && !!(product.colorVariations && product.colorVariations.length > 0);
+  // NOTE: "does the per-colour quantity grid drive the total", not "does this product
+  // have colours". Retail colour products use the plain quantity stepper instead.
+  const hasColorVariations = !hasStorageOptions && showBulkColorTable;
   const variationTotalQty = hasSizeVariations ? getTotalVariationQuantity() : 0;
   const colorVariationTotalQty = hasColorVariations ? getTotalColorVariationQuantity() : 0;
   const totalSelectedQty = variationTotalQty + colorVariationTotalQty;
@@ -1050,25 +1078,7 @@ export const ProductDetailsScreen: React.FC = () => {
   const storageOptions = product.storageOptions || [];
   const effectiveStorageId = selectedStorageId ?? (storageOptions[0]?.id ?? null);
 
-  // Which variant UI this product gets.
-  //
-  // The consumer selector (single-select colour swatches + storage chips) used to be
-  // gated on storageOptions existing, so a phone with colours but no storage rows fell
-  // through to the Alibaba per-colour quantity table — a bulk-ordering matrix shown to
-  // someone buying one handset. Storage often lives only in the description text, so
-  // that gate decided the entire purchase UX on a data-entry detail.
-  //
-  // The table exists for genuine bulk buying, so it now keys on the actual bulk signal
-  // this schema has: quantity-based price tiers. Everything else gets the consumer flow.
-  const isBulkProduct = (product.priceTiers?.length ?? 0) > 0;
-  const hasColorVariants = !!(product.colorVariations && product.colorVariations.length > 0);
-  // Storage is never bulk-gated: a wholesale product with storage tiers still needs a
-  // storage selector, it just picks colours through the quantity table instead of
-  // swatches. Gating the whole block on !isBulkProduct would have left that
-  // combination with no way to choose storage at all.
-  const showConsumerColors = hasColorVariants && !isBulkProduct;
   const showConsumerVariants = showConsumerColors || storageOptions.length > 0;
-  const showBulkColorTable = isBulkProduct && hasColorVariants;
 
   // Colour defaults to the first in-stock option, mirroring what storage already does
   // via effectiveStorageId. The bulk table made a colourless order impossible (you had
@@ -1460,7 +1470,8 @@ export const ProductDetailsScreen: React.FC = () => {
                   styles.fabButton, 
                   { 
                     position: 'absolute',
-                    bottom: SPACING.md,
+                    // Clear the sheet overlap, then the normal inset on top of it.
+                    bottom: SHEET_OVERLAP + SPACING.md,
                     left: SPACING.md,
                     backgroundColor: inStock && (!product.status || product.status === 'available') ? theme.colors.primary : 'rgba(0,0,0,0.5)', 
                     opacity: !inStock || addingToCart || (product.status && product.status !== 'available') ? 0.6 : 1,
@@ -2095,6 +2106,36 @@ export const ProductDetailsScreen: React.FC = () => {
                         {t('product.color', { defaultValue: 'Color' })}
                         {effectiveColor ? <Text style={{ color: theme.colors.textSecondary, fontWeight: '500' }}>{'  •  ' + effectiveColor}</Text> : null}
                       </Text>
+                      {/* Stock is per-colour, and the table this replaced showed it in a
+                          STOCK column. The generic "In Stock" pill above is product-wide,
+                          so without this the customer cannot tell that the colour they
+                          picked has 3 left while another has 40. */}
+                      {(() => {
+                        const sc = product.colorVariations?.find((c) => c.colorValue === effectiveColor);
+                        const left = Number(sc?.stockQuantity) || 0;
+                        if (!sc) return null;
+                        const low = left > 0 && left <= LOW_STOCK_THRESHOLD;
+                        return (
+                          <Text
+                            allowFontScaling={false}
+                            style={{
+                              marginTop: 4,
+                              fontSize: 13,
+                              fontWeight: '600',
+                              textAlign: isRTL ? 'right' : 'left',
+                              color: left <= 0
+                                ? theme.colors.error
+                                : low
+                                  ? theme.colors.warning
+                                  : theme.colors.success,
+                            }}
+                          >
+                            {left <= 0
+                              ? t('product.outOfStock', { defaultValue: 'Out of stock' })
+                              : t('product.unitsLeft', { count: left, defaultValue: `${left} left` })}
+                          </Text>
+                        );
+                      })()}
                       <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', flexWrap: 'wrap', gap: 12, marginTop: 10, marginBottom: 6 }}>
                         {product.colorVariations.map((cv) => {
                           const sel = effectiveColor === cv.colorValue;
@@ -2105,6 +2146,13 @@ export const ProductDetailsScreen: React.FC = () => {
                               disabled={soldOut}
                               onPress={() => setSelectedColor(sel ? null : cv.colorValue)}
                               activeOpacity={0.8}
+                              accessibilityRole="button"
+                              accessibilityState={{ selected: sel, disabled: soldOut }}
+                              accessibilityLabel={
+                                soldOut
+                                  ? `${cv.colorValue} — ${t('product.outOfStock', { defaultValue: 'Out of stock' })}`
+                                  : `${cv.colorValue} — ${t('product.unitsLeft', { count: Number(cv.stockQuantity) || 0, defaultValue: `${Number(cv.stockQuantity) || 0} left` })}`
+                              }
                               style={{
                                 width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center',
                                 borderWidth: sel ? 2.5 : 1.5,
@@ -3061,11 +3109,11 @@ const styles = StyleSheet.create({
 
   // Product Info
   infoContainer: {
-    marginTop: -28,
+    marginTop: -SHEET_OVERLAP,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: SPACING.lg,
-    paddingTop: 28,
+    paddingTop: SHEET_OVERLAP,
     paddingBottom: SPACING.md,
   },
   headerInfo: {

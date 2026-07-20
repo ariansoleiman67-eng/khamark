@@ -244,7 +244,9 @@
     "vipPrice": "VIP price",
     "storage": "Storage",
     "colorCount_one": "{{count}} color",
-    "colorCount_other": "{{count}} colors"
+    "colorCount_other": "{{count}} colors",
+    "unitsLeft_one": "{{count}} left",
+    "unitsLeft_other": "{{count}} left"
   },
   "auth": {
     "accountBlocked": "Account Blocked",
