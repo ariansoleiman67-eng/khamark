@@ -169,9 +169,18 @@ export const updateOrderStatus = async (
       for (const item of order.items) {
         const { data: productData } = await supabase.from('parts').select('stock_qty').eq('id', item.productId).single();
         if (productData) {
-           const newQty = requiresDeduction 
-             ? Math.max(0, productData.stock_qty - item.quantity)
-             : productData.stock_qty + item.quantity;
+           // Coerce both operands. stock_qty is a typed INTEGER column so it always
+           // arrives as a number, but item.quantity comes out of the orders.items
+           // JSONB blob and is whatever the writer stored. The two arithmetic paths
+           // fail asymmetrically: `10 - "2"` coerces to 8, while `10 + "2"` yields
+           // the string "102" — so restoring stock on a cancelled order would set
+           // the level to 102 instead of 12, silently, on an INTEGER column that
+           // happily accepts the numeric-looking string.
+           const currentQty = Number(productData.stock_qty) || 0;
+           const moveQty = Number(item.quantity) || 0;
+           const newQty = requiresDeduction
+             ? Math.max(0, currentQty - moveQty)
+             : currentQty + moveQty;
            await supabase.from('parts').update({ stock_qty: newQty }).eq('id', item.productId);
         }
       }

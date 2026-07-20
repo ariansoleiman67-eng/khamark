@@ -537,7 +537,18 @@ const SearchScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.filtersContent}>
+        {/* A React Native Modal renders into its own native view hierarchy, so the
+            KeyboardAvoidingView further down this file that wraps renderFiltersModal()
+            has no effect on anything inside here — the modal needs its own. Without
+            it the keyboard covered the min/max price inputs and the Apply button, so
+            the user could neither see what they were typing nor apply the filter.
+            Wraps the scroller and the footer but NOT the header, per GOLDEN_RULES'
+            SafeAreaView -> KeyboardAvoidingView -> ScrollView ordering. */}
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+        <ScrollView style={styles.filtersContent} keyboardShouldPersistTaps="handled">
           {/* Category Filter */}
           <View style={styles.filterSection}>
             <Text allowFontScaling={false} style={[styles.filterSectionTitle, { color: theme.colors.text }]}>{t('search.category')}</Text>
@@ -625,6 +636,7 @@ const SearchScreen: React.FC = () => {
             fullWidth
           />
         </View>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </Modal>
   );

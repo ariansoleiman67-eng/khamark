@@ -122,7 +122,9 @@ const AdminCurrencySettingsScreen = () => {
           <View style={{ width: 24 }} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.content}>
+        {/* Without keyboardShouldPersistTaps the first tap on Save while the
+            exchange-rate input is focused only dismisses the keyboard. */}
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
             <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text }]}>
               {t('admin.currency.exchangeRates')}

@@ -355,7 +355,9 @@ export const ThemeCustomizationScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      {/* Without keyboardShouldPersistTaps the first tap on a colour swatch or Save
+          while the hex input is focused only dismisses the keyboard. */}
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {/* Theme Presets */}
         <Animated.View entering={FadeInUp} style={styles.presetsSection}>
           <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text }]}>

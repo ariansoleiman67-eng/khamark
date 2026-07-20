@@ -234,7 +234,10 @@ const AdminBusinessInfoScreen = () => {
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      {/* Without keyboardShouldPersistTaps the first tap on Save (or any control)
+          while an input is focused is consumed dismissing the keyboard, so the
+          press is swallowed and the admin has to tap twice. */}
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
           <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text }]}>
             {t('admin.businessInfo.generalInfo')}
