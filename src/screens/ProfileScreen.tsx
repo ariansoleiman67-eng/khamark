@@ -76,27 +76,40 @@ export const ProfileScreen: React.FC = () => {
   const isAuthed = !!contextUser;
   const displayUser = user ?? contextUser;
 
+  // Monotonic id for profile loads. This tab is the fall-through branch of the
+  // navigator, so logging out does NOT unmount it and an in-flight load survives the
+  // identity change. getCurrentUserFresh() also reads the session BEFORE the slow
+  // users-row read, so a request started as A returns A's profile even once A's
+  // session is gone. Bumped on every logout/identity change so a late response is
+  // dropped instead of repainting the previous account's cover, avatar and email
+  // under the guest UI — and instead of showing A's order stats to B after a switch.
+  const reqIdRef = useRef(0);
+
   // Sync with AuthContext
   useFocusEffect(
     React.useCallback(() => {
-      if (contextUser) {
-        loadUserData();
+      reqIdRef.current++;
+      if (contextUser?.uid) {
+        loadUserData(contextUser.uid);
       } else {
         setUser(null);
         setOrderStats({ totalOrders: 0, totalSpent: 0, pendingOrders: 0 });
         setLoading(false);
       }
-    }, [contextUser])
+    }, [contextUser?.uid])
   );
 
   useEffect(() => {
     if (!contextUser) {
+      reqIdRef.current++;
       setUser(null);
       setOrderStats({ totalOrders: 0, totalSpent: 0, pendingOrders: 0 });
     }
   }, [contextUser]);
 
-  const loadUserData = async () => {
+  const loadUserData = async (uid: string) => {
+    const req = ++reqIdRef.current;
+    const isStale = () => req !== reqIdRef.current;
     try {
       setLoading(true);
       const [userData, stats, settings] = await Promise.all([
@@ -104,6 +117,9 @@ export const ProfileScreen: React.FC = () => {
         OrderService.getOrderStatistics(),
         NotificationService.getNotificationSettings()
       ]);
+      // Two checks: the request must still be the newest, AND the profile that came
+      // back must belong to the account this load was started for.
+      if (isStale() || (userData && userData.uid !== uid)) return;
       if (userData) {
         setUser(userData);
         setOrderStats(stats);
@@ -115,11 +131,12 @@ export const ProfileScreen: React.FC = () => {
       // here would wrongly flip the screen to the guest UI. Logout is handled by
       // the contextUser effects below.
     } catch (error) {
+      if (isStale()) return;
       // Keep any previously loaded profile on failure. The guest/authed gate reads
       // contextUser (isAuthed), so a failed refresh no longer shows the guest UI.
       console.warn('ProfileScreen: failed to refresh user data', error);
     } finally {
-      setLoading(false);
+      if (!isStale()) setLoading(false);
     }
   };
 

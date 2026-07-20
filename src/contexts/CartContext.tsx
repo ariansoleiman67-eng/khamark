@@ -62,6 +62,34 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   // GUEST LOGIN SYSTEM: Use 'guest' as userId when not authenticated
   const cartUserId = user?.uid || 'guest';
 
+  // Owner of the cart currently published in state.
+  //
+  // CartProvider sits above AppNavigator, so it never unmounts on sign-out — a
+  // write path that resolves after the identity changed would otherwise publish the
+  // previous account's cart into the new session. The window is not a microsecond
+  // race: the Alert callbacks below are native dialogs that outlive the navigator
+  // teardown and wait on a human, so an auth change (admin block, failed token
+  // refresh on resume) can easily land while one is open.
+  const identityRef = useRef(cartUserId);
+  useEffect(() => { identityRef.current = cartUserId; }, [cartUserId]);
+
+  // Commit a cart only if the identity it was fetched/built for is still current.
+  const commitCart = useCallback((next: Cart | null, owner: string) => {
+    if (identityRef.current !== owner) return;
+    setCart(next);
+  }, []);
+
+  // Drop the previous owner's cart during render, before any child can read it.
+  // Doing this in an effect is too late: AuthContext batches setUser(null) and
+  // setIsLoading(false) into one commit, so the guest tab bar mounts and reads
+  // getCartItemCount() showing the previous account's item count for a frame.
+  const [loadedFor, setLoadedFor] = useState(cartUserId);
+  if (loadedFor !== cartUserId) {
+    setLoadedFor(cartUserId);
+    setCart(null);
+    setIsLoading(true);
+  }
+
   // Merge guest cart into user cart when logging in
   const mergeGuestCartToUser = useCallback(async (newUserId: string) => {
     try {
@@ -240,16 +268,18 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     setError(null);
     isAddingRef.current = true;
 
+    const owner = cartUserId;
+
     try {
       const updatedCart = await LocalCartService.addToCart(
-        cartUserId, 
-        productId, 
-        quantity, 
+        owner,
+        productId,
+        quantity,
         product,
         selectedOptions
       );
-      setCart(updatedCart);
-      
+      commitCart(updatedCart, owner);
+
         if (user?.uid) {
         CartService.addToCart(user.uid, productId, quantity, product)
           .catch(() => { /* Silent fail for Firebase sync */ });
@@ -266,7 +296,12 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
               text: t('cart.clearAndAdd', { defaultValue: 'Clear & Add' }), 
               style: 'destructive',
               onPress: async () => {
-                // Wipe the cart and then add this item
+                // This dialog is native and waits on a human, so the signed-in
+                // identity may have changed since it was raised. Re-check before
+                // touching storage — otherwise this wipes and rewrites the previous
+                // account's cart from inside the new session.
+                if (identityRef.current !== owner) return;
+
                 try {
                   isAddingRef.current = true; // Prevent UI flashes
                   if (user?.uid) {
@@ -274,25 +309,20 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
                   } else {
                     await LocalCartService.clearCart('guest');
                   }
-                  
-                  // Clear local state first
-                  setCart({
-                     userId: cartUserId,
-                     items: [],
-                     subtotalUSD: 0,
-                     updatedAt: new Date() as any,
-                  });
-                  
-                  // Now effectively run addToCart again
+
+                  // Deliberately NOT clearing local state here. Publishing an empty
+                  // cart before the re-add means a failing add (e.g. the max-stock
+                  // error) leaves storage wiped and state empty, with the item
+                  // silently gone — setError is not rendered by any consumer.
                   const updatedCart = await LocalCartService.addToCart(
-                    cartUserId, 
-                    productId, 
-                    quantity, 
+                    owner,
+                    productId,
+                    quantity,
                     product,
                     selectedOptions
                   );
-                  setCart(updatedCart);
-                  
+                  commitCart(updatedCart, owner);
+
                   if (user?.uid) {
                     CartService.addToCart(user.uid, productId, quantity, product)
                       .catch(() => { /* Silent fail for Firebase sync */ });
@@ -300,6 +330,19 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
                 } catch (clearErr) {
                    console.error('Error clearing cart & adding new item:', clearErr);
                    setError((clearErr as Error).message || 'Failed to restart cart');
+                   // Storage was already wiped, so reflect that truth in state and
+                   // tell the user — otherwise the cart silently empties.
+                   commitCart({
+                     userId: owner,
+                     items: [],
+                     subtotalUSD: 0,
+                     updatedAt: new Date() as any,
+                   }, owner);
+                   Alert.alert(
+                     t('common.error', { defaultValue: 'Error' }),
+                     (clearErr as Error).message ||
+                       t('cart.restartFailed', { defaultValue: 'Your cart was cleared but the item could not be added. Please try again.' })
+                   );
                 } finally {
                    isAddingRef.current = false;
                 }
@@ -331,13 +374,15 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     setError(null);
     isAddingRef.current = true;
 
+    const owner = cartUserId;
+
     try {
       const updatedCart = await LocalCartService.addVariationsToCart(
-        cartUserId,
+        owner,
         product,
         selections
       );
-      setCart(updatedCart);
+      commitCart(updatedCart, owner);
     } catch (err: any) {
       if (err.message === 'DIFFERENT_TENANT') {
         // Show clear cart alert
@@ -350,7 +395,10 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
               text: t('cart.clearAndAdd', { defaultValue: 'Clear & Add' }), 
               style: 'destructive',
               onPress: async () => {
-                // Wipe the cart and then add this item
+                // Native dialog, human-timed: re-check identity before touching
+                // storage. See the matching guard in addToCart.
+                if (identityRef.current !== owner) return;
+
                 try {
                   isAddingRef.current = true; // Prevent UI flashes
                   if (user?.uid) {
@@ -358,23 +406,28 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
                   } else {
                     await LocalCartService.clearCart('guest');
                   }
-                  
-                  setCart({
-                     userId: cartUserId,
-                     items: [],
-                     subtotalUSD: 0,
-                     updatedAt: new Date() as any,
-                  });
-                  
+
+                  // No premature empty-cart publish — see addToCart.
                   const updatedCart = await LocalCartService.addVariationsToCart(
-                    cartUserId,
+                    owner,
                     product,
                     selections
                   );
-                  setCart(updatedCart);
+                  commitCart(updatedCart, owner);
                 } catch (clearErr) {
                    console.error('Error clearing cart & adding variations:', clearErr);
                    setError((clearErr as Error).message || 'Failed to restart cart');
+                   commitCart({
+                     userId: owner,
+                     items: [],
+                     subtotalUSD: 0,
+                     updatedAt: new Date() as any,
+                   }, owner);
+                   Alert.alert(
+                     t('common.error', { defaultValue: 'Error' }),
+                     (clearErr as Error).message ||
+                       t('cart.restartFailed', { defaultValue: 'Your cart was cleared but the items could not be added. Please try again.' })
+                   );
                 } finally {
                    isAddingRef.current = false;
                 }
@@ -400,9 +453,11 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   ) => {
     setError(null);
 
+    const owner = cartUserId;
+
     try {
-      const updatedCart = await LocalCartService.updateQuantity(cartUserId, productId, quantity, selectedOptions);
-      setCart(updatedCart);
+      const updatedCart = await LocalCartService.updateQuantity(owner, productId, quantity, selectedOptions);
+      commitCart(updatedCart, owner);
     } catch (err: any) {
       // eslint-disable-next-line no-console
       console.error('Error updating cart quantity:', err);
@@ -418,10 +473,12 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   ) => {
     setError(null);
 
+    const owner = cartUserId;
+
     try {
-      const updatedCart = await LocalCartService.removeFromCart(cartUserId, productId, selectedOptions);
-      setCart(updatedCart);
-      
+      const updatedCart = await LocalCartService.removeFromCart(owner, productId, selectedOptions);
+      commitCart(updatedCart, owner);
+
       // Only sync to Firebase if user is authenticated
       if (user?.uid) {
         CartService.removeFromCart(user.uid, productId)
@@ -438,21 +495,23 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   const clearCart = useCallback(async () => {
     setError(null);
 
+    const owner = cartUserId;
+
     try {
       if (user?.uid) {
         await CartUtils.clearAllCartData(user.uid);
       } else {
         await LocalCartService.clearCart('guest');
       }
-      
+
       const emptyCart = {
-        userId: cartUserId,
+        userId: owner,
         items: [],
         subtotalUSD: 0,
         updatedAt: new Date() as any,
       };
-      
-      setCart(emptyCart);
+
+      commitCart(emptyCart, owner);
     } catch (err: any) {
       console.error('Error clearing cart:', err);
       setError(err.message || 'Failed to clear cart');

@@ -388,6 +388,8 @@ export default function ConversationsScreen() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
+
     if (!user?.uid) {
       // Clear any previous account's conversations so a logout / switch to
       // guest never leaves the prior user's private chats visible on screen.
@@ -398,12 +400,19 @@ export default function ConversationsScreen() {
     }
 
     const unsub = subscribeToUserConversations(user.uid, (data) => {
+      // subscribeToUserConversations fires an immediate fetch that its unsubscribe
+      // cannot cancel — removeChannel tears down the socket, not the in-flight
+      // query. Without this guard that late fetch calls back after logout and
+      // repopulates the list, defeating the clear above and leaving the previous
+      // account's private chats (store names, message previews, unread badges)
+      // visible to a guest or to the next user who signs in.
+      if (cancelled) return;
       setItems(data || []);
       setLoading(false);
       setRefreshing(false);
     });
 
-    return () => unsub?.();
+    return () => { cancelled = true; unsub?.(); };
   }, [user?.uid, refreshKey]);
 
   const filtered = useMemo(() => {
