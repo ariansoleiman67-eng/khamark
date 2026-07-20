@@ -24,16 +24,34 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   userInterfaceStyle: "automatic",
   splash: {
     image: "./assets/splash-icon.png",
-    backgroundColor: colors.primary,
+    // Matches the splash artwork's own canvas. The image previously had a BLACK
+    // background baked into it, so on the amber primary it rendered as a black square
+    // with barely-visible navy lettering — the dark logo on every cold start. Using the
+    // light monogram on its own background means the splash reads as one clean surface
+    // and matches the app icon exactly.
+    backgroundColor: colors.iconBackground,
     resizeMode: "contain",
   },
   assetBundlePatterns: ["**/*"],
 
-  // Fingerprint policy: runtime identity is derived from the actual native surface
-  // (native deps, config plugins, native project state), so an OTA bundle can never
-  // be delivered to a binary it was not built against. A static string makes every
-  // build advertise the same identity and turns the compatibility check into a no-op.
-  runtimeVersion: { policy: "fingerprint" },
+  // Static on purpose, for now.
+  //
+  // The fingerprint policy is the correct end state — it derives runtime identity from
+  // the real native surface, so an OTA bundle can never reach a binary it was not built
+  // against, which a static string cannot guarantee. But it requires a `fingerprint`
+  // asset generated into the app at build time, and a local `expo run:android` does not
+  // produce one: expo-updates then throws FileNotFoundException("fingerprint") from
+  // UpdatesConfiguration.getRuntimeVersion before MainApplication can start, so the app
+  // crashes on launch every time.
+  //
+  // It also buys nothing yet — `updates.url` below is still the placeholder EAS project
+  // id, so no OTA update can be published or delivered regardless of the policy.
+  //
+  // SWITCH TO { policy: "fingerprint" } as part of `eas init`, once updates.url is real
+  // and builds go through EAS (which does generate the fingerprint asset). Do it BEFORE
+  // the first build ships, because a runtime version already in the field cannot be
+  // changed retroactively.
+  runtimeVersion: "1.0.0",
   updates: {
     // Phase 2: set to the new EAS updates URL after `eas init` under the Asankary account.
     url: "https://u.expo.dev/REPLACE_WITH_ASANKARY_EAS_PROJECT_ID"
