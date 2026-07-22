@@ -1,13 +1,10 @@
 -- ============================================================================
--- ASANKARY — FULL SUPABASE SETUP (paste ALL of this into the SQL Editor, Run)
--- Dashboard -> SQL Editor -> New query -> paste -> Run. Safe to re-run.
--- Generated 2026-07-22 from supabase/migrations/*
+-- ASANKARY — FULL SUPABASE SETUP (idempotent: safe to run any number of times)
+-- Dashboard -> SQL Editor -> New query -> paste ALL -> Run.
 -- ============================================================================
 
 
--- ============================================================
--- 20260101000000_initial_schema.sql
--- ============================================================
+-- === 20260101000000_initial_schema.sql ===
 -- =============================================================================
 -- ASANKARY — Consolidated initial schema for the NEW Supabase project
 -- =============================================================================
@@ -54,7 +51,7 @@ $$;
 -- =============================================================================
 
 -- 1. Users (extends Supabase auth.users) -------------------------------------
-create table public.users (
+create table if not exists public.users (
   id                     uuid primary key references auth.users(id) on delete cascade,
   name                   text,
   full_name              text,
@@ -89,7 +86,7 @@ create table public.users (
 );
 
 -- 2. Parts (products) --------------------------------------------------------
-create table public.parts (
+create table if not exists public.parts (
   id                 uuid primary key default gen_random_uuid(),
   name               text not null,
   name_ar            text,
@@ -117,13 +114,16 @@ create table public.parts (
   specifications     jsonb default '{}'::jsonb,
   weight             numeric,
   video_url          text,
+  -- admin/chat-routing metadata + shared-partner ids (coAdminIds); written by
+  -- productService.toPartRow and read by get_partner_product_sales.
+  extra_data         jsonb default '{}'::jsonb,
   tenant_id          uuid references public.users(id) on delete set null,
   created_at         timestamptz default now(),
   updated_at         timestamptz default now()
 );
 
 -- 3. Orders ------------------------------------------------------------------
-create table public.orders (
+create table if not exists public.orders (
   id                   uuid primary key default gen_random_uuid(),
   user_id              uuid references public.users(id) on delete cascade,
   order_number         text unique not null,
@@ -150,7 +150,7 @@ create table public.orders (
 );
 
 -- 4. Banners -----------------------------------------------------------------
-create table public.banners (
+create table if not exists public.banners (
   id          uuid primary key default gen_random_uuid(),
   title       text,
   image_url   text not null,
@@ -161,7 +161,7 @@ create table public.banners (
 );
 
 -- 5. Tenants (store profile) -------------------------------------------------
-create table public.tenants (
+create table if not exists public.tenants (
   id                 uuid primary key default gen_random_uuid(),
   owner_id           uuid references public.users(id),
   store_name         text,
@@ -198,7 +198,7 @@ create table public.tenants (
 );
 
 -- 6. Categories --------------------------------------------------------------
-create table public.categories (
+create table if not exists public.categories (
   id             uuid primary key default gen_random_uuid(),
   tenant_id      uuid references public.users(id) on delete cascade,
   name           text not null,
@@ -214,7 +214,7 @@ create table public.categories (
 );
 
 -- 7. Discounts ---------------------------------------------------------------
-create table public.discounts (
+create table if not exists public.discounts (
   id               uuid primary key default gen_random_uuid(),
   tenant_id        uuid references public.users(id) on delete cascade,
   code             text,
@@ -243,7 +243,7 @@ create table public.discounts (
 );
 
 -- 8. Tenant settings (key/value) ---------------------------------------------
-create table public.tenant_settings (
+create table if not exists public.tenant_settings (
   id             uuid primary key default gen_random_uuid(),
   tenant_id      uuid references public.users(id) on delete cascade,
   setting_key    text not null,
@@ -253,7 +253,7 @@ create table public.tenant_settings (
 );
 
 -- 9. Global settings ---------------------------------------------------------
-create table public.global_settings (
+create table if not exists public.global_settings (
   id          text primary key,
   data        jsonb,
   created_at  timestamptz default now(),
@@ -261,7 +261,7 @@ create table public.global_settings (
 );
 
 -- 10. App config -------------------------------------------------------------
-create table public.app_config (
+create table if not exists public.app_config (
   id          text primary key,
   data        jsonb,
   created_at  timestamptz default now(),
@@ -269,7 +269,7 @@ create table public.app_config (
 );
 
 -- 11. Conversations ----------------------------------------------------------
-create table public.conversations (
+create table if not exists public.conversations (
   id                text primary key,
   tenant_id         uuid references public.users(id) on delete cascade,
   user_id           uuid references public.users(id) on delete cascade,
@@ -286,7 +286,7 @@ create table public.conversations (
 );
 
 -- 12. Messages ---------------------------------------------------------------
-create table public.messages (
+create table if not exists public.messages (
   id               uuid primary key default gen_random_uuid(),
   conversation_id  text references public.conversations(id) on delete cascade,
   sender_id        uuid references public.users(id) on delete cascade,
@@ -300,7 +300,7 @@ create table public.messages (
 );
 
 -- 13. Addresses --------------------------------------------------------------
-create table public.addresses (
+create table if not exists public.addresses (
   id                  uuid primary key default gen_random_uuid(),
   user_id             uuid references public.users(id) on delete cascade,
   title               text,
@@ -321,7 +321,7 @@ create table public.addresses (
 );
 
 -- 14. Carts (one per user) ---------------------------------------------------
-create table public.carts (
+create table if not exists public.carts (
   id            uuid primary key references public.users(id) on delete cascade,
   items         jsonb not null default '[]'::jsonb,
   subtotal_usd  numeric(10,2) not null default 0,
@@ -329,7 +329,7 @@ create table public.carts (
 );
 
 -- 15. Notifications ----------------------------------------------------------
-create table public.notifications (
+create table if not exists public.notifications (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid references public.users(id) on delete cascade,
   title       text not null,
@@ -343,7 +343,7 @@ create table public.notifications (
 );
 
 -- 16. Devices ----------------------------------------------------------------
-create table public.devices (
+create table if not exists public.devices (
   id                     text primary key,
   uid                    uuid references public.users(id) on delete cascade,
   tenant_id              text,
@@ -358,7 +358,7 @@ create table public.devices (
 );
 
 -- 17. Push tokens ------------------------------------------------------------
-create table public.push_tokens (
+create table if not exists public.push_tokens (
   id          text primary key,         -- deviceId
   token       text not null,
   user_id     uuid references public.users(id) on delete cascade,
@@ -368,7 +368,7 @@ create table public.push_tokens (
 );
 
 -- 18. Live tracking ----------------------------------------------------------
-create table public.live_tracking (
+create table if not exists public.live_tracking (
   id          text primary key,         -- orderId
   tenant_id   uuid references public.users(id) on delete cascade,
   active      boolean default false,
@@ -377,7 +377,7 @@ create table public.live_tracking (
 );
 
 -- 19. Store locations --------------------------------------------------------
-create table public.store_locations (
+create table if not exists public.store_locations (
   id                    uuid primary key default gen_random_uuid(),
   name                  text not null,
   name_ar               text,
@@ -403,80 +403,97 @@ create table public.store_locations (
 -- =============================================================================
 
 -- parts: catalog browse + search
-create index idx_parts_tenant         on public.parts(tenant_id);
-create index idx_parts_category        on public.parts(category);
-create index idx_parts_active          on public.parts(is_active) where is_active = true;
-create index idx_parts_featured        on public.parts(is_featured) where is_featured = true;
-create index idx_parts_part_number     on public.parts(part_number);
-create index idx_parts_brand           on public.parts(brand);
-create index idx_parts_created_at      on public.parts(created_at desc);
+create index if not exists idx_parts_tenant         on public.parts(tenant_id);
+create index if not exists idx_parts_category        on public.parts(category);
+create index if not exists idx_parts_active          on public.parts(is_active) where is_active = true;
+create index if not exists idx_parts_featured        on public.parts(is_featured) where is_featured = true;
+create index if not exists idx_parts_part_number     on public.parts(part_number);
+create index if not exists idx_parts_brand           on public.parts(brand);
+create index if not exists idx_parts_created_at      on public.parts(created_at desc);
 -- trigram indexes for fast ILIKE '%term%' search (SearchScreen)
-create index idx_parts_name_trgm       on public.parts using gin (name gin_trgm_ops);
-create index idx_parts_name_ar_trgm    on public.parts using gin (name_ar gin_trgm_ops);
-create index idx_parts_name_ku_trgm    on public.parts using gin (name_ku gin_trgm_ops);
-create index idx_parts_partno_trgm     on public.parts using gin (part_number gin_trgm_ops);
+create index if not exists idx_parts_name_trgm       on public.parts using gin (name gin_trgm_ops);
+create index if not exists idx_parts_name_ar_trgm    on public.parts using gin (name_ar gin_trgm_ops);
+create index if not exists idx_parts_name_ku_trgm    on public.parts using gin (name_ku gin_trgm_ops);
+create index if not exists idx_parts_partno_trgm     on public.parts using gin (part_number gin_trgm_ops);
 
 -- orders
-create index idx_orders_user           on public.orders(user_id);
-create index idx_orders_tenant         on public.orders(tenant_id);
-create index idx_orders_status         on public.orders(status);
-create index idx_orders_payment_status on public.orders(payment_status);
-create index idx_orders_created_at     on public.orders(created_at desc);
-create index idx_orders_tenant_created on public.orders(tenant_id, created_at desc);
+create index if not exists idx_orders_user           on public.orders(user_id);
+create index if not exists idx_orders_tenant         on public.orders(tenant_id);
+create index if not exists idx_orders_status         on public.orders(status);
+create index if not exists idx_orders_payment_status on public.orders(payment_status);
+create index if not exists idx_orders_created_at     on public.orders(created_at desc);
+create index if not exists idx_orders_tenant_created on public.orders(tenant_id, created_at desc);
 
 -- categories / discounts
-create index idx_categories_tenant     on public.categories(tenant_id);
-create index idx_categories_active     on public.categories(tenant_id, is_active);
-create index idx_discounts_tenant      on public.discounts(tenant_id);
-create index idx_discounts_code        on public.discounts(code);
-create index idx_discounts_active      on public.discounts(tenant_id, is_active);
+create index if not exists idx_categories_tenant     on public.categories(tenant_id);
+create index if not exists idx_categories_active     on public.categories(tenant_id, is_active);
+create index if not exists idx_discounts_tenant      on public.discounts(tenant_id);
+create index if not exists idx_discounts_code        on public.discounts(code);
+create index if not exists idx_discounts_active      on public.discounts(tenant_id, is_active);
 
 -- chat
-create index idx_conversations_tenant  on public.conversations(tenant_id);
-create index idx_conversations_user     on public.conversations(user_id);
-create index idx_conversations_admin    on public.conversations(admin_id);
-create index idx_conversations_updated  on public.conversations(updated_at desc);
-create index idx_messages_conversation  on public.messages(conversation_id, created_at);
+create index if not exists idx_conversations_tenant  on public.conversations(tenant_id);
+create index if not exists idx_conversations_user     on public.conversations(user_id);
+create index if not exists idx_conversations_admin    on public.conversations(admin_id);
+create index if not exists idx_conversations_updated  on public.conversations(updated_at desc);
+create index if not exists idx_messages_conversation  on public.messages(conversation_id, created_at);
 
 -- addresses / notifications
-create index idx_addresses_user        on public.addresses(user_id);
-create index idx_notifications_user    on public.notifications(user_id, created_at desc);
-create index idx_notifications_unread  on public.notifications(user_id, read) where read = false;
+create index if not exists idx_addresses_user        on public.addresses(user_id);
+create index if not exists idx_notifications_user    on public.notifications(user_id, created_at desc);
+create index if not exists idx_notifications_unread  on public.notifications(user_id, read) where read = false;
 
 -- devices / push / tracking / locations
-create index idx_devices_uid           on public.devices(uid);
-create index idx_devices_active        on public.devices(is_active) where is_active = true;
-create index idx_push_tokens_user      on public.push_tokens(user_id);
-create index idx_push_tokens_active    on public.push_tokens(active) where active = true;
-create index idx_live_tracking_tenant  on public.live_tracking(tenant_id);
-create index idx_store_locations_admin on public.store_locations(created_by_admin_id);
-create index idx_store_locations_city  on public.store_locations(city);
+create index if not exists idx_devices_uid           on public.devices(uid);
+create index if not exists idx_devices_active        on public.devices(is_active) where is_active = true;
+create index if not exists idx_push_tokens_user      on public.push_tokens(user_id);
+create index if not exists idx_push_tokens_active    on public.push_tokens(active) where active = true;
+create index if not exists idx_live_tracking_tenant  on public.live_tracking(tenant_id);
+create index if not exists idx_store_locations_admin on public.store_locations(created_by_admin_id);
+create index if not exists idx_store_locations_city  on public.store_locations(city);
 
 -- banners / tenants / users
-create index idx_banners_active        on public.banners(is_active, sort_order);
-create index idx_tenants_owner         on public.tenants(owner_id);
-create index idx_users_role            on public.users(role);
-create index idx_users_is_admin        on public.users(is_admin) where is_admin = true;
+create index if not exists idx_banners_active        on public.banners(is_active, sort_order);
+create index if not exists idx_tenants_owner         on public.tenants(owner_id);
+create index if not exists idx_users_role            on public.users(role);
+create index if not exists idx_users_is_admin        on public.users(is_admin) where is_admin = true;
 
 -- =============================================================================
 -- updated_at TRIGGERS
 -- =============================================================================
+drop trigger if exists trg_users_updated on public.users;
 create trigger trg_users_updated         before update on public.users           for each row execute function public.set_updated_at();
+drop trigger if exists trg_parts_updated on public.parts;
 create trigger trg_parts_updated          before update on public.parts            for each row execute function public.set_updated_at();
+drop trigger if exists trg_orders_updated on public.orders;
 create trigger trg_orders_updated         before update on public.orders           for each row execute function public.set_updated_at();
+drop trigger if exists trg_tenants_updated on public.tenants;
 create trigger trg_tenants_updated        before update on public.tenants          for each row execute function public.set_updated_at();
+drop trigger if exists trg_categories_updated on public.categories;
 create trigger trg_categories_updated     before update on public.categories       for each row execute function public.set_updated_at();
+drop trigger if exists trg_discounts_updated on public.discounts;
 create trigger trg_discounts_updated      before update on public.discounts        for each row execute function public.set_updated_at();
+drop trigger if exists trg_tenant_settings_updated on public.tenant_settings;
 create trigger trg_tenant_settings_updated before update on public.tenant_settings for each row execute function public.set_updated_at();
+drop trigger if exists trg_global_settings_updated on public.global_settings;
 create trigger trg_global_settings_updated before update on public.global_settings for each row execute function public.set_updated_at();
+drop trigger if exists trg_app_config_updated on public.app_config;
 create trigger trg_app_config_updated     before update on public.app_config       for each row execute function public.set_updated_at();
+drop trigger if exists trg_conversations_updated on public.conversations;
 create trigger trg_conversations_updated  before update on public.conversations    for each row execute function public.set_updated_at();
+drop trigger if exists trg_addresses_updated on public.addresses;
 create trigger trg_addresses_updated      before update on public.addresses        for each row execute function public.set_updated_at();
+drop trigger if exists trg_carts_updated on public.carts;
 create trigger trg_carts_updated          before update on public.carts            for each row execute function public.set_updated_at();
+drop trigger if exists trg_notifications_updated on public.notifications;
 create trigger trg_notifications_updated  before update on public.notifications    for each row execute function public.set_updated_at();
+drop trigger if exists trg_devices_updated on public.devices;
 create trigger trg_devices_updated        before update on public.devices          for each row execute function public.set_updated_at();
+drop trigger if exists trg_push_tokens_updated on public.push_tokens;
 create trigger trg_push_tokens_updated    before update on public.push_tokens      for each row execute function public.set_updated_at();
+drop trigger if exists trg_live_tracking_updated on public.live_tracking;
 create trigger trg_live_tracking_updated  before update on public.live_tracking    for each row execute function public.set_updated_at();
+drop trigger if exists trg_store_locations_updated on public.store_locations;
 create trigger trg_store_locations_updated before update on public.store_locations for each row execute function public.set_updated_at();
 
 -- =============================================================================
@@ -503,24 +520,43 @@ alter table public.push_tokens      enable row level security;
 alter table public.live_tracking    enable row level security;
 alter table public.store_locations  enable row level security;
 
+drop policy if exists "permissive_all" on public.users;
 create policy "permissive_all" on public.users          for all using (true) with check (true);
+drop policy if exists "permissive_all" on public.parts;
 create policy "permissive_all" on public.parts           for all using (true) with check (true);
+drop policy if exists "permissive_all" on public.orders;
 create policy "permissive_all" on public.orders          for all using (true) with check (true);
+drop policy if exists "permissive_all" on public.banners;
 create policy "permissive_all" on public.banners         for all using (true) with check (true);
+drop policy if exists "permissive_all" on public.tenants;
 create policy "permissive_all" on public.tenants         for all using (true) with check (true);
+drop policy if exists "permissive_all" on public.categories;
 create policy "permissive_all" on public.categories      for all using (true) with check (true);
+drop policy if exists "permissive_all" on public.discounts;
 create policy "permissive_all" on public.discounts       for all using (true) with check (true);
+drop policy if exists "permissive_all" on public.tenant_settings;
 create policy "permissive_all" on public.tenant_settings for all using (true) with check (true);
+drop policy if exists "permissive_all" on public.global_settings;
 create policy "permissive_all" on public.global_settings for all using (true) with check (true);
+drop policy if exists "permissive_all" on public.app_config;
 create policy "permissive_all" on public.app_config      for all using (true) with check (true);
+drop policy if exists "permissive_all" on public.conversations;
 create policy "permissive_all" on public.conversations   for all using (true) with check (true);
+drop policy if exists "permissive_all" on public.messages;
 create policy "permissive_all" on public.messages        for all using (true) with check (true);
+drop policy if exists "permissive_all" on public.addresses;
 create policy "permissive_all" on public.addresses       for all using (true) with check (true);
+drop policy if exists "permissive_all" on public.carts;
 create policy "permissive_all" on public.carts           for all using (true) with check (true);
+drop policy if exists "permissive_all" on public.notifications;
 create policy "permissive_all" on public.notifications   for all using (true) with check (true);
+drop policy if exists "permissive_all" on public.devices;
 create policy "permissive_all" on public.devices         for all using (true) with check (true);
+drop policy if exists "permissive_all" on public.push_tokens;
 create policy "permissive_all" on public.push_tokens     for all using (true) with check (true);
+drop policy if exists "permissive_all" on public.live_tracking;
 create policy "permissive_all" on public.live_tracking   for all using (true) with check (true);
+drop policy if exists "permissive_all" on public.store_locations;
 create policy "permissive_all" on public.store_locations for all using (true) with check (true);
 
 -- =============================================================================
@@ -537,33 +573,44 @@ create or replace function public.is_admin() returns boolean
 
 -- PARTS: anyone can read active products; only the owning tenant can write.
 drop policy "permissive_all" on public.parts;
-create policy "parts_read"  on public.parts for select using (is_active or tenant_id = auth.uid());
+drop policy if exists "parts_read" on public.parts;
+create policy "parts_read" on public.parts for select using (is_active or tenant_id = auth.uid());
+drop policy if exists "parts_write" on public.parts;
 create policy "parts_write" on public.parts for all
   using (tenant_id = auth.uid()) with check (tenant_id = auth.uid());
 
 -- ORDERS: a user sees their own; the tenant sees orders placed to them.
 drop policy "permissive_all" on public.orders;
-create policy "orders_read"   on public.orders for select using (user_id = auth.uid() or tenant_id = auth.uid());
+drop policy if exists "orders_read" on public.orders;
+create policy "orders_read" on public.orders for select using (user_id = auth.uid() or tenant_id = auth.uid());
+drop policy if exists "orders_insert" on public.orders;
 create policy "orders_insert" on public.orders for insert with check (user_id = auth.uid());
+drop policy if exists "orders_update" on public.orders;
 create policy "orders_update" on public.orders for update using (tenant_id = auth.uid() or user_id = auth.uid());
 
 -- USERS: read/update your own row only.
 drop policy "permissive_all" on public.users;
+drop policy if exists "users_self" on public.users;
 create policy "users_self" on public.users for all using (id = auth.uid()) with check (id = auth.uid());
 
 -- CARTS / ADDRESSES / NOTIFICATIONS: strictly per-user.
 drop policy "permissive_all" on public.carts;
+drop policy if exists "carts_self" on public.carts;
 create policy "carts_self" on public.carts for all using (id = auth.uid()) with check (id = auth.uid());
 drop policy "permissive_all" on public.addresses;
+drop policy if exists "addresses_self" on public.addresses;
 create policy "addresses_self" on public.addresses for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 drop policy "permissive_all" on public.notifications;
+drop policy if exists "notifications_self" on public.notifications;
 create policy "notifications_self" on public.notifications for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 -- CONVERSATIONS / MESSAGES: only participants.
 drop policy "permissive_all" on public.conversations;
+drop policy if exists "conv_participants" on public.conversations;
 create policy "conv_participants" on public.conversations for all
   using (user_id = auth.uid() or admin_id = auth.uid() or tenant_id = auth.uid());
 drop policy "permissive_all" on public.messages;
+drop policy if exists "msg_participants" on public.messages;
 create policy "msg_participants" on public.messages for all
   using (exists (select 1 from public.conversations c where c.id = conversation_id
                  and (c.user_id = auth.uid() or c.admin_id = auth.uid() or c.tenant_id = auth.uid())));
@@ -574,9 +621,7 @@ create policy "msg_participants" on public.messages for all
 */
 
 
--- ============================================================
--- 20260704000000_get_partner_product_sales.sql
--- ============================================================
+-- === 20260704000000_get_partner_product_sales.sql ===
 -- ============================================================================
 -- get_partner_product_sales(p_partner_uid uuid default null)
 -- ----------------------------------------------------------------------------
@@ -632,9 +677,7 @@ $$;
 grant execute on function public.get_partner_product_sales(uuid) to authenticated;
 
 
--- ============================================================
--- 20260705175738_create_saved_cards_table.sql
--- ============================================================
+-- === 20260705175738_create_saved_cards_table.sql ===
 create extension if not exists moddatetime schema extensions;
 
 create table if not exists public.saved_cards (
@@ -649,21 +692,20 @@ create table if not exists public.saved_cards (
 
 alter table public.saved_cards enable row level security;
 
-create policy "Users can view their own saved cards"
-    on public.saved_cards for select
+drop policy if exists "Users can view their own saved cards" on public.saved_cards;
+create policy "Users can view their own saved cards" on public.saved_cards for select
     using (auth.uid() = user_id);
 
-create policy "Users can delete their own saved cards"
-    on public.saved_cards for delete
+drop policy if exists "Users can delete their own saved cards" on public.saved_cards;
+create policy "Users can delete their own saved cards" on public.saved_cards for delete
     using (auth.uid() = user_id);
 
+drop trigger if exists handle_updated_at on public.saved_cards;
 create trigger handle_updated_at before update on public.saved_cards 
   for each row execute procedure extensions.moddatetime (updated_at);
 
 
--- ============================================================
--- 20260706120000_qicard_extra_data_and_merge_rpc.sql
--- ============================================================
+-- === 20260706120000_qicard_extra_data_and_merge_rpc.sql ===
 -- =============================================================================
 -- QiCard: orders.extra_data column + jsonb_merge_extra_data RPC
 -- =============================================================================
@@ -705,9 +747,7 @@ revoke all on function public.jsonb_merge_extra_data(uuid, jsonb) from public, a
 grant execute on function public.jsonb_merge_extra_data(uuid, jsonb) to service_role;
 
 
--- ============================================================
--- 20260709120000_conversation_archive_labels.sql
--- ============================================================
+-- === 20260709120000_conversation_archive_labels.sql ===
 -- Conversation organization: per-side archive flag + labels.
 -- Mirrors the existing deleted_by / unread "JSONB per side" pattern, so the
 -- client updates these columns through the same conversations RLS policy that
@@ -721,9 +761,7 @@ ALTER TABLE public.conversations
   ADD COLUMN IF NOT EXISTS labels jsonb NOT NULL DEFAULT '{}'::jsonb;
 
 
--- ============================================================
--- 20260709160000_cancel_my_order_restores_stock.sql
--- ============================================================
+-- === 20260709160000_cancel_my_order_restores_stock.sql ===
 -- =============================================================================
 -- Fix: user-cancel must restore stock (parity with the admin cancel path).
 -- =============================================================================
@@ -874,9 +912,7 @@ revoke all on function public.cancel_my_order(uuid) from public, anon;
 grant execute on function public.cancel_my_order(uuid) to authenticated;
 
 
--- ============================================================
--- 20260722120000_brands_promos_variant_columns.sql
--- ============================================================
+-- === 20260722120000_brands_promos_variant_columns.sql ===
 -- Asankary — new tables + columns for features built after the initial schema:
 --   • parts: vip_price_usd, compare_at_price_usd, storage_options (colour/storage variants + VIP pricing)
 --   • brands table (admin-managed "Our Brands" name + logo)
@@ -921,7 +957,9 @@ create unique index if not exists uniq_promo_code_per_tenant on public.promo_cod
 
 -- ── updated_at triggers (reuse the existing set_updated_at function) ─────────
 drop trigger if exists trg_brands_updated on public.brands;
+drop trigger if exists trg_brands_updated on public.brands;
 create trigger trg_brands_updated       before update on public.brands      for each row execute function public.set_updated_at();
+drop trigger if exists trg_promo_codes_updated on public.promo_codes;
 drop trigger if exists trg_promo_codes_updated on public.promo_codes;
 create trigger trg_promo_codes_updated  before update on public.promo_codes for each row execute function public.set_updated_at();
 
@@ -929,7 +967,9 @@ create trigger trg_promo_codes_updated  before update on public.promo_codes for 
 alter table public.brands      enable row level security;
 alter table public.promo_codes enable row level security;
 drop policy if exists "permissive_all" on public.brands;
+drop policy if exists "permissive_all" on public.brands;
 create policy "permissive_all" on public.brands      for all using (true) with check (true);
+drop policy if exists "permissive_all" on public.promo_codes;
 drop policy if exists "permissive_all" on public.promo_codes;
 create policy "permissive_all" on public.promo_codes for all using (true) with check (true);
 

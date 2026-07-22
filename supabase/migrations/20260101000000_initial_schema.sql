@@ -107,6 +107,9 @@ create table public.parts (
   specifications     jsonb default '{}'::jsonb,
   weight             numeric,
   video_url          text,
+  -- admin/chat-routing metadata + shared-partner ids (coAdminIds); written by
+  -- productService.toPartRow and read by get_partner_product_sales.
+  extra_data         jsonb default '{}'::jsonb,
   tenant_id          uuid references public.users(id) on delete set null,
   created_at         timestamptz default now(),
   updated_at         timestamptz default now()
