@@ -347,11 +347,6 @@ const HomeScreen: React.FC = () => {
     navigation.navigate('Cart');
   }, [navigation]);
 
-  // A hamburger "menu" that browses the category catalogue.
-  const handleMenuPress = useCallback(() => {
-    navigation.navigate('Categories');
-  }, [navigation]);
-
   const handleBrandsSeeAll = useCallback(() => {
     navigation.navigate('Categories');
   }, [navigation]);
@@ -590,11 +585,8 @@ const HomeScreen: React.FC = () => {
         styles.header,
         { backgroundColor: theme.colors.surface, flexDirection: isRTL ? 'row-reverse' : 'row' },
       ]}>
-        {/* Left: hamburger + two-line greeting */}
+        {/* Left: two-line greeting */}
         <View style={[styles.headerLeft, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-          <TouchableOpacity onPress={handleMenuPress} hitSlop={8} style={styles.iconBtn} accessibilityRole="button">
-            <Ionicons name="menu" size={26} color={theme.colors.text} />
-          </TouchableOpacity>
           <View style={styles.greeting}>
             <Text allowFontScaling={false} numberOfLines={1} style={{ fontSize: 12, color: theme.colors.textSecondary, textAlign }}>
               {t('home.hello')}
@@ -746,7 +738,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   greeting: {
-    marginHorizontal: 10,
+    // Only a trailing gap now that the hamburger is gone — the greeting hugs the
+    // header's own 16px padding instead of being indented behind an icon.
+    marginEnd: 10,
     flexShrink: 1,
   },
   headerRight: {
