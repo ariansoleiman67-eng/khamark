@@ -24,6 +24,9 @@ export const mapProduct = (data: any): Product => ({
   categoryAr: data.category_ar,
   categoryKu: data.category_ku,
   priceUSD: data.price_usd,
+  vipPriceUSD: data.vip_price_usd != null ? Number(data.vip_price_usd) : undefined,
+  compareAtPriceUSD: data.compare_at_price_usd != null ? Number(data.compare_at_price_usd) : undefined,
+  storageOptions: data.storage_options || [],
   purchasePrice: data.purchase_price,
   stockQty: data.stock_qty,
   historicalStockQty: data.historical_stock_qty,
@@ -63,7 +66,7 @@ export const mapProduct = (data: any): Product => ({
 // video_url, purchase_price, weight) so lists load fast and stay light on memory.
 // The product DETAIL screen fetches the full row separately.
 const LIST_COLUMNS =
-  'id,name,name_ar,name_ku,part_number,category,category_ar,category_ku,price_usd,stock_qty,status,is_featured,is_active,brand,image_urls,price_tiers,variations,color_variations,shipping_cost,shipping_rates,tenant_id,created_at,updated_at';
+  'id,name,name_ar,name_ku,part_number,category,category_ar,category_ku,price_usd,vip_price_usd,compare_at_price_usd,storage_options,stock_qty,status,is_featured,is_active,brand,image_urls,price_tiers,variations,color_variations,shipping_cost,shipping_rates,tenant_id,created_at,updated_at';
 
 // Inverse of `mapProduct`: convert a camelCase product payload (as built by the
 // admin product editor) into a snake_case `parts` row. Only keys present in the
@@ -77,7 +80,8 @@ const PART_COLUMN_MAP: Record<string, string> = {
   name: 'name', nameAr: 'name_ar', nameKu: 'name_ku',
   partNumber: 'part_number',
   category: 'category', categoryAr: 'category_ar', categoryKu: 'category_ku',
-  priceUSD: 'price_usd', purchasePrice: 'purchase_price',
+  priceUSD: 'price_usd', vipPriceUSD: 'vip_price_usd', compareAtPriceUSD: 'compare_at_price_usd', storageOptions: 'storage_options',
+  purchasePrice: 'purchase_price',
   stockQty: 'stock_qty', historicalStockQty: 'historical_stock_qty', initialStock: 'initial_stock',
   description: 'description', descriptionAr: 'description_ar', descriptionKu: 'description_ku',
   brand: 'brand', imageUrls: 'image_urls',

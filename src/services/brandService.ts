@@ -4,6 +4,16 @@
 // stick across reloads in the demo. Swap the mock branch for Supabase when live.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { USE_MOCK_DATA } from './mockData';
+import { supabase } from './supabase';
+
+// Map a Supabase `brands` row (snake_case) to the camelCase Brand domain type.
+const mapRow = (r: any): Brand => ({
+  id: r.id,
+  name: r.name,
+  logoUrl: r.logo_url ?? undefined,
+  isActive: r.is_active ?? true,
+  sortOrder: r.sort_order ?? 0,
+});
 
 export interface Brand {
   id: string;
@@ -46,18 +56,25 @@ async function writeMock(brands: Brand[]): Promise<void> {
 }
 
 export const brandService = {
-  async getActiveBrands(_tenantId?: string): Promise<Brand[]> {
+  async getActiveBrands(tenantId?: string): Promise<Brand[]> {
     if (USE_MOCK_DATA) {
       const brands = await readMock();
       return brands.filter(b => b.isActive).sort((a, b) => a.sortOrder - b.sortOrder);
     }
-    // TODO(live): read from Supabase `brands` table (tenant-scoped) when backend is wired.
-    return [];
+    let q = supabase.from('brands').select('*').eq('is_active', true).order('sort_order', { ascending: true });
+    if (tenantId) q = q.eq('tenant_id', tenantId);
+    const { data, error } = await q;
+    if (error) { console.error('getActiveBrands', error); return []; }
+    return (data || []).map(mapRow);
   },
 
-  async getAllBrands(_tenantId?: string): Promise<Brand[]> {
+  async getAllBrands(tenantId?: string): Promise<Brand[]> {
     if (USE_MOCK_DATA) return (await readMock()).sort((a, b) => a.sortOrder - b.sortOrder);
-    return [];
+    let q = supabase.from('brands').select('*').order('sort_order', { ascending: true });
+    if (tenantId) q = q.eq('tenant_id', tenantId);
+    const { data, error } = await q;
+    if (error) { console.error('getAllBrands', error); return []; }
+    return (data || []).map(mapRow);
   },
 
   async saveBrand(brand: Partial<Brand> & { name: string }): Promise<Brand> {
@@ -82,14 +99,17 @@ export const brandService = {
       await writeMock(brands);
       return created;
     }
-    // TODO(live): upsert into Supabase.
-    return {
-      id: brand.id || 'temp',
+    const row: any = {
       name: brand.name,
-      logoUrl: brand.logoUrl,
-      isActive: brand.isActive ?? true,
-      sortOrder: brand.sortOrder ?? 0,
+      logo_url: brand.logoUrl ?? null,
+      is_active: brand.isActive ?? true,
+      sort_order: brand.sortOrder ?? 0,
     };
+    if (brand.id) row.id = brand.id;
+    if ((brand as any).tenantId) row.tenant_id = (brand as any).tenantId;
+    const { data, error } = await supabase.from('brands').upsert(row).select().single();
+    if (error) throw error;
+    return mapRow(data);
   },
 
   async deleteBrand(id: string): Promise<void> {
@@ -98,6 +118,7 @@ export const brandService = {
       await writeMock(brands);
       return;
     }
-    // TODO(live): delete from Supabase.
+    const { error } = await supabase.from('brands').delete().eq('id', id);
+    if (error) throw error;
   },
 };

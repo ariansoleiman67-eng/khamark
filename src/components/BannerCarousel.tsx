@@ -30,6 +30,7 @@ interface BannerCarouselProps {
   images: any[];
   onItemPress?: (item: any, index: number) => void;
   overlayLabel?: string;
+  activeDotColor?: string;
 }
 
 /** Extracted video subcomponent so useVideoPlayer hook can be used properly */
@@ -70,6 +71,7 @@ const BannerCarousel: React.FC<BannerCarouselProps> = memo(({
   images,
   onItemPress,
   overlayLabel,
+  activeDotColor,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -226,7 +228,7 @@ const BannerCarousel: React.FC<BannerCarouselProps> = memo(({
             onPress={() => handleDotPress(index)}
             style={[
               styles.paginationDot,
-              currentIndex === index && styles.paginationDotActive,
+              currentIndex === index && [styles.paginationDotActive, activeDotColor ? { backgroundColor: activeDotColor } : null],
             ]}
           />
         ))}

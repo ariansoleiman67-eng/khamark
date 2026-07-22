@@ -4,7 +4,17 @@
 // categories come from the Supabase `categories` table via tenantAdminService.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { USE_MOCK_DATA } from './mockData';
+import { supabase } from './supabase';
 import type { TenantCategory } from './tenantAdminService';
+
+// Map a Supabase `categories` row to the StoredCategory type.
+const mapRow = (r: any): StoredCategory => ({
+  id: r.id,
+  name: r.name,
+  logoUrl: r.image_url ?? undefined,
+  isActive: r.is_active ?? true,
+  sortOrder: r.sort_order ?? 0,
+});
 
 export interface StoredCategory {
   id: string;
@@ -49,21 +59,38 @@ const toTenantCategory = (c: StoredCategory): TenantCategory => ({
 
 export const categoryStore = {
   async getAll(): Promise<StoredCategory[]> {
-    if (!USE_MOCK_DATA) return [];
+    if (!USE_MOCK_DATA) {
+      const { data, error } = await supabase.from('categories').select('*').order('sort_order', { ascending: true });
+      if (error) { console.error('categoryStore getAll', error); return []; }
+      return (data || []).map(mapRow);
+    }
     return (await readMock()).sort((a, b) => a.sortOrder - b.sortOrder);
   },
 
   // Consumed by categoryService.getActiveCategories (mock branch) — feeds the
   // Categories screen's iconByName (name -> logo), so tiles show admin logos.
   async getActiveTenantCategories(): Promise<TenantCategory[]> {
-    if (!USE_MOCK_DATA) return [];
+    if (!USE_MOCK_DATA) {
+      const { data, error } = await supabase.from('categories').select('*').eq('is_active', true).order('sort_order', { ascending: true });
+      if (error) { console.error('categoryStore getActive', error); return []; }
+      return (data || []).map(mapRow).map(toTenantCategory);
+    }
     return (await readMock()).filter(c => c.isActive).sort((a, b) => a.sortOrder - b.sortOrder).map(toTenantCategory);
   },
 
   async save(cat: Partial<StoredCategory> & { name: string }): Promise<StoredCategory> {
     if (!USE_MOCK_DATA) {
-      // TODO(live): upsert into Supabase `categories` via tenantAdminService.
-      return { id: cat.id || 'temp', name: cat.name, logoUrl: cat.logoUrl, isActive: cat.isActive ?? true, sortOrder: cat.sortOrder ?? 0 };
+      const row: any = {
+        name: cat.name,
+        image_url: cat.logoUrl ?? null,
+        is_active: cat.isActive ?? true,
+        sort_order: cat.sortOrder ?? 0,
+      };
+      if (cat.id) row.id = cat.id;
+      if ((cat as any).tenantId) row.tenant_id = (cat as any).tenantId;
+      const { data, error } = await supabase.from('categories').upsert(row).select().single();
+      if (error) throw error;
+      return mapRow(data);
     }
     const list = await readMock();
     if (cat.id) {
@@ -87,7 +114,11 @@ export const categoryStore = {
   },
 
   async remove(id: string): Promise<void> {
-    if (!USE_MOCK_DATA) return;
+    if (!USE_MOCK_DATA) {
+      const { error } = await supabase.from('categories').delete().eq('id', id);
+      if (error) throw error;
+      return;
+    }
     const list = (await readMock()).filter(c => c.id !== id);
     await writeMock(list);
   },

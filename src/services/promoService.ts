@@ -5,6 +5,18 @@
 // Supabase (a `promo_codes` table) when the backend is wired.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { USE_MOCK_DATA } from './mockData';
+import { supabase } from './supabase';
+
+// Map a Supabase `promo_codes` row (snake_case) to the camelCase Promo type.
+const mapRow = (r: any): Promo => ({
+  id: r.id,
+  code: r.code,
+  type: (r.type === 'fixed' ? 'fixed' : 'percentage') as PromoType,
+  value: Number(r.value) || 0,
+  minPurchase: r.min_purchase != null ? Number(r.min_purchase) : undefined,
+  isActive: r.is_active ?? true,
+  sortOrder: r.sort_order ?? 0,
+});
 
 export type PromoType = 'percentage' | 'fixed';
 
@@ -74,8 +86,9 @@ export function computePromoDiscount(promo: Promo, subtotalUSD: number): number 
 export const promoService = {
   async getAll(): Promise<Promo[]> {
     if (USE_MOCK_DATA) return (await readMock()).sort((a, b) => a.sortOrder - b.sortOrder);
-    // TODO(live): read from Supabase `promo_codes` table (tenant-scoped).
-    return [];
+    const { data, error } = await supabase.from('promo_codes').select('*').order('sort_order', { ascending: true });
+    if (error) { console.error('promo getAll', error); return []; }
+    return (data || []).map(mapRow);
   },
 
   async getActive(): Promise<Promo[]> {
@@ -118,16 +131,19 @@ export const promoService = {
         return created;
       });
     }
-    // TODO(live): upsert into Supabase.
-    return {
-      id: promo.id || 'temp',
+    const row: any = {
       code: normalize(promo.code),
       type: promo.type ?? 'percentage',
       value: promo.value ?? 0,
-      minPurchase: promo.minPurchase,
-      isActive: promo.isActive ?? true,
-      sortOrder: promo.sortOrder ?? 0,
+      min_purchase: promo.minPurchase ?? null,
+      is_active: promo.isActive ?? true,
+      sort_order: promo.sortOrder ?? 0,
     };
+    if (promo.id) row.id = promo.id;
+    if ((promo as any).tenantId) row.tenant_id = (promo as any).tenantId;
+    const { data, error } = await supabase.from('promo_codes').upsert(row).select().single();
+    if (error) throw error;
+    return mapRow(data);
   },
 
   async remove(id: string): Promise<void> {
@@ -138,6 +154,7 @@ export const promoService = {
       });
       return;
     }
-    // TODO(live): delete from Supabase.
+    const { error } = await supabase.from('promo_codes').delete().eq('id', id);
+    if (error) throw error;
   },
 };
