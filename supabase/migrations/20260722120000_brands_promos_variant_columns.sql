@@ -10,6 +10,14 @@ alter table public.parts add column if not exists vip_price_usd        numeric(1
 alter table public.parts add column if not exists compare_at_price_usd numeric(10,2);
 alter table public.parts add column if not exists storage_options      jsonb default '[]'::jsonb;
 
+-- ── parts: columns the app reads/writes that the initial schema omitted ──────
+-- (mapProduct + LIST_COLUMNS + PART_COLUMN_MAP reference these; without them a
+-- live product SELECT/UPDATE fails with "column ... does not exist".)
+alter table public.parts add column if not exists shipping_cost        numeric(10,2);
+alter table public.parts add column if not exists historical_stock_qty integer;
+alter table public.parts add column if not exists initial_stock        integer;
+alter table public.parts add column if not exists sort_order           integer default 0;
+
 -- ── brands ─────────────────────────────────────────────────────────────────
 create table if not exists public.brands (
   id          uuid primary key default gen_random_uuid(),

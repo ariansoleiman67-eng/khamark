@@ -1,8 +1,4 @@
--- ============================================================================
--- ASANKARY — FULL SUPABASE SETUP (idempotent: safe to run any number of times)
--- Dashboard -> SQL Editor -> New query -> paste ALL -> Run.
--- ============================================================================
-
+-- ASANKARY — FULL SUPABASE SETUP (idempotent). Paste ALL -> Run.
 
 -- === 20260101000000_initial_schema.sql ===
 -- =============================================================================
@@ -924,6 +920,14 @@ grant execute on function public.cancel_my_order(uuid) to authenticated;
 alter table public.parts add column if not exists vip_price_usd        numeric(10,2);
 alter table public.parts add column if not exists compare_at_price_usd numeric(10,2);
 alter table public.parts add column if not exists storage_options      jsonb default '[]'::jsonb;
+
+-- ── parts: columns the app reads/writes that the initial schema omitted ──────
+-- (mapProduct + LIST_COLUMNS + PART_COLUMN_MAP reference these; without them a
+-- live product SELECT/UPDATE fails with "column ... does not exist".)
+alter table public.parts add column if not exists shipping_cost        numeric(10,2);
+alter table public.parts add column if not exists historical_stock_qty integer;
+alter table public.parts add column if not exists initial_stock        integer;
+alter table public.parts add column if not exists sort_order           integer default 0;
 
 -- ── brands ─────────────────────────────────────────────────────────────────
 create table if not exists public.brands (
