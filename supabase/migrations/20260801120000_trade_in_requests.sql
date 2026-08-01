@@ -44,34 +44,88 @@ create index if not exists idx_trade_in_user
 alter table public.trade_in_requests enable row level security;
 
 -- Customer: sees and creates only their own.
+drop policy if exists trade_in_select_own on public.trade_in_requests;
 create policy trade_in_select_own on public.trade_in_requests
   for select using (auth.uid() = user_id);
 
+-- A customer may only ever create a PENDING request. Every field the shop owns —
+-- the offer, who reviewed it, when it was quoted — must be null at insert, and the
+-- status must be 'submitted'. Without this, an insert can fabricate an already
+-- 'completed' deal at a self-chosen price directly in a shop's inbox.
+drop policy if exists trade_in_insert_own on public.trade_in_requests;
 create policy trade_in_insert_own on public.trade_in_requests
-  for insert with check (auth.uid() = user_id);
+  for insert with check (
+    auth.uid() = user_id
+    and status = 'submitted'
+    and offer_usd is null
+    and offer_note is null
+    and reviewed_by is null
+    and quoted_at is null
+  );
 
 -- Customer may only move their own request to a terminal answer. They must not be
 -- able to edit offer_usd or push it to 'completed'.
+drop policy if exists trade_in_update_own on public.trade_in_requests;
 create policy trade_in_update_own on public.trade_in_requests
-  for update using (auth.uid() = user_id)
+  for update
+  using (auth.uid() = user_id and status in ('submitted','quoted'))
   with check (auth.uid() = user_id and status in ('accepted','declined','cancelled'));
+
+-- WITH CHECK sees only the new row, so it cannot tell that a customer moved their
+-- request to another shop or rewrote the offer. This trigger restores the columns
+-- the shop owns whenever the caller is not that shop's owner.
+create or replace function public.trade_in_freeze_shop_fields()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if auth.uid() is distinct from old.tenant_id then
+    new.tenant_id  := old.tenant_id;
+    new.offer_usd  := old.offer_usd;
+    new.offer_note := old.offer_note;
+    new.offer_type := old.offer_type;
+    new.reviewed_by := old.reviewed_by;
+    new.quoted_at  := old.quoted_at;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_trade_in_freeze_shop_fields on public.trade_in_requests;
+create trigger trg_trade_in_freeze_shop_fields
+  before update on public.trade_in_requests
+  for each row execute function public.trade_in_freeze_shop_fields();
 
 -- Admin: full access to their own shop's rows only.
 --
 -- `public.users` has NO tenant_id column. Across this schema tenant_id points at
 -- users(id) and the owner admin IS the tenant — see the header comment in
--- 20260101000000_initial_schema.sql, and TenantContext, which derives tenantId
--- straight from the signed-in admin's uid. Comparing tenant_id to auth.uid() is
--- therefore the whole check.
+-- 20260101000000_initial_schema.sql. Comparing tenant_id to auth.uid() is the
+-- tenant half of the check.
+--
+-- The is_admin half is not redundant. Permissive policies OR together, so without
+-- it any customer who set tenant_id to their own uid would fall under this policy
+-- and inherit the `for all` grant on their own row — including DELETE and an
+-- unrestricted status.
 --
 -- Co-admins are deliberately not covered: this schema has no tenant-level admin
 -- link table. Sharing is per-product via extra_data.coAdminIds, which cannot
 -- authorise a trade-in request. Only the shop owner reviews trade-ins.
+drop policy if exists trade_in_admin_all on public.trade_in_requests;
 create policy trade_in_admin_all on public.trade_in_requests
   for all
-  using (trade_in_requests.tenant_id = auth.uid())
-  with check (trade_in_requests.tenant_id = auth.uid());
+  using (
+    trade_in_requests.tenant_id = auth.uid()
+    and exists (select 1 from public.users u where u.id = auth.uid() and u.is_admin = true)
+  )
+  with check (
+    trade_in_requests.tenant_id = auth.uid()
+    and exists (select 1 from public.users u where u.id = auth.uid() and u.is_admin = true)
+  );
 
+drop trigger if exists trg_trade_in_updated on public.trade_in_requests;
 create trigger trg_trade_in_updated
   before update on public.trade_in_requests
   for each row execute function public.set_updated_at();
