@@ -81,7 +81,11 @@ security definer
 set search_path = public, pg_temp
 as $$
 begin
-  if auth.uid() is distinct from old.tenant_id then
+  -- auth.uid() is null for service_role (Edge Functions) and the SQL editor. Those
+  -- are the trusted server paths and must stay able to write the offer; triggers are
+  -- not bypassed by BYPASSRLS, so without this exemption their writes would be
+  -- silently reverted while still reporting success.
+  if auth.uid() is not null and auth.uid() is distinct from old.tenant_id then
     new.tenant_id  := old.tenant_id;
     new.offer_usd  := old.offer_usd;
     new.offer_note := old.offer_note;
