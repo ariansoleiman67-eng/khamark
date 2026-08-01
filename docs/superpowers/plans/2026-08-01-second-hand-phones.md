@@ -33,6 +33,15 @@ Every task's requirements implicitly include this section.
 - Consumes: nothing
 - Produces: table `public.trade_in_requests`; column `public.parts.condition text default 'new'`
 
+> **SUPERSEDED — Task 1 is complete.** The SQL below is the original draft and
+> contains three authorization defects found in review: the insert policy
+> constrained only `user_id` (a customer could fabricate a `completed` request at
+> a self-chosen price in a real shop's inbox), the admin policy lost its
+> `is_admin` gate (permissive policies OR together, handing a customer the `for
+> all` grant on their own row), and the update policy pinned neither `tenant_id`
+> nor the row's current status. The authoritative version is the committed file
+> `supabase/migrations/20260801120000_trade_in_requests.sql`. Read that, not this.
+
 - [ ] **Step 1: Write the migration**
 
 ```sql
