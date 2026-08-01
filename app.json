@@ -43,7 +43,7 @@
         "ITSAppUsesNonExemptEncryption": false
       },
       "config": {
-        "googleMapsApiKey": "AIzaSyBL_OHmMpUcYjgxok8ldXyBWISodVCyAFU"
+        "googleMapsApiKey": ""
       },
       "googleServicesFile": "./GoogleService-Info.plist"
     },
@@ -74,7 +74,7 @@
       ],
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyBL_OHmMpUcYjgxok8ldXyBWISodVCyAFU"
+          "apiKey": ""
         }
       },
       "metaData": [
