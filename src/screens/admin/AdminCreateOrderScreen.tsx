@@ -357,7 +357,11 @@ const AdminCreateOrderScreen: React.FC = () => {
   // Region (country) is the single source of truth for the phone code. Defaults
   // to Iraq (+964); the phone selector below stays in sync with it.
   const allCountries = useMemo(() => getAllCountries(), []);
-  const [country, setCountry] = useState<CountryInfo>(() => allCountries.find((c) => c.code === 'IQ') || allCountries[0]);
+  // Held as a value (not just an inline initializer) so Clear can restore it: leaving the
+  // previous walk-in's region selected prefixes the next customer's digits with the wrong
+  // dial code, and the order commits an unreachable phone number.
+  const defaultCountry = useMemo(() => allCountries.find((c) => c.code === 'IQ') || allCountries[0], [allCountries]);
+  const [country, setCountry] = useState<CountryInfo>(defaultCountry);
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [countrySearch, setCountrySearch] = useState('');
   const filteredCountries = useMemo(() => {
@@ -449,6 +453,13 @@ const AdminCreateOrderScreen: React.FC = () => {
             if (Object.keys(restored).length) setCart(restored);
             if (d.customerName) setCustomerName(d.customerName);
             if (d.customerPhone) setCustomerPhone(d.customerPhone);
+            // Restore the region too, via setCountry (not selectCountry, which clears the
+            // city). Without it the digits came back but the code reverted to +964, so the
+            // sale committed a mis-prefixed number.
+            if (d.countryCode) {
+              const savedCountry = allCountries.find((c) => c.code === d.countryCode);
+              if (savedCountry) setCountry(savedCountry);
+            }
             if (d.customerAddress) setCustomerAddress(d.customerAddress);
             if (d.customerCity) setCustomerCity(d.customerCity);
             if (d.isVip) setIsVip(true);
@@ -466,7 +477,7 @@ const AdminCreateOrderScreen: React.FC = () => {
       setLoading(false);
       hydratedRef.current = true;
     }
-  }, [tenantId]);
+  }, [tenantId, allCountries]);
 
   useEffect(() => { loadProducts(); }, [loadProducts]);
 
@@ -558,11 +569,14 @@ const AdminCreateOrderScreen: React.FC = () => {
   const resetSale = useCallback(() => {
     setCart({});
     setCustomerName(''); setCustomerPhone(''); setCustomerAddress(''); setCustomerCity('');
+    // The region is part of the phone number — clearing the digits but keeping the
+    // previous customer's dial code produces a valid-looking, unreachable number.
+    setCountry(defaultCountry);
     setIsVip(false); setSearch('');
     setDiscountText(''); setDiscountMode('flat'); setCashText(''); setNote('');
     setStep('browse');
     if (tenantId) AsyncStorage.removeItem(`pos_draft_${tenantId}`).catch(() => {});
-  }, [tenantId]);
+  }, [tenantId, defaultCountry]);
 
   // Guard against losing a built-up cart: review→browse first, then confirm before leaving.
   const handleBack = useCallback(() => {
@@ -608,13 +622,13 @@ const AdminCreateOrderScreen: React.FC = () => {
     const hasContent = items.length > 0 || !!customerName || !!customerPhone || !!customerAddress || !!note;
     const h = setTimeout(() => {
       if (hasContent) {
-        AsyncStorage.setItem(key, JSON.stringify({ items, customerName, customerPhone, customerAddress, customerCity, isVip, discountText, discountMode, cashText, note })).catch(() => {});
+        AsyncStorage.setItem(key, JSON.stringify({ items, customerName, customerPhone, countryCode: country.code, customerAddress, customerCity, isVip, discountText, discountMode, cashText, note })).catch(() => {});
       } else {
         AsyncStorage.removeItem(key).catch(() => {});
       }
     }, 400);
     return () => clearTimeout(h);
-  }, [cart, customerName, customerPhone, customerAddress, customerCity, isVip, discountText, discountMode, cashText, note, tenantId]);
+  }, [cart, customerName, customerPhone, country.code, customerAddress, customerCity, isVip, discountText, discountMode, cashText, note, tenantId]);
 
   const lines = Object.values(cart);
   const subtotal = lines.reduce((s, l) => s + (priceOf(l) || 0) * l.quantity, 0);
@@ -678,7 +692,7 @@ const AdminCreateOrderScreen: React.FC = () => {
         variationId: l.variation?.variationId,
       }));
       const fullPhone = customerPhone ? `${country.dialCode}${customerPhone}` : '';
-      const { orderId } = await createTenantAdminService(tenantId).createManualOrder({
+      const { orderId, stockMoved } = await createTenantAdminService(tenantId).createManualOrder({
         items, customerName, customerPhone: fullPhone, customerAddress, customerCity, isVip,
         discountUSD,
         amountPaidUSD: cashText.trim() ? cashUSD : 0,
@@ -689,6 +703,15 @@ const AdminCreateOrderScreen: React.FC = () => {
       // Straight to the order (no extra OK tap), and reset so nothing carries to the next sale.
       resetSale();
       navigation.replace('AdminInStoreOrders', { source: 'in-store', orderId });
+      // The sale IS committed, but the stock deduction was incomplete — nothing else on
+      // screen shows that, so without this the counter sale looks clean while inventory
+      // drifts. Raised after the navigation so the order still opens if it's dismissed.
+      if (!stockMoved) {
+        Alert.alert(
+          t('admin.inStore.stockNotDeductedTitle', { defaultValue: 'Stock not updated' }),
+          t('admin.inStore.stockNotDeductedMsg', { defaultValue: 'The sale was saved, but stock could not be deducted for one or more items. Please adjust the stock manually.' })
+        );
+      }
     } catch (e: any) {
       Alert.alert(t('common.error', { defaultValue: 'Error' }), e.message || t('admin.inStore.createFailed', { defaultValue: 'Failed to create sale' }));
     } finally {

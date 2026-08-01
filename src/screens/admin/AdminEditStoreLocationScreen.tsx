@@ -83,12 +83,21 @@ const AdminEditStoreLocationScreen = () => {
   const [addressAr, setAddressAr] = useState('');
   const [addressKu, setAddressKu] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
-  const [phoneDialCode, setPhoneDialCode] = useState('+1');
-  const [phoneCountry, setPhoneCountry] = useState<CountryCode>('US');
+  // Stores are Iraqi: defaulting to US (+1) silently prefixed local numbers with the wrong
+  // dial code ("07701234567" → "+107701234567"), breaking every customer tel:/WhatsApp link.
+  const [phoneDialCode, setPhoneDialCode] = useState('+964');
+  const [phoneCountry, setPhoneCountry] = useState<CountryCode>('IQ');
+  const [phoneValid, setPhoneValid] = useState(false);
   const [email, setEmail] = useState('');
   const [city, setCity] = useState('');
   const [latitude, setLatitude] = useState(36.1911);
   const [longitude, setLongitude] = useState(44.0094);
+  const [latitudeText, setLatitudeText] = useState('36.1911');
+  const [longitudeText, setLongitudeText] = useState('44.0094');
+  // The lat/lng above are a hard-coded Erbil placeholder. On iOS the map is a static image
+  // (react-native-maps crashes under Fabric), so without this flag every new branch would be
+  // saved at that placeholder and customer "Directions" would route to the wrong place.
+  const [coordsSet, setCoordsSet] = useState(false);
   const [type, setType] = useState<'main' | 'branch' | 'service'>('branch');
   const [isActive, setIsActive] = useState(true);
   const [workingHours, setWorkingHours] = useState(DEFAULT_WORKING_HOURS);
@@ -101,7 +110,7 @@ const AdminEditStoreLocationScreen = () => {
     if (match) {
       return { dialCode: match.dialCode, digits: phone.slice(match.dialCode.length).trim(), countryCode: match.code };
     }
-    return { dialCode: '+1', digits: phone.replace(/[^\d]/g, ''), countryCode: 'US' as CountryCode };
+    return { dialCode: '+964', digits: phone.replace(/[^\d]/g, ''), countryCode: 'IQ' as CountryCode };
   };
   
   // Time picker state
@@ -146,11 +155,20 @@ const AdminEditStoreLocationScreen = () => {
         setCity(location.city || '');
         setLatitude(location.latitude);
         setLongitude(location.longitude);
+        setLatitudeText(String(location.latitude));
+        setLongitudeText(String(location.longitude));
+        setCoordsSet(true);
         setType(location.type);
         setIsActive(location.isActive);
         if (location.workingHours) {
           setWorkingHours(location.workingHours);
         }
+      } else {
+        // The row is genuinely gone (the service now rethrows read failures). Presenting the
+        // blank form here would let the admin re-create it as a new, unrelated location.
+        mountedRef.current && Alert.alert(t('admin.common.error'), t('admin.storeLocations.notFound'));
+        navigation.goBack();
+        return;
       }
     } catch (error) {
       mountedRef.current && Alert.alert(t('admin.common.error'), t('admin.storeLocations.loadFailed'));
@@ -164,6 +182,30 @@ const AdminEditStoreLocationScreen = () => {
     const { latitude: lat, longitude: lng } = e.nativeEvent.coordinate;
     setLatitude(lat);
     setLongitude(lng);
+    setLatitudeText(String(lat));
+    setLongitudeText(String(lng));
+    setCoordsSet(true);
+  };
+
+  // Cross-platform coordinate entry: the only way to set a location on iOS, where the map is
+  // a non-interactive static image. Out-of-range text is kept visible but not committed, so
+  // handleSave's range check is what actually blocks the save.
+  const handleLatitudeChange = (text: string) => {
+    setLatitudeText(text);
+    const parsed = parseFloat(text);
+    if (Number.isFinite(parsed) && parsed >= -90 && parsed <= 90) {
+      setLatitude(parsed);
+      setCoordsSet(true);
+    }
+  };
+
+  const handleLongitudeChange = (text: string) => {
+    setLongitudeText(text);
+    const parsed = parseFloat(text);
+    if (Number.isFinite(parsed) && parsed >= -180 && parsed <= 180) {
+      setLongitude(parsed);
+      setCoordsSet(true);
+    }
   };
 
   // Auto-pick current location using GPS
@@ -189,6 +231,9 @@ const AdminEditStoreLocationScreen = () => {
       
       setLatitude(newLat);
       setLongitude(newLng);
+      setLatitudeText(String(newLat));
+      setLongitudeText(String(newLng));
+      setCoordsSet(true);
 
       // Animate map to new location
       if (mapRef.current) {
@@ -216,9 +261,29 @@ const AdminEditStoreLocationScreen = () => {
   };
 
   const handleSave = async () => {
-    const fullPhone = phoneDigits ? `${phoneDialCode}${phoneDigits}` : '';
+    // Local numbers are written with a trunk "0" that is dropped in E.164 — keeping it
+    // produces "+96407701234567", which no dialer or WhatsApp link resolves.
+    const subscriberDigits = phoneDigits.replace(/\D/g, '').replace(/^0+/, '');
+    const fullPhone = subscriberDigits ? `${phoneDialCode}${subscriberDigits}` : '';
     if (!name.trim() || !address.trim() || !fullPhone.trim() || !city.trim()) {
       mountedRef.current && Alert.alert(t('admin.common.error'), t('admin.storeLocations.requiredFields'));
+      return;
+    }
+
+    if (!phoneValid) {
+      mountedRef.current && Alert.alert(t('admin.common.error'), t('admin.storeLocations.invalidPhone'));
+      return;
+    }
+
+    const latNum = parseFloat(latitudeText);
+    const lngNum = parseFloat(longitudeText);
+    if (!Number.isFinite(latNum) || latNum < -90 || latNum > 90 || !Number.isFinite(lngNum) || lngNum < -180 || lngNum > 180) {
+      mountedRef.current && Alert.alert(t('admin.common.error'), t('admin.storeLocations.invalidCoordinates'));
+      return;
+    }
+
+    if (!coordsSet) {
+      mountedRef.current && Alert.alert(t('admin.common.error'), t('admin.storeLocations.coordinatesRequired'));
       return;
     }
 
@@ -239,8 +304,8 @@ const AdminEditStoreLocationScreen = () => {
         phone: fullPhone.trim(),
         email: email.trim(),
         city: city.trim(),
-        latitude,
-        longitude,
+        latitude: latNum,
+        longitude: lngNum,
         type,
         isActive,
         workingHours,
@@ -376,6 +441,7 @@ const AdminEditStoreLocationScreen = () => {
               <PhoneInput
                 value={phoneDigits}
                 onChangeText={setPhoneDigits}
+                onValidChange={setPhoneValid}
                 onCountryChange={(country: CountryInfo) => setPhoneDialCode(country.dialCode)}
                 defaultCountry={phoneCountry}
                 label=""
@@ -485,6 +551,52 @@ const AdminEditStoreLocationScreen = () => {
                   />
                 </MapView>
               )}
+            </View>
+            {/* Manual entry is the only way to set coordinates on iOS, where the map above
+                is a static image that merely deep-links into Apple Maps. */}
+            <View style={[styles.coordsInputRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <View style={styles.coordsInputField}>
+                <Text allowFontScaling={false} style={[styles.label, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+                  {t('admin.storeLocations.latitude')}
+                </Text>
+                <TextInput allowFontScaling={false}
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: theme.colors.background,
+                      color: theme.colors.text,
+                      borderColor: theme.colors.border,
+                    }
+                  ]}
+                  value={latitudeText}
+                  onChangeText={handleLatitudeChange}
+                  placeholder="36.1911"
+                  placeholderTextColor={theme.colors.textSecondary}
+                  // iOS 'numeric' has no minus key, so southern-hemisphere coordinates
+                  // would be impossible to type.
+                  keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'numeric'}
+                />
+              </View>
+              <View style={styles.coordsInputField}>
+                <Text allowFontScaling={false} style={[styles.label, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+                  {t('admin.storeLocations.longitude')}
+                </Text>
+                <TextInput allowFontScaling={false}
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: theme.colors.background,
+                      color: theme.colors.text,
+                      borderColor: theme.colors.border,
+                    }
+                  ]}
+                  value={longitudeText}
+                  onChangeText={handleLongitudeChange}
+                  placeholder="44.0094"
+                  placeholderTextColor={theme.colors.textSecondary}
+                  keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'numeric'}
+                />
+              </View>
             </View>
             <View style={styles.coordsRow}>
               <Text allowFontScaling={false} style={[styles.coordsText, { color: theme.colors.textSecondary }]}>
@@ -634,6 +746,14 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: SPACING.md,
+  },
+  coordsInputField: {
+    flex: 1,
+    marginHorizontal: 4,
+  },
+  coordsInputRow: {
+    flexDirection: 'row',
+    marginTop: SPACING.sm,
   },
   coordsRow: {
     alignItems: 'center',

@@ -593,7 +593,7 @@ const AdminOrdersScreen: React.FC = () => {
     if (newStatus === 'cancelled_by_store') {
       Alert.alert(
         t('admin.orders.cancelConfirmTitle', { defaultValue: 'Cancel Order?' }),
-        t('admin.orders.cancelConfirmWarning', { defaultValue: 'Cancelling this order will immediately notify the customer and cannot be undone.' }),
+        t('admin.orders.cancelConfirmWarning', { defaultValue: 'Cancelling this order restores its stock and cannot be undone.' }),
         [
           { text: t('admin.common.cancel'), style: 'cancel' },
           {
@@ -1955,6 +1955,20 @@ const AdminOrdersScreen: React.FC = () => {
                         </Text>
                       </View>
                     )}
+                    {(selectedOrder?.discountUSD || 0) > 0 && (
+                      <View style={styles.summaryRow}>
+                        <Text allowFontScaling={false}
+                          style={[styles.summaryLabel, { color: theme.colors.textSecondary }]}
+                          adjustsFontSizeToFit
+                          numberOfLines={1}
+                        >
+                          {t('admin.orders.discount', { defaultValue: 'Discount' })}
+                        </Text>
+                        <Text allowFontScaling={false} style={[styles.summaryValue, { color: '#10B981' }]}>
+                          -{formatPrice(selectedOrder?.discountUSD || 0, selectedOrder?.currency, selectedOrder?.exchangeRate)}
+                        </Text>
+                      </View>
+                    )}
                     <View style={styles.totalRow}>
                       <Text allowFontScaling={false}
                         style={[styles.totalLabel, { color: theme.colors.text }]}
@@ -1971,12 +1985,15 @@ const AdminOrdersScreen: React.FC = () => {
                     {(() => {
                       // Partner-tagged orders are the partner's — no owner profit shown.
                       const isPartnerOrder = !!(selectedOrder as any)?.partnerId;
+                      // The whole-order discount comes straight out of the margin, so it must be
+                      // netted off here exactly like the in-store ring-up does — otherwise a
+                      // discounted sale reads back overstated by the discount amount.
                       const totalProfit = (selectedOrder?.items || []).reduce((sum, itm) => {
                         if (itm.purchasePrice != null && itm.purchasePrice > 0) {
                           return sum + (itm.priceUSD - itm.purchasePrice) * itm.quantity;
                         }
                         return sum;
-                      }, 0);
+                      }, 0) - (selectedOrder?.discountUSD || 0);
                       const hasAnyPurchasePrice = !isPartnerOrder && (selectedOrder?.items || []).some(itm => itm.purchasePrice != null && itm.purchasePrice > 0);
                       if (!hasAnyPurchasePrice) return null;
                       return (

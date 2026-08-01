@@ -165,7 +165,10 @@ const AdminBusinessInfoScreen = () => {
       setSaving(true);
       
       // Save to the tenant row's business_info jsonb (read by tenantInfoService
-      // for WhatsApp support in order details). Also keep store_name in sync.
+      // for WhatsApp support in order details). Deliberately does NOT touch
+      // store_name: Store Profile owns the customer-facing name (and its _ar/_ku
+      // variants), so writing it here left the translations pointing at the old
+      // name and reverted any Store Profile rename on the next Business Info save.
       if (tenantId) {
         const businessInfo = {
           name: formData.name,
@@ -179,7 +182,7 @@ const AdminBusinessInfoScreen = () => {
         };
         const { error } = await supabase
           .from('tenants')
-          .update({ store_name: formData.name, business_info: businessInfo })
+          .update({ business_info: businessInfo })
           .eq('id', tenantId);
         if (error) throw error;
       }
@@ -238,6 +241,28 @@ const AdminBusinessInfoScreen = () => {
           while an input is focused is consumed dismissing the keyboard, so the
           press is swallowed and the admin has to tap twice. */}
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <View
+          style={[
+            styles.noticeCard,
+            {
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.border,
+              flexDirection: isRTL ? 'row-reverse' : 'row',
+            },
+          ]}
+        >
+          <Ionicons name="information-circle-outline" size={18} color={theme.colors.textSecondary} />
+          <Text
+            allowFontScaling={false}
+            style={[
+              styles.noticeText,
+              { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' },
+            ]}
+          >
+            {t('admin.businessInfo.internalOnlyNote')}
+          </Text>
+        </View>
+
         <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
           <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text }]}>
             {t('admin.businessInfo.generalInfo')}
@@ -401,6 +426,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
+  },
+  noticeCard: {
+    alignItems: 'flex-start',
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: SPACING.sm,
+    marginBottom: SPACING.md,
+    padding: SPACING.md,
+  },
+  noticeText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
   },
   phoneLabel: {
     fontSize: 14,

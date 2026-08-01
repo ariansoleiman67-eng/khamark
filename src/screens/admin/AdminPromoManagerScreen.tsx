@@ -20,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../components/ThemeProvider';
+import { useTenant } from '../../contexts/TenantContext';
 import { promoService, Promo, PromoType } from '../../services/promoService';
 
 // Admin: manage promo codes (percentage / fixed discounts) customers enter at
@@ -39,6 +40,7 @@ const AdminPromoManagerScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
   const { t, i18n } = useTranslation();
   const navigation = useNavigation<any>();
+  const { tenantId } = useTenant();
   const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
 
   const [promos, setPromos] = useState<Promo[]>([]);
@@ -53,13 +55,13 @@ const AdminPromoManagerScreen: React.FC = () => {
 
   const load = useCallback(async () => {
     try {
-      setPromos(await promoService.getAll());
+      setPromos(await promoService.getAll(tenantId || undefined));
     } catch {
       // Keep whatever was loaded before; never leave the spinner stuck on failure.
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [tenantId]);
   useEffect(() => { load(); }, [load]);
 
   const openAdd = () => { setForm(emptyForm()); setValueText(''); setMinText(''); setModalVisible(true); };
@@ -86,6 +88,25 @@ const AdminPromoManagerScreen: React.FC = () => {
       );
       return;
     }
+    // computePromoDiscount clamps to the subtotal, so anything over 100% silently
+    // makes the whole cart free instead of erroring.
+    if (((form.type as PromoType) ?? 'percentage') === 'percentage' && value > 100) {
+      Alert.alert(
+        t('common.error', { defaultValue: 'Error' }),
+        t('admin.promos.percentRange', { defaultValue: 'Percent off must be between 1 and 100' })
+      );
+      return;
+    }
+    // Mirror the uniq_promo_code_per_tenant index client-side: without this the
+    // same code can be created twice and checkout resolves whichever row sorts first.
+    const normalizedCode = code.toUpperCase();
+    if (promos.some(p => p.id !== form.id && p.code.trim().toUpperCase() === normalizedCode)) {
+      Alert.alert(
+        t('common.error', { defaultValue: 'Error' }),
+        t('admin.promos.duplicateCode', { defaultValue: 'That code already exists' })
+      );
+      return;
+    }
     setSaving(true);
     try {
       const minParsed = minText.trim() !== '' ? Number(minText) : NaN;
@@ -98,6 +119,7 @@ const AdminPromoManagerScreen: React.FC = () => {
         minPurchase: min,
         isActive: form.isActive ?? true,
         sortOrder: form.sortOrder,
+        tenantId: tenantId || undefined,
       });
       setModalVisible(false);
       await load();
@@ -122,7 +144,7 @@ const AdminPromoManagerScreen: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await promoService.remove(p.id);
+              await promoService.remove(p.id, tenantId || undefined);
               await load();
             } catch {
               Alert.alert(

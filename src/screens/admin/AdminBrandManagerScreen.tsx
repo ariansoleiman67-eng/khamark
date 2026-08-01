@@ -20,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../components/ThemeProvider';
+import { useTenant } from '../../contexts/TenantContext';
 import { brandService, Brand } from '../../services/brandService';
 import { ImageService } from '../../services/imageService';
 import { USE_MOCK_DATA } from '../../services/mockData';
@@ -32,6 +33,7 @@ const AdminBrandManagerScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
   const { t, i18n } = useTranslation();
   const navigation = useNavigation<any>();
+  const { tenantId } = useTenant();
   const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
 
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -42,9 +44,9 @@ const AdminBrandManagerScreen: React.FC = () => {
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
-    setBrands(await brandService.getAllBrands());
+    setBrands(await brandService.getAllBrands(tenantId || undefined));
     setLoading(false);
-  }, []);
+  }, [tenantId]);
   useEffect(() => { load(); }, [load]);
 
   const openAdd = () => { setForm(emptyForm()); setModalVisible(true); };
@@ -58,7 +60,17 @@ const AdminBrandManagerScreen: React.FC = () => {
       let logoUrl = uri;
       if (!USE_MOCK_DATA) {
         const res = await ImageService.uploadImage(uri);
-        if (res?.success && res.url) logoUrl = res.url;
+        // Never fall back to the raw local file:// uri: it renders fine on this
+        // device so the logo looks saved, but every customer gets a blank tile
+        // (and so does the admin once the OS clears its cache).
+        if (!res?.success || !res.url) {
+          Alert.alert(
+            t('common.error', { defaultValue: 'Error' }),
+            t('admin.brands.logoUploadFailed', { defaultValue: 'Could not upload the logo. Check your connection and try again.' })
+          );
+          return;
+        }
+        logoUrl = res.url;
       }
       setForm(f => ({ ...f, logoUrl }));
     } finally {
@@ -73,9 +85,14 @@ const AdminBrandManagerScreen: React.FC = () => {
     }
     setSaving(true);
     try {
-      await brandService.saveBrand({ id: form.id, name: form.name.trim(), logoUrl: form.logoUrl, isActive: form.isActive ?? true, sortOrder: form.sortOrder });
+      await brandService.saveBrand({ id: form.id, name: form.name.trim(), logoUrl: form.logoUrl, isActive: form.isActive ?? true, sortOrder: form.sortOrder, tenantId: tenantId || undefined });
       setModalVisible(false);
       await load();
+    } catch {
+      Alert.alert(
+        t('common.error', { defaultValue: 'Error' }),
+        t('admin.brands.saveFailed', { defaultValue: 'Could not save. Try again.' })
+      );
     } finally {
       setSaving(false);
     }
@@ -90,7 +107,17 @@ const AdminBrandManagerScreen: React.FC = () => {
         {
           text: t('common.delete', { defaultValue: 'Delete' }),
           style: 'destructive',
-          onPress: async () => { await brandService.deleteBrand(b.id); await load(); },
+          onPress: async () => {
+            try {
+              await brandService.deleteBrand(b.id, tenantId || undefined);
+              await load();
+            } catch {
+              Alert.alert(
+                t('common.error', { defaultValue: 'Error' }),
+                t('admin.brands.deleteFailed', { defaultValue: 'Could not delete. Try again.' })
+              );
+            }
+          },
         },
       ]
     );

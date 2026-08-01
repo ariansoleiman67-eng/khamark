@@ -18,6 +18,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTranslation } from 'react-i18next';
+import { useTenant } from '../../contexts/TenantContext';
 import { useTheme } from '../../components/ThemeProvider';
 import Button from '../../components/Button';
 import { SPACING, SHADOW_STYLES } from '../../constants/theme';
@@ -36,6 +37,9 @@ const DAYS = [
 
 const AdminOperatingHoursScreen = () => {
   const { theme, isDark } = useTheme();
+  // Hours are per store. Without this every shop read and wrote one shared row, so
+  // saving "Friday closed" set it for every shop in the app.
+  const { tenantId } = useTenant();
   const navigation = useNavigation();
   const { t, i18n } = useTranslation();
   // Directional icons must follow the reading direction. Global auto-RTL is
@@ -44,7 +48,11 @@ const AdminOperatingHoursScreen = () => {
   const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  
+  // The form is seeded with Mon-Fri 09:00-18:00 defaults. Until a read actually succeeds we
+  // cannot tell those defaults apart from the real saved schedule, so editing stays locked —
+  // otherwise Save silently replaces the stored hours with the placeholder ones.
+  const [loaded, setLoaded] = useState(false);
+
   // Default Initial State
   const defaultSchedule: DaySchedule = {
     isOpen: true,
@@ -70,12 +78,14 @@ const AdminOperatingHoursScreen = () => {
 
   useEffect(() => {
     fetchOperatingHours();
-  }, []);
+    // tenantId resolves asynchronously; re-read once it lands so the editor
+    // never loads one store's schedule and saves it onto another's.
+  }, [tenantId]);
 
   const fetchOperatingHours = async () => {
     try {
       setLoading(true);
-      const data = await settingsService.getOperatingHours();
+      const data = await settingsService.getOperatingHours(tenantId);
       if (data) {
         // The stored value is a raw JSONB blob (`data.data as OperatingHours`)
         // with no runtime validation. Normalize per-day so a partial/malformed
@@ -97,18 +107,22 @@ const AdminOperatingHoursScreen = () => {
           return normalized;
         });
       }
+      // A null `data` here is a genuine "never configured" (the service now rethrows read
+      // failures), so the defaults are safe to edit and save.
+      setLoaded(true);
     } catch (error) {
       console.error('Error fetching operating hours:', error);
-      Alert.alert(t('admin.common.error'), t('admin.operatingHours.failed'));
+      Alert.alert(t('admin.common.error'), t('admin.operatingHours.loadFailed'));
     } finally {
       setLoading(false);
     }
   };
 
   const handleSave = async () => {
+    if (!loaded) return;
     try {
       setSaving(true);
-      await settingsService.updateOperatingHours(schedule);
+      await settingsService.updateOperatingHours(schedule, tenantId);
       Alert.alert(t('admin.common.success'), t('admin.operatingHours.success'));
       navigation.goBack();
     } catch (error) {
@@ -180,6 +194,7 @@ const AdminOperatingHoursScreen = () => {
           <Switch
             value={daySchedule.isOpen}
             onValueChange={() => toggleDay(day)}
+            disabled={!loaded}
             trackColor={{ false: theme.colors.border, true: theme.colors.primary + '60' }}
             thumbColor={daySchedule.isOpen ? theme.colors.primary : '#f4f3f4'}
           />
@@ -195,6 +210,7 @@ const AdminOperatingHoursScreen = () => {
               <TouchableOpacity
                 style={[styles.timeButton, { backgroundColor: theme.colors.surface }]}
                 onPress={() => openTimePicker(day, 'open')}
+                disabled={!loaded}
               >
                 <Text allowFontScaling={false} style={[styles.timeText, { color: '#000000', fontWeight: '600' }]}>
                   {daySchedule.openTime}
@@ -204,6 +220,7 @@ const AdminOperatingHoursScreen = () => {
               <TouchableOpacity
                 style={[styles.timeButton, { backgroundColor: theme.colors.surface }]}
                 onPress={() => openTimePicker(day, 'close')}
+                disabled={!loaded}
               >
                 <Text allowFontScaling={false} style={[styles.timeText, { color: '#000000', fontWeight: '600' }]}>
                   {daySchedule.closeTime}
@@ -241,6 +258,11 @@ const AdminOperatingHoursScreen = () => {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
+        {!loaded && (
+          <Text allowFontScaling={false} style={[styles.readOnlyNotice, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
+            {t('admin.operatingHours.readOnlyUntilLoaded')}
+          </Text>
+        )}
         <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
           {DAYS.map(day => renderDayRow(day))}
         </View>
@@ -254,6 +276,7 @@ const AdminOperatingHoursScreen = () => {
           title={t('admin.businessInfo.saveChanges')}
           onPress={handleSave}
           loading={saving}
+          disabled={!loaded}
           style={styles.saveButton}
         />
       </View>
@@ -386,6 +409,10 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     paddingBottom: 30,
+  },
+  readOnlyNotice: {
+    fontSize: 13,
+    marginBottom: SPACING.md,
   },
   saveButton: {
     width: '100%',

@@ -136,7 +136,14 @@ const AdminBannerScreen: React.FC = () => {
           onPress: async () => {
             const success = await bannerService.deleteBanner(banner.id);
             if (success) {
+              // Deleting from the middle leaves a hole in sort_order, so the rows
+              // after it tie and swap arbitrarily until a move button is pressed.
+              const remaining = banners.filter((b) => b.id !== banner.id);
+              const renumbered = await bannerService.reorderBanners(remaining.map((b) => b.id));
               await loadBanners();
+              if (!renumbered) {
+                Alert.alert(t('common.error'), t('admin.banner.reorderFailed', { defaultValue: 'Failed to save the new order' }));
+              }
             } else {
               Alert.alert(t('common.error'), t('admin.banner.deleteFailed', { defaultValue: 'Failed to delete banner' }));
             }
@@ -146,12 +153,22 @@ const AdminBannerScreen: React.FC = () => {
     );
   };
 
+  // The list is swapped optimistically, so a failed write has to be rolled back from
+  // the server — otherwise the new order stays on screen and silently reverts later.
+  const persistOrder = async (ordered: BannerItem[]) => {
+    const ok = await bannerService.reorderBanners(ordered.map((b) => b.id));
+    if (!ok) {
+      await loadBanners();
+      Alert.alert(t('common.error'), t('admin.banner.reorderFailed', { defaultValue: 'Failed to save the new order' }));
+    }
+  };
+
   const handleMoveUp = async (index: number) => {
     if (index === 0) return;
     const newBanners = [...banners];
     [newBanners[index - 1], newBanners[index]] = [newBanners[index], newBanners[index - 1]];
     setBanners(newBanners);
-    await bannerService.reorderBanners(newBanners.map((b) => b.id));
+    await persistOrder(newBanners);
   };
 
   const handleMoveDown = async (index: number) => {
@@ -159,7 +176,18 @@ const AdminBannerScreen: React.FC = () => {
     const newBanners = [...banners];
     [newBanners[index], newBanners[index + 1]] = [newBanners[index + 1], newBanners[index]];
     setBanners(newBanners);
-    await bannerService.reorderBanners(newBanners.map((b) => b.id));
+    await persistOrder(newBanners);
+  };
+
+  // Live-edit the tap-through link locally; persist when the field loses focus.
+  const handleLinkChange = (id: string, value: string) => {
+    setBanners((prev) => prev.map((b) => (b.id === id ? { ...b, linkUrl: value } : b)));
+  };
+  const handleLinkBlur = async (banner: BannerItem) => {
+    const ok = await bannerService.updateBanner(banner.id, { linkUrl: banner.linkUrl || '' });
+    if (!ok) {
+      Alert.alert(t('common.error'), t('admin.banner.updateFailed', { defaultValue: 'Failed to update banner' }));
+    }
   };
 
   // ========================
@@ -401,6 +429,23 @@ const AdminBannerScreen: React.FC = () => {
                 >
                   <Ionicons name="trash-outline" size={22} color="#F44336" />
                 </TouchableOpacity>
+              </View>
+
+              {/* Optional tap-through link */}
+              <View style={[styles.linkRow, { borderTopColor: theme.colors.border }]}>
+                <Ionicons name="link" size={16} color={theme.colors.textSecondary} style={{ marginHorizontal: 8 }} />
+                <TextInput allowFontScaling={false}
+                  style={{ flex: 1, color: theme.colors.text, paddingVertical: 10, paddingHorizontal: 4, textAlign: isRTL ? 'right' : 'left' }}
+                  value={banner.linkUrl || ''}
+                  onChangeText={(text) => handleLinkChange(banner.id, text)}
+                  onBlur={() => handleLinkBlur(banner)}
+                  placeholder={t('admin.banner.linkPlaceholder', { defaultValue: 'Link when tapped (optional) — e.g. https://…' })}
+                  placeholderTextColor={theme.colors.textSecondary}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                  multiline={false}
+                />
               </View>
             </View>
           ))}
@@ -672,6 +717,12 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     width: 40,
+  },
+  linkRow: {
+    alignItems: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    paddingHorizontal: 8,
   },
   // FAB
   fab: {

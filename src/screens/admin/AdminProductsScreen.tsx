@@ -14,6 +14,7 @@ import {
   Alert,
   Modal,
   Platform,
+  I18nManager,
   LayoutAnimation,
   UIManager,
 } from 'react-native';
@@ -33,7 +34,9 @@ import { Image as ExpoImage } from 'expo-image';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTenant } from '../../contexts/TenantContext';
 import { createTenantAdminService, TenantCategory } from '../../services/tenantAdminService';
+import { categoryStore } from '../../services/categoryStore';
 import { ImageService } from '../../services/imageService';
+import { brandService } from '../../services/brandService';
 import { VideoService, VIDEO_CONFIG, VideoPickResult } from '../../services/videoService';
 import { useTranslation } from 'react-i18next';
 import { Product, PriceTier, ProductStatus, ProductVariation, ColorVariation } from '../../types';
@@ -147,9 +150,13 @@ const AdminProductsScreen: React.FC = () => {
   const [variations, setVariations] = useState<ProductVariation[]>([]);
   const [newSizeValue, setNewSizeValue] = useState('');
   const [newSizeStock, setNewSizeStock] = useState('');
+  const [newSizePrice, setNewSizePrice] = useState(''); // optional per-tier price (e.g. 256GB costs more)
+  // Common phone storage tiers for quick-add (tap to fill the value field).
+  const STORAGE_PRESETS = ['64GB', '128GB', '256GB', '512GB', '1TB'];
 
   // ALIBABA VARIATION: Color variations with stock
   const [colorVariations, setColorVariations] = useState<ColorVariation[]>([]);
+  const [colorImgUploadingId, setColorImgUploadingId] = useState<string | null>(null);
   const [newColorStock, setNewColorStock] = useState('');
 
   // Calculate total stocks for variations
@@ -159,14 +166,27 @@ const AdminProductsScreen: React.FC = () => {
   const [categoryPickerVisible, setCategoryPickerVisible] = useState(false);
   const [managedCategories, setManagedCategories] = useState<TenantCategory[]>([]);
   // Load the shop's managed categories each time the picker opens (fresh if the
-  // admin just added some in Settings → Categories).
+  // admin just added some in Settings → Categories). Read from categoryStore —
+  // the SAME source the Category Manager writes to — so newly-added categories
+  // actually appear here (the old tenant-scoped read returned "No categories").
+  // Also loaded on modal open, because the category field needs the list to tell a
+  // managed category (shown translated, read-only) from a free-typed custom one.
   useEffect(() => {
-    if (categoryPickerVisible && tenantId) {
-      createTenantAdminService(tenantId).getCategories().then(setManagedCategories).catch(() => {});
+    if (categoryPickerVisible || modalVisible) {
+      categoryStore.getActiveTenantCategories(tenantId || undefined).then(setManagedCategories).catch(() => {});
     }
-  }, [categoryPickerVisible, tenantId]);
+  }, [categoryPickerVisible, modalVisible, tenantId]);
   const [applyShippingToAll, setApplyShippingToAll] = useState(false);
   const [isFeatured, setIsFeatured] = useState(false); // pin product to the featured row
+  const [isActive, setIsActive] = useState(true); // false = hide from the storefront without deleting
+  // The shop's managed brands, offered as tap-to-fill chips so admins pick a
+  // canonical name instead of retyping (which caused "Sumsung"-style drift).
+  const [brandOptions, setBrandOptions] = useState<string[]>([]);
+  useEffect(() => {
+    brandService.getActiveBrands(tenantId || undefined)
+      .then(bs => setBrandOptions(bs.map(b => b.name)))
+      .catch(() => {});
+  }, [tenantId]);
   
   // City-based shipping rates
   const [shippingRates, setShippingRates] = useState<Array<{ city: string; price: number }>>([]);
@@ -182,15 +202,34 @@ const AdminProductsScreen: React.FC = () => {
     nameKu: '',
     partNumber: '',
     category: '',
+    categoryAr: '',
+    categoryKu: '',
     priceUSD: '',
+    compareAtPriceUSD: '',
+    vipPriceUSD: '',
     purchasePrice: '',
     stockQty: '',
     shippingCost: '',
     description: '',
+    descriptionAr: '',
+    descriptionKu: '',
     brand: '',
     initialStock: '',
     status: 'available' as ProductStatus,
+    warranty: '',
+    sku: '',
+    barcode: '',
+    weight: '',
+    dimLength: '',
+    dimWidth: '',
+    dimHeight: '',
   });
+
+  // Structured specifications (RAM / screen / battery ...) as an ordered key/value list.
+  const [specEntries, setSpecEntries] = useState<Array<{ key: string; value: string }>>([]);
+  const [newSpecKey, setNewSpecKey] = useState('');
+  const [newSpecValue, setNewSpecValue] = useState('');
+  const SPEC_PRESETS = ['RAM', 'Storage', 'Screen', 'Battery', 'Chipset', 'Camera', 'OS'];
 
   useEffect(() => {
     // Keep the ref in lockstep with the active tenant so an in-flight loadProducts()
@@ -206,13 +245,19 @@ const AdminProductsScreen: React.FC = () => {
     setVariations([]);
     setNewSizeValue('');
     setNewSizeStock('');
+    setNewSizePrice('');
+    setSpecEntries([]);
+    setNewSpecKey('');
+    setNewSpecValue('');
     setColorVariations([]);
     setNewColorStock('');
     setNewColorKey(null);
     setIsFeatured(false);
+    setIsActive(true);
     setFormData({
-      name: '', nameAr: '', nameKu: '', partNumber: '', category: '',
-      priceUSD: '', purchasePrice: '', stockQty: '', historicalStockQty: '', initialStock: '', shippingCost: '', description: '', brand: '', status: 'available',
+      name: '', nameAr: '', nameKu: '', partNumber: '', category: '', categoryAr: '', categoryKu: '',
+      priceUSD: '', compareAtPriceUSD: '', vipPriceUSD: '', purchasePrice: '', stockQty: '', historicalStockQty: '', initialStock: '', shippingCost: '', description: '', descriptionAr: '', descriptionKu: '', brand: '', status: 'available',
+      warranty: '', sku: '', barcode: '', weight: '', dimLength: '', dimWidth: '', dimHeight: '',
     });
     // Also reset view state so a tenant switch doesn't carry over filters/reorder mode.
     setFilterStatus('all');
@@ -238,9 +283,15 @@ const AdminProductsScreen: React.FC = () => {
     }
   }, [modalVisible]);
 
+  // Set once the admin types into the Total Historical Stock field. Without it the
+  // auto-calc below overwrites their manual override the moment Stock Qty changes,
+  // and the save then persists the recalculated number instead of what they entered.
+  const historicalTouchedRef = useRef(false);
+
   // Auto-calculate historical stock when stock fields change
   useEffect(() => {
     if (!modalVisible) return;
+    if (historicalTouchedRef.current) return;
 
     const newStockQty = parseInt(formData.stockQty) || 0;
     const newVariationStock = variations.reduce((s, v) => s + (v.stockQuantity || 0), 0);
@@ -314,11 +365,15 @@ const AdminProductsScreen: React.FC = () => {
 
   const resetForm = () => {
     editSessionRef.current++;
+    historicalTouchedRef.current = false;
     setUploadingImage(false);
     setUploadingVideo(false);
+    setIsFeatured(false);
+    setIsActive(true);
     setFormData({
-      name: '', nameAr: '', nameKu: '', partNumber: '', category: '',
-      priceUSD: '', purchasePrice: '', stockQty: '', historicalStockQty: '', initialStock: '', shippingCost: '', description: '', brand: '', status: 'available',
+      name: '', nameAr: '', nameKu: '', partNumber: '', category: '', categoryAr: '', categoryKu: '',
+      priceUSD: '', compareAtPriceUSD: '', vipPriceUSD: '', purchasePrice: '', stockQty: '', historicalStockQty: '', initialStock: '', shippingCost: '', description: '', descriptionAr: '', descriptionKu: '', brand: '', status: 'available',
+      warranty: '', sku: '', barcode: '', weight: '', dimLength: '', dimWidth: '', dimHeight: '',
     });
     setApplyShippingToAll(false);
     setShippingRates([]);
@@ -332,6 +387,10 @@ const AdminProductsScreen: React.FC = () => {
     setVariations([]);
     setNewSizeValue('');
     setNewSizeStock('');
+    setNewSizePrice('');
+    setSpecEntries([]);
+    setNewSpecKey('');
+    setNewSpecValue('');
     setColorVariations([]);
     setNewColorStock('');
     setNewColorKey(null);
@@ -368,17 +427,49 @@ const AdminProductsScreen: React.FC = () => {
       return;
     }
 
+    const priceNum = parseFloat(newSizePrice);
     const newVariation: ProductVariation = {
       variationId: `var_${Date.now()}_${sizeText}`,
       sizeValue: sizeText,
       sizeUnit: '',
       stockQuantity: stockNum,
+      ...(newSizePrice.trim() !== '' && !isNaN(priceNum) && priceNum > 0 ? { priceUSD: priceNum } : {}),
     };
 
     setVariations([...variations, newVariation]);
     setNewSizeValue('');
     setNewSizeStock('');
+    setNewSizePrice('');
   };
+
+  // Per-tier price override (blank clears it → tier uses the base price).
+  const updateVariationPrice = (variationId: string, newPrice: string) => {
+    const num = parseFloat(newPrice);
+    setVariations(variations.map(v => {
+      if (v.variationId !== variationId) return v;
+      if (newPrice.trim() === '' || isNaN(num) || num <= 0) {
+        const { priceUSD, ...rest } = v;
+        return rest as ProductVariation;
+      }
+      return { ...v, priceUSD: num };
+    }));
+  };
+
+  const addSpec = () => {
+    const k = newSpecKey.trim();
+    const v = newSpecValue.trim();
+    if (!k || !v) return;
+    if (specEntries.some(s => s.key.toLowerCase() === k.toLowerCase())) {
+      Alert.alert(t('admin.common.error'), t('admin.products.form.duplicateSpec', { defaultValue: 'That spec already exists' }));
+      return;
+    }
+    setSpecEntries([...specEntries, { key: k, value: v }]);
+    setNewSpecKey('');
+    setNewSpecValue('');
+  };
+  const removeSpec = (key: string) => setSpecEntries(specEntries.filter(s => s.key !== key));
+  const updateSpecValue = (key: string, value: string) =>
+    setSpecEntries(specEntries.map(s => (s.key === key ? { ...s, value } : s)));
 
   const removeVariation = (variationId: string) => {
     setVariations(variations.filter(v => v.variationId !== variationId));
@@ -431,6 +522,33 @@ const AdminProductsScreen: React.FC = () => {
     ));
   };
 
+  // Pick + upload an image for a color (swaps the hero when that color is selected).
+  const pickColorVariationImage = async (variationId: string) => {
+    const session = editSessionRef.current;
+    try {
+      const result = await ImageService.pickImage({ quality: 0.85 });
+      if (result.canceled || !result.assets?.[0]) return;
+      if (!isSameEditSession(session)) return;
+      setColorImgUploadingId(variationId);
+      const up = await ImageService.uploadImage(result.assets[0].uri);
+      // Admin may have switched products mid-upload — don't commit into another product.
+      if (!isSameEditSession(session)) return;
+      if (up.success && up.url) {
+        const url = up.url;
+        setColorVariations(prev => prev.map(v => v.variationId === variationId ? { ...v, imageUrl: url } : v));
+      } else {
+        Alert.alert(t('admin.common.error'), t('admin.products.form.imageUploadFailed', { defaultValue: 'Image upload failed' }));
+      }
+    } catch {
+      if (!isSameEditSession(session)) return;
+      Alert.alert(t('admin.common.error'), t('common.somethingWentWrong', { defaultValue: 'Something went wrong' }));
+    } finally {
+      if (isSameEditSession(session)) setColorImgUploadingId(null);
+    }
+  };
+  const removeColorVariationImage = (variationId: string) =>
+    setColorVariations(prev => prev.map(v => v.variationId === variationId ? { ...v, imageUrl: undefined } : v));
+
   const updateVariationSize = (variationId: string, newSize: string) => {
     const sizeText = newSize.trim();
     if (!sizeText) return;
@@ -449,24 +567,45 @@ const AdminProductsScreen: React.FC = () => {
   };
 
   const openEditModal = useCallback((product: Product) => {
+    // Invalidate any in-flight image upload from a previously-open product so it
+    // can't commit into THIS product's form (isSameEditSession guard).
+    editSessionRef.current++;
+    // Fresh product → the loaded historical value is the stored one, not a manual override.
+    historicalTouchedRef.current = false;
     setEditingProduct(product);
     setIsFeatured(!!(product as any).isFeatured);
+    setIsActive((product as any).isActive !== false);
     setFormData({
       name: product.name || '',
       nameAr: product.nameAr || '',
       nameKu: product.nameKu || '',
       partNumber: product.partNumber || '',
       category: product.category || '',
+      categoryAr: (product as any).categoryAr || '',
+      categoryKu: (product as any).categoryKu || '',
       priceUSD: product.priceUSD?.toString() || '',
+      compareAtPriceUSD: product.compareAtPriceUSD != null ? String(product.compareAtPriceUSD) : '',
+      vipPriceUSD: product.vipPriceUSD != null ? String(product.vipPriceUSD) : '',
       purchasePrice: (product as any).purchasePrice?.toString() || '',
       stockQty: product.stockQty?.toString() || '',
       historicalStockQty: product.historicalStockQty?.toString() || '',
       initialStock: product.initialStock?.toString() || '',
       shippingCost: product.shippingCost?.toString() || '',
       description: product.description || '',
+      descriptionAr: (product as any).descriptionAr || '',
+      descriptionKu: (product as any).descriptionKu || '',
       brand: product.brand || '',
       status: product.status || 'available',
+      warranty: (product as any).warranty || '',
+      sku: (product as any).sku || '',
+      barcode: (product as any).barcode || '',
+      weight: (product as any).weight != null ? String((product as any).weight) : '',
+      dimLength: (product as any).dimensions?.length != null ? String((product as any).dimensions.length) : '',
+      dimWidth: (product as any).dimensions?.width != null ? String((product as any).dimensions.width) : '',
+      dimHeight: (product as any).dimensions?.height != null ? String((product as any).dimensions.height) : '',
     });
+    const specObj = (product as any).specifications || {};
+    setSpecEntries(Object.keys(specObj).map(k => ({ key: k, value: String(specObj[k]) })));
     setApplyShippingToAll(false);
     setShippingRates(product.shippingRates || []);
     setNewCityName('');
@@ -478,6 +617,7 @@ const AdminProductsScreen: React.FC = () => {
     setColorVariations(product.colorVariations || []);
     setNewSizeValue('');
     setNewSizeStock('');
+    setNewSizePrice('');
     setNewColorStock('');
     // Video state from product
     setVideoUrl(product.videoUrl || null);
@@ -501,13 +641,31 @@ const AdminProductsScreen: React.FC = () => {
       return parseFloat(cleaned) || 0;
     };
 
-    if (!formData.name || !formData.partNumber || !formData.priceUSD) {
+    // Trimmed: " " is not a name — untrimmed truthiness let whitespace-only values save.
+    // Price is checked below, and only for `available`, so a coming_soon product can be
+    // saved without one (which the unconditional `!formData.priceUSD` test blocked).
+    if (!formData.name.trim() || !formData.partNumber.trim()) {
       Alert.alert(t('admin.common.error'), t('admin.products.fillRequired'));
       return;
     }
     // Available products must have a real price; coming_soon/on_the_way may stay $0.
     if (formData.status === 'available' && !(sanitizePrice(formData.priceUSD) > 0)) {
       Alert.alert(t('admin.common.error'), t('admin.products.priceMustBePositive', { defaultValue: 'Available products need a price greater than 0.' }));
+      return;
+    }
+    // validatePriceTiers rejects the ENTIRE tier array if any single tier is invalid, so
+    // one freshly-added tier left at the seeded price of 0 silently kills wholesale
+    // pricing for the whole product (the storefront just falls back to the base price).
+    // Same rule as src/utils/pricingUtils.ts: positive minQty, positive price, ascending.
+    const tiersByMinQty = [...priceTiers].sort((a, b) => a.minQty - b.minQty);
+    const hasInvalidTier = tiersByMinQty.some((tier, i) =>
+      !(tier.minQty > 0) || !(tier.priceUSD > 0) || (i > 0 && tier.minQty === tiersByMinQty[i - 1].minQty)
+    );
+    if (hasInvalidTier) {
+      Alert.alert(
+        t('admin.common.error'),
+        t('admin.products.invalidPriceTiers', { defaultValue: 'Every wholesale tier needs a quantity and a price greater than 0, and two tiers cannot share the same minimum quantity.' })
+      );
       return;
     }
     if (!tenantId) {
@@ -573,22 +731,43 @@ const AdminProductsScreen: React.FC = () => {
         historicalStockQty = Math.max(0, oldHistorical + stockDelta);
       }
 
+      // Store trimmed: trailing spaces break part-number matching and search.
+      const trimmedName = formData.name.trim();
+      const trimmedPartNumber = formData.partNumber.trim();
+
       const productData: any = {
-        name: formData.name,
-        nameAr: formData.nameAr || formData.name,
-        nameKu: formData.nameKu || formData.name,
-        partNumber: formData.partNumber,
+        name: trimmedName,
+        // NULL when blank, never a copy of the English name. Copying made the value
+        // STICKY: the copy loads back into the form on the next edit, so renaming
+        // the product in English no longer updated the Arabic/Kurdish columns and
+        // those shoppers kept seeing the original name indefinitely.
+        nameAr: formData.nameAr.trim() || null,
+        nameKu: formData.nameKu.trim() || null,
+        partNumber: trimmedPartNumber,
         category: formData.category || 'General',
-        categoryAr: (formData as any).categoryAr || formData.category || 'General',
-        categoryKu: (formData as any).categoryKu || formData.category || 'General',
+        // Blank stays NULL, never the English text. Back-filling English here made
+        // the customer-side fallback (`categoryAr?.trim() ? categoryAr : category`)
+        // unreachable, so an Arabic shopper saw English for a field the admin had
+        // simply left empty — and the app could never tell "not translated" from
+        // "translated to the same words".
+        categoryAr: (formData as any).categoryAr?.trim() || null,
+        categoryKu: (formData as any).categoryKu?.trim() || null,
         priceUSD: sanitizePrice(formData.priceUSD),
+        // "Was" price (strike-through) and VIP-only price. Sent as null when blank
+        // so clearing the field removes it; the service maps these to
+        // compare_at_price_usd / vip_price_usd.
+        compareAtPriceUSD: formData.compareAtPriceUSD.trim() !== '' ? sanitizePrice(formData.compareAtPriceUSD) : null,
+        vipPriceUSD: formData.vipPriceUSD.trim() !== '' ? sanitizePrice(formData.vipPriceUSD) : null,
         purchasePrice: payloadPurchasePrice,
         stockQty: newStockQty,
         historicalStockQty: historicalStockQty,
         initialStock: parseInt(formData.initialStock) || 0,
         description: formData.description || '',
-        descriptionAr: formData.description || '',
-        descriptionKu: formData.description || '',
+        // Same rule as the category fields above: an empty Arabic/Kurdish box is
+        // stored as NULL, so the product page can fall back to English instead of
+        // being handed English pretending to be a translation.
+        descriptionAr: formData.descriptionAr?.trim() || null,
+        descriptionKu: formData.descriptionKu?.trim() || null,
         brand: formData.brand || '',
         imageUrls: imageUrls,
         priceTiers: priceTiers.length > 0
@@ -600,13 +779,14 @@ const AdminProductsScreen: React.FC = () => {
           : [],
         compatibleModels: editingProduct?.compatibleModels || [],
         isFeatured: isFeatured,
-        isActive: true,
+        isActive: isActive,
         status: formData.status,
         options: optionsData,
         variations: variationsData,
         colorVariations: colorVariationsData,
-        // Include videoUrl if already uploaded (editing) or null
-        ...(videoUrl && { videoUrl }),
+        // Always sent: spreading it in only when truthy made "no video" unrepresentable,
+        // so a removed video was never cleared on the row and kept playing on the storefront.
+        videoUrl: videoUrl || null,
         // STRICT: Set ownerAdminId to current admin to ensure chats are routed to them
         ownerAdminId: user?.uid || editingProduct?.ownerAdminId || null,
         // Legacy support
@@ -615,6 +795,24 @@ const AdminProductsScreen: React.FC = () => {
         shippingCost: parseFloat(formData.shippingCost) || 0,
         // City-based shipping rates
         shippingRates: shippingRates.length > 0 ? shippingRates : [],
+        // Extra product details (electronics/phone). Blank -> null so they clear.
+        warranty: formData.warranty.trim() || null,
+        sku: formData.sku.trim() || null,
+        barcode: formData.barcode.trim() || null,
+        weight: formData.weight.trim() !== '' ? (parseFloat(formData.weight) || null) : null,
+        dimensions: (formData.dimLength.trim() || formData.dimWidth.trim() || formData.dimHeight.trim())
+          ? {
+              length: parseFloat(formData.dimLength) || 0,
+              width: parseFloat(formData.dimWidth) || 0,
+              height: parseFloat(formData.dimHeight) || 0,
+            }
+          : null,
+        // Structured specs (RAM/screen/battery...) -> jsonb object
+        specifications: specEntries.reduce((acc, s) => {
+          const k = s.key.trim();
+          if (k) acc[k] = s.value.trim();
+          return acc;
+        }, {} as Record<string, string>),
       };
 
       if (editingProduct) {
@@ -654,33 +852,43 @@ const AdminProductsScreen: React.FC = () => {
         }
       }
 
-      // Apply ALL shipping settings (Cost + Rates) to all products if checkbox is checked
-      if (applyShippingToAll) {
-        const shippingCostValue = parseFloat(formData.shippingCost) || 0;
-        const allProducts = await service.getAllProducts();
-        
-        // Optimize: Single update per product for both fields
-        const updates: any = {};
-        if (shippingCostValue > 0) updates.shippingCost = shippingCostValue;
-        if (shippingRates.length > 0) updates.shippingRates = shippingRates;
+      // Close as soon as the row is written. Doing this only AFTER the apply-to-all loop
+      // meant a failure in that loop left the modal open in create mode, and a second
+      // Save inserted the product again (part_number has no UNIQUE constraint).
+      // The isSameEditSession guard stays: saving a video takes tens of seconds, and the
+      // admin may already be editing a different product by the time we get here.
+      if (isSameEditSession(session)) {
+        setModalVisible(false);
+        resetForm();
+      }
 
-        if (Object.keys(updates).length > 0) {
+      // Apply ALL shipping settings (Cost + Rates) to all products if checkbox is checked.
+      // Own try/catch: the product is already saved, so a failure here must not be
+      // reported as a failed save (and must not re-open the create form).
+      if (applyShippingToAll) {
+        try {
+          const allProducts = await service.getAllProducts();
+
+          // No `> 0` / `length > 0` guards: switching the catalogue to FREE shipping means
+          // propagating 0 and [], which the old guards skipped while still reporting success.
+          const updates: any = {
+            shippingCost: parseFloat(formData.shippingCost) || 0,
+            shippingRates: shippingRates,
+          };
+
           for (const p of allProducts) {
             if (p.id && p.id !== editingProduct?.id) {
               await service.updateProduct(p.id, updates);
             }
           }
+        } catch (bulkError) {
+          Alert.alert(
+            t('admin.common.error'),
+            t('admin.products.applyAllShippingFailed', { defaultValue: 'The product was saved, but applying the shipping settings to your other products failed.' })
+          );
         }
       }
 
-      // The apply-to-all loop above updates the whole catalogue one row at a time,
-      // which takes tens of seconds. If the admin closed the modal and started
-      // editing a different product meanwhile, closing and resetting here would slam
-      // that product's modal shut and wipe what they had typed.
-      if (isSameEditSession(session)) {
-        setModalVisible(false);
-        resetForm();
-      }
       await loadProducts();
     } catch (error) {
       Alert.alert(t('admin.common.error'), t('admin.products.saveFailed'));
@@ -908,31 +1116,24 @@ const AdminProductsScreen: React.FC = () => {
     if (!tenantId) return;
     try {
       const service = createTenantAdminService(tenantId);
+      // Spread the source instead of re-listing fields: the old explicit literal silently
+      // dropped every column it forgot (compare-at/VIP price, AR/KU descriptions, specs,
+      // warranty, sku, barcode, weight, dimensions, video, storage options), so the copy
+      // came back stripped. Only the deliberate resets are overridden below.
+      const { id, created_at, updated_at, createdAt, updatedAt, ...source } = product as any;
       const copy: any = {
+        ...source,
         name: `${product.name} (copy)`,
         nameAr: product.nameAr || product.name,
         nameKu: product.nameKu || product.name,
         partNumber: '',
-        category: product.category || 'General',
-        categoryAr: (product as any).categoryAr || product.category || 'General',
-        categoryKu: (product as any).categoryKu || product.category || 'General',
-        priceUSD: product.priceUSD || 0,
-        purchasePrice: (product as any).purchasePrice || 0,
         stockQty: 0,
         historicalStockQty: 0,
         initialStock: 0,
-        description: product.description || '',
-        brand: product.brand || '',
-        imageUrls: product.imageUrls || [],
-        priceTiers: product.priceTiers || [],
-        compatibleModels: product.compatibleModels || [],
         isFeatured: false,
         isActive: true,
-        status: product.status || 'available',
         variations: [],
         colorVariations: [],
-        shippingCost: (product as any).shippingCost || 0,
-        shippingRates: (product as any).shippingRates || [],
         ownerAdminId: user?.uid || null,
         adminId: user?.uid || null,
       };
@@ -1379,13 +1580,22 @@ const AdminProductsScreen: React.FC = () => {
              item.name}
           </Text>
 
-          <Text allowFontScaling={false} 
+          <Text allowFontScaling={false}
             style={[styles.productPartNumber, { color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }]}
             adjustsFontSizeToFit
             numberOfLines={1}
           >
             {item.partNumber}
           </Text>
+
+          {(item as any).isActive === false && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 3, marginTop: 2, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, backgroundColor: theme.colors.textSecondary + '22' }}>
+              <Ionicons name="eye-off" size={11} color={theme.colors.textSecondary} />
+              <Text allowFontScaling={false} style={{ fontSize: 11, fontWeight: '600', color: theme.colors.textSecondary }} numberOfLines={1}>
+                {t('admin.products.form.hidden', { defaultValue: 'Hidden' })}
+              </Text>
+            </View>
+          )}
 
           <View style={styles.productMeta}>
             <Text allowFontScaling={false}
@@ -1568,6 +1778,24 @@ const AdminProductsScreen: React.FC = () => {
   }
 
   const isRTL = i18n.language === 'ar' || i18n.language === 'ku';
+
+  // The category field shows a TRANSLATED label. Typing into it used to write that label
+  // back into `category`, so an admin working in Arabic renamed the product's category to
+  // its Arabic label and the product dropped out of that category for every shopper.
+  // A known/managed category is therefore read-only here — only the picker can change it.
+  const managedCategory = managedCategories.find(c => c.name === formData.category);
+  const isKnownCategory = !!managedCategory || !!CATEGORY_TRANSLATION_KEYS[formData.category];
+  const categoryLabel = CATEGORY_TRANSLATION_KEYS[formData.category]
+    ? t(CATEGORY_TRANSLATION_KEYS[formData.category])
+    : managedCategory
+      ? ((i18n.language === 'ar' && managedCategory.nameAr) ? managedCategory.nameAr
+        : (i18n.language === 'ku' && managedCategory.nameKu) ? managedCategory.nameKu : managedCategory.name)
+      : formData.category;
+
+  // Price is only required for `available` products (see handleSave) — the button used to
+  // demand one for every status, so a "Coming soon" product could never be saved.
+  const canSubmitForm = !!formData.name.trim() && !!formData.partNumber.trim()
+    && (formData.status !== 'available' || !!formData.priceUSD.trim());
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: pageBg }]} edges={['left', 'right']}>
@@ -2227,13 +2455,32 @@ const AdminProductsScreen: React.FC = () => {
                       {t('admin.products.form.category')}
                     </Text>
                     <View style={[styles.input, { backgroundColor: theme.colors.background, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 0, paddingHorizontal: 0 }]}>
-                      <TextInput allowFontScaling={false}                        style={{ flex: 1, paddingHorizontal: 12, height: '100%', color: theme.colors.text }}
-                        value={CATEGORY_TRANSLATION_KEYS[formData.category] ? t(CATEGORY_TRANSLATION_KEYS[formData.category]) : formData.category}
-                        onChangeText={(text) => setFormData(prev => ({ ...prev, category: text }))}
-                        placeholder={t('admin.products.form.selectOrType')}
-                        placeholderTextColor={theme.colors.textSecondary}
-                      />
-                      <TouchableOpacity 
+                      {isKnownCategory ? (
+                        // Display-only: the label is translated, so editing it would corrupt
+                        // the stored English category name (see isKnownCategory above).
+                        <TouchableOpacity
+                          style={{ flex: 1, paddingHorizontal: 12, height: '100%', justifyContent: 'center' }}
+                          onPress={() => setCategoryPickerVisible(true)}
+                          activeOpacity={0.7}
+                        >
+                          <Text allowFontScaling={false}
+                            style={{ fontSize: 15, color: theme.colors.text, textAlign: I18nManager.isRTL ? 'right' : 'left' }}
+                            numberOfLines={1}
+                          >
+                            {categoryLabel}
+                          </Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <TextInput allowFontScaling={false}                        style={{ flex: 1, paddingHorizontal: 12, height: '100%', color: theme.colors.text }}
+                          value={formData.category}
+                          // Clear the translations too: keeping the old categoryAr/categoryKu
+                          // would leave the product filed under the previous category in AR/KU.
+                          onChangeText={(text) => setFormData(prev => ({ ...prev, category: text, categoryAr: '', categoryKu: '' }))}
+                          placeholder={t('admin.products.form.selectOrType')}
+                          placeholderTextColor={theme.colors.textSecondary}
+                        />
+                      )}
+                      <TouchableOpacity
                         onPress={() => setCategoryPickerVisible(true)}
                         style={{ padding: 12 }}
                       >
@@ -2260,6 +2507,34 @@ const AdminProductsScreen: React.FC = () => {
                       disableFullscreenUI
                       autoComplete="off"
                     />
+                    {brandOptions.length > 0 && (
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 6 }}>
+                        {brandOptions.map((b) => {
+                          const selected = formData.brand.trim().toLowerCase() === b.toLowerCase();
+                          return (
+                            <TouchableOpacity
+                              key={b}
+                              onPress={() => setFormData(prev => ({ ...prev, brand: b }))}
+                              activeOpacity={0.7}
+                              style={{
+                                paddingVertical: 5,
+                                paddingHorizontal: 12,
+                                borderRadius: 16,
+                                borderWidth: 1,
+                                borderColor: selected ? theme.colors.primary : theme.colors.border,
+                                backgroundColor: selected ? theme.colors.primary + '15' : 'transparent',
+                                marginRight: 6,
+                                marginBottom: 6,
+                              }}
+                            >
+                              <Text allowFontScaling={false} style={{ fontSize: 12, color: selected ? theme.colors.primary : theme.colors.textSecondary, fontWeight: selected ? '600' : '400' }}>
+                                {b}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    )}
                   </View>
                 </View>
               </View>
@@ -2317,10 +2592,58 @@ const AdminProductsScreen: React.FC = () => {
                   </View>
                 </View>
 
+                {/* "Was" (compare-at) price + VIP price */}
+                <View style={[styles.rowInputs, { marginTop: SPACING.md }]}>
+                  <View style={styles.halfInput}>
+                    <Text allowFontScaling={false}
+                      style={[styles.inputLabel, { color: theme.colors.textSecondary, marginTop: 0 }]}
+                      adjustsFontSizeToFit
+                      numberOfLines={1}
+                    >
+                      {t('admin.products.form.compareAtPrice', { defaultValue: 'Was Price ($)' })}
+                    </Text>
+                    <TextInput allowFontScaling={false} style={[styles.input, { backgroundColor: theme.colors.background, color: theme.colors.text }]}
+                      value={formData.compareAtPriceUSD}
+                      onChangeText={(text) => setFormData(prev => ({ ...prev, compareAtPriceUSD: text }))}
+                      placeholder="0.00"
+                      keyboardType="decimal-pad"
+                      placeholderTextColor={theme.colors.textSecondary}
+                      multiline={false}
+                      scrollEnabled={false}
+                      disableFullscreenUI
+                    />
+                    <Text allowFontScaling={false} style={{ fontSize: 11, color: theme.colors.textSecondary, marginTop: 4 }} numberOfLines={2}>
+                      {t('admin.products.form.compareAtHint', { defaultValue: 'Shown crossed-out to display a discount. Leave blank for none.' })}
+                    </Text>
+                  </View>
+                  <View style={styles.halfInput}>
+                    <Text allowFontScaling={false}
+                      style={[styles.inputLabel, { color: theme.colors.textSecondary, marginTop: 0 }]}
+                      adjustsFontSizeToFit
+                      numberOfLines={1}
+                    >
+                      {t('admin.products.form.vipPrice', { defaultValue: 'VIP Price ($)' })}
+                    </Text>
+                    <TextInput allowFontScaling={false} style={[styles.input, { backgroundColor: theme.colors.background, color: theme.colors.text }]}
+                      value={formData.vipPriceUSD}
+                      onChangeText={(text) => setFormData(prev => ({ ...prev, vipPriceUSD: text }))}
+                      placeholder="0.00"
+                      keyboardType="decimal-pad"
+                      placeholderTextColor={theme.colors.textSecondary}
+                      multiline={false}
+                      scrollEnabled={false}
+                      disableFullscreenUI
+                    />
+                    <Text allowFontScaling={false} style={{ fontSize: 11, color: theme.colors.textSecondary, marginTop: 4 }} numberOfLines={2}>
+                      {t('admin.products.form.vipPriceHint', { defaultValue: 'Special price for VIP customers only. Leave blank for none.' })}
+                    </Text>
+                  </View>
+                </View>
+
                 {/* Purchase Price (Cost Price) */}
                 <View style={[styles.rowInputs, { marginTop: SPACING.md }]}>
                   <View style={styles.halfInput}>
-                    <Text allowFontScaling={false} 
+                    <Text allowFontScaling={false}
                       style={[styles.inputLabel, { color: theme.colors.textSecondary, marginTop: 0 }]}
                       adjustsFontSizeToFit
                       numberOfLines={1}
@@ -2376,7 +2699,11 @@ const AdminProductsScreen: React.FC = () => {
                     </Text>
                     <TextInput allowFontScaling={false}                      style={[styles.input, { backgroundColor: theme.colors.background, color: theme.colors.text }]}
                       value={formData.historicalStockQty}
-                      onChangeText={(text) => setFormData(prev => ({ ...prev, historicalStockQty: text }))}
+                      onChangeText={(text) => {
+                        // Manual override — stop the auto-calc effect from overwriting it.
+                        historicalTouchedRef.current = true;
+                        setFormData(prev => ({ ...prev, historicalStockQty: text }));
+                      }}
                       placeholder={t('admin.products.form.historicalStockPlaceholder', { defaultValue: 'Override History' })}
                       keyboardType="number-pad"
                       placeholderTextColor={theme.colors.textSecondary}
@@ -2564,6 +2891,20 @@ const AdminProductsScreen: React.FC = () => {
                     <Text allowFontScaling={false} style={{ fontSize: 12, color: theme.colors.textSecondary }} numberOfLines={2}>{t('admin.products.form.featuredHint', { defaultValue: 'Show this part in the featured row for customers.' })}</Text>
                   </View>
                   <View style={{ width: 46, height: 28, borderRadius: 14, padding: 3, backgroundColor: isFeatured ? '#F59E0B' : (isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)'), alignItems: isFeatured ? 'flex-end' : 'flex-start' }}>
+                    <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff' }} />
+                  </View>
+                </TouchableOpacity>
+              </View>
+
+              {/* Visible / hidden toggle — hide from the storefront without deleting */}
+              <View style={[styles.formSectionCard, { backgroundColor: isDark ? theme.colors.surface : '#FFFFFF', borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: isDark ? 0 : 0.06, shadowRadius: 8, elevation: 2 }]}>
+                <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }} onPress={() => setIsActive(v => !v)} activeOpacity={0.7}>
+                  <Ionicons name={isActive ? 'eye' : 'eye-off'} size={22} color={isActive ? '#22C55E' : theme.colors.textSecondary} />
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text allowFontScaling={false} style={[styles.inputLabel, { color: theme.colors.text, marginBottom: 2 }]} numberOfLines={1}>{t('admin.products.form.visible', { defaultValue: 'Visible in store' })}</Text>
+                    <Text allowFontScaling={false} style={{ fontSize: 12, color: theme.colors.textSecondary }} numberOfLines={2}>{t('admin.products.form.visibleHint', { defaultValue: 'Turn off to hide this product from customers without deleting it.' })}</Text>
+                  </View>
+                  <View style={{ width: 46, height: 28, borderRadius: 14, padding: 3, backgroundColor: isActive ? '#22C55E' : (isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)'), alignItems: isActive ? 'flex-end' : 'flex-start' }}>
                     <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff' }} />
                   </View>
                 </TouchableOpacity>
@@ -2767,41 +3108,84 @@ const AdminProductsScreen: React.FC = () => {
                     </View>
                   </View>
 
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                    <TextInput allowFontScaling={false}                      style={[styles.input, { backgroundColor: theme.colors.background, color: theme.colors.text, flex: 1, marginRight: 8 }]}
-                      value={newSizeValue}
-                      onChangeText={setNewSizeValue}
-                      placeholder={t('admin.products.form.sizePlaceholder')}
-                      placeholderTextColor={theme.colors.textSecondary}
-                      multiline={false}
-                      scrollEnabled={false}
-                      disableFullscreenUI
-                    />
-                    <TextInput allowFontScaling={false}                      style={[styles.input, { backgroundColor: theme.colors.background, color: theme.colors.text, width: 80, marginRight: 8 }]}
-                      value={newSizeStock}
-                      onChangeText={setNewSizeStock}
-                      keyboardType="number-pad"
-                      placeholder={t('admin.products.form.stock')}
-                      placeholderTextColor={theme.colors.textSecondary}
-                      multiline={false}
-                      scrollEnabled={false}
-                      disableFullscreenUI
-                    />
+                  {/* Quick-add common phone storage tiers */}
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
+                    {STORAGE_PRESETS.map((preset) => {
+                      const already = variations.some(v => v.sizeValue.toLowerCase() === preset.toLowerCase());
+                      return (
+                        <TouchableOpacity
+                          key={preset}
+                          onPress={() => setNewSizeValue(preset)}
+                          disabled={already}
+                          activeOpacity={0.7}
+                          style={{
+                            paddingVertical: 5,
+                            paddingHorizontal: 12,
+                            borderRadius: 16,
+                            borderWidth: 1,
+                            borderColor: already ? theme.colors.border : theme.colors.primary,
+                            backgroundColor: already ? 'transparent' : theme.colors.primary + '12',
+                            marginRight: 6,
+                            marginBottom: 6,
+                            opacity: already ? 0.4 : 1,
+                          }}
+                        >
+                          <Text allowFontScaling={false} style={{ fontSize: 12, color: already ? theme.colors.textSecondary : theme.colors.primary, fontWeight: '600' }}>
+                            {preset}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  {/* Value on its own line so the label isn't cramped */}
+                  <TextInput allowFontScaling={false} style={[styles.input, { backgroundColor: theme.colors.background, color: theme.colors.text, width: '100%', marginBottom: 10 }]}
+                    value={newSizeValue}
+                    onChangeText={setNewSizeValue}
+                    placeholder={t('admin.products.form.sizePlaceholder')}
+                    placeholderTextColor={theme.colors.textSecondary}
+                    multiline={false}
+                    scrollEnabled={false}
+                    disableFullscreenUI
+                  />
+                  {/* Stock + Price + Add on the next line, each labelled + roomy */}
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginBottom: 12 }}>
+                    <View style={{ flex: 1, marginRight: 8 }}>
+                      <Text allowFontScaling={false} style={[styles.inputLabel, { color: theme.colors.textSecondary, marginTop: 0 }]} numberOfLines={1}>{t('admin.products.form.stock')}</Text>
+                      <TextInput allowFontScaling={false} style={[styles.input, { backgroundColor: theme.colors.background, color: theme.colors.text, textAlign: 'center' }]}
+                        value={newSizeStock}
+                        onChangeText={setNewSizeStock}
+                        keyboardType="number-pad"
+                        placeholder="0"
+                        placeholderTextColor={theme.colors.textSecondary}
+                        multiline={false} scrollEnabled={false} disableFullscreenUI
+                      />
+                    </View>
+                    <View style={{ flex: 1, marginRight: 8 }}>
+                      <Text allowFontScaling={false} style={[styles.inputLabel, { color: theme.colors.textSecondary, marginTop: 0 }]} numberOfLines={1}>{t('admin.products.form.priceLabel', { defaultValue: 'Price ($)' })}</Text>
+                      <TextInput allowFontScaling={false} style={[styles.input, { backgroundColor: theme.colors.background, color: theme.colors.text, textAlign: 'center' }]}
+                        value={newSizePrice}
+                        onChangeText={setNewSizePrice}
+                        keyboardType="decimal-pad"
+                        placeholder={t('admin.products.form.optional', { defaultValue: 'optional' })}
+                        placeholderTextColor={theme.colors.textSecondary}
+                        multiline={false} scrollEnabled={false} disableFullscreenUI
+                      />
+                    </View>
                     <TouchableOpacity
-                      style={[styles.addTierButton, { backgroundColor: theme.colors.primary + '20' }]}
+                      style={[styles.addTierButton, { backgroundColor: theme.colors.primary + '20', minHeight: 48, paddingHorizontal: 18 }]}
                       onPress={addVariation}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="add" size={16} color={theme.colors.primary} />
-                      <Text allowFontScaling={false} 
-                        style={[styles.addTierButtonText, { color: theme.colors.primary }]}
-                        adjustsFontSizeToFit
-                        numberOfLines={1}
-                      >
+                      <Ionicons name="add" size={18} color={theme.colors.primary} />
+                      <Text allowFontScaling={false} style={[styles.addTierButtonText, { color: theme.colors.primary }]} numberOfLines={1}>
                         {t('admin.products.form.add')}
                       </Text>
                     </TouchableOpacity>
                   </View>
+                  <Text allowFontScaling={false} style={{ fontSize: 11, color: theme.colors.textSecondary, marginTop: -6, marginBottom: 10 }} numberOfLines={2}>
+                    {t('admin.products.form.storageTierHint', { defaultValue: 'Value / stock / optional price. Set a price only for tiers that cost more (e.g. 512GB); blank uses the base price.' })}
+                  </Text>
 
                   {variations.length === 0 ? (
                     <Text allowFontScaling={false} 
@@ -2834,6 +3218,19 @@ const AdminProductsScreen: React.FC = () => {
                               onChangeText={(text) => updateVariationStock(variation.variationId, text)}
                               keyboardType="number-pad"
                               placeholder="0"
+                              placeholderTextColor={theme.colors.textSecondary}
+                              multiline={false}
+                              scrollEnabled={false}
+                  disableFullscreenUI
+                            />
+                          </View>
+                          <View style={styles.tierInputGroup}>
+                            <Text allowFontScaling={false} style={[styles.tierLabel, { color: theme.colors.textSecondary, textAlign: 'center', lineHeight: 18, paddingVertical: 2, includeFontPadding: true }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{t('product.priceLabel', 'Price')}</Text>
+                            <TextInput allowFontScaling={false} style={[styles.input, { backgroundColor: theme.colors.surface, color: theme.colors.text, paddingHorizontal: 0, minHeight: 48, paddingVertical: 10, minWidth: 60, textAlign: 'center', lineHeight: 22, includeFontPadding: true, fontWeight: Platform.OS === 'android' ? 'normal' : undefined }]}
+                              value={variation.priceUSD != null ? variation.priceUSD.toString() : ''}
+                              onChangeText={(text) => updateVariationPrice(variation.variationId, text)}
+                              keyboardType="decimal-pad"
+                              placeholder="$"
                               placeholderTextColor={theme.colors.textSecondary}
                               multiline={false}
                               scrollEnabled={false}
@@ -2986,6 +3383,21 @@ const AdminProductsScreen: React.FC = () => {
                   disableFullscreenUI
                             />
                           </View>
+                          {/* Per-color image (swaps the hero when selected) */}
+                          <TouchableOpacity
+                            onPress={() => variation.imageUrl ? removeColorVariationImage(variation.variationId) : pickColorVariationImage(variation.variationId)}
+                            activeOpacity={0.7}
+                            disabled={colorImgUploadingId === variation.variationId}
+                            style={{ width: 44, height: 44, borderRadius: 10, marginHorizontal: 6, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surface }}
+                          >
+                            {colorImgUploadingId === variation.variationId ? (
+                              <ActivityIndicator size="small" color={theme.colors.primary} />
+                            ) : variation.imageUrl ? (
+                              <ExpoImage source={{ uri: variation.imageUrl }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+                            ) : (
+                              <Ionicons name="camera-outline" size={18} color={theme.colors.textSecondary} />
+                            )}
+                          </TouchableOpacity>
                           <TouchableOpacity
                             style={[styles.removeTierButton, { backgroundColor: '#F44336' + '20' }]}
                             onPress={() => removeColorVariation(variation.variationId)}
@@ -2997,6 +3409,140 @@ const AdminProductsScreen: React.FC = () => {
                       ))}
                     </View>
                   )}
+                </View>
+              </View>
+
+              {/* SPECIFICATIONS CARD (RAM / screen / battery ...) */}
+              <View style={[styles.formSectionCard, { backgroundColor: isDark ? theme.colors.surface : '#FFFFFF', borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: isDark ? 0 : 0.06, shadowRadius: 8, elevation: 2 }]}>
+                <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text }]} numberOfLines={1}>
+                  {t('admin.products.form.specifications', { defaultValue: 'Specifications' })}
+                </Text>
+                {/* Quick-add common spec keys */}
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
+                  {SPEC_PRESETS.map((preset) => {
+                    const already = specEntries.some(s => s.key.toLowerCase() === preset.toLowerCase());
+                    return (
+                      <TouchableOpacity
+                        key={preset}
+                        onPress={() => setNewSpecKey(preset)}
+                        disabled={already}
+                        activeOpacity={0.7}
+                        style={{ paddingVertical: 5, paddingHorizontal: 12, borderRadius: 16, borderWidth: 1, borderColor: already ? theme.colors.border : theme.colors.primary, backgroundColor: already ? 'transparent' : theme.colors.primary + '12', marginRight: 6, marginBottom: 6, opacity: already ? 0.4 : 1 }}
+                      >
+                        <Text allowFontScaling={false} style={{ fontSize: 12, color: already ? theme.colors.textSecondary : theme.colors.primary, fontWeight: '600' }}>{preset}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                  <TextInput allowFontScaling={false} style={[styles.input, { backgroundColor: theme.colors.background, color: theme.colors.text, flex: 1, marginRight: 6 }]}
+                    value={newSpecKey}
+                    onChangeText={setNewSpecKey}
+                    placeholder={t('admin.products.form.specName', { defaultValue: 'Spec (e.g. RAM)' })}
+                    placeholderTextColor={theme.colors.textSecondary}
+                    multiline={false} scrollEnabled={false} disableFullscreenUI
+                  />
+                  <TextInput allowFontScaling={false} style={[styles.input, { backgroundColor: theme.colors.background, color: theme.colors.text, flex: 1, marginRight: 6 }]}
+                    value={newSpecValue}
+                    onChangeText={setNewSpecValue}
+                    placeholder={t('admin.products.form.specValue', { defaultValue: 'Value (e.g. 8GB)' })}
+                    placeholderTextColor={theme.colors.textSecondary}
+                    multiline={false} scrollEnabled={false} disableFullscreenUI
+                  />
+                  <TouchableOpacity style={[styles.addTierButton, { backgroundColor: theme.colors.primary + '20' }]} onPress={addSpec} activeOpacity={0.7}>
+                    <Ionicons name="add" size={18} color={theme.colors.primary} />
+                  </TouchableOpacity>
+                </View>
+                {specEntries.length === 0 ? (
+                  <Text allowFontScaling={false} style={[styles.noTiersText, { color: theme.colors.textSecondary }]} numberOfLines={2}>
+                    {t('admin.products.form.noSpecs', { defaultValue: 'No specifications added' })}
+                  </Text>
+                ) : (
+                  <View style={styles.priceTiersList}>
+                    {specEntries.map((spec) => (
+                      <View key={spec.key} style={[styles.priceTierRow, { backgroundColor: theme.colors.background }]}>
+                        <View style={{ width: 100, justifyContent: 'center' }}>
+                          <Text allowFontScaling={false} style={{ color: theme.colors.text, fontWeight: '600', fontSize: 13, textAlign: I18nManager.isRTL ? 'right' : 'left' }} numberOfLines={1}>{spec.key}</Text>
+                        </View>
+                        <TextInput allowFontScaling={false} style={[styles.input, { flex: 1, backgroundColor: theme.colors.surface, color: theme.colors.text, minHeight: 44, paddingVertical: 8, marginHorizontal: 8 }]}
+                          value={spec.value}
+                          onChangeText={(text) => updateSpecValue(spec.key, text)}
+                          placeholder={t('admin.products.form.specValue', { defaultValue: 'Value' })}
+                          placeholderTextColor={theme.colors.textSecondary}
+                          multiline={false} scrollEnabled={false} disableFullscreenUI
+                        />
+                        <TouchableOpacity style={[styles.removeTierButton, { backgroundColor: '#F44336' + '20' }]} onPress={() => removeSpec(spec.key)} activeOpacity={0.7}>
+                          <Ionicons name="trash-outline" size={16} color="#F44336" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+
+              {/* DETAILS CARD (SKU / barcode / weight / warranty / dimensions) */}
+              <View style={[styles.formSectionCard, { backgroundColor: isDark ? theme.colors.surface : '#FFFFFF', borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: isDark ? 0 : 0.06, shadowRadius: 8, elevation: 2 }]}>
+                <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text }]} numberOfLines={1}>
+                  {t('admin.products.form.details', { defaultValue: 'Details' })}
+                </Text>
+                <View style={styles.rowInputs}>
+                  <View style={styles.halfInput}>
+                    <Text allowFontScaling={false} style={[styles.inputLabel, { color: theme.colors.textSecondary, marginTop: 0 }]} numberOfLines={1}>{t('admin.products.form.sku', { defaultValue: 'SKU' })}</Text>
+                    <TextInput allowFontScaling={false} style={[styles.input, { backgroundColor: theme.colors.background, color: theme.colors.text }]}
+                      value={formData.sku}
+                      onChangeText={(text) => setFormData(prev => ({ ...prev, sku: text }))}
+                      placeholder={t('admin.products.form.skuPlaceholder', { defaultValue: 'e.g. IP17PM-256-BLK' })}
+                      placeholderTextColor={theme.colors.textSecondary}
+                      autoCapitalize="characters" autoCorrect={false}
+                      multiline={false} scrollEnabled={false} disableFullscreenUI
+                    />
+                  </View>
+                  <View style={styles.halfInput}>
+                    <Text allowFontScaling={false} style={[styles.inputLabel, { color: theme.colors.textSecondary, marginTop: 0 }]} numberOfLines={1}>{t('admin.products.form.barcode', { defaultValue: 'Barcode' })}</Text>
+                    <TextInput allowFontScaling={false} style={[styles.input, { backgroundColor: theme.colors.background, color: theme.colors.text }]}
+                      value={formData.barcode}
+                      onChangeText={(text) => setFormData(prev => ({ ...prev, barcode: text }))}
+                      placeholder={t('admin.products.form.barcodePlaceholder', { defaultValue: 'e.g. 194253000000' })}
+                      placeholderTextColor={theme.colors.textSecondary}
+                      keyboardType="number-pad" autoCorrect={false}
+                      multiline={false} scrollEnabled={false} disableFullscreenUI
+                    />
+                  </View>
+                </View>
+                <View style={[styles.rowInputs, { marginTop: SPACING.md }]}>
+                  <View style={styles.halfInput}>
+                    <Text allowFontScaling={false} style={[styles.inputLabel, { color: theme.colors.textSecondary, marginTop: 0 }]} numberOfLines={1}>{t('admin.products.form.warranty', { defaultValue: 'Warranty' })}</Text>
+                    <TextInput allowFontScaling={false} style={[styles.input, { backgroundColor: theme.colors.background, color: theme.colors.text }]}
+                      value={formData.warranty}
+                      onChangeText={(text) => setFormData(prev => ({ ...prev, warranty: text }))}
+                      placeholder={t('admin.products.form.warrantyPlaceholder', { defaultValue: 'e.g. 1 year' })}
+                      placeholderTextColor={theme.colors.textSecondary}
+                      multiline={false} scrollEnabled={false} disableFullscreenUI
+                    />
+                  </View>
+                  <View style={styles.halfInput}>
+                    <Text allowFontScaling={false} style={[styles.inputLabel, { color: theme.colors.textSecondary, marginTop: 0 }]} numberOfLines={1}>{t('admin.products.form.weight', { defaultValue: 'Weight (kg)' })}</Text>
+                    <TextInput allowFontScaling={false} style={[styles.input, { backgroundColor: theme.colors.background, color: theme.colors.text }]}
+                      value={formData.weight}
+                      onChangeText={(text) => setFormData(prev => ({ ...prev, weight: text }))}
+                      placeholder="0.0"
+                      keyboardType="decimal-pad"
+                      placeholderTextColor={theme.colors.textSecondary}
+                      multiline={false} scrollEnabled={false} disableFullscreenUI
+                    />
+                  </View>
+                </View>
+                <Text allowFontScaling={false} style={[styles.inputLabel, { color: theme.colors.textSecondary, marginTop: SPACING.md }]} numberOfLines={1}>{t('admin.products.form.dimensions', { defaultValue: 'Dimensions (cm) — L / W / H' })}</Text>
+                <View style={{ flexDirection: 'row', marginTop: 4 }}>
+                  <TextInput allowFontScaling={false} style={[styles.input, { flex: 1, backgroundColor: theme.colors.background, color: theme.colors.text, marginRight: 6, textAlign: 'center' }]}
+                    value={formData.dimLength} onChangeText={(text) => setFormData(prev => ({ ...prev, dimLength: text }))}
+                    placeholder="L" keyboardType="decimal-pad" placeholderTextColor={theme.colors.textSecondary} multiline={false} scrollEnabled={false} disableFullscreenUI />
+                  <TextInput allowFontScaling={false} style={[styles.input, { flex: 1, backgroundColor: theme.colors.background, color: theme.colors.text, marginRight: 6, textAlign: 'center' }]}
+                    value={formData.dimWidth} onChangeText={(text) => setFormData(prev => ({ ...prev, dimWidth: text }))}
+                    placeholder="W" keyboardType="decimal-pad" placeholderTextColor={theme.colors.textSecondary} multiline={false} scrollEnabled={false} disableFullscreenUI />
+                  <TextInput allowFontScaling={false} style={[styles.input, { flex: 1, backgroundColor: theme.colors.background, color: theme.colors.text, textAlign: 'center' }]}
+                    value={formData.dimHeight} onChangeText={(text) => setFormData(prev => ({ ...prev, dimHeight: text }))}
+                    placeholder="H" keyboardType="decimal-pad" placeholderTextColor={theme.colors.textSecondary} multiline={false} scrollEnabled={false} disableFullscreenUI />
                 </View>
               </View>
 
@@ -3031,6 +3577,36 @@ const AdminProductsScreen: React.FC = () => {
                   autoComplete="off"
                   textAlignVertical="top"
                 />
+
+                <Text allowFontScaling={false} style={[styles.inputLabel, { color: theme.colors.textSecondary, marginTop: SPACING.md }]} numberOfLines={1}>
+                  {t('admin.products.form.descriptionAr', { defaultValue: 'Description (Arabic)' })}
+                </Text>
+                <TextInput allowFontScaling={false} style={[styles.input, styles.textArea, { backgroundColor: theme.colors.background, color: theme.colors.text, height: undefined, minHeight: 100, paddingVertical: 12, textAlign: 'right' }]}
+                  value={formData.descriptionAr}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, descriptionAr: text }))}
+                  placeholder={t('admin.products.form.descriptionArPlaceholder', { defaultValue: 'وصف المنتج بالعربية (اختياري)' })}
+                  placeholderTextColor={theme.colors.textSecondary}
+                  multiline
+                  scrollEnabled={false}
+                  disableFullscreenUI
+                  autoComplete="off"
+                  textAlignVertical="top"
+                />
+
+                <Text allowFontScaling={false} style={[styles.inputLabel, { color: theme.colors.textSecondary, marginTop: SPACING.md }]} numberOfLines={1}>
+                  {t('admin.products.form.descriptionKu', { defaultValue: 'Description (Kurdish)' })}
+                </Text>
+                <TextInput allowFontScaling={false} style={[styles.input, styles.textArea, { backgroundColor: theme.colors.background, color: theme.colors.text, height: undefined, minHeight: 100, paddingVertical: 12, textAlign: 'right' }]}
+                  value={formData.descriptionKu}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, descriptionKu: text }))}
+                  placeholder={t('admin.products.form.descriptionKuPlaceholder', { defaultValue: 'وەسفی بەرهەم بە کوردی (ئارەزوومەندانە)' })}
+                  placeholderTextColor={theme.colors.textSecondary}
+                  multiline
+                  scrollEnabled={false}
+                  disableFullscreenUI
+                  autoComplete="off"
+                  textAlignVertical="top"
+                />
               </View>
             </KeyboardAwareScrollView>
           ) : null}
@@ -3051,10 +3627,10 @@ const AdminProductsScreen: React.FC = () => {
                   alignItems: 'center', borderRadius: 16, flexDirection: 'row',
                   justifyContent: 'center', paddingVertical: 16,
                   backgroundColor: theme.colors.primary,
-                  opacity: (!formData.name || !formData.partNumber || !formData.priceUSD) ? 0.5 : 1,
+                  opacity: canSubmitForm ? 1 : 0.5,
                 }}
                 onPress={() => handleSave()}
-                disabled={saving || !formData.name || !formData.partNumber || !formData.priceUSD}
+                disabled={saving || !canSubmitForm}
                 activeOpacity={0.8}
               >
                 {saving ? (
@@ -3138,7 +3714,10 @@ const AdminProductsScreen: React.FC = () => {
                         backgroundColor: isSelected ? (theme.colors.primary + '10') : 'transparent',
                       }}
                       onPress={() => {
-                        setFormData(prev => ({ ...prev, category: cat.name, categoryAr: cat.nameAr || cat.name, categoryKu: cat.nameKu || cat.name }));
+                        // Empty, not the English name, when the category has no
+                        // translation — otherwise the stored ar/ku value is English
+                        // and the customer-side fallback can never fire.
+                        setFormData(prev => ({ ...prev, category: cat.name, categoryAr: cat.nameAr || '', categoryKu: cat.nameKu || '' }));
                         setCategoryPickerVisible(false);
                       }}
                       activeOpacity={0.6}

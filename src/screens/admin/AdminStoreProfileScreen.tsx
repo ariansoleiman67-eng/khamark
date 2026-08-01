@@ -78,15 +78,16 @@ const AdminStoreProfileScreen: React.FC = () => {
     timeZone: DateTime.local().zoneName, // Default to device zone (IANA)
   });
 
-  // Phone input state
+  // Phone input state. Iraq-only app: defaulting to US (+1) made a first-time setup
+  // store "+1770…" and every tel:/wa.me link built from it was dead.
   const [phoneDigits, setPhoneDigits] = useState('');
-  const [phoneDialCode, setPhoneDialCode] = useState('+1');
-  const [phoneCountry, setPhoneCountry] = useState<CountryCode>('US');
+  const [phoneDialCode, setPhoneDialCode] = useState('+964');
+  const [phoneCountry, setPhoneCountry] = useState<CountryCode>('IQ');
 
   // WhatsApp input state
   const [waDigits, setWaDigits] = useState('');
-  const [waDialCode, setWaDialCode] = useState('+1');
-  const [waCountry, setWaCountry] = useState<CountryCode>('US');
+  const [waDialCode, setWaDialCode] = useState('+964');
+  const [waCountry, setWaCountry] = useState<CountryCode>('IQ');
 
   // Track which tenant's data has already hydrated the editable form, so that
   // re-focusing the screen never clobbers the admin's unsaved edits (see loadData).
@@ -477,13 +478,15 @@ const AdminStoreProfileScreen: React.FC = () => {
         timeZone: profile.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
       };
       
-      await storeProfileService.updateStoreProfile(tenantId, updateData);
-      
-      // If location selected, sync location data
+      // Location first: it is the write most likely to fail (permission check +
+      // lookup). Running it last meant a location failure reported "Failed to save
+      // store profile" after every other field had already committed.
       if (selectedLocationId) {
         await storeProfileService.setDefaultLocation(tenantId, selectedLocationId, user.uid);
       }
-      
+
+      await storeProfileService.updateStoreProfile(tenantId, updateData);
+
       Alert.alert(
         t('common.success'), 
         t('admin.storeProfile.saveSuccess', { defaultValue: 'Store profile saved successfully' })
@@ -1105,7 +1108,12 @@ const AdminStoreProfileScreen: React.FC = () => {
               <PhoneInput
                 value={phoneDigits}
                 onChangeText={setPhoneDigits}
-                onCountryChange={(country: CountryInfo) => setPhoneDialCode(country.dialCode)}
+                onCountryChange={(country: CountryInfo) => {
+                  setPhoneDialCode(country.dialCode);
+                  // phoneCountry feeds defaultCountry (the flag). Leaving it stale made
+                  // the picker snap back on re-render/refocus: admin sees +964, stores +1.
+                  setPhoneCountry(country.code);
+                }}
                 defaultCountry={phoneCountry}
                 label=""
               />
@@ -1118,7 +1126,10 @@ const AdminStoreProfileScreen: React.FC = () => {
               <PhoneInput
                 value={waDigits}
                 onChangeText={setWaDigits}
-                onCountryChange={(country: CountryInfo) => setWaDialCode(country.dialCode)}
+                onCountryChange={(country: CountryInfo) => {
+                  setWaDialCode(country.dialCode);
+                  setWaCountry(country.code);
+                }}
                 defaultCountry={waCountry}
                 label=""
               />

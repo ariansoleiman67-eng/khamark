@@ -55,6 +55,8 @@ const AdminEditDiscountScreen: React.FC = () => {
   const [nameAr, setNameAr] = useState('');
   const [nameKu, setNameKu] = useState('');
   const [description, setDescription] = useState('');
+  const [descriptionAr, setDescriptionAr] = useState('');
+  const [descriptionKu, setDescriptionKu] = useState('');
   const [type, setType] = useState<DiscountType>('percentage');
   const [value, setValue] = useState('');
   const [bundleQuantity, setBundleQuantity] = useState('');
@@ -116,6 +118,8 @@ const AdminEditDiscountScreen: React.FC = () => {
         setNameAr(discount.name_ar || '');
         setNameKu(discount.name_ku || '');
         setDescription(discount.description || '');
+        setDescriptionAr(discount.description_ar || '');
+        setDescriptionKu(discount.description_ku || '');
         setType(discount.type);
         setValue(discount.value?.toString() || '');
         setBundleQuantity(discount.bundle_quantity?.toString() || '');
@@ -210,13 +214,25 @@ const AdminEditDiscountScreen: React.FC = () => {
         end_date: endDate.toISOString(),
       };
 
-      // Add optional fields only if they have values
-      if (nameAr.trim()) discountData.name_ar = nameAr.trim();
-      if (nameKu.trim()) discountData.name_ku = nameKu.trim();
-      if (description.trim()) discountData.description = description.trim();
+      // Optional text fields are always sent, cleared ones as null. Omitting the key
+      // on an update leaves the old value in the row, so deleting a translation or the
+      // description looked saved ("Discount updated") but never stuck.
+      discountData.name_ar = nameAr.trim() || null;
+      discountData.name_ku = nameKu.trim() || null;
+      discountData.description = description.trim() || null;
+      discountData.description_ar = descriptionAr.trim() || null;
+      discountData.description_ku = descriptionKu.trim() || null;
       // Only write finite values. Previously each of these parsed straight into the
       // payload with no guard, so any unparseable input became NaN -> null in the row.
+      // A blank field is an explicit "no limit" and must be sent as null — skipping the
+      // key meant clearing Min Purchase / Min Items / Max Discount / Usage Limit was
+      // silently discarded and the old restriction survived the save. Non-empty but
+      // unparseable input is still skipped, so a typo can't wipe a live limit.
       const put = (key: string, raw: string, asInt = false) => {
+        if (!String(raw ?? '').trim()) {
+          discountData[key] = null;
+          return;
+        }
         const n = num(raw);
         if (Number.isFinite(n)) discountData[key] = asInt ? Math.trunc(n) : n;
       };
@@ -226,9 +242,18 @@ const AdminEditDiscountScreen: React.FC = () => {
       }
       put('min_purchase', minPurchase);
       put('min_quantity', minQuantity, true);
-      put('max_discount', maxDiscount);
+      // Bundle deals hide the Max Discount field, so a cap typed before switching the
+      // type to Bundle would still be saved and would still truncate the bundle saving
+      // with nothing on screen explaining it.
+      if (type === 'bundle') {
+        discountData.max_discount = null;
+      } else {
+        put('max_discount', maxDiscount);
+      }
       put('usage_limit', usageLimit, true);
-      if (selectedProductIds.length > 0) discountData.product_ids = selectedProductIds;
+      // Always sent: an empty selection means "all products", and omitting the key made
+      // Clear All inert — the discount stayed pinned to the products picked earlier.
+      discountData.product_ids = selectedProductIds;
 
       if (!tenantId) {
         Alert.alert(t('common.error'), 'No business selected');
@@ -373,6 +398,35 @@ const AdminEditDiscountScreen: React.FC = () => {
             placeholderTextColor={theme.colors.placeholder}
             value={description}
             onChangeText={setDescription}
+            multiline
+            numberOfLines={3}
+          />
+
+          {/* description_ar / description_ku are read by discountService and rendered
+              on the cart, checkout and confirmation screens — but there was no input
+              for them, so those paths could never show anything but English. */}
+          <Text allowFontScaling={false} style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>
+            {t('admin.discounts.descriptionArabic', { defaultValue: 'Description (Arabic)' })}
+          </Text>
+          <TextInput allowFontScaling={false}
+            style={[styles.input, styles.textArea, { backgroundColor: theme.colors.background, color: theme.colors.text, borderColor: theme.colors.border, textAlign: 'right' }]}
+            placeholder={t('admin.discounts.descriptionPlaceholder')}
+            placeholderTextColor={theme.colors.placeholder}
+            value={descriptionAr}
+            onChangeText={setDescriptionAr}
+            multiline
+            numberOfLines={3}
+          />
+
+          <Text allowFontScaling={false} style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>
+            {t('admin.discounts.descriptionKurdish', { defaultValue: 'Description (Kurdish)' })}
+          </Text>
+          <TextInput allowFontScaling={false}
+            style={[styles.input, styles.textArea, { backgroundColor: theme.colors.background, color: theme.colors.text, borderColor: theme.colors.border, textAlign: 'right' }]}
+            placeholder={t('admin.discounts.descriptionPlaceholder')}
+            placeholderTextColor={theme.colors.placeholder}
+            value={descriptionKu}
+            onChangeText={setDescriptionKu}
             multiline
             numberOfLines={3}
           />

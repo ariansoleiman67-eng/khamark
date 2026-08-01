@@ -11,6 +11,9 @@ import {
   Alert,
   I18nManager,
   Switch,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -18,7 +21,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../components/ThemeProvider';
+import { useTenant } from '../../contexts/TenantContext';
 import { categoryStore, StoredCategory } from '../../services/categoryStore';
+// Storefront categories are cached; drop that cache after an edit so shoppers see
+// the change immediately instead of waiting for the TTL. (Called from the screen
+// rather than categoryStore to avoid a categoryService <-> categoryStore import cycle.)
+import { categoryService } from '../../services/categoryService';
 import { ImageService } from '../../services/imageService';
 import { USE_MOCK_DATA } from '../../services/mockData';
 
@@ -30,6 +38,7 @@ const AdminCategoryManagerScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
   const { t, i18n } = useTranslation();
   const navigation = useNavigation<any>();
+  const { tenantId } = useTenant();
   const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
 
   const [items, setItems] = useState<StoredCategory[]>([]);
@@ -41,14 +50,14 @@ const AdminCategoryManagerScreen: React.FC = () => {
 
   const load = useCallback(async () => {
     try {
-      setItems(await categoryStore.getAll());
+      setItems(await categoryStore.getAll(tenantId || undefined));
     } catch (e) {
       console.warn('[AdminCategoryManager] Failed to load categories', e);
       setItems([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [tenantId]);
   useEffect(() => { load(); }, [load]);
 
   const openAdd = () => { setForm(emptyForm()); setModalVisible(true); };
@@ -59,27 +68,57 @@ const AdminCategoryManagerScreen: React.FC = () => {
     try {
       const uri = await ImageService.showImagePicker();
       if (!uri) return;
-      let logoUrl = uri;
       if (!USE_MOCK_DATA) {
+        // Upload to Supabase Storage and ONLY keep the returned public URL. Never
+        // fall back to the local file:// path — that "works" on this device but
+        // shows a broken image everywhere else and after the app restarts.
         const res = await ImageService.uploadImage(uri);
-        if (res?.success && res.url) logoUrl = res.url;
+        if (!res?.success || !res.url) {
+          Alert.alert(
+            t('common.error', { defaultValue: 'Error' }),
+            res?.error || t('admin.categoryMgr.imageUploadFailed', { defaultValue: 'Image upload failed. Check your connection and try again.' })
+          );
+          return;
+        }
+        setForm(f => ({ ...f, logoUrl: res.url }));
+      } else {
+        setForm(f => ({ ...f, logoUrl: uri }));
       }
-      setForm(f => ({ ...f, logoUrl }));
     } finally {
       setPicking(false);
     }
   };
 
   const save = async () => {
-    if (!form.name?.trim()) {
+    const name = form.name?.trim();
+    if (!name) {
       Alert.alert(t('common.error', { defaultValue: 'Error' }), t('admin.categoryMgr.nameRequired', { defaultValue: 'Category name is required' }));
+      return;
+    }
+    // Storefront tiles are keyed by name, so two categories sharing one name collide
+    // into a single tile (and only one logo wins) — reject it here instead.
+    if (items.some(c => c.id !== form.id && (c.name || '').trim().toLowerCase() === name.toLowerCase())) {
+      Alert.alert(t('common.error', { defaultValue: 'Error' }), t('admin.categoryMgr.duplicateName', { defaultValue: 'A category with this name already exists' }));
       return;
     }
     setSaving(true);
     try {
-      await categoryStore.save({ id: form.id, name: form.name.trim(), logoUrl: form.logoUrl, isActive: form.isActive ?? true, sortOrder: form.sortOrder });
+      await categoryStore.save({
+        id: form.id,
+        name,
+        logoUrl: form.logoUrl,
+        isActive: form.isActive ?? true,
+        sortOrder: form.sortOrder,
+        tenantId: tenantId || undefined,
+      });
+      await categoryService.clearCache();
       setModalVisible(false);
       await load();
+    } catch (e) {
+      // Without this the write failed silently: the sheet stayed open and the admin
+      // assumed the category was saved.
+      console.warn('[AdminCategoryManager] Failed to save category', e);
+      Alert.alert(t('common.error', { defaultValue: 'Error' }), t('admin.categoryMgr.saveError', { defaultValue: 'Could not save the category. Please try again.' }));
     } finally {
       setSaving(false);
     }
@@ -91,7 +130,17 @@ const AdminCategoryManagerScreen: React.FC = () => {
       c.name,
       [
         { text: t('common.cancel', { defaultValue: 'Cancel' }), style: 'cancel' },
-        { text: t('common.delete', { defaultValue: 'Delete' }), style: 'destructive', onPress: async () => { await categoryStore.remove(c.id); await load(); } },
+        { text: t('common.delete', { defaultValue: 'Delete' }), style: 'destructive', onPress: async () => {
+          try {
+            await categoryStore.remove(c.id);
+            await categoryService.clearCache();
+            await load();
+          } catch (e) {
+            // A rejected delete (RLS, network) left the row listed with no feedback.
+            console.warn('[AdminCategoryManager] Failed to delete category', e);
+            Alert.alert(t('common.error', { defaultValue: 'Error' }), t('admin.categoryMgr.deleteError', { defaultValue: 'Could not delete the category. Please try again.' }));
+          }
+        } },
       ]
     );
   };
@@ -145,7 +194,17 @@ const AdminCategoryManagerScreen: React.FC = () => {
       )}
 
       <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+          {/* Scrollable card: the logo picker makes this sheet tall, so on a short
+              screen the name field still landed under the keyboard even with the
+              KeyboardAvoidingView. Scrolling lets the focused input always come up. */}
+          <ScrollView
+            style={styles.modalScroll}
+            contentContainerStyle={styles.modalScrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+          >
           <View style={[styles.modalCard, { backgroundColor: theme.colors.card }]}>
             <Text style={[styles.modalTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
               {form.id ? t('admin.categoryMgr.edit', { defaultValue: 'Edit Category' }) : t('admin.categoryMgr.add', { defaultValue: 'Add Category' })}
@@ -187,7 +246,8 @@ const AdminCategoryManagerScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -207,6 +267,8 @@ const styles = StyleSheet.create({
   sub: { fontSize: 12, marginTop: 2, fontWeight: '600' },
   actionBtn: { padding: 8 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalScroll: { flexGrow: 0 },
+  modalScrollContent: { justifyContent: 'flex-end' },
   modalCard: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 36 },
   modalTitle: { fontSize: 20, fontWeight: '800', marginBottom: 16 },
   logoPicker: { alignSelf: 'center', width: 120, height: 120, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 16, overflow: 'hidden' },

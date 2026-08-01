@@ -106,6 +106,10 @@ const AdminCustomersScreen: React.FC = () => {
   const [selectedCustomer, setSelectedCustomer] = useState<User | null>(null);
   const [selectedCustomerAddresses, setSelectedCustomerAddresses] = useState<Address[]>([]);
   const [loadingAddresses, setLoadingAddresses] = useState(false);
+  // Real order count + lifetime spend for the open customer (was hardcoded 0).
+  const [customerStats, setCustomerStats] = useState<{ orders: number; spent: number } | null>(null);
+  const [loadingStats, setLoadingStats] = useState(false);
+  const statsReqIdRef = useRef(0);
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
 
   // Map modal state
@@ -239,6 +243,26 @@ const AdminCustomersScreen: React.FC = () => {
     } finally {
       if (reqId === addressReqIdRef.current) setLoadingAddresses(false);
     }
+
+    // Order count + lifetime spend (own request token, same stale-guard reason).
+    setCustomerStats(null);
+    if (tenantId) {
+      setLoadingStats(true);
+      const statsReq = ++statsReqIdRef.current;
+      try {
+        const orders = await createTenantAdminService(tenantId).getCustomerOrders(customer.uid);
+        if (statsReq !== statsReqIdRef.current) return;
+        const live = (orders || []).filter((o: any) => o.status !== 'cancelled');
+        const spent = live
+          .filter((o: any) => o.status === 'delivered')
+          .reduce((sum: number, o: any) => sum + (Number(o.total_usd) || 0), 0);
+        setCustomerStats({ orders: live.length, spent });
+      } catch {
+        if (statsReq === statsReqIdRef.current) setCustomerStats({ orders: 0, spent: 0 });
+      } finally {
+        if (statsReq === statsReqIdRef.current) setLoadingStats(false);
+      }
+    }
   };
 
   const handleViewMap = (address: Address) => {
@@ -277,6 +301,7 @@ const AdminCustomersScreen: React.FC = () => {
     setDetailsModalVisible(false);
     setSelectedCustomer(null);
     setSelectedCustomerAddresses([]);
+    setCustomerStats(null);
   };
 
   const closeMapModal = () => {
@@ -706,6 +731,26 @@ const AdminCustomersScreen: React.FC = () => {
                         </TouchableOpacity>
                       </View>
                     )}
+
+                    {/* Orders + lifetime spend */}
+                    <View style={{ flexDirection: 'row', marginTop: 12, marginBottom: 4 }}>
+                      <View style={{ flex: 1, alignItems: 'center', paddingVertical: 12, marginRight: 6, borderRadius: 12, backgroundColor: theme.colors.primary + '12' }}>
+                        <Text allowFontScaling={false} style={{ fontSize: 20, fontWeight: '800', color: theme.colors.text }}>
+                          {loadingStats ? '…' : (customerStats?.orders ?? 0)}
+                        </Text>
+                        <Text allowFontScaling={false} style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 }}>
+                          {t('admin.customers.orders', { defaultValue: 'Orders' })}
+                        </Text>
+                      </View>
+                      <View style={{ flex: 1, alignItems: 'center', paddingVertical: 12, marginLeft: 6, borderRadius: 12, backgroundColor: '#22C55E12' }}>
+                        <Text allowFontScaling={false} style={{ fontSize: 20, fontWeight: '800', color: theme.colors.text }}>
+                          {loadingStats ? '…' : `$${(customerStats?.spent ?? 0).toFixed(2)}`}
+                        </Text>
+                        <Text allowFontScaling={false} style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 }}>
+                          {t('admin.customers.totalSpent', { defaultValue: 'Total Spent' })}
+                        </Text>
+                      </View>
+                    </View>
 
                     {selectedCustomer.email && !isSyntheticEmail(selectedCustomer.email) && !isPhoneAuthEmail(selectedCustomer.email) && (
                       <View style={styles.infoRow}>

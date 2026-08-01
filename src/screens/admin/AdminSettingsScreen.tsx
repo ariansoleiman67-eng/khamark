@@ -33,6 +33,7 @@ import adminService from '../../services/adminService';
 import { ImageService } from '../../services/imageService';
 import { storeProfileService, StoreProfile } from '../../services/storeProfileService';
 import { supabase } from '../../services/supabase';
+import { NotificationService } from '../../services/NotificationService';
 import { PasswordPromptModal } from '../../components/PasswordPromptModal';
 
 // Tab bar height constant
@@ -224,6 +225,19 @@ const AdminSettingsScreen: React.FC = () => {
           // ignore — header falls back to store name
         }
       })();
+
+      // Real push preference for this device. Reading the `devices` row directly is
+      // not enough: push registration re-upserts that row on every launch, so a
+      // switch the admin turned off came back ON after every restart. The stored
+      // preference wins — see NotificationService.getDevicePushEnabled.
+      (async () => {
+        try {
+          const enabled = await NotificationService.getDevicePushEnabled();
+          if (!cancelled) setNotificationsEnabled(enabled);
+        } catch {
+          // ignore — switch keeps the default-on state set above
+        }
+      })();
     }
 
     return () => { cancelled = true; };
@@ -370,6 +384,21 @@ const AdminSettingsScreen: React.FC = () => {
 
   const navigateToSendNotification = () => {
     navigation.navigate('AdminSendNotification');
+  };
+
+  const handleNotificationsToggle = async (enabled: boolean) => {
+    const previous = notificationsEnabled;
+    setNotificationsEnabled(enabled);
+    try {
+      await NotificationService.setDevicePushEnabled(enabled);
+    } catch (error: any) {
+      // Revert so the switch never shows a state the server did not accept.
+      setNotificationsEnabled(previous);
+      Alert.alert(
+        t('common.error'),
+        t('admin.settings.pushNotificationsSaveFailed', { defaultValue: 'Failed to update notification settings' })
+      );
+    }
   };
 
   const handleDeleteAccount = () => {
@@ -683,7 +712,7 @@ const AdminSettingsScreen: React.FC = () => {
                     : t('admin.settings.pushNotificationsSubtitle', { defaultValue: 'Receive order alerts' })
                   }
                   hasSwitch switchValue={notificationsEnabled}
-                  onSwitchChange={setNotificationsEnabled}
+                  onSwitchChange={handleNotificationsToggle}
                   theme={theme} isDark={isDark} tintBg={tintBg} />
               </View>
             </Animated.View>
