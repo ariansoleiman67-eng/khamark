@@ -52,6 +52,8 @@ export const mapProduct = (data: any): Product => ({
   sku: data.sku,
   barcode: data.barcode,
   dimensions: data.dimensions || undefined,
+  // Defaults to 'new' so a row written before the column existed still reads sensibly.
+  condition: data.condition || 'new',
   videoUrl: data.video_url,
   // Admin-controlled display order. Defaults to 0 for every never-reordered row,
   // so customer listings fall back to their previous ordering until an admin drags.
@@ -85,7 +87,7 @@ export const mapProduct = (data: any): Product => ({
 // scanned value to Search, which matches it against this already-loaded list — a
 // column that isn't selected is undefined, so every scan returned zero results.
 const LIST_COLUMNS =
-  'id,name,name_ar,name_ku,part_number,barcode,category,category_ar,category_ku,price_usd,vip_price_usd,compare_at_price_usd,storage_options,stock_qty,status,is_featured,is_active,brand,image_urls,price_tiers,variations,color_variations,shipping_cost,shipping_rates,sort_order,tenant_id,created_at,updated_at';
+  'id,name,name_ar,name_ku,part_number,barcode,category,category_ar,category_ku,price_usd,vip_price_usd,compare_at_price_usd,storage_options,stock_qty,status,is_featured,is_active,brand,image_urls,price_tiers,variations,color_variations,shipping_cost,shipping_rates,sort_order,tenant_id,created_at,updated_at,condition';
 
 // Primary ordering for every customer-facing listing: the order the admin set by
 // dragging in AdminProductsScreen (parts.sort_order). The column defaults to 0, so
@@ -117,6 +119,7 @@ const PART_COLUMN_MAP: Record<string, string> = {
   videoUrl: 'video_url', shippingCost: 'shipping_cost', shippingRates: 'shipping_rates',
   weight: 'weight', sortOrder: 'sort_order', specifications: 'specifications',
   warranty: 'warranty', sku: 'sku', barcode: 'barcode', dimensions: 'dimensions',
+  condition: 'condition',
 };
 // Non-column metadata the admin editor sends — folded into `extra_data` jsonb.
 const PART_EXTRA_KEYS = ['ownerAdminId', 'adminId', 'coAdminIds', 'options', 'videoUpdatedAt', 'inStock'];
