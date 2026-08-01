@@ -387,6 +387,33 @@ export interface Order {
   } | null;
 }
 
+// Trade-In Types
+export type TradeInStatus =
+  | 'submitted' | 'quoted' | 'accepted' | 'declined' | 'completed' | 'cancelled';
+
+export interface TradeInRequest {
+  id: string;
+  tenantId: string;
+  userId?: string;
+  contactName: string;
+  contactPhone: string;
+  deviceBrand: string;
+  deviceModel: string;
+  storage?: string;
+  questionsVersion: number;
+  answers: Record<string, string>;
+  photos: string[];
+  customerNote?: string;
+  status: TradeInStatus;
+  offerUSD?: number;
+  offerNote?: string;
+  offerType?: 'cash' | 'credit';
+  reviewedBy?: string;
+  createdAt: string;
+  updatedAt: string;
+  quotedAt?: string;
+}
+
 // Notification Types
 // GOLDEN TEMPLATE: Alibaba-style notification normalization
 export interface Notification {

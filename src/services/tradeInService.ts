@@ -1,0 +1,126 @@
+// Trade-in requests. RLS (supabase/migrations/20260801120000_trade_in_requests.sql) is the
+// real gatekeeper: a customer can only insert a 'submitted' row with null offer fields, and
+// can only move their own row to accepted/declined/cancelled from submitted/quoted. This
+// service does not re-check any of that — it just shapes the calls so RLS accepts them.
+import { supabase } from './supabase';
+import { TRADE_IN_QUESTIONS_VERSION } from '../constants/tradeInQuestions';
+import { TradeInRequest, TradeInStatus } from '../types';
+
+// Map a Supabase `trade_in_requests` row (snake_case) to the camelCase domain type.
+const mapRow = (r: any): TradeInRequest => ({
+  id: r.id,
+  tenantId: r.tenant_id,
+  userId: r.user_id ?? undefined,
+  contactName: r.contact_name,
+  contactPhone: r.contact_phone,
+  deviceBrand: r.device_brand,
+  deviceModel: r.device_model,
+  storage: r.storage ?? undefined,
+  questionsVersion: r.questions_version ?? 1,
+  answers: r.answers || {},
+  photos: r.photos || [],
+  customerNote: r.customer_note ?? undefined,
+  status: r.status,
+  offerUSD: r.offer_usd != null ? Number(r.offer_usd) : undefined,
+  offerNote: r.offer_note ?? undefined,
+  offerType: r.offer_type ?? undefined,
+  reviewedBy: r.reviewed_by ?? undefined,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+  quotedAt: r.quoted_at ?? undefined,
+});
+
+export interface CreateTradeInInput {
+  tenantId: string;
+  userId: string;
+  contactName: string;
+  contactPhone: string;
+  deviceBrand: string;
+  deviceModel: string;
+  storage?: string;
+  answers: Record<string, string>;
+  photos: string[];
+  customerNote?: string;
+}
+
+export const tradeInService = {
+  async createRequest(input: CreateTradeInInput): Promise<TradeInRequest> {
+    const { data, error } = await supabase
+      .from('trade_in_requests')
+      .insert({
+        tenant_id: input.tenantId,
+        user_id: input.userId,
+        contact_name: input.contactName,
+        contact_phone: input.contactPhone,
+        device_brand: input.deviceBrand,
+        device_model: input.deviceModel,
+        storage: input.storage?.trim() || null,
+        questions_version: TRADE_IN_QUESTIONS_VERSION,
+        answers: input.answers,
+        photos: input.photos,
+        customer_note: input.customerNote?.trim() || null,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return mapRow(data);
+  },
+
+  async getMyRequests(userId: string): Promise<TradeInRequest[]> {
+    const { data, error } = await supabase
+      .from('trade_in_requests')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data || []).map(mapRow);
+  },
+
+  async getTenantRequests(tenantId: string, status?: string): Promise<TradeInRequest[]> {
+    let q = supabase
+      .from('trade_in_requests')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: false });
+    if (status) q = q.eq('status', status);
+    const { data, error } = await q;
+    if (error) throw error;
+    return (data || []).map(mapRow);
+  },
+
+  /**
+   * Conditional on status still being 'submitted', so two admins quoting the same
+   * request at once cannot silently overwrite each other. Returns false when the
+   * request was already quoted by someone else.
+   */
+  async sendQuote(
+    id: string,
+    offerUsd: number,
+    offerNote: string,
+    reviewedBy: string
+  ): Promise<boolean> {
+    const { data, error } = await supabase
+      .from('trade_in_requests')
+      .update({
+        offer_usd: offerUsd,
+        offer_note: offerNote.trim() || null,
+        offer_type: 'cash',
+        status: 'quoted',
+        reviewed_by: reviewedBy,
+        quoted_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .eq('status', 'submitted')
+      .select('id');
+    if (error) throw error;
+    return (data || []).length > 0;
+  },
+
+  async setStatus(id: string, status: TradeInStatus): Promise<void> {
+    const { error } = await supabase
+      .from('trade_in_requests')
+      .update({ status })
+      .eq('id', id);
+    if (error) throw error;
+  },
+};
