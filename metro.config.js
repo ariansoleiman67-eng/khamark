@@ -47,4 +47,29 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   return context.resolveRequest(context, moduleName, platform);
 };
 
+// Inline requires: move each `require()` to its first point of use instead of
+// evaluating every import when a module is first required.
+//
+// Without this, opening the admin area evaluated the whole admin subtree in one
+// blocking chunk: AdminNavigator statically imports 27 screens and
+// AdminTabNavigator 5 more (~30k lines, incl. expo-print / expo-sharing). The
+// React.lazy() around AdminNavigator only defers that work to the moment admin
+// opens — it doesn't shrink it. With inline requires, a screen's module body runs
+// when it actually renders.
+//
+// Expo's default is `inlineRequires: false`, so this must be opted into. We wrap
+// the existing getTransformOptions rather than replacing it, to preserve whatever
+// else Expo sets there.
+const baseGetTransformOptions = config.transformer.getTransformOptions;
+config.transformer.getTransformOptions = async (entryPoints, options, getDependenciesOf) => {
+  const base = await baseGetTransformOptions(entryPoints, options, getDependenciesOf);
+  return {
+    ...base,
+    transform: {
+      ...base.transform,
+      inlineRequires: true,
+    },
+  };
+};
+
 module.exports = config;

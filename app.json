@@ -12,31 +12,38 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#000000"
+      "backgroundColor": "#FFFFFF"
     },
     "notification": {
       "icon": "./assets/notification-icon.png",
       "color": "#1a365d"
     },
     "assetBundlePatterns": [
-      "**/*"
+      "assets/images/**",
+      "assets/icons/**",
+      "assets/categories/**",
+      "assets/category-icons/**",
+      "assets/flags/**",
+      "assets/fonts/**",
+      "assets/video/intro.mp4",
+      "assets/video/intro-poster.jpg",
+      "assets/*.png",
+      "assets/*.jpg"
     ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.asankary.app",
       "buildNumber": "73",
-      "associatedDomains": [
-        "applinks:ASANKARY_DOMAIN_TBD",
-        "applinks:www.ASANKARY_DOMAIN_TBD"
-      ],
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "This app needs location access to provide accurate delivery addresses and find nearby parts.",
         "NSCameraUsageDescription": "This app needs camera access to take photos for profile and support tickets.",
         "NSPhotoLibraryUsageDescription": "This app needs photo library access to select images for profile and support.",
-        "NSMicrophoneUsageDescription": "This app needs microphone access for sending voice messages in chat."
+        "NSMicrophoneUsageDescription": "This app needs microphone access for sending voice messages in chat.",
+        "NSUserTrackingUsageDescription": "This identifier is used to measure the performance of our ads so we can show you more relevant offers.",
+        "ITSAppUsesNonExemptEncryption": false
       },
       "config": {
-        "googleMapsApiKey": "REPLACE_WITH_ASANKARY_FIREBASE_API_KEY"
+        "googleMapsApiKey": "AIzaSyBL_OHmMpUcYjgxok8ldXyBWISodVCyAFU"
       },
       "googleServicesFile": "./GoogleService-Info.plist"
     },
@@ -67,7 +74,7 @@
       ],
       "config": {
         "googleMaps": {
-          "apiKey": "REPLACE_WITH_ASANKARY_FIREBASE_API_KEY"
+          "apiKey": "AIzaSyBL_OHmMpUcYjgxok8ldXyBWISodVCyAFU"
         }
       },
       "metaData": [
@@ -106,6 +113,12 @@
       "@react-native-firebase/app",
       "@react-native-firebase/messaging",
       "@react-native-firebase/auth",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.22285264318-9ipslo5beas3b4l0a2c969eq1fqnnk2j"
+        }
+      ],
       "./plugins/withFmtFix.js"
     ],
     "web": {

@@ -91,18 +91,93 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
-    // Collect FCM tokens for the target users (users.fcm_token + active push_tokens)
-    const tokens = new Set<string>();
+    // ---------------------------------------------------------------------
+    // Honour the in-app "Push Notifications" switch.
+    //
+    // The app stores that preference per device in `devices.notifications_enabled`
+    // (NotificationService.setDevicePushEnabled). This function used to read only
+    // users.fcm_token and push_tokens, neither of which carries the flag — so
+    // turning the switch off changed nothing and alerts kept arriving.
+    //
+    // Two rules, because a token can be reached by more than one route:
+    //   1. Drop any token belonging to a device that is explicitly disabled.
+    //   2. If a user has device rows and EVERY one of them is disabled, drop that
+    //      user's tokens entirely — users.fcm_token and push_tokens can hold a
+    //      stale token that no longer matches any current device row, and without
+    //      this that stale copy would keep delivering.
+    // A user with no device rows at all is left alone and still receives: absence
+    // of a row means "never expressed a preference", not "opted out".
+    // ---------------------------------------------------------------------
+    const { data: deviceRows } = await supabase
+      .from('devices')
+      .select('uid, fcm_token, notifications_enabled, is_active')
+      .in('uid', userIds);
 
-    const { data: users } = await supabase.from('users').select('fcm_token').in('id', userIds);
-    (users || []).forEach((u: { fcm_token: string | null }) => u.fcm_token && tokens.add(u.fcm_token));
+    const disabledTokens = new Set<string>();
+    const hasAnyDevice = new Set<string>();
+    const hasEnabledDevice = new Set<string>();
+
+    (deviceRows || []).forEach((d: { uid: string | null; fcm_token: string | null; notifications_enabled: boolean | null; is_active: boolean | null }) => {
+      if (!d.uid) return;
+      // A retired device still counts for "disabled" (its token must not receive)
+      // but must NOT count as an enabled device, or one stale row left over from an
+      // old handset would keep a user deliverable after they switched push off on
+      // the phone they actually use.
+      const retired = d.is_active === false;
+      if (d.notifications_enabled === false) {
+        hasAnyDevice.add(d.uid);
+        if (d.fcm_token) disabledTokens.add(d.fcm_token);
+      } else if (!retired) {
+        hasAnyDevice.add(d.uid);
+        hasEnabledDevice.add(d.uid);
+      }
+    });
+
+    const optedOutUsers = new Set(
+      [...hasAnyDevice].filter((uid) => !hasEnabledDevice.has(uid)),
+    );
+
+    const deliverableUserIds = userIds.filter((id: string) => !optedOutUsers.has(id));
+    if (deliverableUserIds.length === 0) {
+      return new Response(JSON.stringify({ sent: 0, note: 'all targets have push disabled' }), { status: 200 });
+    }
+
+    // Collect FCM tokens for the target users (users.fcm_token + active push_tokens),
+    // remembering which language each token belongs to so the lock-screen banner can
+    // be sent in the recipient's own language. The admin composer already collects
+    // Arabic and Kurdish copies and ships them inside `data`; before this every
+    // recipient got the English banner regardless of their app language.
+    const tokens = new Set<string>();
+    const langByToken = new Map<string, string>();
+    const langByUser = new Map<string, string>();
+
+    const { data: users } = await supabase
+      .from('users')
+      .select('id, fcm_token, language')
+      .in('id', deliverableUserIds);
+    (users || []).forEach((u: { id: string; fcm_token: string | null; language: string | null }) => {
+      const lang = (u.language || 'en').toLowerCase();
+      langByUser.set(u.id, lang);
+      if (u.fcm_token) {
+        tokens.add(u.fcm_token);
+        langByToken.set(u.fcm_token, lang);
+      }
+    });
 
     const { data: pt } = await supabase
       .from('push_tokens')
-      .select('token')
-      .in('user_id', userIds)
+      .select('user_id, token')
+      .in('user_id', deliverableUserIds)
       .eq('active', true);
-    (pt || []).forEach((p: { token: string | null }) => p.token && tokens.add(p.token));
+    (pt || []).forEach((p: { user_id: string; token: string | null }) => {
+      if (!p.token) return;
+      tokens.add(p.token);
+      langByToken.set(p.token, langByUser.get(p.user_id) || 'en');
+    });
+
+    // Rule 1: a device switched off never receives, even when another device of the
+    // same user is still on.
+    disabledTokens.forEach((tok) => tokens.delete(tok));
 
     if (tokens.size === 0) {
       return new Response(JSON.stringify({ sent: 0, note: 'no tokens for targets' }), { status: 200 });
@@ -118,10 +193,23 @@ Deno.serve(async (req: Request) => {
       if (v != null) stringData[k] = String(v);
     }
 
+    // Localized copies ride in `data` as titleAr/titleKu/bodyAr/bodyKu. A blank or
+    // missing translation falls back to the English the admin typed, so a partially
+    // translated notification still reaches everyone.
+    const localized = (lang: string): { title: string; body: string } => {
+      const suffix = lang.startsWith('ar') ? 'Ar' : lang.startsWith('ku') ? 'Ku' : '';
+      if (!suffix) return { title, body };
+      return {
+        title: (stringData[`title${suffix}`] || '').trim() || title,
+        body: (stringData[`body${suffix}`] || '').trim() || body,
+      };
+    };
+
     let sent = 0;
     let failed = 0;
     await Promise.all(
       [...tokens].map(async (token) => {
+        const copy = localized(langByToken.get(token) || 'en');
         const r = await fetch(endpoint, {
           method: 'POST',
           headers: {
@@ -131,7 +219,7 @@ Deno.serve(async (req: Request) => {
           body: JSON.stringify({
             message: {
               token,
-              notification: { title, body },
+              notification: { title: copy.title, body: copy.body },
               data: stringData,
               android: { priority: 'high', notification: { channel_id: 'default_v1' } },
             },

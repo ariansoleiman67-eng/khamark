@@ -17,7 +17,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   name: "Asankary",
   slug: "asankary",
   scheme: "asankary",
-  version: "1.0.0",
+  // Must match CFBundleShortVersionString in ios/Asankary/Info.plist and the
+  // version record in App Store Connect ("1.0"), or the processed build may not
+  // attach to that version.
+  version: "1.0",
   newArchEnabled: true,
   orientation: "portrait",
   icon: "./assets/icon.png",
@@ -60,13 +63,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: "com.asankary.app",
-    buildNumber: "1",
+    buildNumber: "3",
     associatedDomains: ["applinks:ASANKARY_DOMAIN_TBD"],
     usesAppleSignIn: true,
     googleServicesFile: "./GoogleService-Info.plist",
     config: {
       usesNonExemptEncryption: false,
-      googleMapsApiKey: "REPLACE_WITH_ASANKARY_GOOGLE_MAPS_KEY",
+      // Read from .env / EAS env so the key is never committed. The JS side reads the
+      // same var via GOOGLE_MAPS_API_KEY in src/constants/config.ts — keep them in sync.
+      googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
     },
     infoPlist: {
       NSCameraUsageDescription:
@@ -77,15 +82,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         "Asankary needs access to your photo library to select images for products and profile pictures.",
       NSLocationWhenInUseUsageDescription:
         "Asankary uses your location to provide accurate delivery.",
-      NSUserTrackingUsageDescription:
-        "This identifier will be used to deliver personalized ads to you.",
+      // NSUserTrackingUsageDescription deliberately absent — the app does no
+      // cross-app tracking and shows no ads, so it must not request ATT.
       UIBackgroundModes: ["fetch", "remote-notification"],
+      // The Google reversed-client-ID scheme is injected by the
+      // @react-native-google-signin/google-signin plugin from GoogleService-Info.plist.
+      // Do not duplicate it here — a stale copy ships a bogus scheme and App Store
+      // Connect rejects the upload (error 90158).
       CFBundleURLTypes: [
-        {
-          CFBundleURLSchemes: [
-            "com.googleusercontent.apps.REPLACE_WITH_ASANKARY_GOOGLE_REVERSED_CLIENT_ID"
-          ]
-        },
         {
           CFBundleURLSchemes: [
             "asankary"
@@ -107,7 +111,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backgroundColor: colors.iconBackground,
     },
     package: "com.asankary.app",
-    versionCode: 1,
+    versionCode: 2,
     googleServicesFile: "./google-services.json",
     intentFilters: [
       {
@@ -132,7 +136,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 
     config: {
       googleMaps: {
-        apiKey: "REPLACE_WITH_ASANKARY_GOOGLE_MAPS_KEY",
+        apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
       },
     },
     permissions: [
@@ -168,8 +172,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       "@react-native-google-signin/google-signin",
       {
+        // Must match REVERSED_CLIENT_ID in GoogleService-Info.plist.
         iosUrlScheme:
-          "com.googleusercontent.apps.REPLACE_WITH_ASANKARY_GOOGLE_REVERSED_CLIENT_ID",
+          "com.googleusercontent.apps.22285264318-9ipslo5beas3b4l0a2c969eq1fqnnk2j",
       },
     ],
     [
@@ -199,19 +204,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "expo-font",
     "expo-secure-store",
     "expo-localization",
-    [
-      "react-native-fbsdk-next",
-      {
-        appID: "REPLACE_WITH_ASANKARY_FB_APP_ID",
-        clientToken: "REPLACE_WITH_ASANKARY_FB_CLIENT_TOKEN",
-        displayName: "Asankary",
-        scheme: "fbREPLACE_WITH_ASANKARY_FB_APP_ID",
-        advertiserIDCollectionEnabled: false,
-        autoLogAppEventsEnabled: false,
-        isAutoInitEnabled: true,
-        iosUserTrackingPermission: "This identifier will be used to deliver personalized ads to you.",
-      },
-    ],
+    // react-native-fbsdk-next plugin intentionally disabled: Asankary has no Meta app
+    // yet, so the plugin emitted a placeholder `fb<APPID>` URL scheme that App Store
+    // Connect rejects (error 90158). The Facebook auth code in
+    // src/services/auth/facebookAuth.ts stays dormant (the sign-in buttons are already
+    // gated off). To re-enable: create the Meta app, restore this block with the real
+    // appID + clientToken, then re-run `npx expo prebuild --clean -p ios`.
     [
       "expo-location",
       {
