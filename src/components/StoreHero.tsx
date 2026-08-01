@@ -14,10 +14,12 @@ import CountdownDisplay from './CountdownDisplay';
 
 interface StoreHeroProps {
   profile: StoreProfile;
+  // Which store's Operating Hours schedule the badge should read.
+  tenantId?: string;
   productCount: number;
 }
 
-const StoreHero: React.FC<StoreHeroProps> = ({ profile, productCount }) => {
+const StoreHero: React.FC<StoreHeroProps> = ({ profile, productCount, tenantId }) => {
   const { theme, isDark } = useTheme();
   const { t, i18n } = useTranslation();
   const navigation = useNavigation();
@@ -202,23 +204,33 @@ const StoreHero: React.FC<StoreHeroProps> = ({ profile, productCount }) => {
             width: '100%'
           }
         ]}>
-          {/* Timer (Left side in LTR, Right in RTL) */}
+          {/* Timer (Left side in LTR, Right in RTL).
+              Hidden until the countdown reports a real status. `isStoreOpen ?? true`
+              painted the pill green — "open" — before any schedule had been read,
+              and CountdownDisplay now renders nothing while the schedule is unknown,
+              which left a green open-looking badge with no text inside it. */}
           <View style={[
             styles.storeStatusBadge,
-            { 
-              backgroundColor: (isStoreOpen ?? true) ? theme.colors.success + '20' : theme.colors.error + '20'
-            }
+            // Kept mounted, not conditionally rendered: CountdownDisplay is what
+            // reports the status, so gating the badge on isStoreOpen would stop the
+            // only thing that can ever set it. Collapsed to nothing until known.
+            isStoreOpen === null
+              ? styles.storeStatusBadgeHidden
+              : { backgroundColor: isStoreOpen ? theme.colors.success + '20' : theme.colors.error + '20' }
           ]}>
-            <View style={[
-              styles.storeStatusDot, 
-              { backgroundColor: (isStoreOpen ?? true) ? theme.colors.success : theme.colors.error }
-            ]} />
-            <CountdownDisplay 
-              color={(isStoreOpen ?? true) ? theme.colors.success : theme.colors.error}
+            {isStoreOpen !== null && (
+              <View style={[
+                styles.storeStatusDot,
+                { backgroundColor: isStoreOpen ? theme.colors.success : theme.colors.error }
+              ]} />
+            )}
+            <CountdownDisplay
+              color={isStoreOpen ? theme.colors.success : theme.colors.error}
               openTime={profile.openTime}
               closeTime={profile.closeTime}
               closedDays={profile.closedDays}
               timeZone={profile.timeZone}
+              tenantId={tenantId}
               onStatusChange={setIsStoreOpen}
             />
           </View>
@@ -331,6 +343,17 @@ const styles = StyleSheet.create({
     minHeight: 18,
     paddingHorizontal: 8,
     paddingVertical: 2,
+  },
+  // Zero-size and invisible while the schedule is still unknown. The child has to
+  // stay mounted to report the status, so it cannot simply be unmounted.
+  storeStatusBadgeHidden: {
+    backgroundColor: 'transparent',
+    minHeight: 0,
+    height: 0,
+    opacity: 0,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    overflow: 'hidden',
   },
   storeStatusDot: {
     borderRadius: 2.5,

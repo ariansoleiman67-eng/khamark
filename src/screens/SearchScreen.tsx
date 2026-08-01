@@ -302,7 +302,20 @@ const SearchScreen: React.FC = () => {
             }
           }
 
-          if (product.compatibleModels && product.compatibleModels.some(model => 
+          // BarcodeScannerScreen navigates here with the scanned code as `query`, and
+          // this local predicate — not ProductService.searchProducts — is what filters
+          // the list. Without a barcode branch every scan fell through to "no results".
+          // Normalized compare too: scanners emit bare digits, stored barcodes are
+          // sometimes typed with spaces/dashes.
+          if (product.barcode) {
+            const rawBarcode = product.barcode.toLowerCase();
+            const normBarcode = normalize(product.barcode);
+            if (rawBarcode.includes(term) || (hasNormalizedTerm && normBarcode.includes(normalizedTerm))) {
+              return true;
+            }
+          }
+
+          if (product.compatibleModels && product.compatibleModels.some(model =>
             model.toLowerCase().includes(term) || 
             (hasNormalizedTerm && normalize(model).includes(normalizedTerm))
           )) {
@@ -383,9 +396,12 @@ const SearchScreen: React.FC = () => {
     setFilteredProducts(filtered);
   }, [debouncedQuery, filters, products, isVisualSearch, visualAnalysis, scoreProductForVisualSearch]);
 
-  const handleProductPress = (productId: string) => {
+  // Stable identity: this is handed straight to memoized product cards, whose
+  // comparator checks onPress by reference — a fresh function each render made
+  // every visible card re-render on every keystroke.
+  const handleProductPress = useCallback((productId: string) => {
     (navigation as any).navigate('ProductDetails', { productId });
-  };
+  }, [navigation]);
 
   // GOLDEN TEMPLATE: Guest CAN add to cart - no auth blocking
   // ALIBABA PATTERN: Silent add-to-cart, no confirmation dialog
@@ -511,7 +527,7 @@ const SearchScreen: React.FC = () => {
   const renderProduct = useCallback(({ item }: { item: Product }) => (
     <MasonryProductCard
       product={item}
-      onPress={() => handleProductPress(item.id)}
+      onPress={handleProductPress}
       onAddToCart={handleAddToCart}
       isFavorite={isFavorite(item.id)}
       onToggleFavorite={toggleFavorite}

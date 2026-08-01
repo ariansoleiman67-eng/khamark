@@ -20,7 +20,13 @@ import AppNumber from "./AppNumber";
 import { useCurrency } from "../contexts/CurrencyContext";
 import { useAuth } from "../contexts/AuthContext";
 import { formatPrice } from "../utils/currency";
-import { getDisplayUnitPrice, hasVipPrice } from "../utils/pricingUtils";
+import {
+  getDisplayUnitPrice,
+  getDiscountPercent,
+  getEffectiveStock,
+  hasCompareAtDiscount,
+  LOW_STOCK_THRESHOLD,
+} from "../utils/pricingUtils";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -182,15 +188,16 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
     return formatPrice(getDisplayUnitPrice(product, isVip), currency, exchangeRateIQD);
   };
   const vipActive = isVip && typeof product.vipPriceUSD === "number" && product.vipPriceUSD > 0;
-  const vipLocked = !isVip && typeof product.vipPriceUSD === "number" && hasVipPrice(product);
-  const shownPrice = getDisplayUnitPrice(product, isVip);
-  const hasDiscount = typeof product.compareAtPriceUSD === "number" && product.compareAtPriceUSD > shownPrice;
-  const savePct = hasDiscount ? Math.round((1 - shownPrice / (product.compareAtPriceUSD as number)) * 100) : 0;
+  // VIP price shown only to VIP users — no locked/teaser hint for normal users.
+  // Saving is measured against what THIS shopper pays, so a VIP sees the badge (they
+  // used to see no discount cue at all) and the figure matches the product page.
+  const hasDiscount = hasCompareAtDiscount(product, isVip);
+  const savePct = getDiscountPercent(product, isVip);
 
-  const effectiveStock =
-    product.variations && product.variations.length > 0
-      ? product.variations.reduce((sum, v) => sum + (v.stockQuantity || 0), 0)
-      : product.stockQty;
+  // Main + per-size + per-colour stock. The old form ignored colorVariations entirely
+  // and dropped the main stock whenever sizes existed, so a product stocked only in
+  // colours rendered a dead "Out of Stock" CTA the product page contradicted.
+  const effectiveStock = getEffectiveStock(product);
 
   const hasValidPrice =
     (product.priceUSD || 0) > 0 ||
@@ -233,7 +240,22 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
     storageLabels.length > 0 ||
     (product.variations?.length ?? 0) > 0;
 
-  const brandLine = product.brand || product.category || "";
+  // Brandless products fall back to the category — which has to follow the UI language
+  // the same way the title above it does, or the card reads "هاتف" over "Smartphones".
+  // Admin-entered translation wins; otherwise fall back to the app's own
+  // categories.* strings before showing raw English, so a stock category still
+  // reads Arabic on a card even when nobody typed an Arabic name for it. Same
+  // order of preference as translateCategory on the product page.
+  const localizedCategory = (() => {
+    if (i18n.language === "ar" && product.categoryAr?.trim()) return product.categoryAr;
+    if (i18n.language === "ku" && product.categoryKu?.trim()) return product.categoryKu;
+    if (!product.category) return "";
+    const key = `categories.${product.category.toLowerCase().replace(/\s+/g, "")}`;
+    const translated = t(key);
+    return translated !== key ? translated : product.category;
+  })();
+
+  const brandLine = product.brand || localizedCategory || "";
 
   const imageUri = getProductImageUrl({
     imageUrls: product.imageUrls,
@@ -344,6 +366,25 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
             </AppText>
           </View>
         )}
+
+        {/* Scarcity cue. Mutually exclusive with the status badges above (inStock
+            already requires no special status), so they never stack in this corner. */}
+        {inStock && effectiveStock <= LOW_STOCK_THRESHOLD && (
+          <View style={[styles.statusBadge, { backgroundColor: theme.colors.warning }]}>
+            <Ionicons name="alert-circle-outline" size={11} color="#fff" />
+            <AppNumber
+              value={t("product.lowStock", {
+                count: effectiveStock,
+                defaultValue: `Only ${effectiveStock} left`,
+              })}
+              numberOfLines={1}
+              // AppNumber's outer View is the flex item; without this the badge cannot
+              // shrink the label and a long RTL string overflows the 85% max width.
+              containerStyle={styles.lowStockLabel}
+              style={[styles.statusText, { fontSize: 11 }]}
+            />
+          </View>
+        )}
       </View>
 
       {/* Text + CTA */}
@@ -397,7 +438,9 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
                   </AppText>
                 )}
               </View>
-            ) : (
+            ) : colorOptions.length > 0 ? (
+              // Guarded on the count, not just on swatchable: this branch also runs
+              // for a storage-only product, which rendered a literal "0 colors".
               <AppText
                 fontSize={10}
                 numberOfLines={1}
@@ -408,7 +451,7 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
                   defaultValue: `${colorOptions.length} colors`,
                 })}
               </AppText>
-            )}
+            ) : null}
 
             {!!storageRange && (
               <AppText
@@ -438,7 +481,7 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
               value={getPriceDisplay()}
               numberOfLines={1}
               adjustsFontSizeToFit
-              minimumFontScale={0.8}
+              minimumFontScale={0.9}
               containerStyle={styles.priceShrink}
               style={[styles.price, { color: vipActive ? VIP_PURPLE : theme.colors.text, textAlign }]}
             />
@@ -447,35 +490,24 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
                 <AppText fontSize={9} style={styles.tagText}>VIP</AppText>
               </View>
             )}
-            {/* Inline with the price: the old price reads as a comparison rather than
-                as a second thing to parse, and the pair survives a narrow card because
-                both can shrink. */}
-            {hasDiscount && !vipActive && (
-              <>
-                <AppText
-                  fontSize={11}
-                  numberOfLines={1}
-                  style={[styles.compareAt, { color: theme.colors.textSecondary }]}
-                >
-                  {formatPrice(product.compareAtPriceUSD as number, currency, exchangeRateIQD)}
-                </AppText>
-                <View style={[styles.tag, { backgroundColor: SALE_RED }]}>
-                  <AppText fontSize={9} style={styles.tagText}>-{savePct}%</AppText>
-                </View>
-              </>
-            )}
           </View>
 
-          {vipLocked && (
-            <View style={[styles.vipHintRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-              <Ionicons name="lock-closed" size={9} color={theme.colors.textSecondary} />
+          {/* Second line: a long price (e.g. $1,199.00) used to share one row with the
+              strikethrough + badge, which forced it to auto-shrink and read smaller
+              than cheap products' prices. Giving the comparison its own row keeps the
+              paid price at full size on every card. */}
+          {hasDiscount && (
+            <View style={[styles.compareRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
               <AppText
-                fontSize={9}
+                fontSize={11}
                 numberOfLines={1}
-                style={[styles.vipHintText, { color: theme.colors.textSecondary }]}
+                style={[styles.compareAt, { color: theme.colors.textSecondary }]}
               >
-                {formatPrice(product.vipPriceUSD as number, currency, exchangeRateIQD, { symbol: true })} VIP
+                {formatPrice(product.compareAtPriceUSD as number, currency, exchangeRateIQD)}
               </AppText>
+              <View style={[styles.tag, { backgroundColor: SALE_RED }]}>
+                <AppText fontSize={9} style={styles.tagText}>-{savePct}%</AppText>
+              </View>
             </View>
           )}
         </View>
@@ -605,6 +637,10 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === "android" ? 1 : 0,
     textAlign: "center",
   },
+  lowStockLabel: {
+    flexShrink: 1,
+    minWidth: 0,
+  },
   textContainer: {
     flex: 1,
     paddingHorizontal: 12,
@@ -672,13 +708,16 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     fontSize: 16,
   },
+  compareRow: {
+    alignItems: "center",
+    gap: 5,
+    marginTop: 3,
+  },
   compareAt: {
     textDecorationLine: "line-through",
-    // Shrinks before the price does and is capped, so the comparison never competes
-    // with the number the customer actually pays.
-    flexShrink: 2,
+    // On its own row now, so it only needs to yield to the badge.
+    flexShrink: 1,
     minWidth: 0,
-    maxWidth: "40%",
   },
   tag: {
     borderRadius: 5,

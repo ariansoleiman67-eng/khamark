@@ -16,6 +16,8 @@ import { Product } from '../../types';
 import { useTheme } from '../../components/ThemeProvider';
 import { useCurrency } from '../../contexts/CurrencyContext';
 import { formatPrice } from '../../utils/currency';
+import { getDisplayUnitPrice } from '../../utils/pricingUtils';
+import { useAuth } from '../../contexts/AuthContext';
 import { SPACING, FONT_SIZE } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../../types';
@@ -69,7 +71,10 @@ const StoreHomeTab: React.FC<StoreHomeTabProps & { onSwitchTab?: (tabName: strin
   const ProductCard = ({ product }: { product: Product }) => {
     const scale = useSharedValue(1);
     const { currency, exchangeRateIQD } = useCurrency();
-    
+    // Same price the grid cards and the product page show. Quoting priceUSD raw
+    // meant a VIP tapped a $1299 card and landed on a $1049 page.
+    const { isVip } = useAuth();
+
     const animatedStyle = useAnimatedStyle(() => ({
       transform: [{ scale: scale.value }],
     }));
@@ -105,7 +110,7 @@ const StoreHomeTab: React.FC<StoreHomeTabProps & { onSwitchTab?: (tabName: strin
               numberOfLines={1}
               adjustsFontSizeToFit
             >
-              {formatPrice(product.priceUSD, currency, exchangeRateIQD)}
+              {formatPrice(getDisplayUnitPrice(product, isVip), currency, exchangeRateIQD)}
             </Text>
           </View>
         </View>

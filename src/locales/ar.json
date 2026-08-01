@@ -98,6 +98,8 @@
     "softMessage": "يتوفر إصدار جديد من تطبيق Asankary مع تحسينات وإصلاحات. ننصح بالتحديث."
   },
   "common": {
+    "showPassword": "إظهار كلمة المرور",
+    "hidePassword": "إخفاء كلمة المرور",
     "video": "فيديو",
     "images": "الصور",
     "phone": "الهاتف",
@@ -175,7 +177,8 @@
     "order": "طلب",
     "tryDifferentSearch": "جرّب مصطلح بحث مختلف",
     "pullToRefresh": "اسحب للأسفل للتحديث",
-    "somethingWentWrong": "حدث خطأ ما"
+    "somethingWentWrong": "حدث خطأ ما",
+    "loadError": "تعذر تحميل المنتجات. تحقق من اتصالك."
   },
   "product": {
     "lowStock": "متبقي {{count}} فقط",
@@ -199,6 +202,7 @@
     "specifications": "المواصفات",
     "category": "الفئة",
     "brand": "العلامة التجارية",
+    "viewAllBrand": "عرض جميع منتجات {{brand}}",
     "availability": "التوفر",
     "available": "متوفر",
     "storeInfo": "معلومات المتجر",
@@ -227,6 +231,9 @@
     "notFound": "المنتج غير موجود",
     "selectVariationFirst": "يرجى تحديد كمية لخيار واحد على الأقل قبل الإضافة إلى السلة.",
     "warranty": "الضمان",
+    "weight": "الوزن",
+    "dimensions": "الأبعاد",
+    "priceLabel": "السعر",
     "whatsappMsg": "مرحباً، لدي سؤال حول هذا المنتج.",
     "comingSoon": "قريباً",
     "onTheWay": "في الطريق",
@@ -241,6 +248,8 @@
     "paymentMethods": "طرق الدفع",
     "save": "وفّر",
     "sku": "SKU",
+    "barcode": "الباركود",
+    "viewAllBranches": "عرض جميع الفروع",
     "vipPrice": "سعر VIP",
     "storage": "السعة",
     "colorCount_zero": "بدون ألوان",
@@ -482,6 +491,7 @@
     "signInWithApple": "المتابعة باستخدام Apple",
     "signInWithFacebook": "المتابعة باستخدام Facebook",
     "verifyFailed": "فشل التحقق. حاول مرة أخرى.",
+    "accountCheckFailed": "تعذّر التحقق مما إذا كان هذا الحساب موجوداً بالفعل. يرجى المحاولة مرة أخرى.",
     "invalidPhone": "يرجى إدخال رقم هاتف صالح"
   },
   "home": {
@@ -609,7 +619,10 @@
     "issues": "مشاكل في السلة",
     "removeError": "تعذّر إزالة العنصر",
     "saving": "جارٍ الحفظ",
-    "updateError": "تعذّر تحديث الكمية"
+    "youSave": "أنت توفّر",
+    "updateError": "تعذّر تحديث الكمية",
+    "moreToUnlock": "إضافية للحصول على {{name}}",
+    "moreItemsToUnlock": "منتجات إضافية للحصول على {{name}}"
   },
   "checkout": {
     "title": "إتمام الطلب",
@@ -704,7 +717,8 @@
     "promoRemove": "إزالة",
     "promoPlaceholder": "رمز الخصم",
     "promoApply": "تطبيق",
-    "promoNoLongerEligible": "رمز الخصم لم يعد ينطبق على سلتك"
+    "promoNoLongerEligible": "رمز الخصم لم يعد ينطبق على سلتك",
+    "promoSingleStore": "ينطبق هذا الرمز على منتجات متجر واحد فقط."
   },
   "qiCard": {
     "title": "دفع بطاقة كي",
@@ -1269,6 +1283,10 @@
   },
   "notifications": {
     "title": "الإشعارات",
+    "enableTitle": "تفعيل الإشعارات",
+    "enableBody": "الإشعارات مُعطّلة. فعّلها لتصلك تحديثات الطلبات والعروض.",
+    "enable": "تفعيل",
+    "later": "ليس الآن",
     "loading": "تحميل الإشعارات...",
     "loadError": "فشل في تحميل الإشعارات. يرجى المحاولة مرة أخرى.",
     "empty": "لا توجد إشعارات",
@@ -1310,6 +1328,8 @@
     "newProducts": "منتجات جديدة أُضيفت إلى فئتك المفضلة"
   },
   "favorites": {
+    "add": "أضف إلى المفضلة",
+    "remove": "إزالة من المفضلة",
     "title": "المفضلة",
     "empty": "لا توجد مفضلات بعد",
     "emptySubtitle": "اضغط على أيقونة القلب على المنتجات التي تحبها لحفظها هنا",
@@ -1321,7 +1341,7 @@
   },
   "search": {
     "title": "البحث",
-    "placeholder": "البحث عن القطع، الفئات، أو أرقام القطع...",
+    "placeholder": "ابحث عن المنتجات أو العلامات التجارية أو الفئات...",
     "recentSearches": "عمليات البحث الأخيرة",
     "noResults": "لم يتم العثور على نتائج",
     "noResultsFor": "لم يتم العثور على نتائج لـ \"{{query}}\"",
@@ -1399,7 +1419,16 @@
     "accessories": "الإكسسوارات",
     "turboSupercharger": "تيربو وسوبرتشارجر",
     "exhaustsystem": "نظام العادم",
-    "turbo&supercharger": "تيربو وسوبر تشارجر"
+    "turbo&supercharger": "تيربو وسوبر تشارجر",
+    "phones": "هواتف",
+    "earphone": "سماعات",
+    "powerbanks": "باور بانك",
+    "chargers": "شواحن",
+    "cables": "كوابل",
+    "bags": "حقائب",
+    "smartwatches": "ساعات ذكية",
+    "trackers": "أجهزة تتبع",
+    "security": "أنظمة حماية"
   },
   "settings": {
     "title": "الإعدادات",
@@ -2189,11 +2218,12 @@
       "items": "العناصر",
       "subtotal": "المجموع الفرعي",
       "shipping": "الشحن",
+      "discount": "الخصم",
       "total": "المجموع",
       "confirmUpdateTitle": "تحديث حالة الطلب",
       "printInvoice": "طباعة الفاتورة",
       "cancelConfirmTitle": "إلغاء الطلب؟",
-      "cancelConfirmWarning": "إلغاء هذا الطلب سيبلغ العميل فوراً ولا يمكن التراجع عنه.",
+      "cancelConfirmWarning": "إلغاء هذا الطلب يعيد كميته إلى المخزون ولا يمكن التراجع عنه.",
       "confirmCancel": "نعم، إلغاء الطلب",
       "statusUpdateSuccess": "تم تحديث حالة الطلب بنجاح",
       "paymentDetails": "تفاصيل الدفع",
@@ -2282,6 +2312,7 @@
       "sendNotificationSubtitle": "إشعارات للمستخدمين",
       "pushNotifications": "إشعارات التطبيق",
       "pushNotificationsSubtitle": "تلقي تنبيهات الطلبات",
+      "pushNotificationsSaveFailed": "تعذّر تحديث إعدادات الإشعارات",
       "reports": "البيانات والتقارير",
       "exportOrders": "تصدير الطلبات",
       "exportOrdersSubtitle": "تنزيل سجل الطلبات",
@@ -2404,6 +2435,7 @@
       "unlock": "فتح القفل",
       "noBanners": "لا توجد بانرات بعد",
       "addFirst": "اضغط + لإضافة أول صورة بانر",
+      "linkPlaceholder": "رابط عند الضغط (اختياري) — مثل https://…",
       "total": "الإجمالي",
       "active": "نشط",
       "inactive": "غير نشط",
@@ -2413,6 +2445,8 @@
       "deleteTitle": "حذف البانر",
       "deleteConfirm": "هل أنت متأكد أنك تريد حذف هذا البانر؟",
       "deleteFailed": "فشل حذف البانر",
+      "updateFailed": "فشل تحديث البانر",
+      "reorderFailed": "فشل حفظ الترتيب الجديد",
       "loadFailed": "فشل تحميل البانرات",
       "uploadFailed": "فشل رفع الصورة"
     },
@@ -2509,7 +2543,13 @@
       "locationAutoSet": "تم تعيين الموقع على إحداثيات GPS الحالية",
       "noPermission": "ليس لديك صلاحية للقيام بذلك",
       "mustBeLoggedIn": "يجب تسجيل الدخول لحفظ المواقع",
-      "openInMaps": "فتح في الخرائط"
+      "openInMaps": "فتح في الخرائط",
+      "notFound": "هذا الموقع لم يعد موجودًا",
+      "invalidPhone": "يرجى إدخال رقم هاتف صالح للدولة المحددة",
+      "latitude": "خط العرض",
+      "longitude": "خط الطول",
+      "invalidCoordinates": "يرجى إدخال خط عرض وخط طول صالحين",
+      "coordinatesRequired": "حدد الموقع على الخريطة أو استخدم موقعك الحالي أو أدخل الإحداثيات يدويًا"
     },
     "discounts": {
       "title": "الخصومات",
@@ -2574,7 +2614,9 @@
       "off": "خصم",
       "for": "لـ",
       "minOrder": "أقل طلب",
-      "minItems": "أقل عدد عناصر"
+      "minItems": "أقل عدد عناصر",
+      "descriptionArabic": "الوصف (بالعربية)",
+      "descriptionKurdish": "الوصف (بالكردية)"
     },
     "analytics": {
       "reports": "التقارير",
@@ -2615,6 +2657,7 @@
     },
     "businessInfo": {
       "title": "معلومات العمل",
+      "internalOnlyNote": "هذه التفاصيل مخصّصة لسجلاتك الداخلية ولا تظهر للعملاء. أمّا الاسم والشعار وبيانات التواصل والعنوان التي يراها العملاء فتُضبط من «ملف المتجر».",
       "generalInfo": "معلومات عامة",
       "businessName": "اسم العمل",
       "businessNamePlaceholder": "أدخل اسم العمل",
@@ -2643,7 +2686,9 @@
       "closed": "مغلق",
       "open": "مفتوح",
       "success": "تم تحديث ساعات العمل",
-      "failed": "فشل تحديث ساعات العمل"
+      "failed": "فشل تحديث ساعات العمل",
+      "loadFailed": "فشل تحميل ساعات العمل",
+      "readOnlyUntilLoaded": "تعذر تحميل ساعات العمل المحفوظة. تم تعطيل التعديل حتى لا يتم استبدالها — يرجى الرجوع والمحاولة مرة أخرى."
     },
     "shippingSettings": {
       "title": "إعدادات الشحن",
@@ -2716,6 +2761,7 @@
       "noCustomers": "لم يتم العثور على عملاء",
       "totalOrders": "إجمالي الطلبات",
       "totalSpent": "إجمالي المنفق",
+      "orders": "الطلبات",
       "totalCustomers": "إجمالي العملاء",
       "failedToLoad": "فشل تحميل العملاء",
       "unknown": "غير معروف",
@@ -2881,6 +2927,25 @@
         "brandPlaceholder": "مثال: Toyota, Bosch",
         "description": "الوصف",
         "descriptionPlaceholder": "تفاصيل المنتج، المواصفات، إلخ.",
+        "descriptionAr": "الوصف (بالعربية)",
+        "descriptionKu": "الوصف (بالكردية)",
+        "descriptionArPlaceholder": "وصف المنتج بالعربية (اختياري)",
+        "descriptionKuPlaceholder": "وەسفی بەرهەم بە کوردی (ئارەزوومەندانە)",
+        "specifications": "المواصفات",
+        "specName": "المواصفة (مثل RAM)",
+        "specValue": "القيمة (مثل 8GB)",
+        "noSpecs": "لا توجد مواصفات",
+        "duplicateSpec": "هذه المواصفة موجودة بالفعل",
+        "details": "تفاصيل",
+        "sku": "SKU",
+        "skuPlaceholder": "مثال: IP17PM-256-BLK",
+        "barcode": "الباركود",
+        "barcodePlaceholder": "مثال: 194253000000",
+        "warranty": "الضمان",
+        "warrantyPlaceholder": "مثال: سنة واحدة",
+        "weight": "الوزن (كغ)",
+        "dimensions": "الأبعاد (سم) — الطول / العرض / الارتفاع",
+        "imageUploadFailed": "فشل رفع الصورة",
         "optionsTitle": "خيارات المنتج (اختياري)",
         "optionsSubtitle": "هذه الخيارات لا تؤثر على السعر أو المخزون",
         "colors": "الألوان",
@@ -2906,8 +2971,10 @@
         "maxQty": "أقصى كمية",
         "priceLabel": "السعر",
         "variations": "الاختلافات",
-        "sizeVariations": "اختلافات الحجم",
-        "sizePlaceholder": "مثال: XL, 42, كبير",
+        "sizeVariations": "التخزين / الحجم",
+        "sizePlaceholder": "مثال: 128GB, 256GB, 512GB",
+        "storageTierHint": "القيمة / المخزون / سعر اختياري. حدّد سعراً فقط للفئات الأغلى (مثل 512GB)؛ اتركه فارغاً لاستخدام السعر الأساسي.",
+        "optional": "اختياري",
         "stock": "المخزون",
         "noSizeVariations": "لم يتم إضافة اختلافات الحجم",
         "colorVariations": "اختلافات اللون",
@@ -2925,6 +2992,13 @@
         "defaultShippingCost": "سعر الشحن الافتراضي (دولار)",
         "featured": "مميّز (تثبيت بالأعلى)",
         "featuredHint": "إظهار هذه القطعة في صف المنتجات المميّزة للعملاء.",
+        "compareAtPrice": "السعر السابق ($)",
+        "compareAtHint": "يظهر مشطوباً لعرض خصم. اتركه فارغاً لعدم وجود خصم.",
+        "vipPrice": "سعر VIP ($)",
+        "vipPriceHint": "سعر خاص لعملاء VIP فقط. اتركه فارغاً لعدم وجوده.",
+        "visible": "ظاهر في المتجر",
+        "visibleHint": "أوقفه لإخفاء هذا المنتج عن العملاء دون حذفه.",
+        "hidden": "مخفي",
         "defaultShippingHint": "يطبق على أي منطقة غير مدرجة أدناه",
         "free": "مجاني",
         "edit": "تعديل",
@@ -2947,6 +3021,8 @@
       "noSearchResults": "لم يتم العثور على منتجات مطابقة",
       "loadingTenant": "جارٍ تحميل بيانات المتجر...",
       "priceMustBePositive": "المنتجات المتاحة تحتاج إلى سعر أكبر من 0.",
+      "invalidPriceTiers": "كل فئة جملة تحتاج إلى كمية وسعر أكبر من 0، ولا يمكن أن تتشارك فئتان نفس الحد الأدنى للكمية.",
+      "applyAllShippingFailed": "تم حفظ المنتج، لكن تطبيق إعدادات الشحن على بقية منتجاتك فشل.",
       "reorderFailed": "تعذّر حفظ ترتيب المنتجات",
       "reorderSuccess": "تم حفظ ترتيب المنتجات!"
     },
@@ -3020,13 +3096,18 @@
       "pickVariation": "اختر النوع",
       "pickVariationHint": "اضغط على نوع لإضافته إلى السلة",
       "options": "خيارات",
-      "createFailed": "فشل إنشاء عملية البيع"
+      "createFailed": "فشل إنشاء عملية البيع",
+      "stockNotDeductedTitle": "لم يتم تحديث المخزون",
+      "stockNotDeductedMsg": "تم حفظ عملية البيع، لكن تعذّر خصم المخزون لصنف واحد أو أكثر. يرجى تعديل المخزون يدويًا."
     },
     "active": "نشط",
     "brands": {
       "add": "إضافة علامة تجارية",
+      "deleteFailed": "تعذّر الحذف. حاول مرة أخرى.",
       "deleteTitle": "حذف العلامة التجارية؟",
       "edit": "تعديل العلامة التجارية",
+      "logoUploadFailed": "تعذّر رفع الشعار. تحقق من اتصالك وحاول مرة أخرى.",
+      "saveFailed": "تعذّر الحفظ. حاول مرة أخرى.",
       "empty": "لا توجد علامات تجارية بعد. اضغط + لإضافة واحدة.",
       "name": "اسم العلامة التجارية",
       "nameRequired": "اسم العلامة التجارية مطلوب",
@@ -3036,12 +3117,16 @@
     },
     "categoryMgr": {
       "add": "إضافة تصنيف",
+      "deleteError": "تعذر حذف التصنيف. حاول مرة أخرى.",
       "deleteTitle": "حذف التصنيف؟",
+      "duplicateName": "يوجد تصنيف بهذا الاسم بالفعل",
       "edit": "تعديل التصنيف",
       "empty": "لا توجد تصنيفات بعد. اضغط + لإضافة واحد.",
+      "imageUploadFailed": "فشل رفع الصورة. تحقق من اتصالك وحاول مرة أخرى.",
       "name": "اسم التصنيف",
       "nameRequired": "اسم التصنيف مطلوب",
       "pickLogo": "إضافة شعار",
+      "saveError": "تعذر حفظ التصنيف. حاول مرة أخرى.",
       "title": "التصنيفات"
     },
     "hidden": "مخفي",
@@ -3058,7 +3143,11 @@
       "minPurchase": "الحد الأدنى للشراء ($)",
       "empty": "لا توجد أكواد خصم بعد. اضغط + لإضافة واحد.",
       "codeRequired": "الكود والقيمة مطلوبان",
-      "deleteTitle": "حذف كود الخصم؟"
+      "deleteTitle": "حذف كود الخصم؟",
+      "duplicateCode": "هذا الكود موجود بالفعل",
+      "percentRange": "يجب أن تكون نسبة الخصم بين 1 و 100",
+      "saveFailed": "تعذّر الحفظ. حاول مرة أخرى.",
+      "deleteFailed": "تعذّر الحذف. حاول مرة أخرى."
     }
   },
   "onboarding": {
@@ -3166,7 +3255,8 @@
   },
   "sort": {
     "priceHigh": "السعر ↓",
-    "priceLow": "السعر ↑"
+    "priceLow": "السعر ↑",
+    "recommended": "موصى به"
   },
   "storeLocations": {
     "loadError": "فشل تحميل مواقع المتاجر. يرجى المحاولة مرة أخرى.",
@@ -3183,7 +3273,13 @@
     "emptyTitle": "لم يتم العثور على مواقع متاجر",
     "emptyHint": "يرجى المحاولة لاحقاً أو التواصل مع الدعم.",
     "list": "قائمة",
-    "map": "خريطة"
+    "map": "خريطة",
+    "todayHours": "اليوم",
+    "closedToday": "مغلق اليوم",
+    "mapsError": "تعذّر فتح تطبيق الخرائط.",
+    "phoneError": "تعذّر فتح تطبيق الهاتف.",
+    "whatsappError": "واتساب غير مثبّت على هذا الجهاز.",
+    "whatsappMessage": "مرحباً، أودّ الاستفسار عن المنتجات في {{store}}."
   },
   "loginGate": {
     "backToBrowsing": "العودة إلى التصفح",

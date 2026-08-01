@@ -423,12 +423,16 @@ const RegisterScreen: React.FC = () => {
               <View style={[styles.logoMedallion, { backgroundColor: theme.colors.surface }]}>
                 <Image source={ASANKARY_LOGO} style={styles.logoImage} contentFit="contain" />
               </View>
-              <Animated.Text allowFontScaling={false} entering={SlideInLeft.duration(500).delay(280)} style={styles.heroTitle}>
+              <Animated.View entering={SlideInLeft.duration(500).delay(280)}>
+              <Animated.Text allowFontScaling={false} style={styles.heroTitle}>
                 {t('auth.createAccount', { defaultValue: 'Create account' })}
               </Animated.Text>
-              <Animated.Text allowFontScaling={false} entering={FadeIn.duration(500).delay(360)} style={styles.heroSubtitle}>
+            </Animated.View>
+              <Animated.View entering={FadeIn.duration(500).delay(360)}>
+              <Animated.Text allowFontScaling={false} style={styles.heroSubtitle}>
                 {t('auth.createAccountSubtitle', { defaultValue: 'Start with your phone or email.' })}
               </Animated.Text>
+            </Animated.View>
             </Animated.View>
           </View>
 

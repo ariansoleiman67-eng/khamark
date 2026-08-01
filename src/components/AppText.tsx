@@ -31,11 +31,23 @@ export default function AppText({ style, fontSize, allowFontScaling = false, ...
   // Auto-enable adjustsFontSizeToFit for single line text if not explicitly disabled
   const isSingleLine = props.numberOfLines === 1;
   const shouldAdjust = props.adjustsFontSizeToFit ?? isSingleLine;
-  const minScale = props.minimumFontScale ?? (shouldAdjust ? 0.7 : undefined);
+  // 0.7 let labels shrink to an illegible size next to full-size neighbours.
+  // Keep shrink available, but only as a last resort.
+  const minScale = props.minimumFontScale ?? (shouldAdjust ? 0.85 : undefined);
+
+  // Android caches the auto-shrink measurement per Text instance: when the string
+  // changes (switching language, a stock count updating) it reuses the OLD fitted
+  // size and clips the new, longer text — e.g. "In Stock (40)" rendering as
+  // "In Stock". Keying by content remounts the node so it re-measures.
+  const contentKey =
+    Platform.OS === 'android' && shouldAdjust && (typeof props.children === 'string' || typeof props.children === 'number')
+      ? String(props.children)
+      : undefined;
 
   return (
     <Text
       {...props}
+      key={contentKey}
       allowFontScaling={allowFontScaling}
       adjustsFontSizeToFit={shouldAdjust}
       minimumFontScale={minScale}

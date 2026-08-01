@@ -1,5 +1,4 @@
 // @ts-nocheck
-import { supabase } from '../services/supabase';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   ActivityIndicator,
@@ -31,7 +30,13 @@ import { LocalCartService } from '../services/localCartService';
 import { useCart } from '../contexts/CartContext';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { useAuth } from '../contexts/AuthContext';
-import { getDisplayUnitPrice, getEffectiveUnitPrice } from '../utils/pricingUtils';
+import {
+  getDisplayUnitPrice,
+  getEffectiveUnitPrice,
+  hasCompareAtDiscount,
+  getDiscountPercent,
+  getEffectiveStock,
+} from '../utils/pricingUtils';
 import { useFavorites } from '../contexts/FavoritesContext';
 import { COLLECTIONS } from '../constants/config';
 import Button from '../components/Button';
@@ -42,6 +47,9 @@ import AppText from '../components/AppText';
 import { formatPrice } from '../utils/currency';
 import { getProductImageUrls } from '../utils/imageUtils';
 import { ProductService } from '../services/productService';
+import { brandService } from '../services/brandService';
+import { storeProfileService } from '../services/storeProfileService';
+import { getTenantContactInfo, getTenantPrimaryLocation } from '../services/tenantInfoService';
 import { getDirection } from '../locales';
 import { SPACING } from '../constants/theme';
 import GoldenCarousel from '../components/GoldenCarousel';
@@ -54,6 +62,24 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // the same thing everywhere in the app.
 const LOW_STOCK_THRESHOLD = 5;
 
+// Column widths for the variation tables (size table and colour table). Shared so a
+// header cell and its row cell can never drift apart.
+//
+// QTY has to fit two 28pt steppers plus the quantity field plus the gaps between
+// them (VARIANT_QTY_FIELD_WIDTH below). At the old flex of 1.5 the cell measured
+// narrower than its own contents, and because a flex row doesn't clip, the stepper
+// spilled left over the STOCK number — the two collided on screen.
+const VARIANT_COL = {
+  model: 1.6,
+  price: 1.3,
+  stock: 1,
+  qty: 2.2,
+} as const;
+
+// Fixed, not minWidth: an unconstrained TextInput in a row grows to fill and pushes
+// the minus button further left, which is what made the overflow worse.
+const VARIANT_QTY_FIELD_WIDTH = 44;
+
 // How far the white info sheet is pulled up over the bottom of the hero image. Any
 // control anchored to the image bottom has to clear this, so both the sheet and the
 // cart FAB derive from it rather than each hard-coding a number that can drift apart —
@@ -63,6 +89,63 @@ const SHEET_OVERLAP = 28;
 // Alibaba-style bottom bar is shorter than the old CTA.
 // Keep this close to the real bar height (excluding safe-area inset).
 const CTA_BAR_HEIGHT = 80;
+
+// Brand logo lookup for the brand card below the SKU row.
+//
+// A product only stores its brand as a free-text name; the logo lives on the
+// admin-managed `brands` row. Matching is by normalised name because the admin
+// product form lets the brand be typed by hand as well as picked from a chip,
+// so "apple " and "Apple" have to resolve to the same logo.
+//
+// Cached at module scope: the brand list is small, changes rarely, and without
+// this every product opened would fire its own query for the same few rows.
+const BRAND_CACHE_TTL_MS = 5 * 60 * 1000;
+let brandLogoCache: { at: number; byName: Map<string, string | undefined> } | null = null;
+let brandLogoInFlight: Promise<Map<string, string | undefined>> | null = null;
+
+const normalizeBrandName = (name: string) => name.trim().toLowerCase();
+
+// Font size for the no-logo wordmark, picked from the name length.
+//
+// Deliberately NOT adjustsFontSizeToFit: on Android that measurement clips the
+// string rather than shrinking it inside a narrow box, which is how "HONOR"
+// rendered as "HONO". A fixed size per length band always fits BRAND_LOGO_WIDTH.
+const BRAND_LOGO_WIDTH = 84;
+const BRAND_LOGO_HEIGHT = 56;
+
+function brandWordmarkFontSize(label: string): number {
+  const len = label.trim().length;
+  if (len <= 4) return 16;
+  if (len <= 6) return 13;
+  if (len <= 9) return 11;
+  if (len <= 12) return 9;
+  return 8;
+}
+
+async function getBrandLogoMap(now: number): Promise<Map<string, string | undefined>> {
+  if (brandLogoCache && now - brandLogoCache.at < BRAND_CACHE_TTL_MS) return brandLogoCache.byName;
+  if (brandLogoInFlight) return brandLogoInFlight;
+
+  brandLogoInFlight = (async () => {
+    try {
+      const brands = await brandService.getActiveBrands();
+      const byName = new Map<string, string | undefined>();
+      brands.forEach(b => {
+        if (b?.name) byName.set(normalizeBrandName(b.name), b.logoUrl);
+      });
+      brandLogoCache = { at: now, byName };
+      return byName;
+    } catch {
+      // Never let a brand-logo lookup break the product screen — the card falls
+      // back to the wordmark, which is what a brand with no logo shows anyway.
+      return brandLogoCache?.byName ?? new Map<string, string | undefined>();
+    } finally {
+      brandLogoInFlight = null;
+    }
+  })();
+
+  return brandLogoInFlight;
+}
 
 type ProductDetailsRouteProp = RouteProp<{
   ProductDetails: { productId: string };
@@ -191,6 +274,10 @@ export const ProductDetailsScreen: React.FC = () => {
   const [colorVariationQtyTexts, setColorVariationQtyTexts] = useState<Record<string, string>>({});
   const [ready, setReady] = useState(false);
 
+  // Logo for this product's brand, when the admin uploaded one in Brand Manager.
+  // undefined = no logo (card draws the wordmark instead).
+  const [brandLogoUrl, setBrandLogoUrl] = useState<string | undefined>(undefined);
+
   const isProductFavorite = isFavorite(productId);
 
   // Helper to get translated category name
@@ -259,6 +346,22 @@ export const ProductDetailsScreen: React.FC = () => {
     });
     return () => cancelAnimationFrame(task);
   }, [productId]);
+
+  // Resolve the brand logo for the brand card. Clears first so a product with no
+  // matching brand can't inherit the previous product's logo when the route param
+  // is swapped in place (see the load effect above).
+  useEffect(() => {
+    const brand = product?.brand?.trim();
+    setBrandLogoUrl(undefined);
+    if (!brand) return;
+
+    let cancelled = false;
+    getBrandLogoMap(Date.now()).then(byName => {
+      if (cancelled) return;
+      setBrandLogoUrl(byName.get(normalizeBrandName(brand)));
+    });
+    return () => { cancelled = true; };
+  }, [product?.brand]);
 
   // GOLDEN TEMPLATE: Toggle functions with trim normalization
   const toggleColor = (color: string) => {
@@ -433,89 +536,57 @@ export const ProductDetailsScreen: React.FC = () => {
   // =================================================================
 
   /**
-   * Load store profile from tenants/{tenantId}/public/storeProfile
-   * Falls back to legacy tenant doc + locations query if profile doesn't exist
+   * Load the seller's store profile for the store card.
+   *
+   * The profile lives on the `tenants` row (see update_schema_store_profile.sql).
+   * This used to query a `store_profiles` table that does not exist in this project,
+   * so the lookup failed for every product and the whole card rendered empty; the
+   * fallback then read camelCase keys off a raw snake_case row, losing the address.
+   * Both reads now go through the services that own those tables.
    */
   const loadStoreInfo = async (tid: string) => {
     try {
       setStoreInfoLoading(true);
-      
-      // STEP 1: Try public store profile first (new approach)
-      const { data: profile } = await supabase
-        .from('store_profiles')
-        .select('*')
-        .eq('tenant_id', tid)
-        .single();
-      
-      if (profile) {
-        // Map profile to display info - Alibaba-style Store Card
-        const displayInfo: StoreDisplayInfo = {
-          storeName: profile.store_name,
-          storeNameAr: profile.store_name_ar,
-          storeNameKu: profile.store_name_ku,
-          logoUrl: profile.logo_url,
-          isVerified: profile.is_verified,
-          phone: profile.phone,
-          whatsapp: profile.whatsapp || profile.phone,
-          city: profile.city,
-          addressText: profile.address_text,
-          addressTextAr: profile.address_text_ar,
-          addressTextKu: profile.address_text_ku,
-          location: profile.latitude && profile.longitude ? {
-            lat: profile.latitude,
-            lng: profile.longitude,
-          } : undefined,
-          tenantId: tid,
-        };
-        
-        setStoreInfo(displayInfo);
-        return;
-      }
-      
-      // STEP 2: Fallback to legacy approach (tenant doc + locations query)
-      const { data: tenantData } = await supabase
-        .from('tenants')
-        .select('*')
-        .eq('id', tid)
-        .single();
-      
-      if (!tenantData) {
+
+      const [profile, contact] = await Promise.all([
+        storeProfileService.getStoreProfile(tid),
+        // Covers tenants whose phone/WhatsApp still only exist in the legacy
+        // business_info blob rather than the top-level columns.
+        getTenantContactInfo(tid),
+      ]);
+
+      // Stores that never filled in the Store Profile address keep it on their
+      // `store_locations` branch row instead.
+      const needsBranch = !profile?.addressText || !profile?.city || !profile?.location;
+      const branch = needsBranch ? await getTenantPrimaryLocation(tid) : null;
+
+      if (!profile && !branch) {
         setStoreInfo(null);
         return;
       }
-      
-      // Query locations by ownerUid
-      let storeLocation: StoreLocation | null = null;
-      
-      if (tenantData.owner_uid) {
-        const { data: locations } = await supabase
-          .from('store_locations')
-          .select('*')
-          .eq('created_by_admin_id', tenantData.owner_uid)
-          .eq('is_active', true);
-        
-        if (locations && locations.length > 0) {
-          storeLocation = locations.find(loc => loc.type === 'main') as any 
-            || locations[0] as any;
-        }
-      }
-      
-      // Build display info from legacy data
+
+      // Coerced: tenants.location is jsonb, so a coordinate written as a string
+      // would silently hide the Directions button.
+      const lat = Number(profile?.location?.latitude ?? branch?.latitude);
+      const lng = Number(profile?.location?.longitude ?? branch?.longitude);
+
       const displayInfo: StoreDisplayInfo = {
-        storeName: tenantData.store_name,
-        storeNameAr: tenantData.store_name_ar,
-        storeNameKu: tenantData.store_name_ku,
-        phone: storeLocation?.phone || tenantData.phone,
-        whatsapp: tenantData.whatsapp || storeLocation?.phone || tenantData.phone,
-        city: storeLocation?.city,
-        addressText: storeLocation?.address || storeLocation?.name,
-        addressTextAr: storeLocation?.addressAr || storeLocation?.nameAr,
-        addressTextKu: storeLocation?.addressKu || storeLocation?.nameKu,
-        location: (storeLocation?.lat && storeLocation?.lng) 
-          ? { lat: storeLocation.lat, lng: storeLocation.lng } 
-          : undefined,
+        storeName: profile?.storeName || branch?.name,
+        storeNameAr: profile?.storeNameAr || branch?.nameAr,
+        storeNameKu: profile?.storeNameKu || branch?.nameKu,
+        logoUrl: profile?.logoUrl,
+        isVerified: profile?.isVerified,
+        phone: profile?.phone || contact.phone || branch?.phone,
+        // Digits only: whatsapp:// rejects a leading "+" (it decodes to a space).
+        whatsapp: (profile?.whatsapp || contact.whatsapp || profile?.phone || branch?.phone)?.replace(/[^0-9]/g, ''),
+        city: profile?.city || branch?.city,
+        addressText: profile?.addressText || branch?.address || branch?.name,
+        addressTextAr: profile?.addressTextAr || branch?.addressAr || branch?.nameAr,
+        addressTextKu: profile?.addressTextKu || branch?.addressKu || branch?.nameKu,
+        location: (Number.isFinite(lat) && Number.isFinite(lng)) ? { lat, lng } : undefined,
+        tenantId: tid,
       };
-      
+
       setStoreInfo(displayInfo);
     } catch (e) {
       // Silent fail - hide store section
@@ -1005,6 +1076,33 @@ export const ProductDetailsScreen: React.FC = () => {
 
   const isRTL = i18n?.language ? getDirection(i18n.language) === 'rtl' : false;
 
+  // Same fallback chain the product name uses. The admin saves description_ar /
+  // description_ku and the service maps them, but every render site read the English
+  // column, so Arabic and Kurdish shoppers got an English description on a fully
+  // translated page.
+  const localizedDescription =
+    i18n.language === 'ar' && product.descriptionAr?.trim()
+      ? product.descriptionAr
+      : i18n.language === 'ku' && product.descriptionKu?.trim()
+      ? product.descriptionKu
+      : product.description;
+
+  // Store card display values (same localisation fallback as the product name).
+  const storeDisplayName =
+    (i18n.language === 'ar' && storeInfo?.storeNameAr?.trim()
+      ? storeInfo.storeNameAr
+      : i18n.language === 'ku' && storeInfo?.storeNameKu?.trim()
+      ? storeInfo.storeNameKu
+      : storeInfo?.storeName) || '';
+  const storeAddress =
+    i18n.language === 'ar' && storeInfo?.addressTextAr?.trim()
+      ? storeInfo.addressTextAr
+      : i18n.language === 'ku' && storeInfo?.addressTextKu?.trim()
+      ? storeInfo.addressTextKu
+      : storeInfo?.addressText;
+  const storeAddressLine = [storeInfo?.city, storeAddress].filter(Boolean).join(' · ');
+  const hasStoreCard = !!(storeDisplayName || storeAddressLine || storeInfo?.phone || storeInfo?.whatsapp);
+
   // Gallery images from product. When a colour with its own image is selected,
   // that image leads the gallery so the hero swaps to the chosen colour.
   const selectedColorImg = effectiveColor
@@ -1072,8 +1170,8 @@ export const ProductDetailsScreen: React.FC = () => {
   // Hero "from" unit price (qty 1), VIP-aware; storage delta added in the render.
   // Uses the flat-VIP-aware helper directly (same path as the product cards).
   const heroUnitPrice = getDisplayUnitPrice(product, isVip);
+  // VIP pricing is visible ONLY to VIP users — non-VIPs get no hint it exists.
   const vipActive = isVip && typeof product.vipPriceUSD === 'number' && product.vipPriceUSD > 0;
-  const vipLocked = !isVip && typeof product.vipPriceUSD === 'number' && product.vipPriceUSD > 0 && product.vipPriceUSD < product.priceUSD;
   // Storage options (capacity) — selection adds a price delta to the base price.
   const storageOptions = product.storageOptions || [];
   const effectiveStorageId = selectedStorageId ?? (storageOptions[0]?.id ?? null);
@@ -1174,8 +1272,14 @@ export const ProductDetailsScreen: React.FC = () => {
   };
 
   const handleTotalButtonPress = async () => {
-    // ALIBABA: Open the Start Order bottom sheet instead of going to cart directly
-    setStartOrderVisible(true);
+    // Flow A (retail): add the currently-selected color + storage as a single cart
+    // line (handleAddToCart bakes the storage delta + does fly-to-cart). Only the
+    // legacy per-size quantity table (no single-select UI) keeps the Start Order sheet.
+    if (hasSizeVariations) {
+      setStartOrderVisible(true);
+      return;
+    }
+    await handleAddToCart();
   };
 
   // Handle add-to-cart confirmation from the Alibaba-style cart bottom sheet
@@ -1537,25 +1641,20 @@ export const ProductDetailsScreen: React.FC = () => {
                           <Text allowFontScaling={false} style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 11, letterSpacing: 0.5 }}>VIP</Text>
                         </View>
                       )}
-                      {!!product.compareAtPriceUSD && product.compareAtPriceUSD > product.priceUSD && (
+                      {/* Gated and computed through pricingUtils, same as the grid
+                          cards. The old inline formula divided by priceUSD, so a VIP
+                          saw one Save% on the card and a different one here. */}
+                      {hasCompareAtDiscount(product, isVip) && (
                         <AppNumber
-                          value={formatPrice(product.compareAtPriceUSD, currentCurrency as any, exchangeRateIQD)}
+                          value={formatPrice(product.compareAtPriceUSD as number, currentCurrency as any, exchangeRateIQD)}
                           style={[styles.comparePrice, { color: theme.colors.textSecondary }]}
                         />
                       )}
                     </View>
-                    {vipLocked && (
-                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 5, marginTop: 4, alignSelf: isRTL ? 'flex-end' : 'flex-start' }}>
-                        <Ionicons name="lock-closed" size={13} color={'#7C3AED'} />
-                        <Text allowFontScaling={false} style={{ color: '#7C3AED', fontWeight: '700', fontSize: 13 }}>
-                          {t('product.vipPrice', { defaultValue: 'VIP price' })}: {formatPrice(product.vipPriceUSD as number, currentCurrency as any, exchangeRateIQD)}
-                        </Text>
-                      </View>
-                    )}
-                    {!!product.compareAtPriceUSD && product.compareAtPriceUSD > product.priceUSD && (
+                    {hasCompareAtDiscount(product, isVip) && (
                       <View style={[styles.saveBadge, { alignSelf: isRTL ? 'flex-end' : 'flex-start' }]}>
                         <Text allowFontScaling={false} style={styles.saveBadgeText}>
-                          {t('product.save', { defaultValue: 'Save' })} {Math.round((1 - product.priceUSD / product.compareAtPriceUSD) * 100)}%
+                          {t('product.save', { defaultValue: 'Save' })} {getDiscountPercent(product, isVip)}%
                         </Text>
                       </View>
                     )}
@@ -1596,8 +1695,7 @@ export const ProductDetailsScreen: React.FC = () => {
                     <AppText
                       fontSize={14}
                       numberOfLines={1}
-                      adjustsFontSizeToFit
-                      minimumFontScale={0.5}
+                      adjustsFontSizeToFit={false}
                       style={[
                         styles.stockText,
                         {
@@ -1638,18 +1736,105 @@ export const ProductDetailsScreen: React.FC = () => {
                 )}
               </View>
 
-              {/* Sku / Manufacturer card */}
-              <View style={[styles.skuCard, { borderColor: theme.colors.border, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                <View style={styles.skuCell}>
-                  <Text allowFontScaling={false} style={[styles.skuLabel, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>{t('product.sku', { defaultValue: 'Sku' })}</Text>
-                  <Text allowFontScaling={false} style={[styles.skuValue, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{product.partNumber}</Text>
+              {/* Sku / Manufacturer / Barcode card */}
+              <View style={[styles.skuCard, { borderColor: theme.colors.border }]}>
+                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                  <View style={styles.skuCell}>
+                    <Text allowFontScaling={false} style={[styles.skuLabel, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>{t('product.sku', { defaultValue: 'Sku' })}</Text>
+                    {/* The admin types SKU and Part Number into separate fields; showing
+                        partNumber here made the real SKU unreachable from the app.
+                        No fallback to partNumber either — with SKU and Manufacturer
+                        Code both falling back to it, one part number printed three
+                        times on this screen under three different labels. */}
+                    <Text allowFontScaling={false} style={[styles.skuValue, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{product.sku?.trim() || t('product.notAvailable', { defaultValue: 'Not Available' })}</Text>
+                  </View>
+                  <View style={[styles.skuDivider, { backgroundColor: theme.colors.border }]} />
+                  <View style={styles.skuCell}>
+                    <Text allowFontScaling={false} style={[styles.skuLabel, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>{t('product.manufacturerCode', { defaultValue: 'Manufacturer Code' })}</Text>
+                    <Text allowFontScaling={false} style={[styles.skuValue, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{product.specifications?.['Manufacturer Code'] || product.specifications?.['Manufacturer'] || t('product.notAvailable', { defaultValue: 'Not Available' })}</Text>
+                  </View>
                 </View>
-                <View style={[styles.skuDivider, { backgroundColor: theme.colors.border }]} />
-                <View style={styles.skuCell}>
-                  <Text allowFontScaling={false} style={[styles.skuLabel, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>{t('product.manufacturerCode', { defaultValue: 'Manufacturer Code' })}</Text>
-                  <Text allowFontScaling={false} style={[styles.skuValue, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{product.specifications?.['Manufacturer Code'] || product.specifications?.['Manufacturer'] || product.partNumber}</Text>
-                </View>
+                {/* Full-width row rather than a third column: "Manufacturer Code" already
+                    wraps at one third of a small phone's width. */}
+                {!!product.barcode?.trim() && (
+                  <>
+                    <View style={[styles.skuRowDivider, { backgroundColor: theme.colors.border }]} />
+                    <View style={styles.skuCell}>
+                      <Text allowFontScaling={false} style={[styles.skuLabel, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>{t('product.barcode', { defaultValue: 'Barcode' })}</Text>
+                      <AppNumber
+                        value={product.barcode.trim()}
+                        style={[styles.skuValue, { color: theme.colors.text }]}
+                        containerStyle={{ alignItems: isRTL ? 'flex-end' : 'flex-start' }}
+                        numberOfLines={1}
+                      />
+                    </View>
+                  </>
+                )}
               </View>
+
+              {/* Brand card — logo (or wordmark) + name, opens every product of that brand */}
+              {!!product.brand && (
+                <TouchableOpacity
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('product.viewAllBrand', { brand: product.brand, defaultValue: `View all ${product.brand} products` })}
+                  onPress={() => navigation.navigate('CategoryProducts', { brand: product.brand, title: product.brand })}
+                  style={[
+                    styles.brandCard,
+                    {
+                      borderColor: theme.colors.border,
+                      flexDirection: isRTL ? 'row-reverse' : 'row',
+                    },
+                  ]}
+                >
+                  <View style={[styles.brandLogoBox, { backgroundColor: isDark ? theme.colors.surface : '#F1F2F4' }]}>
+                    {brandLogoUrl ? (
+                      <Image
+                        source={{ uri: brandLogoUrl }}
+                        style={styles.brandLogo}
+                        contentFit="contain"
+                        transition={0}
+                        cachePolicy="memory-disk"
+                        recyclingKey={brandLogoUrl}
+                      />
+                    ) : (
+                      <Text
+                        allowFontScaling={false}
+                        numberOfLines={1}
+                        style={[
+                          styles.brandWordmark,
+                          { color: theme.colors.text, fontSize: brandWordmarkFontSize(product.brand) },
+                        ]}
+                      >
+                        {product.brand.toUpperCase()}
+                      </Text>
+                    )}
+                  </View>
+
+                  <View style={styles.brandCardText}>
+                    <Text
+                      allowFontScaling={false}
+                      numberOfLines={1}
+                      style={[styles.brandCardName, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}
+                    >
+                      {product.brand}
+                    </Text>
+                    <Text
+                      allowFontScaling={false}
+                      numberOfLines={1}
+                      style={[styles.brandCardHint, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}
+                    >
+                      {t('product.viewAllBrand', { brand: product.brand, defaultValue: `View all ${product.brand} products` })}
+                    </Text>
+                  </View>
+
+                  <Ionicons
+                    name={isRTL ? 'chevron-back' : 'chevron-forward'}
+                    size={20}
+                    color={theme.colors.textSecondary}
+                  />
+                </TouchableOpacity>
+              )}
 
               {/* Wholesale Pricing Tiers */}
               {product.priceTiers && product.priceTiers.length > 0 && (
@@ -1831,13 +2016,16 @@ export const ProductDetailsScreen: React.FC = () => {
 
                   {/* Table Header */}
                   <View style={[styles.alibabaTableHeader, { backgroundColor: theme.colors.surface, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                    <Text allowFontScaling={false} style={[styles.alibabaHeaderText, { color: theme.colors.textSecondary, flex: 2, textAlign: isRTL ? 'right' : 'left' }]}>
+                    <Text allowFontScaling={false} style={[styles.alibabaHeaderText, { color: theme.colors.textSecondary, flex: VARIANT_COL.model, textAlign: isRTL ? 'right' : 'left' }]}>
                       {t('product.modelNumber', { defaultValue: 'Model' })}
                     </Text>
-                    <Text allowFontScaling={false} style={[styles.alibabaHeaderText, { color: theme.colors.textSecondary, flex: 1, textAlign: 'center' }]}>
+                    <Text allowFontScaling={false} style={[styles.alibabaHeaderText, { color: theme.colors.textSecondary, flex: VARIANT_COL.price, textAlign: 'center' }]}>
+                      {t('product.priceLabel', { defaultValue: 'Price' })}
+                    </Text>
+                    <Text allowFontScaling={false} style={[styles.alibabaHeaderText, { color: theme.colors.textSecondary, flex: VARIANT_COL.stock, textAlign: 'center' }]}>
                       {t('product.stock', { defaultValue: 'Stock' })}
                     </Text>
-                    <Text allowFontScaling={false} style={[styles.alibabaHeaderText, { color: theme.colors.textSecondary, flex: 1.5, textAlign: isRTL ? 'left' : 'right' }]}>
+                    <Text allowFontScaling={false} style={[styles.alibabaHeaderText, { color: theme.colors.textSecondary, flex: VARIANT_COL.qty, textAlign: isRTL ? 'left' : 'right' }]}>
                       {t('product.quantity', { defaultValue: 'Qty' })}
                     </Text>
                   </View>
@@ -1867,7 +2055,7 @@ export const ProductDetailsScreen: React.FC = () => {
                             {
                               color: isOutOfStock ? theme.colors.textSecondary : theme.colors.text,
                               textDecorationLine: isOutOfStock ? 'line-through' : 'none',
-                              flex: 2,
+                              flex: VARIANT_COL.model,
                               textAlign: isRTL ? 'right' : 'left',
                             },
                           ]}
@@ -1876,7 +2064,21 @@ export const ProductDetailsScreen: React.FC = () => {
                           {sizeDisplay}
                         </Text>
 
-                        <View style={[styles.alibabaStockCell, { flex: 1 }]}>
+                        <View style={{ flex: VARIANT_COL.price, alignItems: 'center', justifyContent: 'center' }}>
+                          <Text allowFontScaling={false}
+                            style={{
+                              color: isOutOfStock ? theme.colors.textSecondary : theme.colors.text,
+                              textDecorationLine: isOutOfStock ? 'line-through' : 'none',
+                              fontSize: 13,
+                              fontWeight: '600',
+                            }}
+                            numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}
+                          >
+                            ${(variation.priceUSD != null ? variation.priceUSD : product.priceUSD)?.toFixed(2)}
+                          </Text>
+                        </View>
+
+                        <View style={[styles.alibabaStockCell, { flex: VARIANT_COL.stock }]}>
                           <AppNumber
                             value={variation.stockQuantity}
                             style={[
@@ -1886,7 +2088,7 @@ export const ProductDetailsScreen: React.FC = () => {
                           />
                         </View>
 
-                        <View style={[styles.alibabaQtyCell, { flex: 1.5, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                        <View style={[styles.alibabaQtyCell, { flex: VARIANT_COL.qty, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                           <TouchableOpacity
                             onPress={() => updateVariationQuantity(variation.variationId, -1)}
                             disabled={currentQty <= 0}
@@ -1911,8 +2113,8 @@ export const ProductDetailsScreen: React.FC = () => {
                             style={[styles.alibabaQtyText, { 
                               color: theme.colors.text,
                               backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
-                              minWidth: 40,
-                              height: 40,
+                              width: VARIANT_QTY_FIELD_WIDTH,
+                              height: 32,
                               textAlign: 'center',
                               textAlignVertical: 'center',
                               paddingVertical: 0,
@@ -2220,13 +2422,13 @@ export const ProductDetailsScreen: React.FC = () => {
 
                   {/* Table Header */}
                   <View style={[styles.alibabaTableHeader, { backgroundColor: theme.colors.surface, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                    <Text allowFontScaling={false} style={[styles.alibabaHeaderText, { color: theme.colors.textSecondary, flex: 2, textAlign: isRTL ? 'right' : 'left' }]}>
+                    <Text allowFontScaling={false} style={[styles.alibabaHeaderText, { color: theme.colors.textSecondary, flex: VARIANT_COL.model, textAlign: isRTL ? 'right' : 'left' }]}>
                       {t('product.color', { defaultValue: 'Color' })}
                     </Text>
-                    <Text allowFontScaling={false} style={[styles.alibabaHeaderText, { color: theme.colors.textSecondary, flex: 1, textAlign: 'center' }]}>
+                    <Text allowFontScaling={false} style={[styles.alibabaHeaderText, { color: theme.colors.textSecondary, flex: VARIANT_COL.stock, textAlign: 'center' }]}>
                       {t('product.stock', { defaultValue: 'Stock' })}
                     </Text>
-                    <Text allowFontScaling={false} style={[styles.alibabaHeaderText, { color: theme.colors.textSecondary, flex: 1.5, textAlign: isRTL ? 'left' : 'right' }]}>
+                    <Text allowFontScaling={false} style={[styles.alibabaHeaderText, { color: theme.colors.textSecondary, flex: VARIANT_COL.qty, textAlign: isRTL ? 'left' : 'right' }]}>
                       {t('product.quantity', { defaultValue: 'Qty' })}
                     </Text>
                   </View>
@@ -2251,7 +2453,7 @@ export const ProductDetailsScreen: React.FC = () => {
                           },
                         ]}
                       >
-                        <View style={{ flex: 2, flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center' }}>
+                        <View style={{ flex: VARIANT_COL.model, flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center' }}>
                           {/* Color swatch */}
                           <View
                             style={{
@@ -2280,7 +2482,7 @@ export const ProductDetailsScreen: React.FC = () => {
                           </Text>
                         </View>
 
-                        <View style={[styles.alibabaStockCell, { flex: 1 }]}>
+                        <View style={[styles.alibabaStockCell, { flex: VARIANT_COL.stock }]}>
                           <AppNumber
                             value={colorVar.stockQuantity}
                             style={[
@@ -2290,7 +2492,7 @@ export const ProductDetailsScreen: React.FC = () => {
                           />
                         </View>
 
-                        <View style={[styles.alibabaQtyCell, { flex: 1.5, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                        <View style={[styles.alibabaQtyCell, { flex: VARIANT_COL.qty, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                           <TouchableOpacity
                             onPress={() => updateColorVariationQuantity(colorVar.variationId, -1)}
                             disabled={currentQty <= 0}
@@ -2315,8 +2517,8 @@ export const ProductDetailsScreen: React.FC = () => {
                             style={[styles.alibabaQtyText, { 
                               color: theme.colors.text,
                               backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
-                              minWidth: 40,
-                              height: 40,
+                              width: VARIANT_QTY_FIELD_WIDTH,
+                              height: 32,
                               textAlign: 'center',
                               textAlignVertical: 'center',
                               paddingVertical: 0,
@@ -2414,13 +2616,13 @@ export const ProductDetailsScreen: React.FC = () => {
               )}
 
               {/* Description */}
-              {product.description && (
+              {!!localizedDescription && (
                 <View style={styles.section}>
                   <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
                     {t('product.description')}
                   </Text>
                   <Text allowFontScaling={false} style={[styles.descriptionText, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
-                    {product.description}
+                    {localizedDescription}
                   </Text>
                 </View>
               )}
@@ -2433,26 +2635,66 @@ export const ProductDetailsScreen: React.FC = () => {
                   {t('product.specifications')}
                 </Text>
 
+                {/* No Condition card: nothing in the admin form or the `parts` table
+                    sets a condition, so it always read "Available" — owner removed it.
+                    Warranty moves up to keep this a full 2-up row. */}
                 <View style={[styles.infoCardsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                  <View style={[styles.infoCard, { backgroundColor: isDark ? theme.colors.surface : '#F0F0F2' }]}>
-                    <Text allowFontScaling={false} style={[styles.infoCardTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{t('product.condition', { defaultValue: 'Condition' })}</Text>
-                    <Text allowFontScaling={false} style={[styles.infoCardValue, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>{product.condition || t('product.available')}</Text>
-                  </View>
                   <View style={[styles.infoCard, { backgroundColor: isDark ? theme.colors.surface : '#F0F0F2' }]}>
                     <Text allowFontScaling={false} style={[styles.infoCardTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{t('product.authentic', { defaultValue: 'Authentic' })}</Text>
                     <Text allowFontScaling={false} style={[styles.infoCardValue, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>{t('product.authenticValue', { defaultValue: '100% Authentic' })}</Text>
                   </View>
-                </View>
-                <View style={[styles.infoCardsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                   <View style={[styles.infoCard, { backgroundColor: isDark ? theme.colors.surface : '#F0F0F2' }]}>
                     <Text allowFontScaling={false} style={[styles.infoCardTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{t('product.warranty', { defaultValue: 'Warranty' })}</Text>
                     <Text allowFontScaling={false} style={[styles.infoCardValue, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>{product.warranty || t('product.notAvailable', { defaultValue: 'Not Available' })}</Text>
                   </View>
-                  <View style={[styles.infoCard, { backgroundColor: isDark ? theme.colors.surface : '#F0F0F2' }]}>
+                </View>
+                <View style={[styles.infoCardsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                  {/* infoCard is flex:1, so the lone card in this row stretched to full
+                      width once Condition was removed and no longer matched the 2-up
+                      row above it. Pinned to half width instead. */}
+                  <View style={[styles.infoCard, styles.infoCardHalf, { backgroundColor: isDark ? theme.colors.surface : '#F0F0F2' }]}>
                     <Text allowFontScaling={false} style={[styles.infoCardTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{t('product.availability', { defaultValue: 'Availability' })}</Text>
                     <Text allowFontScaling={false} style={[styles.infoCardValue, { color: inStock ? theme.colors.success : theme.colors.error, textAlign: isRTL ? 'right' : 'left' }]}>{inStock ? t('product.available') : t('product.unavailable')}</Text>
                   </View>
                 </View>
+
+                {/* Full technical spec sheet (admin-entered specs + weight + dimensions) */}
+                {(() => {
+                  const specRows: Array<{ k: string; v: string }> = [];
+                  const specs = (product as any).specifications || {};
+                  Object.keys(specs).forEach((k) => {
+                    const v = specs[k];
+                    if (v != null && String(v).trim() !== '') specRows.push({ k, v: String(v) });
+                  });
+                  const w = (product as any).weight;
+                  if (w != null && w !== '') specRows.push({ k: t('product.weight', { defaultValue: 'Weight' }), v: `${w} kg` });
+                  const d = (product as any).dimensions;
+                  if (d && (d.length || d.width || d.height)) {
+                    specRows.push({ k: t('product.dimensions', { defaultValue: 'Dimensions' }), v: `${d.length || 0} × ${d.width || 0} × ${d.height || 0} cm` });
+                  }
+                  if (specRows.length === 0) return null;
+                  return (
+                    <View style={{ marginTop: 12, borderRadius: 14, overflow: 'hidden', backgroundColor: isDark ? theme.colors.surface : '#F0F0F2' }}>
+                      {specRows.map((row, i) => (
+                        <View
+                          key={`${row.k}-${i}`}
+                          style={{
+                            flexDirection: isRTL ? 'row-reverse' : 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            paddingVertical: 12,
+                            paddingHorizontal: 14,
+                            borderTopWidth: i === 0 ? 0 : StyleSheet.hairlineWidth,
+                            borderTopColor: theme.colors.border,
+                          }}
+                        >
+                          <Text allowFontScaling={false} style={{ color: theme.colors.textSecondary, fontSize: 13.5, flex: 1, textAlign: isRTL ? 'right' : 'left' }} numberOfLines={2}>{row.k}</Text>
+                          <Text allowFontScaling={false} style={{ color: theme.colors.text, fontSize: 13.5, fontWeight: '600', flex: 1, textAlign: isRTL ? 'left' : 'right' }} numberOfLines={2}>{row.v}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  );
+                })()}
               </View>
 
               {/* Product Overview (collapsible) */}
@@ -2469,7 +2711,7 @@ export const ProductDetailsScreen: React.FC = () => {
                 </TouchableOpacity>
                 {overviewExpanded && (
                   <Text allowFontScaling={false} style={[styles.descriptionText, { color: theme.colors.textSecondary, marginTop: 12, textAlign: isRTL ? 'right' : 'left' }]}>
-                    {product.description || t('product.noOverview', { defaultValue: 'No additional details available.' })}
+                    {localizedDescription || t('product.noOverview', { defaultValue: 'No additional details available.' })}
                   </Text>
                 )}
               </View>
@@ -2486,6 +2728,134 @@ export const ProductDetailsScreen: React.FC = () => {
                   </Text>
                 </View>
               </View>
+
+              {/* Seller store card. Everything here was loaded but never rendered. */}
+              {hasStoreCard && (
+                <View style={styles.section}>
+                  <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+                    {t('product.storeInfo')}
+                  </Text>
+
+                  <View style={[styles.storeCard, { borderColor: theme.colors.border, backgroundColor: isDark ? theme.colors.surface : '#FFFFFF' }]}>
+                    <TouchableOpacity
+                      style={[styles.storeHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                      activeOpacity={0.75}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('product.viewStore')}
+                      onPress={() => {
+                        const tid = storeInfo?.tenantId || tenantId;
+                        if (tid) navigation.navigate('StoreProducts', { tenantId: tid });
+                      }}
+                    >
+                      {storeInfo?.logoUrl ? (
+                        <Image
+                          source={{ uri: storeInfo.logoUrl }}
+                          style={styles.storeLogo}
+                          contentFit="cover"
+                          transition={0}
+                          cachePolicy="memory-disk"
+                          recyclingKey={storeInfo.logoUrl}
+                        />
+                      ) : (
+                        <View style={[styles.storeIconContainer, { backgroundColor: isDark ? theme.colors.card : '#F0F0F2' }]}>
+                          <Ionicons name="storefront-outline" size={24} color={theme.colors.primary} />
+                        </View>
+                      )}
+
+                      <View style={styles.storeHeaderText}>
+                        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center' }}>
+                          <Text
+                            allowFontScaling={false}
+                            numberOfLines={1}
+                            style={[styles.storeName, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left', flexShrink: 1 }]}
+                          >
+                            {storeDisplayName}
+                          </Text>
+                          {!!storeInfo?.isVerified && (
+                            <View style={[styles.verifiedBadge, { backgroundColor: theme.colors.success }]}>
+                              <Ionicons name="checkmark" size={11} color="#FFFFFF" />
+                            </View>
+                          )}
+                        </View>
+
+                        {/* Address is NOT gated on coordinates — a branch saved without
+                            a pin still has a real address customers need to see. */}
+                        {!!storeAddressLine && (
+                          <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'flex-start', marginTop: 2 }}>
+                            <Ionicons name="location-outline" size={14} color={theme.colors.textSecondary} style={{ marginTop: 2 }} />
+                            <Text
+                              allowFontScaling={false}
+                              numberOfLines={2}
+                              style={[styles.storeLocation, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left', flex: 1 }]}
+                            >
+                              {storeAddressLine}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+
+                      <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={18} color={theme.colors.textSecondary} />
+                    </TouchableOpacity>
+
+                    {!!(storeInfo?.phone || storeInfo?.whatsapp || storeInfo?.location) && (
+                      <View style={[styles.storeActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                        {!!storeInfo?.phone && (
+                          <TouchableOpacity
+                            style={[styles.storeActionButton, { backgroundColor: theme.colors.primary, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                            activeOpacity={0.85}
+                            accessibilityRole="button"
+                            onPress={() => callSeller(storeInfo.phone)}
+                          >
+                            <Ionicons name="call" size={16} color="#FFFFFF" />
+                            <Text allowFontScaling={false} numberOfLines={1} style={styles.storeActionText}>{t('common.call')}</Text>
+                          </TouchableOpacity>
+                        )}
+                        {!!storeInfo?.whatsapp && (
+                          <TouchableOpacity
+                            style={[styles.storeActionButton, { backgroundColor: '#25D366', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                            activeOpacity={0.85}
+                            accessibilityRole="button"
+                            onPress={() => whatsappSeller(storeInfo.whatsapp)}
+                          >
+                            <Ionicons name="logo-whatsapp" size={16} color="#FFFFFF" />
+                            <Text allowFontScaling={false} numberOfLines={1} style={styles.storeActionText}>{t('common.whatsapp')}</Text>
+                          </TouchableOpacity>
+                        )}
+                        {!!storeInfo?.location && (
+                          <TouchableOpacity
+                            style={[styles.storeActionButton, { backgroundColor: '#4285F4', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                            activeOpacity={0.85}
+                            accessibilityRole="button"
+                            onPress={() => openMapToStore(storeInfo.location)}
+                          >
+                            <Ionicons name="navigate" size={16} color="#FFFFFF" />
+                            <Text allowFontScaling={false} numberOfLines={1} style={styles.storeActionText}>{t('common.directions')}</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    )}
+
+                    <TouchableOpacity
+                      style={[styles.viewStoreButton, { borderColor: theme.colors.border, marginTop: SPACING.sm, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                      activeOpacity={0.75}
+                      accessibilityRole="button"
+                      onPress={() => navigation.navigate('StoreLocation', {
+                        // Without this the branches screen lists every seller's shops.
+                        tenantId: storeInfo?.tenantId || product?.tenantId || tenantId || undefined,
+                      })}
+                    >
+                      <Ionicons name="map-outline" size={15} color={theme.colors.primary} />
+                      <Text
+                        allowFontScaling={false}
+                        numberOfLines={1}
+                        style={[styles.viewStoreButtonText, { color: theme.colors.primary, marginHorizontal: 6 }]}
+                      >
+                        {t('product.viewAllBranches', { defaultValue: 'View all branches' })}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
 
             </View>
 
@@ -2564,9 +2934,9 @@ export const ProductDetailsScreen: React.FC = () => {
                         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', marginTop: 8 }}>
                           <View style={{ backgroundColor: theme.colors.primary + '12', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
                             <AppNumber
-                              value={formatPrice(item.priceUSD, currentCurrency as any, exchangeRateIQD)}
+                              value={formatPrice(getDisplayUnitPrice(item, isVip), currentCurrency as any, exchangeRateIQD)}
                               style={[
-                                styles.relatedPrice, 
+                                styles.relatedPrice,
                                 { color: theme.colors.primary }
                               ]}
                               numberOfLines={1}
@@ -2574,6 +2944,39 @@ export const ProductDetailsScreen: React.FC = () => {
                               minimumFontScale={0.85}
                             />
                           </View>
+
+                          {/* Availability, same rules as the grid cards. Without this a
+                              coming-soon or sold-out product sat in the strip looking
+                              exactly like a stocked one. Stock is the shared effective
+                              figure, so a colour-only product is not called sold out. */}
+                          {(() => {
+                            const relStock = getEffectiveStock(item);
+                            const label =
+                              item.status === 'coming_soon'
+                                ? t('products.status.comingSoon', { defaultValue: 'Coming Soon' })
+                                : item.status === 'on_the_way'
+                                ? t('products.status.onTheWay', { defaultValue: 'On The Way' })
+                                : relStock <= 0
+                                ? t('product.outOfStock')
+                                : null;
+                            if (!label) return null;
+                            return (
+                              <View
+                                style={{
+                                  marginLeft: isRTL ? 0 : 8,
+                                  marginRight: isRTL ? 8 : 0,
+                                  backgroundColor: theme.colors.textSecondary + '1A',
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 3,
+                                  borderRadius: 6,
+                                }}
+                              >
+                                <AppText fontSize={10} numberOfLines={1} style={{ color: theme.colors.textSecondary, fontWeight: '700' }}>
+                                  {label}
+                                </AppText>
+                              </View>
+                            );
+                          })()}
                         </View>
                       </View>
 
@@ -2725,9 +3128,11 @@ export const ProductDetailsScreen: React.FC = () => {
                     ) : (
                       <>
                         <AppText fontSize={10} style={styles.alibabaTotalLabel} numberOfLines={1} adjustsFontSizeToFit>
-                          {t('product.startOrder', { defaultValue: 'Start Order' })}
+                          {hasSizeVariations
+                            ? t('product.startOrder', { defaultValue: 'Start Order' })
+                            : t('product.addToCart', { defaultValue: 'Add to Cart' })}
                         </AppText>
-                    
+
                         <AppNumber value={totalPriceText} style={styles.alibabaTotalValue} />
                        
                         {showSavings && (
@@ -3148,6 +3553,13 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: -0.5,
   },
+  // Referenced by the related-products strip. It was missing from the sheet, and
+  // because this file is @ts-nocheck nothing flagged it — RN silently skips an
+  // undefined style entry, so the price rendered at AppNumber's 14px default.
+  relatedPrice: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
   stockBadge: {
     alignItems: 'center',
     borderRadius: 20,
@@ -3155,7 +3567,10 @@ const styles = StyleSheet.create({
     minHeight: 30,
     paddingHorizontal: SPACING.md,
     paddingVertical: 3,
-    flexShrink: 1,
+    // Hold the pill's intrinsic width: it used to shrink next to a long price
+    // (e.g. $1,199.00), which clipped the stock count off "In Stock (40)".
+    // The price block beside it wraps instead.
+    flexShrink: 0,
   },
   stockDot: {
     borderRadius: 4,
@@ -3168,7 +3583,7 @@ const styles = StyleSheet.create({
     includeFontPadding: false, // GOLDEN FIX
     textAlignVertical: 'center', // Centers vertically
     paddingTop: Platform.OS === 'android' ? 1 : 0,
-    flexShrink: 1,
+    // No flexShrink: the label must never be squeezed into an ellipsis/clip.
   },
   comparePrice: {
     fontSize: 16,
@@ -3221,6 +3636,10 @@ const styles = StyleSheet.create({
   skuDivider: {
     width: 1,
   },
+  skuRowDivider: {
+    height: 1,
+    marginVertical: SPACING.md,
+  },
   skuLabel: {
     fontSize: 13,
     fontWeight: '600',
@@ -3229,6 +3648,46 @@ const styles = StyleSheet.create({
   skuValue: {
     fontSize: 15,
     fontWeight: '500',
+  },
+  brandCard: {
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+    gap: SPACING.md,
+  },
+  brandLogoBox: {
+    width: BRAND_LOGO_WIDTH,
+    height: BRAND_LOGO_HEIGHT,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    overflow: 'hidden',
+  },
+  brandLogo: {
+    width: '100%',
+    height: '100%',
+  },
+  brandWordmark: {
+    fontWeight: '800',
+    letterSpacing: 0.3,
+    textAlign: 'center',
+    // Android clips the last glyph of a bold string flush against its bounds.
+    paddingHorizontal: 2,
+  },
+  brandCardText: {
+    flex: 1,
+  },
+  brandCardName: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  brandCardHint: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginTop: 2,
   },
   infoCardsRow: {
     flexDirection: 'row',
@@ -3240,6 +3699,13 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: SPACING.md,
     minHeight: 92,
+  },
+  // Keeps a single card in a row the same width as a card in the 2-up row above,
+  // instead of flex:1 stretching it edge to edge. Halves the 12pt row gap.
+  infoCardHalf: {
+    flex: 0,
+    width: '50%',
+    maxWidth: '50%',
   },
   infoCardTitle: {
     fontSize: 15,
@@ -3383,6 +3849,8 @@ const styles = StyleSheet.create({
   alibabaQtyCell: {
     alignItems: 'center',
     flexDirection: 'row',
+    // Keeps the steppers off the STOCK number even when the row is tight.
+    gap: 6,
     justifyContent: 'flex-end',
   },
   alibabaQtyButton: {
@@ -3672,7 +4140,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     height: 16,
     justifyContent: 'center',
-    marginLeft: 6,
+    // marginHorizontal, not marginLeft: the badge sits on the other side of the name in RTL.
+    marginHorizontal: 6,
     width: 16,
   },
   viewStoreButton: {

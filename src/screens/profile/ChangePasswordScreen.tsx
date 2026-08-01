@@ -22,15 +22,13 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../contexts/AuthContext';
 import { AuthService } from '../../services/authService';
-import { 
-  getAuthState, 
-  setPassword, 
-  mapFirebaseError, 
-  sendOTP, 
-  verifyOTP, 
-  resetPasswordAfterOTP, 
+import {
+  getAuthState,
+  setPassword,
+  mapFirebaseError,
+  resetPasswordAfterOTP,
   sendPasswordResetEmail,
-  reloadUser 
+  reloadUser
 } from '../../services/auth';
 import ReauthModal, { ReauthModalHandle } from '../../components/ReauthModal';
 import { useTheme } from '../../components/ThemeProvider';
@@ -287,8 +285,9 @@ const ChangePasswordScreen = () => {
     try {
       setLoading(true);
       setErrorMessage('');
-      const result = await sendOTP(userPhone);
-      setVerificationId(result.verificationId);
+      // Supabase phone OTP (delivered via the OTPIQ Send-SMS hook), not Firebase.
+      await AuthService.sendPhoneVerification(userPhone);
+      setVerificationId(userPhone);
       setStep('otp');
       setCooldown(30);
     } catch (error: any) {
@@ -353,8 +352,8 @@ const ChangePasswordScreen = () => {
 
     try {
       setLoading(true);
-      await verifyOTP(verificationId, otpCode);
-      // OTP verified → now set new password
+      await AuthService.verifyPhoneCode(userPhone, otpCode);
+      // OTP verified (Supabase session now active) → set new password
       setStep('newPass');
     } catch (error: any) {
       setErrorMessage(error.message || t('profile.passwordScreen.errors.incorrectCode'));
@@ -373,8 +372,8 @@ const ChangePasswordScreen = () => {
     inFlightRef.current = true;
     try {
       setLoading(true);
-      const result = await sendOTP(userPhone);
-      setVerificationId(result.verificationId);
+      await AuthService.sendPhoneVerification(userPhone);
+      setVerificationId(userPhone);
       setCooldown(30);
     } catch (error: any) {
       setErrorMessage(error.message || t('profile.passwordScreen.errors.failedResend'));

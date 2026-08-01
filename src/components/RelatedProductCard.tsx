@@ -22,17 +22,32 @@ import {
   Platform,
 } from "react-native";
 import { Image } from "expo-image";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { useTheme } from "../components/ThemeProvider";
 import { Product } from "../types";
 import { formatPrice } from "../utils/currency";
 import { useCurrency } from "../contexts/CurrencyContext";
+import { useAuth } from "../contexts/AuthContext";
+import {
+  getDisplayUnitPrice,
+  getDiscountPercent,
+  getEffectiveStock,
+  hasCompareAtDiscount,
+  LOW_STOCK_THRESHOLD,
+} from "../utils/pricingUtils";
 import { getDirection } from "../locales";
+import { getThumbnailUrl } from "../utils/imageUtils";
 import { SPACING } from "../constants/theme";
+import AppNumber from "./AppNumber";
 
 // GOLDEN: Fixed width for predictable snapping - NOT screenWidth-based
 const CARD_WIDTH = 140;
+
+// Same fixed brand accents as the grid cards: these read as "VIP" and "sale"
+// regardless of theme and both carry white text.
+const VIP_PURPLE = "#7C3AED";
+const SALE_RED = "#E53935";
 
 interface RelatedProductCardProps {
   product: Product;
@@ -48,6 +63,7 @@ const RelatedProductCard: React.FC<RelatedProductCardProps> = ({
   const { theme, isDark } = useTheme();
   const { t, i18n } = useTranslation();
   const { currency, exchangeRateIQD } = useCurrency();
+  const { isVip } = useAuth();
   const isRTL = i18n?.language ? getDirection(i18n.language) === "rtl" : false;
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -60,12 +76,50 @@ const RelatedProductCard: React.FC<RelatedProductCardProps> = ({
         ? product.nameKu
         : product.name;
 
-  // Image URL - get first from imageUrls array
-  const imageUrl = product.imageUrls?.[0];
+  // Brandless sub-line falls back to the category, which has to follow the UI language
+  // the same way the name above it does — it used to always render the English one.
+  const displayCategory =
+    i18n.language === "ar" && product.categoryAr
+      ? product.categoryAr
+      : i18n.language === "ku" && product.categoryKu
+        ? product.categoryKu
+        : product.category;
+
+  // Image URL — thumbnail, not the full-size original: this is a small carousel tile.
+  const imageUrl = getThumbnailUrl(product.imageUrls?.[0], 400);
   const hasValidImage = imageUrl && !imageError;
 
-  // Stock status
-  const inStock = product.stockQty > 0;
+  // Stock status. Main + per-size + per-colour, same source as the product page: a
+  // product stocked only through colour variations was advertised here as out of stock
+  // while the page it links to sold it.
+  const effectiveStock = getEffectiveStock(product);
+  const isComingSoon = product.status === "coming_soon";
+  const isOnTheWay = product.status === "on_the_way";
+  // Mutually exclusive stock badges, ordered exactly as on the grid cards.
+  const isPlainStatus = !product.status || product.status === "available";
+  const outOfStock = isPlainStatus && effectiveStock === 0;
+  const lowStock =
+    isPlainStatus && effectiveStock > 0 && effectiveStock <= LOW_STOCK_THRESHOLD;
+  const inStock = isPlainStatus && effectiveStock > LOW_STOCK_THRESHOLD;
+
+  // Price. Same path as the grid cards (VIP flat price, wholesale tiers, compare-at),
+  // so a VIP is not shown their price on the card and the page and then the higher
+  // non-VIP price for the same product down here.
+  const getPriceDisplay = () => {
+    if (product.priceTiers && product.priceTiers.length > 0) {
+      const minPrice = Math.min(...product.priceTiers.map((tier) => tier.priceUSD));
+      const minFormatted = formatPrice(minPrice, currency, exchangeRateIQD);
+      const maxFormatted = formatPrice(product.priceUSD, currency, exchangeRateIQD, {
+        symbol: false,
+      });
+      return `${minFormatted} - ${maxFormatted}`;
+    }
+    return formatPrice(getDisplayUnitPrice(product, isVip), currency, exchangeRateIQD);
+  };
+  const vipActive =
+    isVip && typeof product.vipPriceUSD === "number" && product.vipPriceUSD > 0;
+  const hasDiscount = hasCompareAtDiscount(product, isVip);
+  const savePct = getDiscountPercent(product, isVip);
 
   return (
     <TouchableOpacity
@@ -140,38 +194,81 @@ const RelatedProductCard: React.FC<RelatedProductCardProps> = ({
             />
           </View>
         )}
-
-        {/* Out of Stock Badge - Inline, NOT absolute */}
-        {!inStock && (
-          <View
-            style={[
-              styles.outOfStockBadge,
-              { backgroundColor: theme.colors.error },
-            ]}
-          >
-            <Text allowFontScaling={false} style={styles.outOfStockText}>
-              {t("product.outOfStock", { defaultValue: "Out of Stock" })}
-            </Text>
-          </View>
-        )}
-
-        {/* Available Badge - show when in stock */}
-        {inStock && (
-          <View
-            style={[styles.outOfStockBadge, { backgroundColor: "#4CAF50" }]}
-          >
-            <Ionicons
-              name="checkmark-circle-outline"
-              size={10}
-              color="#ffffff"
-              style={{ marginRight: 2 }}
-            />
-            <Text allowFontScaling={false} style={styles.outOfStockText}>
-              {t("products.status.available", { defaultValue: "Available" })}
-            </Text>
-          </View>
-        )}
       </View>
+
+      {/* Status / stock badge — one badge, in normal flow directly under the image.
+          These used to live INSIDE the image container, where the aspectRatio-1 image
+          consumed the container's whole height and `overflow: hidden` clipped them
+          away, so none of them ever reached the screen. */}
+      {isComingSoon && (
+        <View style={[styles.statusBadge, { backgroundColor: "#FF9800" }]}>
+          <Ionicons
+            name="time-outline"
+            size={10}
+            color="#ffffff"
+            style={styles.statusBadgeIcon}
+          />
+          <Text allowFontScaling={false} style={styles.statusBadgeText} numberOfLines={1}>
+            {t("products.status.comingSoon", { defaultValue: "Coming Soon" })}
+          </Text>
+        </View>
+      )}
+
+      {isOnTheWay && (
+        <View style={[styles.statusBadge, { backgroundColor: "#2196F3" }]}>
+          <MaterialCommunityIcons
+            name="truck-outline"
+            size={11}
+            color="#ffffff"
+            style={styles.statusBadgeIcon}
+          />
+          <Text allowFontScaling={false} style={styles.statusBadgeText} numberOfLines={1}>
+            {t("products.status.onTheWay", { defaultValue: "On The Way" })}
+          </Text>
+        </View>
+      )}
+
+      {outOfStock && (
+        <View style={[styles.statusBadge, { backgroundColor: theme.colors.error }]}>
+          <Text allowFontScaling={false} style={styles.statusBadgeText} numberOfLines={1}>
+            {t("product.outOfStock", { defaultValue: "Out of Stock" })}
+          </Text>
+        </View>
+      )}
+
+      {lowStock && (
+        <View style={[styles.statusBadge, { backgroundColor: theme.colors.warning }]}>
+          <Ionicons
+            name="alert-circle-outline"
+            size={11}
+            color="#ffffff"
+            style={styles.statusBadgeIcon}
+          />
+          <AppNumber
+            value={t("product.lowStock", {
+              count: effectiveStock,
+              defaultValue: `Only ${effectiveStock} left`,
+            })}
+            numberOfLines={1}
+            containerStyle={styles.shrinkable}
+            style={styles.statusBadgeText}
+          />
+        </View>
+      )}
+
+      {inStock && (
+        <View style={[styles.statusBadge, { backgroundColor: "#4CAF50" }]}>
+          <Ionicons
+            name="checkmark-circle-outline"
+            size={10}
+            color="#ffffff"
+            style={styles.statusBadgeIcon}
+          />
+          <Text allowFontScaling={false} style={styles.statusBadgeText} numberOfLines={1}>
+            {t("products.status.available", { defaultValue: "Available" })}
+          </Text>
+        </View>
+      )}
 
       {/* Content Container - flexGrow for proper layout */}
       <View style={styles.content}>
@@ -197,7 +294,7 @@ const RelatedProductCard: React.FC<RelatedProductCardProps> = ({
           ]}
           numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}
         >
-          {product.category}
+          {displayCategory}
           {product.partNumber ? ` ` : ""}
           {product.partNumber && (
             <Text allowFontScaling={false}
@@ -206,19 +303,49 @@ const RelatedProductCard: React.FC<RelatedProductCardProps> = ({
           )}
         </Text>
 
-        {/* Price - at bottom via flex */}
+        {/* Price - at bottom via flex. Stacked, not inline: this tile is only 140pt
+            wide, so the VIP tag and the "was" price get their own rows rather than
+            squeezing the price the customer actually pays. */}
         <View style={styles.priceContainer}>
-          <Text allowFontScaling={false}
+          <AppNumber
+            value={getPriceDisplay()}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.85}
             style={[
               styles.price,
               {
-                color: theme.colors.primary,
+                color: vipActive ? VIP_PURPLE : theme.colors.primary,
                 textAlign: isRTL ? "right" : "left",
               },
             ]}
-           numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
-            {formatPrice(product.priceUSD, currency, exchangeRateIQD)}
-          </Text>
+          />
+
+          {vipActive && (
+            <View style={[styles.vipTag, { backgroundColor: VIP_PURPLE }]}>
+              <Text allowFontScaling={false} style={styles.tagText}>
+                VIP
+              </Text>
+            </View>
+          )}
+
+          {hasDiscount && (
+            <View style={styles.saveRow}>
+              <AppNumber
+                value={formatPrice(
+                  product.compareAtPriceUSD as number,
+                  currency,
+                  exchangeRateIQD,
+                )}
+                numberOfLines={1}
+                containerStyle={styles.shrinkable}
+                style={[styles.wasPrice, { color: theme.colors.textSecondary }]}
+              />
+              <View style={[styles.saveBadge, { backgroundColor: SALE_RED }]}>
+                <AppNumber value={`-${savePct}%`} style={styles.tagText} />
+              </View>
+            </View>
+          )}
         </View>
       </View>
     </TouchableOpacity>
@@ -263,28 +390,67 @@ const styles = StyleSheet.create({
    * - minHeight: 28 for Arabic text room
    * - paddingVertical: 4 for extra space
    */
-  outOfStockBadge: {
+  statusBadge: {
     alignItems: "center",
     alignSelf: "flex-start",
     borderRadius: 4,
     flexDirection: "row",
-    marginLeft: SPACING.sm,
     marginTop: SPACING.xs,
+    maxWidth: "100%",
     minHeight: 28,
     paddingHorizontal: SPACING.xs,
     paddingVertical: 4,
+  },
+  statusBadgeIcon: {
+    marginRight: 2,
   },
   /**
    * SAMSUNG BOLD FIX (Arabic-safe):
    * - includeFontPadding: true on Android
    * - lineHeight for Arabic glyph height
    */
-  outOfStockText: {
+  statusBadgeText: {
     color: "#fff",
     fontSize: 12,
     fontWeight: Platform.OS === "android" ? "normal" : "600",
     includeFontPadding: Platform.OS === "android",
     lineHeight: Platform.OS === "android" ? 18 : 14,
+  },
+  // AppNumber's outer View is the flex item, so shrink rules have to land there or a
+  // long price / RTL label takes its full intrinsic width and pushes the badge out.
+  shrinkable: {
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  vipTag: {
+    alignSelf: "flex-start",
+    borderRadius: 5,
+    marginTop: 2,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  tagText: {
+    color: "#FFFFFF",
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 0.3,
+  },
+  saveRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 5,
+    marginTop: 2,
+  },
+  wasPrice: {
+    fontSize: 11,
+    fontWeight: "500",
+    textDecorationLine: "line-through",
+  },
+  saveBadge: {
+    borderRadius: 5,
+    flexShrink: 0,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
   },
   partNumber: {
     fontSize: 12,
@@ -305,4 +471,6 @@ const styles = StyleSheet.create({
 // Export card width for FlatList snapToInterval calculation
 export const RELATED_CARD_WIDTH = CARD_WIDTH;
 
-export default RelatedProductCard;
+// Memoized like the other product cards — it renders in a carousel on the detail
+// screen, which re-renders often (quantity, variant selection, etc.).
+export default React.memo(RelatedProductCard);

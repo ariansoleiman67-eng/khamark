@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '../services/supabase';
+import { perfMark } from '../utils/perfTrace';
 
 export interface TenantDocument {
   id: string;
@@ -79,81 +80,74 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const creatingPartnerRef = useRef(false);
 
   useEffect(() => {
+    // Clear the previous tenant's state SYNCHRONOUSLY on identity change so no
+    // admin screen keys a query/cache/React-key on the old tenantId during the
+    // async reload (GOLDEN_RULES: clear all tenant state on tenant change).
+    setTenantId(null);
+    setTenant(null);
+    setAdminProfile(null);
+
     // Guard against stale in-flight resolutions overwriting state after `user`
     // changes (logout / account switch / realtime users-row UPDATE). React does
     // not cancel the previous run's promise, so we discard its writes explicitly.
     let cancelled = false;
 
-    const fetchAdminData = async () => {
-      if (!user || !user.uid) {
-        if (!cancelled) {
-          setTenantId(null);
-          setTenant(null);
-          setAdminProfile(null);
-          setIsLoading(false);
-        }
-        return;
-      }
+    setError(null);
 
-      if (!cancelled) {
-        setIsLoading(true);
-        setError(null);
-      }
+    if (!user || !user.uid || !isAdmin) {
+      setTenantId(null);
+      setIsLoading(false);
+      return;
+    }
 
-      try {
-        const { data: userData, error: userError } = await supabase.from('users').select('*').eq('id', user.uid).single();
-        if (cancelled) return;
-        if (userError) throw userError;
+    // Resolve the tenant SYNCHRONOUSLY — no network on the critical path.
+    //
+    // This used to `select('*')` from `users` and then, serially, from `tenants`,
+    // gating every admin screen behind two round-trips. Both were avoidable:
+    // AuthContext already fetched this exact users row (AuthService.getCurrentUserFresh)
+    // and mapped every field used here, and the tenant id is just the admin's own uid.
+    setAdminProfile({
+      uid: user.uid,
+      email: user.email,
+      phone: user.phone,
+      displayName: user.name || user.fullName || '',
+      tenantId: user.uid,
+      role: user.role === 'admin' ? 'admin' : 'owner',
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    });
+    setTenantId(user.uid);
+    setIsLoading(false);
+    perfMark('admin:tenant-resolved');
 
-        if (userData?.is_admin) {
-          const adminData: AdminDocument = {
-            uid: userData.id,
-            email: userData.email,
-            phone: userData.phone,
-            displayName: userData.name || userData.full_name || '',
-            tenantId: userData.id,
-            role: userData.role === 'admin' ? 'admin' : 'owner',
-            createdAt: userData.created_at,
-            updatedAt: userData.updated_at,
-          };
-
-          setAdminProfile(adminData);
-          setTenantId(adminData.tenantId);
-
-          const { data: tenantData } = await supabase.from('tenants').select('*').eq('id', adminData.tenantId).single();
-          if (cancelled) return;
-          if (tenantData) {
-            setTenant({
-              id: tenantData.id,
-              name: tenantData.store_name,
-              ownerUid: tenantData.owner_id,
-              ownerEmail: userData.email,
-              createdAt: tenantData.created_at,
-              updatedAt: tenantData.updated_at,
-              settings: { currency: 'USD', timezone: 'Asia/Baghdad', language: 'en' },
-            });
-          }
-        } else {
-          setAdminProfile(null);
-          setTenantId(null);
-          setTenant(null);
-        }
-      } catch (err: any) {
-        if (!cancelled) {
-          console.error('Error fetching admin data:', err);
-          setError(err.message || 'Failed to load admin data');
-        }
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    };
-
-    fetchAdminData();
+    // The tenants row only backs `tenant`, which no screen currently reads — so it
+    // loads in the background and is deliberately NOT allowed to gate isLoading.
+    // Failure is non-fatal for the same reason: it must not block or error the
+    // admin UI, which needs only tenantId.
+    (async () => {
+      const { data: tenantData } = await supabase
+        .from('tenants')
+        .select('id, store_name, owner_id, created_at, updated_at')
+        .eq('id', user.uid)
+        .single();
+      if (cancelled || !tenantData) return;
+      setTenant({
+        id: tenantData.id,
+        name: tenantData.store_name,
+        ownerUid: tenantData.owner_id,
+        ownerEmail: user.email,
+        createdAt: tenantData.created_at,
+        updatedAt: tenantData.updated_at,
+        settings: { currency: 'USD', timezone: 'Asia/Baghdad', language: 'en' },
+      });
+    })();
 
     return () => {
       cancelled = true;
     };
-  }, [user]);
+    // Key on uid + isAdmin only: `user` is a fresh object on every foreground/token-refresh,
+    // so depending on it re-ran this (spinner flicker + needless DB reads).
+  }, [user?.uid, isAdmin]);
 
   const createAdminAccount = useCallback(async (displayName: string, storeName: string, phone?: string, whatsapp?: string) => {
     // Ignore re-entrant taps: a second concurrent RPC runs against the now-already-admin

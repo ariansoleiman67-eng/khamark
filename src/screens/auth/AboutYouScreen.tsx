@@ -221,12 +221,16 @@ const AboutYouScreen: React.FC = () => {
               <View style={[styles.logoMedallion, { backgroundColor: colors.surface }]}>
                 <Image source={ASANKARY_LOGO} style={styles.logoImage} contentFit="contain" />
               </View>
-              <Animated.Text allowFontScaling={false} entering={SlideInLeft.duration(500).delay(280)} style={styles.heroTitle}>
+              <Animated.View entering={SlideInLeft.duration(500).delay(280)}>
+              <Animated.Text allowFontScaling={false} style={styles.heroTitle}>
                 {t('auth.yourDetails', { defaultValue: 'Your details' })}
               </Animated.Text>
-              <Animated.Text allowFontScaling={false} entering={FadeIn.duration(500).delay(360)} style={styles.heroSubtitle}>
+            </Animated.View>
+              <Animated.View entering={FadeIn.duration(500).delay(360)}>
+              <Animated.Text allowFontScaling={false} style={styles.heroSubtitle}>
                 {t('auth.yourDetailsSubtitle', { defaultValue: 'Tell us a bit about yourself.' })}
               </Animated.Text>
+            </Animated.View>
             </Animated.View>
           </View>
 

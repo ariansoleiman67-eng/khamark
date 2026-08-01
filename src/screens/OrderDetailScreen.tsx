@@ -25,6 +25,7 @@ import { OrderService } from '../services/OrderService';
 import { useCart } from '../contexts/CartContext';
 import { getOrCreateConversation, sendMessage, findConversationByTenant } from '../services/chatService';
 import { getOrderSupportContact, TenantContactInfo } from '../services/tenantInfoService';
+import { discountDisplayName } from '../services/discountService';
 import { formatPrice } from '../utils/currency';
 import { getProductImageUrl } from '../utils/imageUtils';
 import { useCurrency } from '../contexts/CurrencyContext';
@@ -905,7 +906,10 @@ ${t('orders.messagePrompt', { defaultValue: 'Hi, I have a question about this or
                   <Feather name="tag" size={16} color={theme.colors.success} style={styles.summaryIcon} />
                   <View style={styles.textWrapper}>
                     <Text allowFontScaling={false} style={[styles.summaryItemLabel, { color: theme.colors.success }]}>
-                      {order.appliedDiscount.discountName}
+                      {/* Same helper the confirmation screen uses. Rendering the raw
+                          name here meant an Arabic shopper saw the localized name at
+                          checkout and the English one when reopening the order. */}
+                      {discountDisplayName(order.appliedDiscount, i18n.language)}
                     </Text>
                   </View>
                 </View>

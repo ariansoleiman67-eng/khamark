@@ -98,6 +98,8 @@
     "softMessage": "A new version of Asankary is available with improvements and fixes."
   },
   "common": {
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
     "video": "Video",
     "images": "Images",
     "phone": "Phone",
@@ -175,7 +177,8 @@
     "order": "Order",
     "tryDifferentSearch": "Try a different search term",
     "pullToRefresh": "Pull down to refresh",
-    "somethingWentWrong": "Something went wrong"
+    "somethingWentWrong": "Something went wrong",
+    "loadError": "Could not load products. Check your connection."
   },
   "product": {
     "lowStock": "Only {{count}} left",
@@ -199,6 +202,7 @@
     "specifications": "Specifications",
     "category": "Category",
     "brand": "Brand",
+    "viewAllBrand": "View all {{brand}} products",
     "availability": "Availability",
     "available": "Available",
     "storeInfo": "Store Information",
@@ -227,6 +231,9 @@
     "notFound": "Product not found",
     "selectVariationFirst": "Please select a quantity for at least one option before adding to cart.",
     "warranty": "Warranty",
+    "weight": "Weight",
+    "dimensions": "Dimensions",
+    "priceLabel": "Price",
     "whatsappMsg": "Hello, I have a question about this product.",
     "comingSoon": "Coming soon",
     "onTheWay": "On the way",
@@ -241,6 +248,8 @@
     "paymentMethods": "Payment Methods",
     "save": "Save",
     "sku": "Sku",
+    "barcode": "Barcode",
+    "viewAllBranches": "View all branches",
     "vipPrice": "VIP price",
     "storage": "Storage",
     "colorCount_one": "{{count}} color",
@@ -474,6 +483,7 @@
     "signInWithApple": "Continue with Apple",
     "signInWithFacebook": "Continue with Facebook",
     "verifyFailed": "Verification failed. Try again.",
+    "accountCheckFailed": "We couldn't check whether this account already exists. Please try again.",
     "invalidPhone": "Please enter a valid phone number"
   },
   "home": {
@@ -639,7 +649,10 @@
     "issues": "Cart Issues",
     "removeError": "Failed to remove item",
     "saving": "Saving",
-    "updateError": "Failed to update quantity"
+    "youSave": "You save",
+    "updateError": "Failed to update quantity",
+    "moreToUnlock": "more to unlock {{name}}",
+    "moreItemsToUnlock": "more items to unlock {{name}}"
   },
   "checkout": {
     "title": "Checkout",
@@ -734,7 +747,8 @@
     "promoRemove": "Remove",
     "promoPlaceholder": "Promo code",
     "promoApply": "Apply",
-    "promoNoLongerEligible": "Promo code no longer applies to your cart"
+    "promoNoLongerEligible": "Promo code no longer applies to your cart",
+    "promoSingleStore": "This code applies to one store's items only."
   },
   "qiCard": {
     "title": "QI Card Payment",
@@ -1299,6 +1313,10 @@
   },
   "notifications": {
     "title": "Notifications",
+    "enableTitle": "Turn on notifications",
+    "enableBody": "Notifications are off. Turn them on to get order updates and offers.",
+    "enable": "Turn on",
+    "later": "Not now",
     "loading": "Loading notifications...",
     "loadError": "Failed to load notifications. Please try again.",
     "empty": "No notifications",
@@ -1340,6 +1358,8 @@
     "newProducts": "New products added to your favorite category"
   },
   "favorites": {
+    "add": "Add to favorites",
+    "remove": "Remove from favorites",
     "title": "My Favorites",
     "empty": "No favorites yet",
     "emptySubtitle": "Tap the heart icon on products you love to save them here",
@@ -1351,7 +1371,7 @@
   },
   "search": {
     "title": "Search",
-    "placeholder": "Search for parts, categories, or part numbers...",
+    "placeholder": "Search products, brands, or categories...",
     "recentSearches": "Recent Searches",
     "noResults": "No results found",
     "noResultsFor": "No results found for \"{{query}}\"",
@@ -1429,7 +1449,16 @@
     "accessories": "Accessories",
     "turboSupercharger": "Turbo & Supercharger",
     "exhaustsystem": "Exhaust System",
-    "turbo&supercharger": "Turbo & Supercharger"
+    "turbo&supercharger": "Turbo & Supercharger",
+    "phones": "Phones",
+    "earphone": "Earphones",
+    "powerbanks": "Power Banks",
+    "chargers": "Chargers",
+    "cables": "Cables",
+    "bags": "Bags",
+    "smartwatches": "Smartwatches",
+    "trackers": "Trackers",
+    "security": "Security"
   },
   "settings": {
     "title": "Settings",
@@ -2147,6 +2176,7 @@
       "customerMessagesSubtitle": "View and reply to customer inquiries",
       "pushNotifications": "Push Notifications",
       "pushNotificationsSubtitle": "Receive order alerts",
+      "pushNotificationsSaveFailed": "Failed to update notification settings",
       "shippingSettings": "Shipping Settings",
       "shippingSettingsSubtitle": "Free shipping, region rates",
       "notifications": "Notifications",
@@ -2277,6 +2307,7 @@
       "unlock": "Unlock",
       "noBanners": "No Banners Yet",
       "addFirst": "Tap + to add your first banner image",
+      "linkPlaceholder": "Link when tapped (optional) — e.g. https://…",
       "total": "Total",
       "active": "Active",
       "inactive": "Inactive",
@@ -2286,6 +2317,8 @@
       "deleteTitle": "Delete Banner",
       "deleteConfirm": "Are you sure you want to delete this banner?",
       "deleteFailed": "Failed to delete banner",
+      "updateFailed": "Failed to update banner",
+      "reorderFailed": "Failed to save the new order",
       "loadFailed": "Failed to load banners",
       "uploadFailed": "Image upload failed"
     },
@@ -2352,7 +2385,9 @@
       "off": "OFF",
       "for": "for",
       "minOrder": "Min Order",
-      "minItems": "Min Items"
+      "minItems": "Min Items",
+      "descriptionArabic": "Description (Arabic)",
+      "descriptionKurdish": "Description (Kurdish)"
     },
     "storeProfile": {
       "title": "Store Profile",
@@ -2447,7 +2482,13 @@
       "locationAutoSet": "Location has been set to your current GPS coordinates",
       "noPermission": "You don't have permission to do this",
       "mustBeLoggedIn": "You must be logged in to save locations",
-      "openInMaps": "Open in Maps"
+      "openInMaps": "Open in Maps",
+      "notFound": "This location no longer exists",
+      "invalidPhone": "Please enter a valid phone number for the selected country",
+      "latitude": "Latitude",
+      "longitude": "Longitude",
+      "invalidCoordinates": "Please enter a valid latitude and longitude",
+      "coordinatesRequired": "Set the location on the map, use your current location, or enter the coordinates manually"
     },
     "analytics": {
       "title": "Analytics & Reports",
@@ -2521,6 +2562,7 @@
     },
     "businessInfo": {
       "title": "Business Info",
+      "internalOnlyNote": "These details are for your shop's own records and are not shown to customers. The name, logo, contact details and address customers see are set in Store Profile.",
       "generalInfo": "General Info",
       "locationLegal": "Location & Legal",
       "businessName": "Business Name",
@@ -2549,7 +2591,9 @@
       "closed": "Closed",
       "open": "Open",
       "success": "Operating hours updated",
-      "failed": "Failed to update operating hours"
+      "failed": "Failed to update operating hours",
+      "loadFailed": "Failed to load operating hours",
+      "readOnlyUntilLoaded": "The saved hours could not be loaded. Editing is disabled so they are not overwritten — please go back and try again."
     },
     "dashboard": {
       "title": "Dashboard",
@@ -2647,6 +2691,7 @@
       "unknownCustomer": "Unknown Customer",
       "subtotal": "Subtotal",
       "shipping": "Shipping",
+      "discount": "Discount",
       "total": "Total",
       "all": "All Orders",
       "deliveryLocation": "Delivery Location",
@@ -2689,7 +2734,7 @@
       "bulkDone": "Updated {{count}} orders",
       "printInvoice": "Print Invoice",
       "cancelConfirmTitle": "Cancel Order?",
-      "cancelConfirmWarning": "Cancelling this order will immediately notify the customer and cannot be undone.",
+      "cancelConfirmWarning": "Cancelling this order restores its stock and cannot be undone.",
       "confirmCancel": "Yes, Cancel Order",
       "paymentDetails": "Payment Details",
       "amountPaid": "Amount Paid",
@@ -2826,6 +2871,25 @@
         "brandPlaceholder": "e.g. Toyota, Bosch",
         "description": "Description",
         "descriptionPlaceholder": "Product details, specs, etc.",
+        "descriptionAr": "Description (Arabic)",
+        "descriptionKu": "Description (Kurdish)",
+        "descriptionArPlaceholder": "وصف المنتج بالعربية (اختياري)",
+        "descriptionKuPlaceholder": "وەسفی بەرهەم بە کوردی (ئارەزوومەندانە)",
+        "specifications": "Specifications",
+        "specName": "Spec (e.g. RAM)",
+        "specValue": "Value (e.g. 8GB)",
+        "noSpecs": "No specifications added",
+        "duplicateSpec": "That spec already exists",
+        "details": "Details",
+        "sku": "SKU",
+        "skuPlaceholder": "e.g. IP17PM-256-BLK",
+        "barcode": "Barcode",
+        "barcodePlaceholder": "e.g. 194253000000",
+        "warranty": "Warranty",
+        "warrantyPlaceholder": "e.g. 1 year",
+        "weight": "Weight (kg)",
+        "dimensions": "Dimensions (cm) — L / W / H",
+        "imageUploadFailed": "Image upload failed",
         "optionsTitle": "Product Options (Optional)",
         "optionsSubtitle": "These options do not affect price or stock",
         "colors": "Colors",
@@ -2857,8 +2921,10 @@
         "maxQty": "Max Qty",
         "priceLabel": "Price",
         "variations": "Variations",
-        "sizeVariations": "Size Variations",
-        "sizePlaceholder": "e.g. XL, 42, Large",
+        "sizeVariations": "Storage / Size",
+        "sizePlaceholder": "e.g. 128GB, 256GB, 512GB",
+        "storageTierHint": "Value / stock / optional price. Set a price only for tiers that cost more (e.g. 512GB); blank uses the base price.",
+        "optional": "optional",
         "stock": "Stock",
         "noSizeVariations": "No size variations added",
         "colorVariations": "Color Variations",
@@ -2870,6 +2936,13 @@
         "defaultShippingCost": "Default Shipping Cost (USD)",
         "featured": "Featured (pin to top)",
         "featuredHint": "Show this part in the featured row for customers.",
+        "compareAtPrice": "Was Price ($)",
+        "compareAtHint": "Shown crossed-out to display a discount. Leave blank for none.",
+        "vipPrice": "VIP Price ($)",
+        "vipPriceHint": "Special price for VIP customers only. Leave blank for none.",
+        "visible": "Visible in store",
+        "visibleHint": "Turn off to hide this product from customers without deleting it.",
+        "hidden": "Hidden",
         "defaultShippingHint": "Applies to any region not listed below",
         "purchasePrice": "Purchase Price ($)",
         "free": "Free",
@@ -2896,6 +2969,8 @@
       "duplicateColor": "This color already exists",
       "loadingTenant": "Loading business data...",
       "priceMustBePositive": "Available products need a price greater than 0.",
+      "invalidPriceTiers": "Every wholesale tier needs a quantity and a price greater than 0, and two tiers cannot share the same minimum quantity.",
+      "applyAllShippingFailed": "The product was saved, but applying the shipping settings to your other products failed.",
       "reorderFailed": "Failed to save product order",
       "reorderSuccess": "Product order saved!"
     },
@@ -2905,6 +2980,7 @@
       "noCustomers": "No customers found",
       "totalOrders": "Total Orders",
       "totalSpent": "Total Spent",
+      "orders": "Orders",
       "totalCustomers": "Total Customers",
       "failedToLoad": "Failed to load customers",
       "unknown": "Unknown",
@@ -3067,13 +3143,18 @@
       "pickVariation": "Choose variant",
       "pickVariationHint": "Tap a variant to add it to the cart",
       "options": "options",
-      "createFailed": "Failed to create sale"
+      "createFailed": "Failed to create sale",
+      "stockNotDeductedTitle": "Stock not updated",
+      "stockNotDeductedMsg": "The sale was saved, but stock could not be deducted for one or more items. Please adjust the stock manually."
     },
     "active": "Active",
     "brands": {
       "add": "Add Brand",
+      "deleteFailed": "Could not delete. Try again.",
       "deleteTitle": "Delete brand?",
       "edit": "Edit Brand",
+      "logoUploadFailed": "Could not upload the logo. Check your connection and try again.",
+      "saveFailed": "Could not save. Try again.",
       "empty": "No brands yet. Tap + to add one.",
       "name": "Brand name",
       "nameRequired": "Brand name is required",
@@ -3083,12 +3164,16 @@
     },
     "categoryMgr": {
       "add": "Add Category",
+      "deleteError": "Could not delete the category. Please try again.",
       "deleteTitle": "Delete category?",
+      "duplicateName": "A category with this name already exists",
       "edit": "Edit Category",
       "empty": "No categories yet. Tap + to add one.",
+      "imageUploadFailed": "Image upload failed. Check your connection and try again.",
       "name": "Category name",
       "nameRequired": "Category name is required",
       "pickLogo": "Add logo",
+      "saveError": "Could not save the category. Please try again.",
       "title": "Categories"
     },
     "hidden": "Hidden",
@@ -3105,7 +3190,11 @@
       "minPurchase": "Min purchase ($)",
       "empty": "No promo codes yet. Tap + to add one.",
       "codeRequired": "Code and a value are required",
-      "deleteTitle": "Delete promo code?"
+      "deleteTitle": "Delete promo code?",
+      "duplicateCode": "That code already exists",
+      "percentRange": "Percent off must be between 1 and 100",
+      "saveFailed": "Could not save. Try again.",
+      "deleteFailed": "Could not delete. Try again."
     }
   },
   "onboarding": {
@@ -3158,7 +3247,8 @@
   },
   "sort": {
     "priceHigh": "Price ↓",
-    "priceLow": "Price ↑"
+    "priceLow": "Price ↑",
+    "recommended": "Recommended"
   },
   "storeLocations": {
     "loadError": "Failed to load store locations. Please try again.",
@@ -3175,7 +3265,13 @@
     "emptyTitle": "No Store Locations Found",
     "emptyHint": "Please check back later or contact support.",
     "list": "List",
-    "map": "Map"
+    "map": "Map",
+    "todayHours": "Today",
+    "closedToday": "Closed today",
+    "mapsError": "Could not open the maps application.",
+    "phoneError": "Could not open the phone application.",
+    "whatsappError": "WhatsApp is not installed on this device.",
+    "whatsappMessage": "Hello, I would like to inquire about products at {{store}}."
   },
   "loginGate": {
     "backToBrowsing": "Back to Browsing",

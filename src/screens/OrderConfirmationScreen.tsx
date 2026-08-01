@@ -15,6 +15,7 @@ import { formatPrice } from '../utils/currency';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { getProductImageUrl } from '../utils/imageUtils';
 import { formatFirestoreDate } from '../utils/dateUtils';
+import { discountDisplayName, discountDisplayDescription } from '../services/discountService';
 
 type OrderConfirmationScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'OrderConfirmation'>;
 type OrderConfirmationScreenRouteProp = RouteProp<RootStackParamList, 'OrderConfirmation'>;
@@ -299,9 +300,19 @@ const OrderConfirmationScreen: React.FC = () => {
 
               {order.appliedDiscount && order.appliedDiscount.savedAmount > 0 && (
                 <View style={[styles.summaryItemRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                  <Text allowFontScaling={false} style={[styles.summaryItemLabel, { color: theme.colors.success, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1} adjustsFontSizeToFit>
-                    {order.appliedDiscount.discountName}
-                  </Text>
+                  {/* The order stores the discount's translations alongside its name,
+                      so a receipt opened in Arabic reads in Arabic. Orders placed
+                      before that was captured fall back to the English name. */}
+                  <View style={[styles.discountLabelColumn, { marginLeft: isRTL ? 8 : 0, marginRight: isRTL ? 0 : 8 }]}>
+                    <Text allowFontScaling={false} style={[styles.summaryItemLabel, { color: theme.colors.success, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1} adjustsFontSizeToFit>
+                      {discountDisplayName(order.appliedDiscount, i18n.language)}
+                    </Text>
+                    {!!discountDisplayDescription(order.appliedDiscount, i18n.language) && (
+                      <Text allowFontScaling={false} style={[styles.discountDescription, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
+                        {discountDisplayDescription(order.appliedDiscount, i18n.language)}
+                      </Text>
+                    )}
+                  </View>
                   <Text allowFontScaling={false} style={[styles.summaryItemValue, { color: theme.colors.success, textAlign: isRTL ? 'left' : 'right' }]} numberOfLines={1} adjustsFontSizeToFit>
                     -{formatPrice(order.appliedDiscount.savedAmount, displayCurrency, displayExchangeRate)}
                   </Text>
@@ -425,6 +436,8 @@ const styles = StyleSheet.create({
   divider: { borderBottomWidth: 1, marginVertical: 12 },
   summaryItemRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   summaryItemLabel: { fontSize: 14 },
+  discountLabelColumn: { flex: 1 },
+  discountDescription: { fontSize: 12, lineHeight: 17, marginTop: 2 },
   summaryItemValue: { fontSize: 14, fontWeight: '500' },
   summaryTotalText: { fontSize: 16, fontWeight: '700' },
   summaryTotalValue: { fontSize: 16, fontWeight: '700' },

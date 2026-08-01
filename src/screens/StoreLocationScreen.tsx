@@ -32,7 +32,7 @@ if (Platform.OS === 'android') {
   }
 }
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '../components/ThemeProvider';
@@ -40,6 +40,7 @@ import { SPACING } from '../constants/theme';
 import { BRAND, GOOGLE_MAPS_API_KEY } from '../constants/config';
 import { locationService, StoreLocation } from '../services/locationService';
 import { supabase } from '../services/supabase';
+import AppNumber from '../components/AppNumber';
 
 // --- Local helpers ---
 // LocationService does not implement getActiveLocations / getStoreTypeIcon /
@@ -72,6 +73,17 @@ const getLocalizedAddress = (loc: StoreLocation, lang?: string): string => {
   if (lang === 'ar' && loc.addressAr) return loc.addressAr;
   if (lang === 'ku' && loc.addressKu) return loc.addressKu;
   return loc.address || '';
+};
+
+// The branch's own per-day schedule, as written by Admin > Edit Store Location
+// ({ open, close, isOpen } keyed by lowercase day name). Returns null when the
+// branch has no schedule at all, so the card simply omits the row.
+const getTodayHours = (loc: StoreLocation): { isOpen: boolean; open: string; close: string } | null => {
+  const schedule = loc?.workingHours?.[DAY_KEYS[new Date().getDay()]];
+  if (!schedule) return null;
+  if (schedule.isOpen === false) return { isOpen: false, open: '', close: '' };
+  if (!schedule.open || !schedule.close) return null;
+  return { isOpen: true, open: String(schedule.open), close: String(schedule.close) };
 };
 
 const isStoreOpen = (loc: StoreLocation): boolean => {
@@ -114,11 +126,27 @@ const mapDbToStoreLocation = (data: any): StoreLocation => ({
   updatedAt: data.updated_at ? new Date(data.updated_at) : undefined,
 });
 
-const fetchActiveLocations = async (): Promise<StoreLocation[]> => {
-  const { data, error } = await supabase
-    .from('store_locations')
-    .select('*')
-    .eq('is_active', true);
+// Branches for one seller.
+//
+// store_locations has no tenant_id — only created_by_admin_id (schema.sql:389) —
+// so scoping means resolving the tenant's admins first. Without this the screen
+// listed EVERY seller's branches, so opening "View all branches" from store A's
+// product page showed store B's shops with live Call and Directions buttons.
+//
+// tenantId omitted (a caller that has no seller context) keeps the old unscoped
+// behaviour rather than rendering an empty screen.
+const fetchActiveLocations = async (tenantId?: string): Promise<StoreLocation[]> => {
+  let query = supabase.from('store_locations').select('*').eq('is_active', true);
+
+  if (tenantId) {
+    // A store owner's tenantId IS their own user id, but a co-admin creating a
+    // branch stamps their own id, so both have to be in the filter.
+    const { data: admins } = await supabase.from('users').select('id').eq('tenant_id', tenantId);
+    const adminIds = Array.from(new Set([tenantId, ...(admins || []).map((a: any) => a.id)]));
+    query = query.in('created_by_admin_id', adminIds);
+  }
+
+  const { data, error } = await query;
   if (error) throw error;
   return (data || []).map(mapDbToStoreLocation);
 };
@@ -127,6 +155,8 @@ export const StoreLocationScreen: React.FC = () => {
   const { theme } = useTheme();
   const { t, i18n } = useTranslation();
   const navigation = useNavigation();
+  const route = useRoute<any>();
+  const tenantId: string | undefined = route.params?.tenantId;
   const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
 
   const [locations, setLocations] = useState<StoreLocation[]>([]);
@@ -142,12 +172,13 @@ export const StoreLocationScreen: React.FC = () => {
 
   useEffect(() => {
     loadLocations();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId]);
 
   const loadLocations = async () => {
     try {
       setLoading(true);
-      const storeLocations = await fetchActiveLocations();
+      const storeLocations = await fetchActiveLocations(tenantId);
       setLocations(storeLocations);
       
       // If we have locations, center map on first location or main store
@@ -175,24 +206,24 @@ export const StoreLocationScreen: React.FC = () => {
   const openDirections = (storeLocation: StoreLocation) => {
     const url = `https://www.google.com/maps/dir/?api=1&destination=${storeLocation.latitude},${storeLocation.longitude}`;
     Linking.openURL(url).catch(() => {
-      Alert.alert('Error', 'Could not open maps application');
+      Alert.alert(t('common.error'), t('storeLocations.mapsError'));
     });
   };
 
   const callStore = (phoneNumber: string) => {
     const url = `tel:${phoneNumber}`;
     Linking.openURL(url).catch(() => {
-      Alert.alert('Error', 'Could not open phone application');
+      Alert.alert(t('common.error'), t('storeLocations.phoneError'));
     });
   };
 
   const openWhatsApp = (storeLocation: StoreLocation) => {
     const phoneNumber = storeLocation.phone;
     const storeName = getLocalizedName(storeLocation, i18n.language);
-    const message = `Hello, I would like to inquire about products at ${storeName}.`;
+    const message = t('storeLocations.whatsappMessage', { store: storeName });
     const url = `whatsapp://send?phone=${phoneNumber}&text=${encodeURIComponent(message)}`;
     Linking.openURL(url).catch(() => {
-      Alert.alert('Error', 'WhatsApp is not installed on this device');
+      Alert.alert(t('common.error'), t('storeLocations.whatsappError'));
     });
   };
 
@@ -209,7 +240,9 @@ export const StoreLocationScreen: React.FC = () => {
 
   const renderLocationCard = (storeLocation: StoreLocation) => {
     if (!storeLocation) return null;
-    
+
+    const todayHours = getTodayHours(storeLocation);
+
     return (
       <View
         style={[
@@ -272,6 +305,23 @@ export const StoreLocationScreen: React.FC = () => {
               </Text>
             </View>
           )}
+          {todayHours && (
+            <View style={[styles.infoRow, isRTL && { flexDirection: 'row-reverse' }]}>
+              <Ionicons name="time-outline" size={16} color={theme.colors.textSecondary} />
+              <Text allowFontScaling={false} style={[styles.hoursLabel, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }, isRTL ? { marginLeft: 0, marginRight: SPACING.sm } : null]}>
+                {todayHours.isOpen
+                  ? t('storeLocations.todayHours')
+                  : t('storeLocations.closedToday')}
+              </Text>
+              {todayHours.isOpen && (
+                <AppNumber
+                  value={`${todayHours.open} - ${todayHours.close}`}
+                  style={[styles.hoursValue, { color: theme.colors.text }]}
+                  containerStyle={isRTL ? { marginRight: SPACING.xs } : { marginLeft: SPACING.xs }}
+                />
+              )}
+            </View>
+          )}
         </View>
 
         {/* Actions */}
@@ -324,7 +374,10 @@ export const StoreLocationScreen: React.FC = () => {
               ? `https://maps.googleapis.com/maps/api/staticmap?center=${storeLocation.latitude},${storeLocation.longitude}&zoom=15&size=600x200&maptype=roadmap&markers=color:red%7C${storeLocation.latitude},${storeLocation.longitude}&key=${GOOGLE_MAPS_API_KEY}`
               : null;
             return (
-              <View key={storeLocation.id} style={[styles.storeCard, { backgroundColor: theme.colors.surface, borderLeftColor: locationService.getStoreTypeColor(storeLocation.type) }]}>
+              // renderLocationCard already renders a full storeCard; the wrapper only
+              // stacks the static map preview above it (nesting two storeCards doubled
+              // the padding, border and shadow).
+              <View key={storeLocation.id}>
                 {staticMapUrl && (
                   <TouchableOpacity
                     onPress={() => openDirections(storeLocation)}
@@ -609,6 +662,14 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
+    fontWeight: '600',
+  },
+  hoursLabel: {
+    fontSize: 14,
+    marginLeft: SPACING.sm,
+  },
+  hoursValue: {
+    fontSize: 14,
     fontWeight: '600',
   },
   infoRow: {

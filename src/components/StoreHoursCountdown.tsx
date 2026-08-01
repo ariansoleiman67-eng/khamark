@@ -1,22 +1,19 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from './ThemeProvider';
 import AppNumber from './AppNumber';
+import { buildScheduleTable, resolveStoreStatus, useOperatingHours } from './CountdownDisplay';
 
 type DayName = 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday';
 const DAY_NAMES: DayName[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 
-// Fixed store hours: 8 AM - 6 PM, closed on Fridays
-const FIXED_OPEN_HOUR = 8;  // 8:00 AM
-const FIXED_CLOSE_HOUR = 18; // 6:00 PM (18:00)
-const CLOSED_DAY = 5; // Friday (0=Sunday, 5=Friday)
-
 /**
  * StoreHoursCountdown Component
- * Shows live countdown timer for store open/close times
- * Fixed hours: 8 AM - 6 PM daily, closed on Fridays
+ * Shows live countdown timer for store open/close times, driven by the per-day
+ * schedule saved in Admin > Operating Hours (8 AM - 6 PM / closed Friday is only
+ * the fallback for a shop that has never configured hours).
  */
 const StoreHoursCountdown: React.FC = () => {
   const { t } = useTranslation();
@@ -24,105 +21,71 @@ const StoreHoursCountdown: React.FC = () => {
   const [countdown, setCountdown] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [nextEventDay, setNextEventDay] = useState<string>('');
   const [isStoreOpen, setIsStoreOpen] = useState<boolean>(false);
-
-  // Calculate if store is currently open and target time
-  const calculateStoreStatus = useMemo(() => {
-    const now = new Date();
-    const currentDayIndex = now.getDay();
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-    const currentTimeMinutes = currentHour * 60 + currentMinute;
-
-    const openTimeMinutes = FIXED_OPEN_HOUR * 60;
-    const closeTimeMinutes = FIXED_CLOSE_HOUR * 60;
-
-    // Check if today is Friday (closed)
-    const isFriday = currentDayIndex === CLOSED_DAY;
-    
-    // Store is open if: not Friday AND within operating hours
-    const isOpen = !isFriday && 
-                   currentTimeMinutes >= openTimeMinutes && 
-                   currentTimeMinutes < closeTimeMinutes;
-
-    // Calculate target time
-    if (isOpen) {
-      // Store is open - countdown to closing time (today at 6 PM)
-      const target = new Date(now);
-      target.setHours(FIXED_CLOSE_HOUR, 0, 0, 0);
-      return { isOpen: true, target, dayLabel: t('home.today') || 'Today' };
-    } else {
-      // Store is closed - find next opening time
-      const dayLabels: Record<DayName, string> = {
-        sunday: t('days.sunday') || 'Sunday',
-        monday: t('days.monday') || 'Monday',
-        tuesday: t('days.tuesday') || 'Tuesday',
-        wednesday: t('days.wednesday') || 'Wednesday',
-        thursday: t('days.thursday') || 'Thursday',
-        friday: t('days.friday') || 'Friday',
-        saturday: t('days.saturday') || 'Saturday',
-      };
-
-      // If before opening time today and not Friday
-      if (!isFriday && currentTimeMinutes < openTimeMinutes) {
-        const target = new Date(now);
-        target.setHours(FIXED_OPEN_HOUR, 0, 0, 0);
-        return { isOpen: false, target, dayLabel: t('home.today') || 'Today' };
-      }
-
-      // Find next open day (skip Friday)
-      for (let i = 1; i <= 7; i++) {
-        const checkDayIndex = (currentDayIndex + i) % 7;
-        
-        // Skip Friday
-        if (checkDayIndex === CLOSED_DAY) continue;
-        
-        const target = new Date(now);
-        target.setDate(target.getDate() + i);
-        target.setHours(FIXED_OPEN_HOUR, 0, 0, 0);
-        
-        const checkDay = DAY_NAMES[checkDayIndex];
-        const dayLabel = i === 1 
-          ? (t('home.tomorrow') || 'Tomorrow')
-          : dayLabels[checkDay];
-        
-        return { isOpen: false, target, dayLabel };
-      }
-    }
-
-    return null;
-  }, [t]);
+  const { hours: configuredHours, resolved: hoursResolved } = useOperatingHours();
 
   // Update countdown every second
   useEffect(() => {
-    if (!calculateStoreStatus) return;
+    const table = buildScheduleTable(configuredHours);
 
+    const dayLabels: Record<DayName, string> = {
+      sunday: t('days.sunday') || 'Sunday',
+      monday: t('days.monday') || 'Monday',
+      tuesday: t('days.tuesday') || 'Tuesday',
+      wednesday: t('days.wednesday') || 'Wednesday',
+      thursday: t('days.thursday') || 'Thursday',
+      friday: t('days.friday') || 'Friday',
+      saturday: t('days.saturday') || 'Saturday',
+    };
+
+    // Status is recomputed on every tick, not memoised: memoising it froze the target
+    // at mount, so the badge stuck at 00:00 instead of flipping at opening/closing time.
     const updateCountdown = () => {
-      const now = new Date();
-      const diff = calculateStoreStatus.target.getTime() - now.getTime();
+      const status = resolveStoreStatus(table);
+      setIsStoreOpen(status.isOpen);
+
+      if (!status.target) {
+        // Every day is marked closed — there is no next event to count down to.
+        setCountdown({ hours: 0, minutes: 0, seconds: 0 });
+        setNextEventDay('');
+        return;
+      }
+
+      setNextEventDay(
+        status.daysAhead === 0
+          ? (t('home.today') || 'Today')
+          : status.daysAhead === 1
+            ? (t('home.tomorrow') || 'Tomorrow')
+            : dayLabels[DAY_NAMES[status.targetDayIndex]]
+      );
+
+      const diff = status.target.toMillis() - Date.now();
 
       if (diff <= 0) {
         setCountdown({ hours: 0, minutes: 0, seconds: 0 });
         return;
       }
 
-      const hours = Math.floor(diff / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-
-      setCountdown({ hours, minutes, seconds });
-      setNextEventDay(calculateStoreStatus.dayLabel);
-      setIsStoreOpen(calculateStoreStatus.isOpen);
+      setCountdown({
+        hours: Math.floor(diff / (1000 * 60 * 60)),
+        minutes: Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)),
+        seconds: Math.floor((diff % (1000 * 60)) / 1000),
+      });
     };
 
     updateCountdown();
     const interval = setInterval(updateCountdown, 1000);
 
     return () => clearInterval(interval);
-  }, [calculateStoreStatus]);
+  }, [t, configuredHours]);
 
   const statusColor = isStoreOpen ? theme.colors.success : theme.colors.error;
   const bgColor = isStoreOpen ? theme.colors.success + '15' : theme.colors.error + '15';
   const borderColor = isStoreOpen ? theme.colors.success + '30' : theme.colors.error + '30';
+
+  // Nothing rather than a guess: this badge states "Open Now" / "Closed" outright,
+  // and until the admin schedule is actually read that word would come from the
+  // built-in default week.
+  if (!hoursResolved) return null;
 
   return (
     <View style={[styles.container, { backgroundColor: bgColor, borderColor }]}>

@@ -421,16 +421,17 @@ const VerifyPhoneScreen: React.FC = () => {
             </Animated.View>
 
             {/* Title + subtitle */}
-            <Animated.Text
+            <Animated.View entering={SlideInLeft.duration(600).delay(250)}>
+              <Animated.Text
               allowFontScaling={false}
-              entering={SlideInLeft.duration(600).delay(250)}
               style={styles.title}
             >
               {t('auth.verifyPhone.title', { defaultValue: 'Verify' })}
             </Animated.Text>
-            <Animated.Text
+            </Animated.View>
+            <Animated.View entering={FadeIn.duration(600).delay(420)}>
+              <Animated.Text
               allowFontScaling={false}
-              entering={FadeIn.duration(600).delay(420)}
               style={styles.subtitle}
             >
               {t('auth.verifyPhone.subtitle', {
@@ -438,6 +439,7 @@ const VerifyPhoneScreen: React.FC = () => {
                 defaultValue: `Enter the 6-digit code sent to ${phone}`,
               })}
             </Animated.Text>
+            </Animated.View>
           </LinearGradient>
 
           {/* ── Form Card (overlaps hero) ── */}

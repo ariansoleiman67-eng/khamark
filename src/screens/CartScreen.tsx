@@ -34,7 +34,7 @@ import i18n from '../locales';
 import { CartItem, AppliedDiscount, Discount } from '../types';
 import { CartService } from '../services/cartService';
 import { LocalCartService } from '../services/localCartService';
-import discountService from '../services/discountService';
+import discountService, { discountDisplayName, discountDisplayDescription, pickLocalizedText } from '../services/discountService';
 import addressService from '../services/addressService';
 import { RootStackParamList } from '../navigation/types';
 import { Theme } from '../types';
@@ -537,10 +537,13 @@ const CartScreen: React.FC = () => {
 
       if (!ignore) setDiscountLoading(true);
       try {
-        const bestDiscount = await discountService.getBestDiscountForCart(cart, isVip);
+        const best = await discountService.getBestDiscountForCart(cart, isVip);
         if (ignore) return;
-        if (bestDiscount) {
-          const applied = discountService.applyDiscountToCart(cart, bestDiscount, isVip);
+        if (best) {
+          // Apply to the winning store's lines only — the discount was picked from
+          // those lines, so charging it against the whole multi-store cart would
+          // take a tenant-wide offer off the other stores' items too.
+          const applied = discountService.applyDiscountToItems(best.items, best.discount, isVip);
           setAppliedDiscount(applied);
         } else {
           setAppliedDiscount(null);
@@ -552,7 +555,7 @@ const CartScreen: React.FC = () => {
       }
 
       try {
-        const potential = await discountService.getPotentialDiscounts(cart);
+        const potential = await discountService.getPotentialDiscounts(cart, isVip);
         if (!ignore) setOpportunities(potential);
       } catch {
         // Silent fail
@@ -756,13 +759,63 @@ const CartScreen: React.FC = () => {
               ]}>
                 {/* Discount banner */}
                 {appliedDiscount && (
-                  <View style={styles.discountBanner}>
+                  <View style={[styles.discountBanner, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                     <Feather name="tag" size={16} color="#4CAF50" />
-                    <Text allowFontScaling={false} style={styles.discountBannerText}>
-                      {appliedDiscount.discountName}{' - '}{t('cart.saving', 'Saving')}{' '}{formatPrice(appliedDiscount.savedAmount, currency, exchangeRateIQD)}
-                    </Text>
+                    <View style={[styles.discountBannerBody, { marginLeft: isRTL ? 0 : 10, marginRight: isRTL ? 10 : 0 }]}>
+                      <View style={[styles.discountBannerLine, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                        <Text allowFontScaling={false} style={styles.discountBannerText}>
+                          {/* cart.youSave, not cart.saving: the latter resolves to
+                              "جارٍ الحفظ" / "پاشەکەوتکردن" — saving a FILE, in
+                              progress — so the Arabic banner read "discount name -
+                              saving in progress $30.00". */}
+                          {discountDisplayName(appliedDiscount, i18n.language)}{' - '}{t('cart.youSave', { defaultValue: 'You save' })}
+                        </Text>
+                        <AppNumber
+                          value={formatPrice(appliedDiscount.savedAmount, currency, exchangeRateIQD)}
+                          style={styles.discountBannerAmount}
+                        />
+                      </View>
+                      {!!discountDisplayDescription(appliedDiscount, i18n.language) && (
+                        <AppText style={[styles.discountBannerNote, { textAlign: isRTL ? 'right' : 'left' }]}>
+                          {discountDisplayDescription(appliedDiscount, i18n.language)}
+                        </AppText>
+                      )}
+                    </View>
                   </View>
                 )}
+
+                {/* Upsell hint: what the customer still needs for the next deal.
+                    Already computed on every render — surfacing it is the point. */}
+                {opportunities.length > 0 && (() => {
+                  const top = opportunities[0];
+                  const needsAmount = typeof top.missingAmount === 'number' && top.missingAmount > 0;
+                  const needsQuantity = typeof top.missingQuantity === 'number' && top.missingQuantity > 0;
+                  if (!needsAmount && !needsQuantity) return null;
+                  const dealName =
+                    pickLocalizedText(i18n.language, top.discount.name, top.discount.nameAr, top.discount.nameKu) ||
+                    top.discount.name;
+                  return (
+                    <View style={[styles.opportunityBanner, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                      <Feather name="gift" size={16} color="#E65100" />
+                      <View style={[
+                        styles.opportunityBody,
+                        { flexDirection: isRTL ? 'row-reverse' : 'row', marginLeft: isRTL ? 0 : 10, marginRight: isRTL ? 10 : 0 },
+                      ]}>
+                        <AppNumber
+                          value={needsAmount
+                            ? formatPrice(top.missingAmount as number, currency, exchangeRateIQD)
+                            : String(top.missingQuantity)}
+                          style={styles.opportunityAmount}
+                        />
+                        <AppText style={[styles.opportunityText, { textAlign: isRTL ? 'right' : 'left' }]}>
+                          {needsAmount
+                            ? t('cart.moreToUnlock', { name: dealName, defaultValue: 'more to unlock {{name}}' })
+                            : t('cart.moreItemsToUnlock', { name: dealName, defaultValue: 'more items to unlock {{name}}' })}
+                        </AppText>
+                      </View>
+                    </View>
+                  );
+                })()}
 
 
                 {/* Total row */}
@@ -1092,13 +1145,59 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
+  discountBannerBody: {
+    flex: 1,
+  },
+  discountBannerLine: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
   discountBannerText: {
     color: '#4CAF50',
-    flex: 1,
     fontSize: 13,
     fontWeight: '600',
     letterSpacing: 0.1,
-    marginLeft: 10,
+  },
+  discountBannerAmount: {
+    color: '#4CAF50',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  discountBannerNote: {
+    color: '#4CAF50',
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 2,
+    opacity: 0.9,
+  },
+  opportunityBanner: {
+    alignItems: 'center',
+    backgroundColor: '#FFF3E0',
+    borderRadius: 12,
+    flexDirection: 'row',
+    marginBottom: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  opportunityBody: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  opportunityAmount: {
+    color: '#E65100',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  opportunityText: {
+    color: '#E65100',
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.1,
   },
   subtotalRow: {
     alignItems: 'center',

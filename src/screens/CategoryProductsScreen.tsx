@@ -7,6 +7,7 @@ import {
   I18nManager,
   ActivityIndicator,
   RefreshControl,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -21,6 +22,10 @@ import { useCart } from '../contexts/CartContext';
 import { useFavorites } from '../contexts/FavoritesContext';
 import { useTenant } from '../contexts/TenantContext';
 import { Product } from '../types';
+
+// 'recommended' = the order the service already returned (parts.sort_order ascending,
+// previous ordering as tiebreaker) — i.e. the order the admin set by dragging.
+type SortMode = 'recommended' | 'priceAsc' | 'priceDesc';
 
 // Dedicated screen for one category: tap a category tile -> all its products.
 const CategoryProductsScreen: React.FC = () => {
@@ -42,7 +47,7 @@ const CategoryProductsScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
-  const [sortDesc, setSortDesc] = useState(false);
+  const [sortMode, setSortMode] = useState<SortMode>('recommended');
 
   const load = useCallback(async () => {
     try {
@@ -79,10 +84,13 @@ const CategoryProductsScreen: React.FC = () => {
   }, [load]);
 
   const sorted = useMemo(() => {
+    // Re-sorting by price here was unconditional, which threw away the admin's
+    // sort_order the service had already applied — return the list untouched instead.
+    if (sortMode === 'recommended') return products;
     const list = products.slice();
-    list.sort((a, b) => (sortDesc ? b.priceUSD - a.priceUSD : a.priceUSD - b.priceUSD));
+    list.sort((a, b) => (sortMode === 'priceDesc' ? b.priceUSD - a.priceUSD : a.priceUSD - b.priceUSD));
     return list;
-  }, [products, sortDesc]);
+  }, [products, sortMode]);
 
   const handleProductPress = useCallback(
     (productId: string) => navigation.navigate('ProductDetails', { productId }),
@@ -130,13 +138,19 @@ const CategoryProductsScreen: React.FC = () => {
           <AppText fontSize={22} style={[styles.count, { color: theme.colors.text }]}> {t('common.products')}</AppText>
         </View>
         <TouchableOpacity
-          onPress={() => setSortDesc(v => !v)}
+          onPress={() =>
+            setSortMode(m => (m === 'recommended' ? 'priceAsc' : m === 'priceAsc' ? 'priceDesc' : 'recommended'))
+          }
           hitSlop={8}
           style={[styles.sortBtn, { borderColor: theme.colors.border }]}
         >
           <MaterialCommunityIcons name="sort" size={18} color={theme.colors.text} />
           <AppText fontSize={13} style={{ color: theme.colors.textSecondary, marginHorizontal: 6 }}>
-            {sortDesc ? t('sort.priceHigh', { defaultValue: 'Price ↓' }) : t('sort.priceLow', { defaultValue: 'Price ↑' })}
+            {sortMode === 'recommended'
+              ? t('sort.recommended', { defaultValue: 'Recommended' })
+              : sortMode === 'priceAsc'
+                ? t('sort.priceLow', { defaultValue: 'Price ↑' })
+                : t('sort.priceHigh', { defaultValue: 'Price ↓' })}
           </AppText>
         </TouchableOpacity>
       </View>
@@ -154,6 +168,13 @@ const CategoryProductsScreen: React.FC = () => {
           columnWrapperStyle={styles.column}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          // Windowing guardrails (mirrors HomeScreen): this list can hold hundreds
+          // of products, and the defaults mount ~10 rows synchronously before the
+          // first paint, which showed as a white gap when opening a category.
+          initialNumToRender={6}
+          maxToRenderPerBatch={6}
+          windowSize={7}
+          removeClippedSubviews={Platform.OS === 'android'}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
           ListEmptyComponent={
             error ? (

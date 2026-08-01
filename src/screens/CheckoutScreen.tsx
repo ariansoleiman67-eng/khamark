@@ -41,14 +41,14 @@ import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { useTranslation } from 'react-i18next';
-import { ShippingAddress, Theme, Address, AppliedDiscount } from '../types';
+import { ShippingAddress, Theme, Address, AppliedDiscount, CartItem } from '../types';
 import { CartService } from '../services/cartService';
 import { LocalCartService } from '../services/localCartService';
 import { OrderService } from '../services/OrderService';
 import addressService from '../services/addressService';
 import { RootStackParamList } from '../types';
 import { getCountryByCode } from '../constants/countries';
-import discountService from '../services/discountService';
+import discountService, { discountDisplayName, discountDisplayDescription } from '../services/discountService';
 import { promoService, computePromoDiscount, Promo } from '../services/promoService';
 import { QiCardPaymentService } from '../services/qiCardPaymentService';
 
@@ -111,7 +111,7 @@ const CheckoutScreen: React.FC = () => {
   const { preselectedPaymentMethod, preselectedAddressId, specialInstructions: preselectedNotes } = route.params || {};
 
   const { user, isVip } = useAuth();
-  const { cart, clearCart } = useCart();
+  const { cart, clearCart, refreshCart } = useCart();
   const { currency, exchangeRateIQD } = useCurrency();
   const { theme, isDark } = useTheme();
   const { t, i18n } = useTranslation();
@@ -181,6 +181,10 @@ const CheckoutScreen: React.FC = () => {
   const [promoApplying, setPromoApplying] = useState(false);
   const manualPromoRef = useRef(false);
   const appliedPromoRef = useRef<Promo | null>(null);
+  // Which store's promo table the applied code came from — a code may only discount
+  // that store's lines, never the whole basket.
+  const appliedPromoTenantRef = useRef<string | null>(null);
+  const [promoStoreScoped, setPromoStoreScoped] = useState(false);
   
   // Shipping office state (for out-of-country customers)
   const [useShippingOffice, setUseShippingOffice] = useState(false);
@@ -475,12 +479,41 @@ const CheckoutScreen: React.FC = () => {
     return { regularSubtotal, vipSubtotal, savings, discountPercent };
   }, [isVip, cart]);
 
+  // Cart lines grouped by store. Both discounts and promo codes are tenant-scoped,
+  // so anything applied to the cart has to be measured against one store's lines.
+  const itemsByTenant = useMemo(() => {
+    const map = new Map<string, CartItem[]>();
+    for (const item of cart?.items || []) {
+      const tenantId = (item.product as any)?.tenantId;
+      if (!tenantId) continue;
+      if (!map.has(tenantId)) map.set(tenantId, []);
+      map.get(tenantId)!.push(item);
+    }
+    return map;
+  }, [cart]);
+
+  // Subtotal a store-scoped code may discount.
+  //
+  // The whole-cart fallback applies ONLY to a code with no owning store (legacy
+  // cart rows that carry no tenant). Once a code IS owned by a store, removing
+  // that store's last line must yield 0, not the whole cart: itemsByTenant only
+  // holds stores that currently have lines, so falling back here would silently
+  // re-aim the code at the OTHER store's items — discounting them by more than it
+  // ever discounted its own.
+  const promoSubtotal = useCallback((tenantId: string | null): number => {
+    if (!tenantId) return cartSummary?.subtotal || 0;
+    const items = itemsByTenant.get(tenantId);
+    return items ? discountService.subtotalForItems(items, isVip) : 0;
+  }, [itemsByTenant, isVip, cartSummary?.subtotal]);
+
   // Fetch and apply the best AUTO discount (skipped while a manual promo is active).
   const runAutoDiscount = useCallback(async () => {
     if (!cart || cart.items.length === 0) {
       setAppliedDiscount(null);
       manualPromoRef.current = false;
       appliedPromoRef.current = null;
+      appliedPromoTenantRef.current = null;
+      setPromoStoreScoped(false);
       return;
     }
     // A manually-entered promo code wins over the auto-best-discount.
@@ -488,8 +521,11 @@ const CheckoutScreen: React.FC = () => {
 
     setDiscountLoading(true);
     try {
-      const bestDiscount = await discountService.getBestDiscountForCart(cart, isVip);
-      setAppliedDiscount(bestDiscount ? discountService.applyDiscountToCart(cart, bestDiscount, isVip) : null);
+      const best = await discountService.getBestDiscountForCart(cart, isVip);
+      // Apply to the winning store's lines only — the winner was picked from those
+      // lines, so a tenant-wide offer measured against the whole cart would come
+      // off the other stores' items as well.
+      setAppliedDiscount(best ? discountService.applyDiscountToItems(best.items, best.discount, isVip) : null);
     } catch (error) {
       setAppliedDiscount(null);
     } finally {
@@ -506,17 +542,21 @@ const CheckoutScreen: React.FC = () => {
     if (!manualPromoRef.current) return;
     const promo = appliedPromoRef.current;
     if (!promo) return;
-    const subtotal = cartSummary?.subtotal || 0;
-    const saved = computePromoDiscount(promo, subtotal);
+    const saved = computePromoDiscount(promo, promoSubtotal(appliedPromoTenantRef.current));
     if (saved <= 0) {
       manualPromoRef.current = false;
       appliedPromoRef.current = null;
+      appliedPromoTenantRef.current = null;
+      setPromoStoreScoped(false);
       setAppliedDiscount(null);
       setPromoInput('');
       setPromoError(t('checkout.promoNoLongerEligible', { defaultValue: 'Promo code no longer applies to your cart' }));
       runAutoDiscount();
     } else {
       setAppliedDiscount((prev) => (prev ? { ...prev, savedAmount: saved } : prev));
+      // Recompute the disclosure too: set once at apply time it kept claiming
+      // "one store's items only" after the cart had dropped back to a single store.
+      setPromoStoreScoped(itemsByTenant.size > 1 && !!appliedPromoTenantRef.current);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cartSummary?.subtotal]);
@@ -529,19 +569,38 @@ const CheckoutScreen: React.FC = () => {
     setPromoApplying(true);
     setPromoError(null);
     try {
-      const promo = await promoService.findByCode(code);
+      // Promo codes live in one store's promo table, so resolve the code against
+      // each store in the cart rather than asking for it storelessly (which would
+      // let another store's code be redeemed here).
+      const tenantIds = Array.from(itemsByTenant.keys());
+      let promo: Promo | null = null;
+      let promoTenantId: string | null = null;
+      if (tenantIds.length === 0) {
+        promo = await promoService.findByCode(code);
+      } else {
+        for (const tenantId of tenantIds) {
+          const found = await promoService.findByCode(code, tenantId);
+          if (found) {
+            promo = found;
+            promoTenantId = tenantId;
+            break;
+          }
+        }
+      }
       if (!promo) {
         setPromoError(t('checkout.promoInvalid', { defaultValue: 'Invalid or expired code' }));
         return;
       }
-      const subtotal = cartSummary?.subtotal || 0;
-      const saved = computePromoDiscount(promo, subtotal);
+      // Only the owning store's lines are discountable by this code.
+      const saved = computePromoDiscount(promo, promoSubtotal(promoTenantId));
       if (saved <= 0) {
         setPromoError(t('checkout.promoNotEligible', { defaultValue: "This code doesn't apply to your cart" }));
         return;
       }
       manualPromoRef.current = true;
       appliedPromoRef.current = promo;
+      appliedPromoTenantRef.current = promoTenantId;
+      setPromoStoreScoped(tenantIds.length > 1 && !!promoTenantId);
       setAppliedDiscount({
         discountId: promo.id,
         discountName: `${t('checkout.promoCodeLabel', { defaultValue: 'Code' })} ${promo.code}`,
@@ -552,16 +611,24 @@ const CheckoutScreen: React.FC = () => {
     } finally {
       setPromoApplying(false);
     }
-  }, [promoInput, cartSummary, t]);
+  }, [promoInput, itemsByTenant, promoSubtotal, t]);
 
   const removePromo = useCallback(() => {
     manualPromoRef.current = false;
     appliedPromoRef.current = null;
+    appliedPromoTenantRef.current = null;
+    setPromoStoreScoped(false);
     setAppliedDiscount(null);
     setPromoInput('');
     setPromoError(null);
     runAutoDiscount();
   }, [runAutoDiscount]);
+
+  // Identify the promo row by the code actually in hand, not by the id's shape:
+  // Supabase promo ids are UUIDs, so a 'promo-' prefix test only ever matched the
+  // mock seed data and left real customers with no way to remove a code.
+  const isPromoDiscount =
+    !!appliedDiscount && !!appliedPromoRef.current && appliedDiscount.discountId === appliedPromoRef.current.id;
 
   const validateShippingAddress = useCallback((): boolean => {
     if (selectedAddress) {
@@ -687,6 +754,25 @@ const CheckoutScreen: React.FC = () => {
         [{ text: t('cart.update'), onPress: () => navigation.goBack() }]
       );
       isSubmittingRef.current = false;
+      return;
+    }
+
+    // A server-side price move is not a cart error, so validation stays valid —
+    // but the total on screen was computed from the OLD prices while the order
+    // would be placed from the new ones. Never charge a number the shopper was
+    // not shown: surface the change and make them confirm the fresh total.
+    if (validation.pricesChanged && validation.updatedCart) {
+      // validateCart already persisted the repriced cart, so a refresh pulls the
+      // new prices into the summary the shopper is looking at.
+      await refreshCart();
+      Alert.alert(
+        t('checkout.pricesUpdatedTitle', { defaultValue: 'Prices updated' }),
+        t('checkout.pricesUpdatedMessage', {
+          defaultValue: 'Some prices in your cart changed. Please review the new total before placing your order.',
+        })
+      );
+      isSubmittingRef.current = false;
+      setIsProcessing(false);
       return;
     }
 
@@ -1744,24 +1830,33 @@ const CheckoutScreen: React.FC = () => {
             )}
 
             {/* Promo code */}
-            {appliedDiscount?.discountId?.startsWith('promo-') ? (
-              <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }}>
-                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
-                  <Feather name="check-circle" size={16} color={theme.colors.success} />
-                  <Text allowFontScaling={false} style={{ color: theme.colors.success, fontWeight: '700' }}>
-                    {appliedDiscount.discountName}
-                  </Text>
-                </View>
-                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 12 }}>
-                  <Text allowFontScaling={false} style={{ color: theme.colors.success, fontWeight: '700' }}>
-                    -{formatPrice(appliedDiscount.savedAmount, currency, exchangeRateIQD)}
-                  </Text>
-                  <TouchableOpacity onPress={removePromo} hitSlop={8}>
-                    <Text allowFontScaling={false} style={{ color: theme.colors.error, fontWeight: '600' }}>
-                      {t('checkout.promoRemove', { defaultValue: 'Remove' })}
+            {isPromoDiscount && appliedDiscount ? (
+              <View style={{ paddingVertical: 8 }}>
+                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
+                    <Feather name="check-circle" size={16} color={theme.colors.success} />
+                    <Text allowFontScaling={false} style={{ color: theme.colors.success, fontWeight: '700' }}>
+                      {appliedDiscount.discountName}
                     </Text>
-                  </TouchableOpacity>
+                  </View>
+                  <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 12 }}>
+                    <Text allowFontScaling={false} style={{ color: theme.colors.success, fontWeight: '700' }}>
+                      -{formatPrice(appliedDiscount.savedAmount, currency, exchangeRateIQD)}
+                    </Text>
+                    <TouchableOpacity onPress={removePromo} hitSlop={8}>
+                      <Text allowFontScaling={false} style={{ color: theme.colors.error, fontWeight: '600' }}>
+                        {t('checkout.promoRemove', { defaultValue: 'Remove' })}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
+                {/* The basket holds more than one store, so be explicit about which
+                    items the code actually came off. */}
+                {promoStoreScoped && (
+                  <Text allowFontScaling={false} style={{ color: theme.colors.textSecondary, fontSize: 12, marginTop: 6, textAlign: isRTL ? 'right' : 'left' }}>
+                    {t('checkout.promoSingleStore', { defaultValue: "This code applies to one store's items only." })}
+                  </Text>
+                )}
               </View>
             ) : (
               <View style={{ paddingVertical: 8 }}>
@@ -1801,18 +1896,25 @@ const CheckoutScreen: React.FC = () => {
             )}
 
             {/* Discount Row (auto-discounts only; promo codes render above) */}
-            {appliedDiscount && !appliedDiscount.discountId?.startsWith('promo-') && (
-              <View style={styles.discountRow}>
-                <View style={styles.discountInfo}>
-                  <Feather name="tag" size={16} color={theme.colors.success} />
-                  <Text allowFontScaling={false} style={[styles.discountLabel, { color: theme.colors.success }]}>
-                    {appliedDiscount.discountName}
+            {appliedDiscount && !isPromoDiscount && (
+              <>
+                <View style={styles.discountRow}>
+                  <View style={styles.discountInfo}>
+                    <Feather name="tag" size={16} color={theme.colors.success} />
+                    <Text allowFontScaling={false} style={[styles.discountLabel, { color: theme.colors.success }]}>
+                      {discountDisplayName(appliedDiscount, i18n.language)}
+                    </Text>
+                  </View>
+                  <Text allowFontScaling={false} style={[styles.discountValue, { color: theme.colors.success }]}>
+                    -{formatPrice(appliedDiscount.savedAmount, currency, exchangeRateIQD)}
                   </Text>
                 </View>
-                <Text allowFontScaling={false} style={[styles.discountValue, { color: theme.colors.success }]}>
-                  -{formatPrice(appliedDiscount.savedAmount, currency, exchangeRateIQD)}
-                </Text>
-              </View>
+                {!!discountDisplayDescription(appliedDiscount, i18n.language) && (
+                  <Text allowFontScaling={false} style={[styles.discountDescription, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
+                    {discountDisplayDescription(appliedDiscount, i18n.language)}
+                  </Text>
+                )}
+              </>
             )}
             
             {/* Discount loading */}
@@ -2514,6 +2616,12 @@ const createStyles = (theme: Theme) => StyleSheet.create({
   discountValue: {
     fontSize: 14,
     fontWeight: '700',
+  },
+  discountDescription: {
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 12,
+    marginTop: -6,
   },
   discountLoadingRow: {
     flexDirection: 'row',

@@ -1,5 +1,5 @@
 /* eslint-disable react-native/no-inline-styles, react-native/no-color-literals */
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   View,
   TextInput,
@@ -13,6 +13,7 @@ import {
   Dimensions,
   StatusBar,
   I18nManager,
+  Keyboard,
 } from 'react-native';
 import AppText from '../../components/AppText';
 import { Ionicons } from '@expo/vector-icons';
@@ -36,7 +37,9 @@ import Animated, {
   withSequence,
   withSpring,
   Easing,
+  interpolate,
   interpolateColor,
+  Extrapolation,
 } from 'react-native-reanimated';
 import { loginWithPhone, loginWithEmail } from '../../services/auth';
 import { useAuth } from '../../contexts/AuthContext';
@@ -48,6 +51,7 @@ type NavigationProp = StackNavigationProp<RootStackParamList>;
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+
 // ─── Static Design Tokens (theme colours come from useTheme) ─────────────
 const LUX = {
   gold: 'rgba(255,255,255,0.55)',
@@ -55,6 +59,18 @@ const LUX = {
 
 const SPACING = { xs: 8, sm: 12, md: 16, lg: 24, xl: 32 };
 const RADIUS = { input: 16, button: 16, card: 26, coin: 30, back: 22 };
+
+// Hero collapse: the logo coin + big title eat the whole viewport once the keyboard
+// is up, pushing the sign-in button below the fold (Android gets no help from
+// KeyboardAvoidingView, which is a no-op there). Collapsing the hero while typing
+// keeps the button reachable without the user having to scroll.
+const HERO_PAD_BOTTOM_EXPANDED = SPACING.xl + SPACING.lg;
+const HERO_PAD_BOTTOM_COLLAPSED = SPACING.md;
+const HERO_COLLAPSE_DURATION = 220;
+// Slack kept below the sign-in button so it never sits flush against the keyboard.
+const HERO_COLLAPSE_BREATHING_ROOM = SPACING.lg;
+
+const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 
 // ─── Floating Particle Component ─────────────────────────
 const FloatingParticle = ({
@@ -318,6 +334,100 @@ const PasswordScreen: React.FC = () => {
     navigation.goBack();
   };
 
+  // ── Hero collapse while the keyboard is up ──
+  // 0 = full hero, 1 = collapsed to just the back button + a compact title.
+  //
+  // The collapse is proportional, not on/off: we shrink the hero by exactly the
+  // amount the content overflows the (keyboard-shrunk) viewport, capped at 1. On a
+  // tall screen the keyboard may only steal a little room, so the logo and title
+  // stay visible; on a short one it collapses all the way. Collapsing to 1
+  // unconditionally left a band of dead background between the card and the keyboard.
+  const heroCollapse = useSharedValue(0);
+  // Natural height of the logo/title/subtitle block, measured once on first layout
+  // so the collapse animation has a real target instead of a guessed constant.
+  const heroBlockHeight = useSharedValue(0);
+  const heroBlockHeightRef = useRef(0);
+  // Scroll viewport height — shrinks when the keyboard opens (Android adjustResize,
+  // iOS KeyboardAvoidingView padding), so this is what we fit the content into.
+  const viewportHeightRef = useRef(0);
+  // Content height with the hero fully expanded. Only sampled while heroCollapse is
+  // 0, otherwise it would feed its own output back in and the collapse would run away.
+  const expandedContentHeightRef = useRef(0);
+  const appliedCollapseRef = useRef(0);
+
+  const applyHeroCollapse = useCallback(() => {
+    const viewport = viewportHeightRef.current;
+    const content = expandedContentHeightRef.current;
+    const block = heroBlockHeightRef.current;
+    if (viewport <= 0 || content <= 0 || block <= 0) return;
+
+    const overflow = content + HERO_COLLAPSE_BREATHING_ROOM - viewport;
+    const next = Math.min(1, Math.max(0, overflow / block));
+    // Ignore sub-pixel churn; onLayout/onContentSizeChange fire more than we need.
+    if (Math.abs(next - appliedCollapseRef.current) < 0.01) return;
+
+    appliedCollapseRef.current = next;
+    heroCollapse.value = withTiming(next, { duration: HERO_COLLAPSE_DURATION });
+  }, [heroCollapse]);
+
+  const onScrollViewLayout = (event: { nativeEvent: { layout: { height: number } } }) => {
+    viewportHeightRef.current = event.nativeEvent.layout.height;
+    applyHeroCollapse();
+  };
+
+  const onContentSizeChange = (_width: number, height: number) => {
+    // Only trustworthy as a "full hero" baseline while nothing is collapsed.
+    if (appliedCollapseRef.current > 0) return;
+    expandedContentHeightRef.current = height;
+    applyHeroCollapse();
+  };
+
+  const onHeroBlockLayout = (event: { nativeEvent: { layout: { height: number } } }) => {
+    if (heroBlockHeightRef.current > 0) return;
+    const { height } = event.nativeEvent.layout;
+    if (height <= 0) return;
+    heroBlockHeightRef.current = height;
+    heroBlockHeight.value = height;
+    applyHeroCollapse();
+  };
+
+  const heroAnimatedStyle = useAnimatedStyle(() => ({
+    paddingBottom:
+      HERO_PAD_BOTTOM_EXPANDED +
+      (HERO_PAD_BOTTOM_COLLAPSED - HERO_PAD_BOTTOM_EXPANDED) * heroCollapse.value,
+  }));
+
+  // Outer box: the clip window. Its height is what actually reclaims layout space.
+  const heroBlockAnimatedStyle = useAnimatedStyle(() => ({
+    // Before the first measurement, leave height unset so the block lays out naturally.
+    height:
+      heroBlockHeight.value === 0
+        ? undefined
+        : heroBlockHeight.value * (1 - heroCollapse.value),
+    // Hold full opacity through a partial collapse so a light shrink stays legible;
+    // only fade out over the last stretch, as the compact title takes over.
+    opacity: interpolate(heroCollapse.value, [0, 0.65, 1], [1, 1, 0], Extrapolation.CLAMP),
+  }));
+
+  // Inner content: scaled to exactly match the box's height ratio, so the logo/title
+  // shrink in step with the window instead of being sliced off at the bottom. RN scales
+  // about the centre, so the translateY re-anchors that scale to the top edge —
+  // without it the content would drift out of the shrinking box.
+  const heroBlockContentAnimatedStyle = useAnimatedStyle(() => {
+    const scale = 1 - heroCollapse.value;
+    return {
+      transform: [
+        { translateY: (-heroBlockHeight.value * heroCollapse.value) / 2 },
+        { scale },
+      ],
+    };
+  });
+
+  const compactTitleAnimatedStyle = useAnimatedStyle(() => ({
+    // Only appears once the real title is essentially gone, so the two never overlap.
+    opacity: interpolate(heroCollapse.value, [0.65, 1], [0, 1], Extrapolation.CLAMP),
+  }));
+
   const particles = [
     { delay: 0, x: SCREEN_WIDTH * 0.15, size: 3, duration: 9000 },
     { delay: 2000, x: SCREEN_WIDTH * 0.4, size: 2, duration: 11000 },
@@ -342,11 +452,13 @@ const PasswordScreen: React.FC = () => {
           contentContainerStyle={[styles.scrollContent, { paddingBottom: 40 + insets.bottom }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          onLayout={onScrollViewLayout}
+          onContentSizeChange={onContentSizeChange}
         >
           {/* ── Amber Hero Band ── */}
-          <LinearGradient
+          <AnimatedLinearGradient
             colors={[colors.primaryVariant, colors.primary, colors.primaryDark]}
-            style={[styles.hero, { paddingTop: insets.top + SPACING.sm }]}
+            style={[styles.hero, { paddingTop: insets.top + SPACING.sm }, heroAnimatedStyle]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
@@ -362,27 +474,47 @@ const PasswordScreen: React.FC = () => {
               <TouchableOpacity style={styles.backButton} onPress={handleBack} activeOpacity={0.7}>
                 <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={22} color={colors.textOnPrimary} />
               </TouchableOpacity>
+              {/* Stand-in title that fades in as the full hero collapses. It always
+                  occupies its slot in the row so the back button never shifts.
+                  Uses the short `auth.signIn` label, not `auth.welcomeBack` — the
+                  latter is a full sentence in every locale and would truncate. */}
+              <Animated.Text
+                allowFontScaling={false}
+                numberOfLines={1}
+                style={[styles.compactTitle, compactTitleAnimatedStyle]}
+              >
+                {t('auth.signIn', { defaultValue: 'Sign In' })}
+              </Animated.Text>
             </Animated.View>
 
-            {/* Logo coin */}
-            <Animated.View entering={ZoomIn.duration(800).springify().damping(12)} style={styles.logoArea}>
-              <View style={styles.logoCircle}>
-                <Image
-                  source={require('../../../assets/images/asankarylogo.png')}
-                  style={styles.logoImage}
-                  contentFit="contain"
-                />
-              </View>
-            </Animated.View>
+            {/* Collapsible block: logo coin + title + subtitle */}
+            <Animated.View style={[styles.heroBlock, heroBlockAnimatedStyle]}>
+              <Animated.View onLayout={onHeroBlockLayout} style={heroBlockContentAnimatedStyle}>
+                {/* Logo coin */}
+                <Animated.View entering={ZoomIn.duration(800).springify().damping(12)} style={styles.logoArea}>
+                  <View style={styles.logoCircle}>
+                    <Image
+                      source={require('../../../assets/images/asankarylogo.png')}
+                      style={styles.logoImage}
+                      contentFit="contain"
+                    />
+                  </View>
+                </Animated.View>
 
-            {/* Title */}
-            <Animated.Text allowFontScaling={false} entering={SlideInLeft.duration(500).delay(300)} style={styles.title}>
-              {t('auth.welcomeBack', { defaultValue: 'Welcome back' })}
-            </Animated.Text>
-            <Animated.Text allowFontScaling={false} entering={FadeIn.duration(500).delay(400)} style={styles.subtitle}>
-              {t('auth.signInAs', { defaultValue: 'Sign in as' })} {masked}
-            </Animated.Text>
-          </LinearGradient>
+                {/* Title */}
+                <Animated.View entering={SlideInLeft.duration(500).delay(300)}>
+                  <Animated.Text allowFontScaling={false} style={styles.title}>
+                  {t('auth.welcomeBack', { defaultValue: 'Welcome back' })}
+                </Animated.Text>
+                </Animated.View>
+                <Animated.View entering={FadeIn.duration(500).delay(400)}>
+                  <Animated.Text allowFontScaling={false} style={styles.subtitle}>
+                  {t('auth.signInAs', { defaultValue: 'Sign in as' })} {masked}
+                </Animated.Text>
+                </Animated.View>
+              </Animated.View>
+            </Animated.View>
+          </AnimatedLinearGradient>
 
           {/* ── Form Card (overlaps hero) ── */}
           <Animated.View entering={FadeInUp.duration(600).delay(400).springify().damping(14)} style={styles.glassCard}>
@@ -489,7 +621,10 @@ const createStyles = (colors: any, isRTL: boolean, isDark: boolean) => StyleShee
     flex: 1,
   },
   scrollContent: {
-    flexGrow: 1,
+    // Deliberately no flexGrow: it would pad the content out to the viewport height,
+    // and onContentSizeChange (which drives the hero collapse) needs the natural
+    // content height to know how much actually overflows. Empty space below the card
+    // shows styles.container's background either way.
   },
 
   // ── Hero ──
@@ -498,14 +633,30 @@ const createStyles = (colors: any, isRTL: boolean, isDark: boolean) => StyleShee
     borderBottomLeftRadius: 34,
     borderBottomRightRadius: 34,
     overflow: 'hidden',
-    paddingBottom: SPACING.xl + SPACING.lg,
+    // paddingBottom is animated (see heroAnimatedStyle) between
+    // HERO_PAD_BOTTOM_EXPANDED and HERO_PAD_BOTTOM_COLLAPSED.
     paddingHorizontal: SPACING.lg,
   },
   heroHeader: {
-    alignItems: 'flex-start',
+    alignItems: 'center',
     flexDirection: isRTL ? 'row-reverse' : 'row',
     marginBottom: SPACING.sm,
     width: '100%',
+  },
+  compactTitle: {
+    color: colors.textOnPrimary,
+    flex: 1,
+    fontSize: 19,
+    fontWeight: '800',
+    marginHorizontal: SPACING.sm,
+    textAlign: isRTL ? 'right' : 'left',
+  },
+  // Wrapper whose height animates to 0 as the keyboard opens; overflow must be
+  // clipped so the logo/title don't spill out mid-animation.
+  heroBlock: {
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    overflow: 'hidden',
   },
   backButton: {
     alignItems: 'center',

@@ -36,9 +36,10 @@ import ProductService from '../services/productService';
 
 import { useTenant } from '../contexts/TenantContext';
 import { categoryService } from '../services/categoryService';
+import type { TenantCategory } from '../services/tenantAdminService';
 import { storeProfileService, StoreProfile } from '../services/storeProfileService';
 import BannerCarousel from '../components/BannerCarousel';
-import BrandTile from '../components/home/BrandTile';
+import CategoryTile from '../components/home/CategoryTile';
 
 
 
@@ -100,12 +101,20 @@ const CategoriesScreen: React.FC = () => {
   // Uploaded category icons (name -> imageUrl) from the shop's managed categories.
   // When present, the BrandTile shows this image; otherwise it falls back to an initial.
   const [iconByName, setIconByName] = useState<Record<string, string>>({});
+  // The shop's managed categories, in the admin's chosen order. Tiles are otherwise
+  // derived from the products that exist, so a category the admin created (with a
+  // logo) stayed invisible until some product used that exact name. Kept as whole
+  // rows — only the name used to survive, which threw away the admin's Arabic and
+  // Kurdish names so shoppers never saw them.
+  const [managedCategories, setManagedCategories] = useState<TenantCategory[]>([]);
   const loadCategoryIcons = React.useCallback(() => {
-    if (!tenantId && !USE_MOCK_DATA) return;
-    categoryService.getActiveCategories(tenantId || '').then(list => {
+    // No tenant guard: customers browse without a tenantId, and skipping the load
+    // for them meant the admin's category images only ever showed to admins.
+    categoryService.getActiveCategories(tenantId || undefined).then(list => {
       const map: Record<string, string> = {};
       for (const c of list) { if (c.imageUrl) map[c.name] = c.imageUrl; }
       setIconByName(map);
+      setManagedCategories(list.filter(c => !!c.name));
     }).catch(() => {});
   }, [tenantId]);
   useEffect(() => { loadCategoryIcons(); }, [loadCategoryIcons]);
@@ -219,8 +228,11 @@ const CategoriesScreen: React.FC = () => {
         return {
           id: (index + 1).toString(),
           name: categoryName,
-          nameAr: categoryName,
-          nameKu: categoryName,
+          // Left blank on purpose: a category that only exists on products has no
+          // admin translation, and copying the English name in here would outrank
+          // the real one from the managed category / the categories.* JSON lookup.
+          nameAr: '',
+          nameKu: '',
           icon: getCategoryIcon(categoryName),
           count: categoryProducts.length,
           description: `${categoryName} parts and components`,
@@ -241,18 +253,31 @@ const CategoriesScreen: React.FC = () => {
   }, [tenantId, t]); // Added tenantId and t to dependencies
   
   // Helper function to get category icon
+  // Glyph per category for tiles without an admin-uploaded image. Matched
+  // case-insensitively on a keyword so new category names ("Phone Cases",
+  // "Fast Chargers", …) still land on a sensible icon instead of a generic cube.
   const getCategoryIcon = (categoryName: string): keyof typeof Ionicons.glyphMap => {
-    const iconMap: Record<string, keyof typeof Ionicons.glyphMap> = {
-      'Engine Parts': 'cog',
-      'Brake System': 'disc',
-      'Transmission': 'settings',
-      'Electrical': 'flash',
-      'Suspension': 'trending-up',
-      'Body Parts': 'car',
-      'Cabin & Interior': 'home',
-      'Cooling System': 'snow',
-    };
-    return iconMap[categoryName] || 'cube';
+    const name = (categoryName || '').toLowerCase();
+    const rules: Array<[RegExp, keyof typeof Ionicons.glyphMap]> = [
+      [/phone|mobile|iphone/, 'phone-portrait-outline'],
+      [/tablet|ipad/, 'tablet-portrait-outline'],
+      [/laptop|computer|pc/, 'laptop-outline'],
+      [/watch/, 'watch-outline'],
+      [/earphone|headphone|airpod|audio|speaker|sound/, 'headset-outline'],
+      [/power ?bank|battery/, 'battery-charging-outline'],
+      [/charger|charging|adapter/, 'flash-outline'],
+      [/cable|cord|wire/, 'git-commit-outline'],
+      [/case|cover|protect|glass|screen/, 'shield-checkmark-outline'],
+      [/bag|sleeve|backpack/, 'briefcase-outline'],
+      [/track|find|tag|locator/, 'location-outline'],
+      [/security|lock|camera|cctv/, 'lock-closed-outline'],
+      [/memory|storage|card|usb|flash ?drive/, 'save-outline'],
+      [/game|console/, 'game-controller-outline'],
+      [/home|smart/, 'home-outline'],
+      [/accessor/, 'sparkles-outline'],
+    ];
+    for (const [re, icon] of rules) if (re.test(name)) return icon;
+    return 'grid-outline';
   };
   
   // Helper function to get category gradient colors
@@ -653,42 +678,68 @@ const CategoriesScreen: React.FC = () => {
   // Category filter renderer — aynAlfahad BrandTile look (flat light-gray rounded
   // tiles with uploaded icon or initial). Orange ring marks the active category.
   const renderCategoryFilter = () => {
+    // Tiles = the shop's managed categories (admin order, so their logos show even
+    // with zero products yet) + any category a product uses that isn't managed.
+    const productCategories = categories.filter(c => !!c.name);
+    const managedSet = new Set(managedCategories.map(c => (c.name || '').toLowerCase()));
+    const orderedCategories = [
+      ...managedCategories.map(managed => {
+        const name = managed.name || '';
+        const existing = productCategories.find(c => (c.name || '').toLowerCase() === name.toLowerCase());
+        // Merge the admin's saved translations onto the product-derived entry, which
+        // only ever carries the English name.
+        return {
+          ...(existing || ({
+            id: `managed-${name}`,
+            name,
+            isActive: true,
+            count: 0,
+          } as Category)),
+          nameAr: managed.nameAr || '',
+          nameKu: managed.nameKu || '',
+        } as Category;
+      }),
+      ...productCategories.filter(c => !managedSet.has((c.name || '').toLowerCase())),
+    ];
+
     // Original name (for filter logic) + translated name (for display).
     const categoryOptions = [
-      { id: 'All', originalName: 'All', displayName: t('categories.all') },
-      ...categories.map(cat => {
+      { id: 'All', originalName: 'All', displayName: t('categories.all'), icon: 'apps-outline' as keyof typeof Ionicons.glyphMap },
+      ...orderedCategories.map(cat => {
         // Defensive: cat.name is typed string but can be null from nullable DB data.
         const safeName = cat.name || '';
         let displayName = safeName;
 
-        // Create a safe translation key: lowercase and remove spaces
-        const translationKey = safeName.toLowerCase().replace(/\s+/g, '');
-        const fallback = t(`categories.${translationKey}`);
+        // The name the admin typed for this language wins — the categories.* JSON
+        // lookup is only a fallback for categories that were never translated there.
+        const adminName =
+          i18n.language === 'ar' ? (cat.nameAr || '').trim() :
+          i18n.language === 'ku' ? (cat.nameKu || '').trim() : '';
 
-        // If we have a successful translation from our JSON files (it didn't return the raw key)
-        if (fallback !== `categories.${translationKey}`) {
-          displayName = fallback;
-        }
-        // Otherwise try the database fields
-        else if (i18n.language === 'ar' && cat.nameAr && cat.nameAr.trim() !== '') {
-          displayName = cat.nameAr;
-        } else if (i18n.language === 'ku' && cat.nameKu && cat.nameKu.trim() !== '') {
-          displayName = cat.nameKu;
+        if (adminName) {
+          displayName = adminName;
         } else {
-          displayName = safeName;
+          // Create a safe translation key: lowercase and remove spaces
+          const translationKey = safeName.toLowerCase().replace(/\s+/g, '');
+          const fallback = t(`categories.${translationKey}`);
+
+          // If we have a successful translation from our JSON files (it didn't return the raw key)
+          if (fallback !== `categories.${translationKey}`) {
+            displayName = fallback;
+          }
         }
 
-        return { id: cat.id, originalName: cat.name, displayName };
+        return { id: cat.id, originalName: cat.name, displayName, icon: getCategoryIcon(safeName) };
       })
     ];
 
-    // Responsive 3-column grid. OUTER_PADDING matches the header's paddingHorizontal;
-    // subtract 4 for the 2px selection ring drawn on each side of a tile.
+    // Responsive 3-column grid. OUTER_PADDING matches the header's paddingHorizontal.
+    // The selection ring is now drawn as the tile's own border, so no extra inset.
     const OUTER_PADDING = 12;
     const GAP = 10;
     const COLUMNS = 3;
     const available = windowWidth - OUTER_PADDING * 2 - GAP * (COLUMNS - 1);
-    const tileWidth = Math.floor(available / COLUMNS) - 4;
+    const tileWidth = Math.floor(available / COLUMNS);
 
     return (
       <View
@@ -702,24 +753,19 @@ const CategoriesScreen: React.FC = () => {
           const uploadedIcon = cat.originalName === 'All' ? undefined : iconByName[cat.originalName];
 
           return (
-            <View
+            <CategoryTile
               key={cat.originalName}
-              style={[
-                styles.categoryTileWrap,
-                isSelected && { borderColor: theme.colors.primary },
-              ]}
-            >
-              <BrandTile
-                label={cat.displayName}
-                imageUrl={uploadedIcon}
-                width={tileWidth}
-                onPress={() =>
-                  cat.originalName === 'All'
-                    ? handleCategoryFilter('All')
-                    : (navigation as any).navigate('CategoryProducts', { category: cat.originalName, title: cat.displayName })
-                }
-              />
-            </View>
+              label={cat.displayName}
+              imageUrl={uploadedIcon}
+              icon={cat.icon}
+              width={tileWidth}
+              selected={isSelected}
+              onPress={() =>
+                cat.originalName === 'All'
+                  ? handleCategoryFilter('All')
+                  : (navigation as any).navigate('CategoryProducts', { category: cat.originalName, title: cat.displayName })
+              }
+            />
           );
         })}
       </View>
@@ -980,8 +1026,13 @@ const CategoriesScreen: React.FC = () => {
           renderItem={renderProductCard}
           keyExtractor={(item) => `${tenantId}-${item.id}`}
           numColumns={2}
-          ListHeaderComponent={renderHeader}
-          ListEmptyComponent={renderEmptyState}
+          // Pass ELEMENTS, not functions. A function prop is used as the component
+          // *type*, so a fresh arrow each render = new type = the whole header
+          // (banner carousel, search box, category grid) unmounts and remounts on
+          // every render — the banner reset to slide 1 and scrolling hitched.
+          // An element reconciles normally and just updates in place.
+          ListHeaderComponent={renderHeader()}
+          ListEmptyComponent={renderEmptyState()}
           showsVerticalScrollIndicator={false}
           removeClippedSubviews={Platform.OS === 'android'}
           initialNumToRender={6}

@@ -2,6 +2,8 @@ import React, { useState, useEffect, memo, useRef } from 'react';
 import { Text, StyleSheet, AppState, AppStateStatus } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { DateTime } from 'luxon';
+import settingsService from '../services/settingsService';
+import { OperatingHours } from '../types';
 
 interface CountdownDisplayProps {
   color: string;
@@ -9,13 +11,166 @@ interface CountdownDisplayProps {
   closeTime?: string | null; // "18:00" | null (default)
   closedDays?: number[] | null; // [5] | null (default) | [] (none)
   timeZone?: string | null; // IANA | null (device)
+  tenantId?: string | null; // whose Operating Hours schedule to read
   onStatusChange?: (isOpen: boolean) => void;
 }
 
-// Default values
+// Last-resort values, used only when no hours have ever been configured anywhere.
 const DEFAULT_OPEN_TIME = "08:00";
 const DEFAULT_CLOSE_TIME = "18:00";
 const DEFAULT_CLOSED_DAYS = [5]; // Friday
+
+// Admin > Operating Hours stores one entry per day keyed by name; this file works in
+// JS day indexes (0=Sunday..6=Saturday), so index into this to cross over.
+const DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
+
+const TIME_PATTERN = /^\d{1,2}:\d{2}$/;
+// The schedule is an unvalidated JSONB blob; a malformed entry parsed with Number()
+// yields NaN and Luxon then throws on .set(), taking the whole store header down.
+const validTime = (value: unknown, fallback: string): string =>
+  typeof value === 'string' && TIME_PATTERN.test(value) ? value : fallback;
+
+export interface DayHours {
+  isOpen: boolean;
+  open: string;  // "HH:mm"
+  close: string; // "HH:mm"
+}
+
+/**
+ * Flattens both hour sources into a single table indexed by JS day (0=Sunday).
+ * The per-day admin schedule is the base; the store profile's single open/close pair
+ * and closedDays override it, because on that screen a non-null value is an explicit
+ * per-store opt-out (null there means "use the shared schedule").
+ */
+export const buildScheduleTable = (
+  hours?: OperatingHours | null,
+  openTime?: string | null,
+  closeTime?: string | null,
+  closedDays?: number[] | null,
+): DayHours[] => {
+  const table: DayHours[] = [];
+
+  for (let i = 0; i < 7; i++) {
+    const day = hours ? (hours as any)[DAY_KEYS[i]] : null;
+    const base: DayHours = day
+      ? {
+          isOpen: day.isOpen !== false,
+          open: validTime(day.openTime, DEFAULT_OPEN_TIME),
+          close: validTime(day.closeTime, DEFAULT_CLOSE_TIME),
+        }
+      : {
+          isOpen: !DEFAULT_CLOSED_DAYS.includes(i),
+          open: DEFAULT_OPEN_TIME,
+          close: DEFAULT_CLOSE_TIME,
+        };
+
+    table.push({
+      isOpen: closedDays ? !closedDays.includes(i) : base.isOpen,
+      open: openTime ? validTime(openTime, base.open) : base.open,
+      close: closeTime ? validTime(closeTime, base.close) : base.close,
+    });
+  }
+
+  return table;
+};
+
+export interface StoreStatus {
+  isOpen: boolean;
+  target: DateTime | null;
+  daysAhead: number;      // 0 = today, 1 = tomorrow, ...
+  targetDayIndex: number; // JS day index of `target`
+}
+
+/**
+ * Resolves "open now?" plus the next open/close boundary against a schedule table.
+ * Overnight hours (close < open) are still not supported.
+ */
+export const resolveStoreStatus = (table: DayHours[], timeZone?: string | null): StoreStatus => {
+  const now = DateTime.now().setZone(timeZone || undefined);
+
+  const at = (dt: DateTime, time: string) => {
+    const [h, m] = time.split(':').map(Number);
+    return dt.set({ hour: h, minute: m, second: 0, millisecond: 0 });
+  };
+
+  // Luxon weekday: 1=Monday ... 7=Sunday. Table convention: 0=Sunday ... 6=Saturday.
+  // Mapping: Luxon % 7 (7%7=0=Sun, 1%7=1=Mon ... 5%7=5=Fri)
+  const todayIndex = now.weekday % 7;
+  const today = table[todayIndex];
+  const todayOpen = at(now, today.open);
+  const todayClose = at(now, today.close);
+
+  if (today.isOpen && now >= todayOpen && now < todayClose) {
+    return { isOpen: true, target: todayClose, daysAhead: 0, targetDayIndex: todayIndex };
+  }
+
+  // Opens later today?
+  if (today.isOpen && now < todayOpen) {
+    return { isOpen: false, target: todayOpen, daysAhead: 0, targetDayIndex: todayIndex };
+  }
+
+  // Scan the next 7 days for the first open one.
+  for (let i = 1; i <= 7; i++) {
+    const checkDate = now.plus({ days: i });
+    const checkIndex = checkDate.weekday % 7;
+    const day = table[checkIndex];
+    if (day.isOpen) {
+      return { isOpen: false, target: at(checkDate, day.open), daysAhead: i, targetDayIndex: checkIndex };
+    }
+  }
+
+  // Never open on any day.
+  return { isOpen: false, target: null, daysAhead: 0, targetDayIndex: todayIndex };
+};
+
+const HOURS_RETRY_MS = 30000;
+
+/**
+ * Per-day hours as written by the Admin > Operating Hours screen.
+ * An unreadable schedule is retried rather than treated as "none configured" —
+ * otherwise a single cold-start network blip pins the badge to the generic default
+ * schedule for the rest of the session and a Friday-closed shop reads as Open.
+ */
+export const useOperatingHours = (tenantId?: string | null): { hours: OperatingHours | null; resolved: boolean } => {
+  const [hours, setHours] = useState<OperatingHours | null>(null);
+  // False while the schedule is unknown — either still loading or unreadable and
+  // retrying. Exposed because `hours === null` alone cannot tell "this shop never
+  // configured hours" (defaults are correct) from "we could not read them" (defaults
+  // are a guess). Showing a confident Open/Closed badge off a guess is how a
+  // Friday-closed shop advertised itself as open.
+  const [resolved, setResolved] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+
+    const load = async () => {
+      try {
+        const result = await settingsService.getOperatingHoursForDisplay(tenantId);
+        if (!alive) return;
+        if (result.status === 'configured') {
+          setHours(result.hours);
+          setResolved(true);
+        } else if (result.status === 'unconfigured') {
+          setResolved(true);
+        } else {
+          retry = setTimeout(load, HOURS_RETRY_MS);
+        }
+      } catch {
+        if (alive) retry = setTimeout(load, HOURS_RETRY_MS);
+      }
+    };
+
+    load();
+
+    return () => {
+      alive = false;
+      if (retry) clearTimeout(retry);
+    };
+  }, [tenantId]);
+
+  return { hours, resolved };
+};
 
 /**
  * CountdownDisplay - Robust timezone-aware countdown
@@ -27,74 +182,29 @@ const CountdownDisplay: React.FC<CountdownDisplayProps> = memo(function Countdow
   closeTime, 
   closedDays,
   timeZone,
+  tenantId,
   onStatusChange
 }) {
   const { t } = useTranslation();
   const [countdown, setCountdown] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [isOpen, setIsOpen] = useState(false);
   const appState = useRef(AppState.currentState);
+  const { hours: configuredHours, resolved: hoursResolved } = useOperatingHours(tenantId);
+
+  // The store profile's own open/close pair stands on its own; without it the
+  // schedule comes entirely from Admin > Operating Hours, so nothing may be
+  // reported until that read succeeds. Reporting early meant the parent badge lit
+  // up green off the built-in default week and called a Friday-closed shop open.
+  const hasStoreOverride = !!openTime && !!closeTime;
+  const scheduleKnown = hoursResolved || hasStoreOverride;
 
   useEffect(() => {
-    // 1. Resolve Effective Schedule
-    const effectiveOpen = openTime ?? DEFAULT_OPEN_TIME;
-    const effectiveClose = closeTime ?? DEFAULT_CLOSE_TIME;
-    const effectiveClosedDays = closedDays ?? DEFAULT_CLOSED_DAYS;
-    
-    // Resolve timezone: if null/undefined, use system zone (default behavior of Luxon 'local')
-    // If provided, use that zone.
-    const zoneOptions = timeZone ? { zone: timeZone } : {};
+    if (!scheduleKnown) return;
 
-    const calculateTarget = () => {
-      // Current time in the TARGET timezone
-      const now = DateTime.now().setZone(timeZone || undefined);
-      
-      // Parse open/close times (HH:MM)
-      const [openH, openM] = effectiveOpen.split(':').map(Number);
-      const [closeH, closeM] = effectiveClose.split(':').map(Number);
-      
-      // Create Today's Open/Close reference times
-      const todayOpen = now.set({ hour: openH, minute: openM, second: 0, millisecond: 0 });
-      const todayClose = now.set({ hour: closeH, minute: closeM, second: 0, millisecond: 0 });
+    // 1. Resolve Effective Schedule (per-day admin hours, overridden by any per-store pair)
+    const table = buildScheduleTable(configuredHours, openTime, closeTime, closedDays);
 
-      // Check if strictly closed today (by day of week)
-      // Luxon weekday: 1=Monday ... 7=Sunday. 
-      // JS/Our App convention: 0=Sunday ... 6=Saturday.
-      // Mapping: Luxon % 7 = JS (7%7=0=Sun, 1%7=1=Mon... 5%7=5=Fri)
-      const currentDayIndex = now.weekday % 7; 
-      const isTodayClosedDay = effectiveClosedDays.includes(currentDayIndex);
-
-      // Determine Status
-      // Open if: Not closed today AND now is between Open and Close
-      // Note: We don't support overnight yet (Close < Open), assuming same-day hours.
-      const isNowOpen = !isTodayClosedDay && now >= todayOpen && now < todayClose;
-
-      if (isNowOpen) {
-        // OPEN: Countdown to Close
-        return { target: todayClose, isOpen: true };
-      } else {
-        // CLOSED: Find Next Opening
-        
-        // 1. Later today? (Not closed day, and now < Open)
-        if (!isTodayClosedDay && now < todayOpen) {
-          return { target: todayOpen, isOpen: false };
-        }
-
-        // 2. Scan next 7 days
-        let nextOpen: DateTime | null = null;
-        for (let i = 1; i <= 7; i++) {
-          const checkDate = now.plus({ days: i });
-          const checkDayIndex = checkDate.weekday % 7;
-          
-          if (!effectiveClosedDays.includes(checkDayIndex)) {
-            // Found open day
-            nextOpen = checkDate.set({ hour: openH, minute: openM, second: 0, millisecond: 0 });
-            break;
-          }
-        }
-        
-        return { target: nextOpen, isOpen: false };
-      }
-    };
+    const calculateTarget = () => resolveStoreStatus(table, timeZone);
 
     const updateCountdown = () => {
       // Optimization: visible check could go here if we had navigation focus state
@@ -160,10 +270,12 @@ const CountdownDisplay: React.FC<CountdownDisplayProps> = memo(function Countdow
       clearInterval(interval);
       subscription.remove();
     };
-  }, [openTime, closeTime, closedDays, timeZone]); // Re-init on prop change
+  }, [openTime, closeTime, closedDays, timeZone, configuredHours, scheduleKnown]); // Re-init on prop/schedule change
 
-  const prefix = isOpen 
-    ? (t('home.closesIn', 'Close in')) 
+  if (!scheduleKnown) return null;
+
+  const prefix = isOpen
+    ? (t('home.closesIn', 'Close in'))
     : (t('home.opensIn', 'Open in'));
 
   const timeString = countdown.hours > 0 

@@ -163,7 +163,10 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
       console.error('Error merging guest cart:', err);
       return null;
     }
-  }, []);
+    // isVip is read to price the merged cart — without it in deps the callback
+    // closes over the guest-time value (false), so a VIP who filled a guest cart
+    // then logged in got non-VIP pricing on merge.
+  }, [isVip]);
 
   // Load cart when user changes (handles login/logout and guest mode)
   useEffect(() => {

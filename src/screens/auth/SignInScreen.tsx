@@ -394,7 +394,9 @@ const SignInScreen: React.FC = () => {
         navigation.goBack();
       }
     } else {
-      navigation.goBack();
+      // Land in the app after a normal sign-in. goBack() only popped back to the
+      // previous auth screen (Create Account), so social logins looked "stuck".
+      navigation.reset({ index: 0, routes: [{ name: 'Main' as any }] });
     }
   };
 
@@ -614,21 +616,19 @@ const handleGoogleSignIn = async () => {
               </TouchableOpacity>
             </Animated.View>
 
-            {/* Title */}
-            <Animated.Text
-              allowFontScaling={false}
-              entering={SlideInLeft.duration(600).delay(300)}
-              style={styles.title}
-            >
-              {t('auth.signIn', { defaultValue: 'Sign in' })}
-            </Animated.Text>
-            <Animated.Text
-              allowFontScaling={false}
-              entering={FadeIn.duration(600).delay(500)}
-              style={styles.subtitle}
-            >
-              {t('auth.signInSubtitle', { defaultValue: 'Continue with your phone or email.' })}
-            </Animated.Text>
+            {/* Title — the entering animation lives on a wrapper View: applying a
+                layout animation directly to Animated.Text fights the text's own
+                opacity and makes Reanimated warn. */}
+            <Animated.View entering={SlideInLeft.duration(600).delay(300)}>
+              <Animated.Text allowFontScaling={false} style={styles.title}>
+                {t('auth.signIn', { defaultValue: 'Sign in' })}
+              </Animated.Text>
+            </Animated.View>
+            <Animated.View entering={FadeIn.duration(600).delay(500)}>
+              <Animated.Text allowFontScaling={false} style={styles.subtitle}>
+                {t('auth.signInSubtitle', { defaultValue: 'Continue with your phone or email.' })}
+              </Animated.Text>
+            </Animated.View>
           </LinearGradient>
 
           {/* ── Form Card (overlaps hero) ── */}

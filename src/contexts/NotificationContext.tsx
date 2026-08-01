@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, ReactNode } from 'react';
+import { Alert, Linking } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import * as Notifications from 'expo-notifications';
 import { supabase, uniqueChannel } from '../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -35,6 +37,48 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   // updates the threshold read by the realtime closures WITHOUT retearing the
   // effect and resubscribing both realtime channels.
   const lastViewedRef = useRef<number>(0);
+  const { t } = useTranslation();
+
+  // Nudge the user to turn ON system notifications when they're disabled, so they
+  // don't silently miss order updates. Throttled (won't re-ask within 5 days of a
+  // dismiss) and skipped entirely once notifications are granted.
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    const THROTTLE_MS = 5 * 24 * 60 * 60 * 1000;
+    (async () => {
+      try {
+        const perm = await Notifications.getPermissionsAsync();
+        if (cancelled || perm.granted || perm.status === 'granted') return;
+        const last = await AsyncStorage.getItem('notif_prompt_last');
+        if (last && Date.now() - parseInt(last, 10) < THROTTLE_MS) return;
+        if (cancelled) return;
+        const stamp = () => AsyncStorage.setItem('notif_prompt_last', String(Date.now())).catch(() => {});
+        Alert.alert(
+          t('notifications.enableTitle', { defaultValue: 'Turn on notifications' }),
+          t('notifications.enableBody', { defaultValue: 'Notifications are off. Turn them on to get order updates and offers.' }),
+          [
+            { text: t('notifications.later', { defaultValue: 'Not now' }), style: 'cancel', onPress: stamp },
+            {
+              text: t('notifications.enable', { defaultValue: 'Turn on' }),
+              onPress: async () => {
+                stamp();
+                try {
+                  const req = await Notifications.requestPermissionsAsync();
+                  if (!req.granted && !req.canAskAgain) Linking.openSettings();
+                } catch {
+                  Linking.openSettings();
+                }
+              },
+            },
+          ],
+        );
+      } catch {
+        // permission check unavailable — skip silently
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [userId, t]);
 
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
@@ -43,6 +87,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         setBadgeCount(0);
         setOrdersBadgeCount(0);
         setIsLoading(false);
+        // Also clear the OS app-icon badge so the signed-out account's unread
+        // count doesn't linger on the home screen.
+        Notifications.setBadgeCountAsync(0).catch(() => {});
       }
     });
 
@@ -203,13 +250,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     await AsyncStorage.setItem('last_viewed_orders_time', now.toString());
   }, []);
 
-  const value: NotificationContextValue = {
-    badgeCount,
-    ordersBadgeCount,
-    clearBadge,
-    markOrdersAsViewed,
-    isLoading,
-  };
+  // Memoized like every other provider: this sits inside FavoritesProvider, so an
+  // unmemoized object meant every favorite toggle handed consumers a new value and
+  // re-rendered everything reading the badge (including the Home header).
+  const value = useMemo<NotificationContextValue>(
+    () => ({ badgeCount, ordersBadgeCount, clearBadge, markOrdersAsViewed, isLoading }),
+    [badgeCount, ordersBadgeCount, clearBadge, markOrdersAsViewed, isLoading],
+  );
 
   return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>;
 }

@@ -62,6 +62,20 @@ export const FIREBASE_FUNCTIONS_URL =
   process.env.EXPO_PUBLIC_FIREBASE_FUNCTIONS_URL ||
   `https://us-central1-${FIREBASE_PROJECT_ID}.cloudfunctions.net`;
 
+// Where Supabase sends the user after they tap "confirm email".
+//
+// Must be an https URL, NOT the app's asankary:// scheme: the link is opened in
+// whatever browser the recipient's mail client uses, often on a device that
+// doesn't have the app installed, where a custom scheme resolves to nothing.
+// The landing page deep-links into the app for those who do have it.
+//
+// This URL must also be listed under Redirect URLs in the Supabase dashboard
+// (Authentication → URL Configuration), or Supabase silently falls back to the
+// project's Site URL — which is how these links ended up pointing at localhost.
+export const EMAIL_VERIFY_REDIRECT_URL =
+  process.env.EXPO_PUBLIC_EMAIL_VERIFY_REDIRECT_URL ||
+  'https://asankarye-hub.github.io/asankary-legal/verified.html';
+
 // API Configuration
 export const API_CONFIG = {
   BASE_URL: process.env.EXPO_PUBLIC_API_URL || 'https://your-cloud-functions-url.com',

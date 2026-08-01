@@ -13,10 +13,16 @@ import { useFavorites } from "../contexts/FavoritesContext";
 import { useCurrency } from "../contexts/CurrencyContext";
 import { useAuth } from "../contexts/AuthContext";
 import { formatPrice } from "../utils/currency";
-import { getDisplayUnitPrice, hasVipPrice } from "../utils/pricingUtils";
+import {
+  getDisplayUnitPrice,
+  getDiscountPercent,
+  getEffectiveStock,
+  hasCompareAtDiscount,
+  LOW_STOCK_THRESHOLD,
+} from "../utils/pricingUtils";
 import { Product } from "../types";
 import { SHADOW_STYLES } from "../constants/theme";
-import { getProductImageUrl, logImageDebug } from "../utils/imageUtils";
+import { getProductImageUrl, getThumbnailUrl, logImageDebug } from "../utils/imageUtils";
 import {
   adjustFontSize,
   getPlatformTextProps,
@@ -125,17 +131,9 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
 
 
-  // Compute effective stock - SUM all potential stock sources
-  // This addresses "Out of Stock" issue when Main/Size/Color stocks exist independently
-  const sizeStock =
-    product.variations?.reduce((sum, v) => sum + (v.stockQuantity || 0), 0) ||
-    0;
-  const colorStock =
-    product.colorVariations?.reduce(
-      (sum, v) => sum + (v.stockQuantity || 0),
-      0,
-    ) || 0;
-  const effectiveStock = (product.stockQty || 0) + sizeStock + colorStock;
+  // Main + per-size + per-colour stock, shared with the product page so a card can
+  // never say "Out of Stock" for something the page happily sells.
+  const effectiveStock = getEffectiveStock(product);
 
   // Get price display (supports tiered + VIP pricing)
   const getPriceDisplay = () => {
@@ -149,12 +147,13 @@ const ProductCard: React.FC<ProductCardProps> = ({
   };
   // VIP messaging: badge when a VIP is seeing their price; a locked hint for
   // normal users when the product has a VIP-only price.
+  // The VIP price is shown ONLY to VIP users — no locked/teaser hint for others.
   const vipActive = isVip && typeof product.vipPriceUSD === "number" && product.vipPriceUSD > 0;
-  const vipLocked = !isVip && hasVipPrice(product) && typeof product.vipPriceUSD === "number";
   // Item discount: "was" price + Save% when compareAtPriceUSD beats the shown price.
-  const shownPrice = getDisplayUnitPrice(product, isVip);
-  const hasDiscount = typeof product.compareAtPriceUSD === "number" && product.compareAtPriceUSD > shownPrice;
-  const savePct = hasDiscount ? Math.round((1 - shownPrice / (product.compareAtPriceUSD as number)) * 100) : 0;
+  // Measured against what THIS shopper pays, so VIPs get the badge too (previously
+  // hidden from them, leaving them unable to tell a product was discounted at all).
+  const hasDiscount = hasCompareAtDiscount(product, isVip);
+  const savePct = getDiscountPercent(product, isVip);
 
   const getVariantStyles = () => {
     // Use minHeight instead of fixed height to allow content to grow
@@ -203,11 +202,16 @@ const ProductCard: React.FC<ProductCardProps> = ({
   // Removed: Using centralized imageUtils instead
 
   const renderImage = () => {
-    const imageUri = getProductImageUrl({
-      imageUrls: product.imageUrls,
-      images: product.images || product.imageUrls,
-      category: product.category,
-    });
+    // Request a thumbnail, not the full-resolution original — this card is a small
+    // grid cell, and downloading/decoding the full image was pure waste on lists.
+    const imageUri = getThumbnailUrl(
+      getProductImageUrl({
+        imageUrls: product.imageUrls,
+        images: product.images || product.imageUrls,
+        category: product.category,
+      }),
+      400,
+    );
 
     // Debug logging - remove in production
     if (__DEV__) {
@@ -287,7 +291,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
         )}
 
         {/* Low Stock badge - only show if no special status */}
-        {effectiveStock <= 5 &&
+        {effectiveStock <= LOW_STOCK_THRESHOLD &&
           effectiveStock > 0 &&
           (!product.status || product.status === "available") && (
             <View
@@ -297,7 +301,10 @@ const ProductCard: React.FC<ProductCardProps> = ({
               ]}
             >
               <AppNumber
-                value={`${effectiveStock} left`}
+                value={t("product.lowStock", {
+                  count: effectiveStock,
+                  defaultValue: `Only ${effectiveStock} left`,
+                })}
                 style={[
                   styles.stockBadgeText,
                   { color: "#ffffff", fontSize: 12 },
@@ -370,8 +377,10 @@ const ProductCard: React.FC<ProductCardProps> = ({
           </View>
         )}
 
-        {/* Available badge - show when in stock with no special status */}
-        {effectiveStock > 0 &&
+        {/* Available badge - show when comfortably in stock with no special status.
+            Above LOW_STOCK_THRESHOLD only: both badges are absolutely positioned at the
+            same corner, so at 1-5 units they used to render stacked on top of each other. */}
+        {effectiveStock > LOW_STOCK_THRESHOLD &&
           (!product.status || product.status === "available") && (
             <View style={[styles.stockBadge, { backgroundColor: "#4CAF50" }]}>
               <Ionicons
@@ -461,7 +470,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
             value={getPriceDisplay()}
             numberOfLines={1}
             adjustsFontSizeToFit
-            minimumFontScale={0.85}
+            minimumFontScale={0.92}
             style={[
               styles.price,
               { color: vipActive ? "#7C3AED" : theme.colors.primary, fontSize: adjustFontSize(15) },
@@ -472,15 +481,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
               <AppText fontSize={9} style={styles.vipTagText}>VIP</AppText>
             </View>
           )}
-          {vipLocked && (
-            <View style={styles.vipLockRow}>
-              <Ionicons name="lock-closed" size={10} color={theme.colors.textSecondary} />
-              <AppText fontSize={10} style={[styles.vipLockText, { color: theme.colors.textSecondary }]}>
-                {formatPrice(product.vipPriceUSD as number, currency, exchangeRateIQD, { symbol: true })} VIP
-              </AppText>
-            </View>
-          )}
-          {hasDiscount && !vipActive && (
+          {hasDiscount && (
             <View style={styles.saveRow}>
               <AppNumber
                 value={formatPrice(product.compareAtPriceUSD as number, currency, exchangeRateIQD)}

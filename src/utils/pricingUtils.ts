@@ -104,6 +104,51 @@ export const getDisplayUnitPrice = (
   isVip: boolean = false
 ): number => getEffectiveUnitPrice(product, 1, isVip);
 
+// Stock is at or below this before the "only N left" urgency cue appears.
+// ProductDetailsScreen declares its own copy (it is @ts-nocheck and owned elsewhere);
+// it should import this one so the card and the page can never disagree.
+export const LOW_STOCK_THRESHOLD = 5;
+
+// Everything the shop can actually fulfil for a product: the main stock PLUS every
+// per-size and per-colour bucket. A product stocked only through colour variations
+// (main stockQty 0, Red 5 / Blue 3) is genuinely sellable and the detail screen sells
+// it — cards computing stock from `stockQty` alone greyed out the buy button on it.
+// This must stay identical to the `effectiveStock` in ProductDetailsScreen.
+export const getEffectiveStock = (
+  product: Pick<Product, 'stockQty' | 'variations' | 'colorVariations'>
+): number => {
+  const sizeStock = product.variations?.reduce((sum, v) => sum + (v.stockQuantity || 0), 0) || 0;
+  const colorStock = product.colorVariations?.reduce((sum, v) => sum + (v.stockQuantity || 0), 0) || 0;
+  return (product.stockQty || 0) + sizeStock + colorStock;
+};
+
+type DiscountableProduct = Pick<
+  Product,
+  'priceUSD' | 'vipPriceUSD' | 'priceTiers' | 'compareAtPriceUSD'
+>;
+
+// Whether the compare-at ("was") price beats what THIS shopper actually pays.
+// Measured against the displayed price, not `priceUSD`, so a VIP or wholesale buyer
+// still sees the badge — and sees it agree with the number next to it.
+export const hasCompareAtDiscount = (
+  product: DiscountableProduct,
+  isVip: boolean = false
+): boolean =>
+  typeof product.compareAtPriceUSD === 'number' &&
+  product.compareAtPriceUSD > getDisplayUnitPrice(product, isVip);
+
+// The single Save% figure for the whole app. Computed off the price the shopper pays,
+// so the grid card and the product page can no longer quote different percentages for
+// the same product.
+export const getDiscountPercent = (
+  product: DiscountableProduct,
+  isVip: boolean = false
+): number => {
+  if (!hasCompareAtDiscount(product, isVip)) return 0;
+  const shownPrice = getDisplayUnitPrice(product, isVip);
+  return Math.round((1 - shownPrice / (product.compareAtPriceUSD as number)) * 100);
+};
+
 // Whether a product has a VIP-only price that differs from what a non-VIP pays.
 export const hasVipPrice = (
   product: Pick<Product, 'priceUSD' | 'vipPriceUSD' | 'priceTiers'>

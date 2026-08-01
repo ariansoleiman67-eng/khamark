@@ -42,6 +42,8 @@ const BrandCard: React.FC<BrandCardProps> = ({ label, imageUrl, width, onPress }
             style={styles.logo}
             contentFit="contain"
             transition={0}
+            cachePolicy="memory-disk"
+            recyclingKey={imageUrl}
             onError={() => setImgFailed(true)}
           />
         ) : (
@@ -96,4 +98,6 @@ const styles = StyleSheet.create({
   },
 });
 
-export default BrandCard;
+// Rendered once per brand in a horizontal rail — memo keeps the whole rail from
+// re-rendering when an unrelated bit of Home state changes.
+export default React.memo(BrandCard);

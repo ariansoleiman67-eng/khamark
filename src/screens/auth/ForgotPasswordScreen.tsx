@@ -438,20 +438,22 @@ const ForgotPasswordScreen: React.FC = () => {
             </Animated.View>
 
             {/* Title */}
-            <Animated.Text
+            <Animated.View entering={SlideInLeft.duration(600).delay(300)}>
+              <Animated.Text
               allowFontScaling={false}
-              entering={SlideInLeft.duration(600).delay(300)}
               style={styles.title}
             >
               {t('auth.forgotPassword.title', { defaultValue: 'Forgot Password' })}
             </Animated.Text>
-            <Animated.Text
+            </Animated.View>
+            <Animated.View entering={FadeIn.duration(600).delay(500)}>
+              <Animated.Text
               allowFontScaling={false}
-              entering={FadeIn.duration(600).delay(500)}
               style={styles.subtitle}
             >
               {t('auth.forgotPassword.subtitle', { defaultValue: 'Please sign in to your existing account' })}
             </Animated.Text>
+            </Animated.View>
           </LinearGradient>
 
           {/* ── Form Card (overlaps hero) ── */}

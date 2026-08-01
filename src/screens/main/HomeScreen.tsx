@@ -11,6 +11,7 @@ import {
   Platform,
   KeyboardAvoidingView,
   I18nManager,
+  Linking,
 } from 'react-native';
 
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -52,6 +53,10 @@ const PAGE_SIZE = 20;
 const BRAND_GRID_PADDING = 16;
 const BRAND_GRID_GAP = 12;
 const BRAND_TILE_WIDTH = (SCREEN_WIDTH - BRAND_GRID_PADDING * 2 - BRAND_GRID_GAP) / 2;
+// Two stacked cards + the gap. Fixing the column height lets a lone trailing card
+// (odd brand count) stretch to fill it instead of leaving an empty half-column.
+const BRAND_CARD_HEIGHT = 150;
+const BRAND_COL_HEIGHT = BRAND_CARD_HEIGHT * 2 + BRAND_GRID_GAP;
 const chunkPairs = (arr: any[]): any[][] => {
   const out: any[][] = [];
   for (let i = 0; i < arr.length; i += 2) out.push(arr.slice(i, i + 2));
@@ -83,8 +88,9 @@ interface BrandGroup {
  *   ├── FIXED header row (menu + greeting | cart · favorites · notifications · language)
  *   └── KeyboardAvoidingView
  *       └── FlatList (data = newArrivals, numColumns=2) — the only vertical scroller
- *           ├── ListHeaderComponent: hero banner, "Our Brands" grid,
- *           │   per-brand spotlight carousels, "New Arrivals" header
+ *           ├── ListHeaderComponent: hero banner, "Featured Products" row,
+ *           │   "Our Brands" grid, per-brand spotlight carousels,
+ *           │   "New Arrivals" header
  *           └── 2-column masonry grid body (infinite feed)
  *
  * Data flow is untouched: loadBanners/loadNewArrivals/loadMoreProducts/onRefresh,
@@ -128,6 +134,8 @@ const HomeScreen: React.FC = () => {
   // Data states
   const [banners, setBanners] = useState<Banner[]>([]);
   const [newArrivals, setNewArrivals] = useState<Product[]>([]);
+  // Products the admin starred with "Featured (pin to top)". Empty => row is hidden.
+  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [storeProfile, setStoreProfile] = useState<StoreProfile | null>(null);
 
   // Banner images — loaded from Firestore
@@ -152,10 +160,12 @@ const HomeScreen: React.FC = () => {
     const seq = ++loadSeq.current;
     try {
       setLoading(true);
+      // Brands are not loaded here: the focus effect above already fetches them
+      // on mount, and doing both fired two identical queries on every cold start.
       await Promise.all([
         loadBanners(seq),
+        loadFeatured(seq),
         loadNewArrivals(seq),
-        loadBrands(seq),
       ]);
     } catch (error) {
       // Only surface the error for the latest load — a superseded tenant load must stay quiet.
@@ -168,22 +178,11 @@ const HomeScreen: React.FC = () => {
   // onRefresh (memoized with []) never runs a stale first-render loadData.
   loadDataRef.current = loadData;
 
-  const loadBrands = async (seq?: number) => {
-    try {
-      const brands = await brandService.getActiveBrands(tenantId || undefined);
-      if (seq !== undefined && seq !== loadSeq.current) return;
-      setManagedBrands(brands);
-    } catch {
-      if (seq !== undefined && seq !== loadSeq.current) return;
-      setManagedBrands([]);
-    }
-  };
-
   const loadBanners = async (seq?: number) => {
     try {
       const firestoreBanners = await bannerService.getBanners(true);
       if (seq !== undefined && seq !== loadSeq.current) return;
-      const next = firestoreBanners.length > 0 ? firestoreBanners.map(b => ({ uri: b.imageUrl })) : [];
+      const next = firestoreBanners.length > 0 ? firestoreBanners.map(b => ({ uri: b.imageUrl, linkUrl: b.linkUrl })) : [];
       // Keep the SAME array reference when the banners haven't changed, so repeat
       // loads on mount (tenantId resolving in stages) don't re-render the memoized
       // carousel and re-trigger the image fade — that's what made it flash ~3×.
@@ -194,6 +193,19 @@ const HomeScreen: React.FC = () => {
     } catch (error) {
       if (seq !== undefined && seq !== loadSeq.current) return;
       setBannerImages((prev) => (prev.length === 0 ? prev : []));
+    }
+  };
+
+  // Admin-starred products. The service query already filters is_active and orders
+  // by sort_order, so the manual admin ordering carries through to this row.
+  const loadFeatured = async (seq?: number) => {
+    try {
+      const featured = await ProductService.getFeaturedProducts(tenantId ?? undefined);
+      if (seq !== undefined && seq !== loadSeq.current) return;
+      setFeaturedProducts(featured || []);
+    } catch (error) {
+      if (seq !== undefined && seq !== loadSeq.current) return;
+      setFeaturedProducts([]);
     }
   };
 
@@ -297,9 +309,20 @@ const HomeScreen: React.FC = () => {
 
   const handleAddToCartPress = useCallback((productId: string, product: Product) => {
     if (!product) return;
+    // Variant products (color / size / storage) need the customer to choose an
+    // option — send them straight to the detail page instead of a sheet that just
+    // bounces there anyway.
+    const hasVariants =
+      (product.colorVariations && product.colorVariations.length > 0) ||
+      (product.variations && product.variations.length > 0) ||
+      (product.storageOptions && product.storageOptions.length > 0);
+    if (hasVariants) {
+      navigation.navigate('ProductDetails', { productId });
+      return;
+    }
     setCartSheetProduct(product);
     setCartSheetVisible(true);
-  }, []);
+  }, [navigation]);
 
   // Confirm handler for the Add to Cart bottom sheet
   const handleCartSheetConfirm = useCallback(async (orderData: {
@@ -347,10 +370,6 @@ const HomeScreen: React.FC = () => {
     navigation.navigate('Cart');
   }, [navigation]);
 
-  const handleBrandsSeeAll = useCallback(() => {
-    navigation.navigate('Categories');
-  }, [navigation]);
-
   const handleLanguageSelect = (languageCode: string) => {
     changeLanguage(languageCode);
   };
@@ -394,8 +413,8 @@ const HomeScreen: React.FC = () => {
   const stableIsFavorite = useCallback((id: string) => favActionsRef.current.isFavorite(id), []);
   const stableToggleFavorite = useCallback((id: string) => favActionsRef.current.toggleFavorite(id), []);
 
-  const headerDataRef = useRef({ brands, brandSpotlights, hasArrivals, managedBrands });
-  headerDataRef.current = { brands, brandSpotlights, hasArrivals, managedBrands };
+  const headerDataRef = useRef({ brands, brandSpotlights, hasArrivals, managedBrands, featuredProducts });
+  headerDataRef.current = { brands, brandSpotlights, hasArrivals, managedBrands, featuredProducts };
 
   const renderSpotlightCard = useCallback(({ item }: { item: Product }) => (
     <MasonryProductCard
@@ -409,21 +428,57 @@ const HomeScreen: React.FC = () => {
   ), [handleProductPress, handleAddToCartPress, stableIsFavorite, stableToggleFavorite]);
 
   const renderListHeader = useCallback(() => {
-    const { brands: brandList, brandSpotlights: spotlights, hasArrivals: hasItems, managedBrands: mBrands } = headerDataRef.current;
-    const brandTiles = mBrands.length > 0
+    const { brands: brandList, brandSpotlights: spotlights, hasArrivals: hasItems, managedBrands: mBrands, featuredProducts: featured } = headerDataRef.current;
+    const allBrandTiles = mBrands.length > 0
       ? mBrands.map(b => ({ key: b.id, label: b.name, logoUrl: b.logoUrl }))
       : brandList.map(b => ({ key: b, label: b, logoUrl: undefined as string | undefined }));
+    // Every brand is shown. This used to drop the last brand on an odd count to
+    // avoid a half-empty final column, on the assumption that "See All" listed the
+    // rest — but that link went to Categories and no all-brands screen exists, so
+    // the dropped brand was simply unreachable. A single tile in the last column of
+    // a horizontally scrolling rail is a far smaller problem than a hidden brand.
+    const brandTiles = allBrandTiles;
     return (
       <View>
         {/* a. Hero banner */}
         {bannerImages.length > 0 && (
-          <BannerCarousel images={bannerImages} activeDotColor={theme.colors.primary} />
+          <BannerCarousel
+            images={bannerImages}
+            activeDotColor={theme.colors.primary}
+            onItemPress={(item) => {
+              // Open the admin-set tap-through link (http/https only) if present.
+              const url = item?.linkUrl;
+              if (typeof url === 'string' && /^https?:\/\//i.test(url.trim())) {
+                Linking.openURL(url.trim()).catch(() => {});
+              }
+            }}
+          />
+        )}
+
+        {/* a2. Featured — products the admin starred, in the admin's manual
+            sort_order. Rendered only when something is actually starred so a shop
+            that has never used the star never sees an empty row. No "See All":
+            there is no featured-only screen to link to. */}
+        {featured.length > 0 && (
+          <View>
+            <SectionHeader title={t('home.featuredProducts')} />
+            <FlatList
+              data={featured}
+              renderItem={renderSpotlightCard}
+              keyExtractor={(item) => `featured-${item.id}`}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.spotlightList}
+            />
+          </View>
         )}
 
         {/* b. Our Brands — horizontal 2-row rail (shows admin logo when uploaded) */}
         {brandTiles.length > 0 && (
           <View>
-            <SectionHeader title={t('home.ourBrands')} onSeeAll={handleBrandsSeeAll} />
+            {/* No onSeeAll: the rail already shows every brand, and there is no
+                all-brands screen to link to. */}
+            <SectionHeader title={t('home.ourBrands')} />
             <FlatList
               data={(() => { const cols = chunkPairs(brandTiles); return isRTL ? cols.reverse() : cols; })()}
               keyExtractor={(_, i) => `brand-col-${i}`}
@@ -451,7 +506,13 @@ const HomeScreen: React.FC = () => {
         {/* c. Brand-spotlight carousels ("Featured <Brand>") */}
         {spotlights.map((group) => (
           <View key={group.brand}>
-            <SectionHeader title={group.brand} onSeeAll={handleBrandsSeeAll} />
+            {/* "See All" on a "Featured <Brand>" row means that brand's products —
+                the same destination a brand tile opens. It used to land on
+                Categories, which showed nothing to do with the brand. */}
+            <SectionHeader
+              title={group.brand}
+              onSeeAll={() => (navigation as any).navigate('CategoryProducts', { brand: group.brand, title: group.brand })}
+            />
             <FlatList
               data={group.products}
               renderItem={renderSpotlightCard}
@@ -467,7 +528,7 @@ const HomeScreen: React.FC = () => {
         {hasItems && <SectionHeader title={t('home.newArrivals')} />}
       </View>
     );
-  }, [bannerImages, isRTL, t, handleBrandsSeeAll, renderSpotlightCard, theme.colors.primary]);
+  }, [bannerImages, isRTL, t, navigation, renderSpotlightCard, theme.colors.primary]);
 
   // Product card renderer — 2 column grid (memoized to prevent re-renders)
   const renderProduct = useCallback(({ item }: { item: Product }) => (
@@ -790,6 +851,7 @@ const styles = StyleSheet.create({
   brandCol: {
     gap: BRAND_GRID_GAP,
     justifyContent: 'flex-start',
+    height: BRAND_COL_HEIGHT,
   },
   // Brand-spotlight horizontal carousel padding (aligns first card to the grid).
   spotlightList: {

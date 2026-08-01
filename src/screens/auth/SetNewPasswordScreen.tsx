@@ -277,24 +277,26 @@ const SetNewPasswordScreen: React.FC = () => {
             </Animated.View>
 
             {/* Headline */}
-            <Animated.Text
+            <Animated.View entering={SlideInLeft.duration(500).delay(200)}>
+              <Animated.Text
               allowFontScaling={false}
-              entering={SlideInLeft.duration(500).delay(200)}
               style={styles.title}
             >
               {isRegister
                 ? t('auth.setPassword.title', { defaultValue: 'Secure your account' })
                 : t('auth.resetPassword.title', { defaultValue: 'Reset password' })}
             </Animated.Text>
-            <Animated.Text
+            </Animated.View>
+            <Animated.View entering={FadeIn.duration(500).delay(320)}>
+              <Animated.Text
               allowFontScaling={false}
-              entering={FadeIn.duration(500).delay(320)}
               style={styles.subtitle}
             >
               {isRegister
                 ? t('auth.setPassword.subtitle', { defaultValue: 'Create a password for faster sign-ins.' })
                 : t('auth.resetPassword.subtitle', { defaultValue: 'Create a new password for your account.' })}
             </Animated.Text>
+            </Animated.View>
           </LinearGradient>
 
           {/* ── Form Card (overlaps hero) ── */}

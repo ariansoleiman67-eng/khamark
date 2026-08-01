@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 import * as Application from 'expo-application';
 import { getDeviceId } from '../utils/deviceUtils';
 import { supabase } from '../services/supabase';
+import { NotificationService } from '../services/NotificationService';
 
 let isNativeAvailable = false;
 let getMessagingFn: (() => any) | null = null;
@@ -114,7 +115,11 @@ export async function registerNativePushToken(userId: string, tenantId?: string)
       platform: Platform.OS,
       app_version: Application.nativeApplicationVersion || '1.0.0',
       is_active: true,
-      notifications_enabled: true,
+      // The admin's own setting, not a hardcoded true. This upsert runs on every
+      // launch, so writing `true` here silently re-enabled push each time the app
+      // started — the Admin > Settings toggle saved correctly and then reverted,
+      // and order alerts could never actually be switched off.
+      notifications_enabled: await NotificationService.getDevicePushEnabled(),
       channel_version: 1,
       last_seen_at: now,
       updated_at: now,

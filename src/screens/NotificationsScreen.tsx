@@ -29,6 +29,13 @@ const NOTIFICATION_FILTER_OPTIONS = [
   { key: 'system', label: 'System' },
 ];
 
+// The admin composer writes type 'promotion' / 'general' while older rows hold
+// 'promo' / 'system', so a chip that matched its own key alone was permanently empty.
+const NOTIFICATION_FILTER_TYPES: Record<string, string[]> = {
+  promo: ['promo', 'promotion'],
+  system: ['system', 'general'],
+};
+
 export const NotificationsScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
   const { t, i18n } = useTranslation();
@@ -119,7 +126,8 @@ export const NotificationsScreen: React.FC = () => {
 
     // Filter by type
     if (filter !== 'all') {
-      filtered = filtered.filter(notification => notification.type === filter);
+      const acceptedTypes = NOTIFICATION_FILTER_TYPES[filter] || [filter];
+      filtered = filtered.filter(notification => acceptedTypes.includes(notification.type));
     }
 
     // Filter by read status

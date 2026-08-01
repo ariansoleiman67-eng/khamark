@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View, Text, Platform, StatusBar as RNStatusBar } from 'react-native';
+import { View, Text, Platform, ActivityIndicator, StatusBar as RNStatusBar } from 'react-native';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -8,6 +8,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
 import { useTheme } from '../components/ThemeProvider';
 import { useAuth } from '../contexts/AuthContext';
+import { perfStart, perfEnd } from '../utils/perfTrace';
 import AnimatedTabBar from '../components/AnimatedTabBar';
 import ScreenWrapper from '../components/ScreenWrapper';
 import Logo from '../components/Logo';
@@ -78,42 +79,52 @@ import CategoryProductsScreen from '../screens/CategoryProductsScreen';
 import { RootStackParamList, MainTabParamList } from '../types';
 
 // Admin Navigator
-import AdminTabNavigator from './AdminTabNavigator';
-import AdminSendNotificationScreen from '../screens/admin/AdminSendNotificationScreen';
-import AdminBusinessInfoScreen from '../screens/admin/AdminBusinessInfoScreen';
-import AdminCurrencySettingsScreen from '../screens/admin/AdminCurrencySettingsScreen';
-import AdminOperatingHoursScreen from '../screens/admin/AdminOperatingHoursScreen';
-import AdminStockReportScreen from '../screens/admin/AdminStockReportScreen';
 
-import AdminAnalyticsScreen from '../screens/admin/AdminAnalyticsScreen';
-import AdminChangePasswordScreen from '../screens/admin/AdminChangePasswordScreen';
-import AdminAccountSecurityScreen from '../screens/admin/AdminAccountSecurityScreen';
-import AdminStoreLocationsScreen from '../screens/admin/AdminStoreLocationsScreen';
-import AdminEditStoreLocationScreen from '../screens/admin/AdminEditStoreLocationScreen';
-import AdminDiscountsScreen from '../screens/admin/AdminDiscountsScreen';
-import AdminCategoriesScreen from '../screens/admin/AdminCategoriesScreen';
-import AdminEditDiscountScreen from '../screens/admin/AdminEditDiscountScreen';
-import AdminConversationsListScreen from '../screens/admin/AdminConversationsListScreen';
-import AdminStoreProfileScreen from '../screens/admin/AdminStoreProfileScreen';
-import AdminInvoiceSettingsScreen from '../screens/admin/AdminInvoiceSettingsScreen';
-import AdminChatScreen from '../screens/admin/AdminChatScreen';
-import AdminBannerScreen from '../screens/admin/AdminBannerScreen';
-import AdminBrandManagerScreen from '../screens/admin/AdminBrandManagerScreen';
 import { USE_MOCK_DATA } from '../services/mockData';
-import AdminCategoryManagerScreen from '../screens/admin/AdminCategoryManagerScreen';
-import AdminPromoManagerScreen from '../screens/admin/AdminPromoManagerScreen';
-import AdminCustomersScreen from '../screens/admin/AdminCustomersScreen';
-import AdminPartnerManagementScreen from '../screens/admin/AdminPartnerManagementScreen';
-import AdminPartnerAssignmentScreen from '../screens/admin/AdminPartnerAssignmentScreen';
-import AdminPartnerDashboardScreen from '../screens/admin/AdminPartnerDashboardScreen';
-import AdminOrdersScreen from '../screens/admin/AdminOrdersScreen';
-import AdminCreateOrderScreen from '../screens/admin/AdminCreateOrderScreen';
 
 // Chat Screens
 import ChatScreen from '../screens/ChatScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
+
+// Admin + partner surfaces are code-split so a shopper never parses them. They
+// resolve the first time an admin/partner signs in, then stay in memory.
+// The perf span covers resolving AND evaluating the admin module graph — the part
+// that used to block on ~30k lines of eagerly-imported screens (see metro.config.js).
+const LazyAdminNavigator = React.lazy(() => {
+  perfStart('admin:chunk-eval');
+  return import('./AdminNavigator').then((mod) => {
+    perfEnd('admin:chunk-eval');
+    return mod;
+  });
+});
+const LazyPartnerNavigator = React.lazy(() => import('./PartnerNavigator'));
+
+// Demo-only managers, reachable from Profile in offline mock mode. Lazy so they
+// stay off the boot path in the real (Supabase-backed) build. Each is wrapped in
+// its own Suspense boundary — a lazy component rendered as a screen without one
+// would throw the moment it's navigated to.
+const lazyScreen = (loader: () => Promise<{ default: React.ComponentType<any> }>) => {
+  const Lazy = React.lazy(loader);
+  const Screen: React.FC<any> = (props) => (
+    <React.Suspense fallback={<NavigatorLoading />}>
+      <Lazy {...props} />
+    </React.Suspense>
+  );
+  return Screen;
+};
+const LazyAdminBrandManagerScreen = lazyScreen(() => import('../screens/admin/AdminBrandManagerScreen'));
+const LazyAdminCategoryManagerScreen = lazyScreen(() => import('../screens/admin/AdminCategoryManagerScreen'));
+const LazyAdminPromoManagerScreen = lazyScreen(() => import('../screens/admin/AdminPromoManagerScreen'));
+
+// Shown for the moment it takes to resolve one of those chunks.
+const NavigatorLoading: React.FC = () => (
+  // eslint-disable-next-line react-native/no-inline-styles
+  <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+    <ActivityIndicator size="large" />
+  </View>
+);
 
 // Note: AuthNavigator removed for Guest Login System
 // Auth screens (Login, Register, etc.) are now in main stack
@@ -344,68 +355,28 @@ const AppNavigator: React.FC = () => {
 
   // VIEW-ONLY PARTNER: a read-only home showing only the products an owner shared with
   // them (partners are is_admin=false, so they never enter the admin stack below).
+  // Code-split — see the note on the admin stack below.
   if (user && isPartner) {
     return (
       <ErrorBoundary>
-        <NavigationContainer theme={navigationTheme} linking={linking}>
-          <PushInitializer />
-          <Stack.Navigator screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="Main" component={AdminPartnerDashboardScreen} />
-            <Stack.Screen name="AdminPartnerDashboard" component={AdminPartnerDashboardScreen} />
-            <Stack.Screen name="ProductDetails" component={ProductDetailsScreen} />
-            <Stack.Screen name="ChatScreen" component={ChatScreen} />
-          </Stack.Navigator>
-        </NavigationContainer>
+        <React.Suspense fallback={<NavigatorLoading />}>
+          <LazyPartnerNavigator navigationTheme={navigationTheme} linking={linking} />
+        </React.Suspense>
       </ErrorBoundary>
     );
   }
 
-  // GUEST LOGIN SYSTEM: Admin users still get admin navigation
+  // GUEST LOGIN SYSTEM: Admin users still get admin navigation.
+  // The admin stack is code-split: it pulls in ~1.3 MB of JS (product editor,
+  // orders, report generators, the tenant admin service) that a shopper never
+  // touches, and eagerly importing it meant every guest parsed all of it before
+  // the storefront could paint.
   if (user && isAdmin) {
     return (
       <ErrorBoundary>
-        <NavigationContainer theme={navigationTheme} linking={linking}>
-          <PushInitializer />
-          <Stack.Navigator 
-            screenOptions={{ headerShown: false }}
-          >
-            <Stack.Screen name="Main" component={AdminTabNavigator} />
-            <Stack.Screen name="ProductDetails" component={ProductDetailsScreen} />
-            <Stack.Screen name="AdminSendNotification" component={AdminSendNotificationScreen} />
-            <Stack.Screen name="AdminBusinessInfo" component={AdminBusinessInfoScreen} />
-            <Stack.Screen name="AdminCurrencySettings" component={AdminCurrencySettingsScreen} />
-            <Stack.Screen name="AdminOperatingHours" component={AdminOperatingHoursScreen} />
-
-            <Stack.Screen name="AdminAnalytics" component={AdminAnalyticsScreen} />
-            <Stack.Screen name="AdminStockReport" component={AdminStockReportScreen} />
-            <Stack.Screen name={"AdminChangePassword" as any} component={AdminChangePasswordScreen} />
-            <Stack.Screen name={"AdminAccountSecurity" as any} component={AdminAccountSecurityScreen} />
-            <Stack.Screen name={"UpdateEmail" as any} component={UpdateEmailScreen} />
-            <Stack.Screen name={"UpdatePhone" as any} component={UpdatePhoneScreen} />
-            <Stack.Screen name={"ChangePassword" as any} component={ChangePasswordScreen} />
-            <Stack.Screen name="AdminStoreLocations" component={AdminStoreLocationsScreen} />
-            <Stack.Screen name="AdminEditStoreLocation" component={AdminEditStoreLocationScreen} />
-            <Stack.Screen name="AdminDiscounts" component={AdminDiscountsScreen} />
-            <Stack.Screen name={"AdminCategories" as any} component={AdminCategoriesScreen} />
-            <Stack.Screen name="AdminEditDiscount" component={AdminEditDiscountScreen} />
-            <Stack.Screen name="AdminConversationsListScreen" component={AdminConversationsListScreen} />
-            <Stack.Screen name="AdminStoreProfile" component={AdminStoreProfileScreen} />
-            <Stack.Screen name="ChatScreen" component={ChatScreen} />
-            <Stack.Screen name="AdminChatScreen" component={AdminChatScreen} />
-            <Stack.Screen name="ThemeCustomization" component={ThemeCustomizationScreen} />
-            <Stack.Screen name="AdminInvoiceSettings" component={AdminInvoiceSettingsScreen} />
-            <Stack.Screen name="AdminCustomers" component={AdminCustomersScreen} />
-            <Stack.Screen name="AdminBannerManagement" component={AdminBannerScreen} />
-            <Stack.Screen name="AdminBrandManagement" component={AdminBrandManagerScreen} />
-            <Stack.Screen name="AdminCategoryManagement" component={AdminCategoryManagerScreen} />
-            <Stack.Screen name="AdminPromoManagement" component={AdminPromoManagerScreen} />
-            <Stack.Screen name="AdminPartnerManagement" component={AdminPartnerManagementScreen} />
-            <Stack.Screen name="AdminPartnerAssignment" component={AdminPartnerAssignmentScreen} />
-            <Stack.Screen name="AdminPartnerDashboard" component={AdminPartnerDashboardScreen} />
-            <Stack.Screen name="AdminInStoreOrders" component={AdminOrdersScreen} initialParams={{ source: 'in-store' }} />
-            <Stack.Screen name="AdminCreateOrder" component={AdminCreateOrderScreen} />
-          </Stack.Navigator>
-        </NavigationContainer>
+        <React.Suspense fallback={<NavigatorLoading />}>
+          <LazyAdminNavigator navigationTheme={navigationTheme} linking={linking} />
+        </React.Suspense>
       </ErrorBoundary>
     );
   }
@@ -483,9 +454,9 @@ const AppNavigator: React.FC = () => {
         {/* Demo-only: brand/category managers reachable from Profile in offline mock mode */}
         {USE_MOCK_DATA && (
           <>
-            <Stack.Screen name="AdminBrandManagement" component={AdminBrandManagerScreen} />
-            <Stack.Screen name="AdminCategoryManagement" component={AdminCategoryManagerScreen} />
-            <Stack.Screen name="AdminPromoManagement" component={AdminPromoManagerScreen} />
+            <Stack.Screen name="AdminBrandManagement" component={LazyAdminBrandManagerScreen} />
+            <Stack.Screen name="AdminCategoryManagement" component={LazyAdminCategoryManagerScreen} />
+            <Stack.Screen name="AdminPromoManagement" component={LazyAdminPromoManagerScreen} />
           </>
         )}
         </Stack.Navigator>

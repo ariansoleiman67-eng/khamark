@@ -79,7 +79,7 @@ const StoreProductsScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <StoreHero profile={storeProfile} productCount={productCount} />
+      <StoreHero profile={storeProfile} productCount={productCount} tenantId={tenantId} />
       
       <Tab.Navigator
         screenOptions={{

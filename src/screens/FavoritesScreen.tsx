@@ -8,6 +8,7 @@ import {
   Alert,
   FlatList,
   I18nManager,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -147,7 +148,9 @@ const FavoritesScreen: React.FC = () => {
     );
   }, [favorites.length, clearFavorites, t]);
 
-  const renderProductItem = ({ item }: { item: Product }) => (
+  // Stable identity so FlatList doesn't re-render every visible row whenever any
+  // screen state changes.
+  const renderProductItem = useCallback(({ item }: { item: Product }) => (
     <View style={styles.cardItem}>
       <MasonryProductCard
         product={item}
@@ -157,7 +160,7 @@ const FavoritesScreen: React.FC = () => {
         onToggleFavorite={toggleFavorite}
       />
     </View>
-  );
+  ), [handleProductPress, handleAddToCart, isFavorite, toggleFavorite]);
 
   // =================================================================
   // ALIBABA: Skeleton Loading - Static, matches final layout
@@ -275,6 +278,10 @@ const FavoritesScreen: React.FC = () => {
             contentContainerStyle={styles.productsContainer}
             columnWrapperStyle={styles.columnWrapper}
             showsVerticalScrollIndicator={false}
+            initialNumToRender={6}
+            maxToRenderPerBatch={6}
+            windowSize={7}
+            removeClippedSubviews={Platform.OS === 'android'}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
             }

@@ -147,6 +147,8 @@ export interface Product {
   specifications?: Record<string, string>;
   condition?: string;
   warranty?: string;
+  sku?: string;
+  barcode?: string;
   // Add computed property for backward compatibility
   inStock?: boolean;
   // Add alias for images to support existing components
