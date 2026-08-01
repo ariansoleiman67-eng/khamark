@@ -76,7 +76,7 @@ export const tradeInService = {
     return (data || []).map(mapRow);
   },
 
-  async getTenantRequests(tenantId: string, status?: string): Promise<TradeInRequest[]> {
+  async getTenantRequests(tenantId: string, status?: TradeInStatus): Promise<TradeInRequest[]> {
     let q = supabase
       .from('trade_in_requests')
       .select('*')
@@ -110,17 +110,33 @@ export const tradeInService = {
         quoted_at: new Date().toISOString(),
       })
       .eq('id', id)
+      // Belt and braces alongside RLS. The owner admin IS the tenant in this schema,
+      // so reviewedBy is the tenant id — scoping the write here means a bug in a
+      // caller cannot reach another shop's row even if a policy were ever loosened.
+      // brandService.deleteBrand carries the same defence for the same reason.
+      .eq('tenant_id', reviewedBy)
       .eq('status', 'submitted')
       .select('id');
     if (error) throw error;
     return (data || []).length > 0;
   },
 
-  async setStatus(id: string, status: TradeInStatus): Promise<void> {
-    const { error } = await supabase
+  /**
+   * Returns false when the update matched no row.
+   *
+   * trade_in_update_own's USING clause is evaluated against the OLD row, so a
+   * customer accepting a request the admin has already moved past 'quoted' is
+   * filtered out silently — zero rows changed, and `error` is null. Returning void
+   * would show that customer a successful "Accepted" for something that never
+   * happened.
+   */
+  async setStatus(id: string, status: TradeInStatus): Promise<boolean> {
+    const { data, error } = await supabase
       .from('trade_in_requests')
       .update({ status })
-      .eq('id', id);
+      .eq('id', id)
+      .select('id');
     if (error) throw error;
+    return (data || []).length > 0;
   },
 };
