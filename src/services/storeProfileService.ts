@@ -186,6 +186,12 @@ class StoreProfileService {
        console.error('Update store profile failed:', error);
        throw error;
     }
+
+    // Without this the 10-minute cache keeps serving the pre-save row, so the edit
+    // form re-hydrates with the OLD logo/cover and writes them back over the newly
+    // uploaded ones on the next save.
+    this.profileCache.delete(tenantId);
+    this.allStoresCache = null;
   }
 
   async setDefaultLocation(
@@ -220,7 +226,16 @@ class StoreProfileService {
       updateData.location = { latitude: location.latitude, longitude: location.longitude };
     }
     
-    await supabase.from('tenants').update(updateData).eq('id', tenantId);
+    // This write was unchecked, so a failed address/city/coordinates update silently
+    // no-op'd while the admin was told the store profile saved successfully.
+    const { error } = await supabase.from('tenants').update(updateData).eq('id', tenantId);
+    if (error) {
+      console.error('Set default location failed:', error);
+      throw error;
+    }
+
+    this.profileCache.delete(tenantId);
+    this.allStoresCache = null;
   }
 
   async getAllStoreProfiles(): Promise<Array<{ tenantId: string; profile: StoreProfile }>> {

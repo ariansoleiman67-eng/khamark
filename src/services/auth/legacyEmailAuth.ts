@@ -1,4 +1,5 @@
 import { AuthService } from '../authService';
+import i18n from '../../locales';
 import { supabase } from '../supabase';
 import { isSyntheticEmail } from '../../utils/hashUtils';
 import { User } from '../../types';
@@ -10,12 +11,16 @@ import { User } from '../../types';
  */
 
 export const isEmailRegistered = async (email: string): Promise<boolean> => {
+  // SECURITY DEFINER RPC — locked-down RLS blocks a direct pre-auth users read.
+  // A failed lookup must NOT return false: that reads as "not registered" and lets
+  // signup proceed on an email that already HAS an account, whose password
+  // registerWithEmail would then overwrite. Fail closed.
   try {
-    // SECURITY DEFINER RPC — locked-down RLS blocks a direct pre-auth users read.
-    const { data } = await supabase.rpc('email_exists', { p_email: email.trim() });
+    const { data, error } = await supabase.rpc('email_exists', { p_email: email.trim() });
+    if (error) throw error;
     return !!data;
   } catch {
-    return false;
+    throw new Error(i18n.t('auth.accountCheckFailed'));
   }
 };
 

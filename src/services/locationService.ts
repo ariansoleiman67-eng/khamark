@@ -175,7 +175,14 @@ export class LocationService {
   async getLocationById(locationId: string): Promise<StoreLocation | null> {
     try {
       const { data, error } = await supabase.from('store_locations').select('*').eq('id', locationId).single();
-      if (error || !data) return null;
+      // Only a genuine "no rows" (PGRST116) means the location doesn't exist. Collapsing a
+      // transient network/RLS failure into null makes the edit form open fully blank, and
+      // saving it overwrites the real row with empty names, addresses and default coordinates.
+      if (error) {
+        if ((error as any).code === 'PGRST116') return null;
+        throw error;
+      }
+      if (!data) return null;
       return this.mapDbToLocation(data);
     } catch (error) {
       console.error('Error getting location by ID:', error);

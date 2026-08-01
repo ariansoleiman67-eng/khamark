@@ -58,9 +58,14 @@ const toTenantCategory = (c: StoredCategory): TenantCategory => ({
 });
 
 export const categoryStore = {
-  async getAll(): Promise<StoredCategory[]> {
+  // tenantId is required for parity with tenantAdminService.getCategories(), which
+  // the product editor's category picker uses — it filters on tenant_id, so rows
+  // written without one were invisible there ("No categories yet").
+  async getAll(tenantId?: string): Promise<StoredCategory[]> {
     if (!USE_MOCK_DATA) {
-      const { data, error } = await supabase.from('categories').select('*').order('sort_order', { ascending: true });
+      let q = supabase.from('categories').select('*');
+      if (tenantId) q = q.eq('tenant_id', tenantId);
+      const { data, error } = await q.order('sort_order', { ascending: true });
       if (error) { console.error('categoryStore getAll', error); return []; }
       return (data || []).map(mapRow);
     }
@@ -69,16 +74,21 @@ export const categoryStore = {
 
   // Consumed by categoryService.getActiveCategories (mock branch) — feeds the
   // Categories screen's iconByName (name -> logo), so tiles show admin logos.
-  async getActiveTenantCategories(): Promise<TenantCategory[]> {
+  // tenantId is optional (callers without one still get every shop's categories):
+  // pass it from admin screens — the product editor's picker was listing other
+  // stores' categories, and picking one wrote that foreign name onto the product.
+  async getActiveTenantCategories(tenantId?: string): Promise<TenantCategory[]> {
     if (!USE_MOCK_DATA) {
-      const { data, error } = await supabase.from('categories').select('*').eq('is_active', true).order('sort_order', { ascending: true });
+      let q = supabase.from('categories').select('*').eq('is_active', true);
+      if (tenantId) q = q.eq('tenant_id', tenantId);
+      const { data, error } = await q.order('sort_order', { ascending: true });
       if (error) { console.error('categoryStore getActive', error); return []; }
       return (data || []).map(mapRow).map(toTenantCategory);
     }
     return (await readMock()).filter(c => c.isActive).sort((a, b) => a.sortOrder - b.sortOrder).map(toTenantCategory);
   },
 
-  async save(cat: Partial<StoredCategory> & { name: string }): Promise<StoredCategory> {
+  async save(cat: Partial<StoredCategory> & { name: string; tenantId?: string }): Promise<StoredCategory> {
     if (!USE_MOCK_DATA) {
       const row: any = {
         name: cat.name,
@@ -87,7 +97,9 @@ export const categoryStore = {
         sort_order: cat.sortOrder ?? 0,
       };
       if (cat.id) row.id = cat.id;
-      if ((cat as any).tenantId) row.tenant_id = (cat as any).tenantId;
+      // Always stamp the owning tenant — without it the row is orphaned and the
+      // product editor's tenant-scoped picker can't see the category.
+      if (cat.tenantId) row.tenant_id = cat.tenantId;
       const { data, error } = await supabase.from('categories').upsert(row).select().single();
       if (error) throw error;
       return mapRow(data);

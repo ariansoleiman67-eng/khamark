@@ -23,12 +23,14 @@ export const mapProduct = (data: any): Product => ({
   category: data.category,
   categoryAr: data.category_ar,
   categoryKu: data.category_ku,
-  priceUSD: data.price_usd,
+  // Postgres numeric can arrive as a string; coerce money/stock so price math and
+  // the stock_qty > 0 in-stock check stay consistent with the other coerced fields.
+  priceUSD: data.price_usd != null ? Number(data.price_usd) : data.price_usd,
   vipPriceUSD: data.vip_price_usd != null ? Number(data.vip_price_usd) : undefined,
   compareAtPriceUSD: data.compare_at_price_usd != null ? Number(data.compare_at_price_usd) : undefined,
   storageOptions: data.storage_options || [],
-  purchasePrice: data.purchase_price,
-  stockQty: data.stock_qty,
+  purchasePrice: data.purchase_price != null ? Number(data.purchase_price) : data.purchase_price,
+  stockQty: data.stock_qty != null ? Number(data.stock_qty) : data.stock_qty,
   historicalStockQty: data.historical_stock_qty,
   initialStock: data.initial_stock,
   description: data.description,
@@ -46,7 +48,17 @@ export const mapProduct = (data: any): Product => ({
   shippingCost: data.shipping_cost,
   specifications: data.specifications || {},
   weight: data.weight,
+  warranty: data.warranty,
+  sku: data.sku,
+  barcode: data.barcode,
+  dimensions: data.dimensions || undefined,
   videoUrl: data.video_url,
+  // Admin-controlled display order. Defaults to 0 for every never-reordered row,
+  // so customer listings fall back to their previous ordering until an admin drags.
+  sortOrder: data.sort_order,
+  // Legacy cosmetic colours live in extra_data.options (mirrors mapTenantProduct).
+  // Only present on the detail fetch (select '*'); LIST_COLUMNS omits extra_data.
+  options: data.extra_data?.options,
   tenantId: data.tenant_id,
   createdAt: data.created_at,
   updatedAt: data.updated_at,
@@ -62,11 +74,25 @@ export const mapProduct = (data: any): Product => ({
 });
 
 // Columns needed for product LIST/CARD views. Excludes heavy detail-only fields
-// (descriptions, specifications, compatible_models, shipping_rates, color_variations,
-// video_url, purchase_price, weight) so lists load fast and stay light on memory.
-// The product DETAIL screen fetches the full row separately.
+// (descriptions, specifications, compatible_models, video_url, purchase_price,
+// weight) so lists load fast and stay light on memory. The product DETAIL screen
+// fetches the full row separately.
+// `variations` and `color_variations` ARE selected despite being bulky: a product
+// stocked only through colour rows has stock_qty 0, so without them every card
+// rendered "Out of Stock" for a product the detail page happily sold. Do not trim
+// them from this list.
+// `barcode` IS included despite being detail-ish: BarcodeScannerScreen hands the
+// scanned value to Search, which matches it against this already-loaded list — a
+// column that isn't selected is undefined, so every scan returned zero results.
 const LIST_COLUMNS =
-  'id,name,name_ar,name_ku,part_number,category,category_ar,category_ku,price_usd,vip_price_usd,compare_at_price_usd,storage_options,stock_qty,status,is_featured,is_active,brand,image_urls,price_tiers,variations,color_variations,shipping_cost,shipping_rates,tenant_id,created_at,updated_at';
+  'id,name,name_ar,name_ku,part_number,barcode,category,category_ar,category_ku,price_usd,vip_price_usd,compare_at_price_usd,storage_options,stock_qty,status,is_featured,is_active,brand,image_urls,price_tiers,variations,color_variations,shipping_cost,shipping_rates,sort_order,tenant_id,created_at,updated_at';
+
+// Primary ordering for every customer-facing listing: the order the admin set by
+// dragging in AdminProductsScreen (parts.sort_order). The column defaults to 0, so
+// on a shop that has never been reordered every row ties and the existing
+// .order(...) chained after it still decides — today's behaviour is preserved.
+const SORT_ORDER_COLUMN = 'sort_order';
+const SORT_ORDER_OPTS = { ascending: true, nullsFirst: false } as const;
 
 // Inverse of `mapProduct`: convert a camelCase product payload (as built by the
 // admin product editor) into a snake_case `parts` row. Only keys present in the
@@ -90,6 +116,7 @@ const PART_COLUMN_MAP: Record<string, string> = {
   status: 'status', variations: 'variations', colorVariations: 'color_variations',
   videoUrl: 'video_url', shippingCost: 'shipping_cost', shippingRates: 'shipping_rates',
   weight: 'weight', sortOrder: 'sort_order', specifications: 'specifications',
+  warranty: 'warranty', sku: 'sku', barcode: 'barcode', dimensions: 'dimensions',
 };
 // Non-column metadata the admin editor sends — folded into `extra_data` jsonb.
 const PART_EXTRA_KEYS = ['ownerAdminId', 'adminId', 'coAdminIds', 'options', 'videoUpdatedAt', 'inStock'];
@@ -137,6 +164,9 @@ export class ProductService {
       if (tenantId) query = query.eq('tenant_id', tenantId);
       if (filters.category) query = query.eq('category', filters.category);
       if (filters.brand) query = query.eq('brand', filters.brand);
+      // Filter inactive/hidden products in the DB (not after pagination) so pages
+      // aren't left with holes and `hasMore` stays accurate.
+      query = query.eq('is_active', true);
 
       if (filters.sortBy) {
         const ascending = filters.sortOrder === 'asc';
@@ -151,10 +181,10 @@ export class ProductService {
             query = query.order('created_at', { ascending });
             break;
           default:
-            query = query.order('created_at', { ascending: false });
+            query = query.order(SORT_ORDER_COLUMN, SORT_ORDER_OPTS).order('created_at', { ascending: false });
         }
       } else {
-        query = query.order('created_at', { ascending: false });
+        query = query.order(SORT_ORDER_COLUMN, SORT_ORDER_OPTS).order('created_at', { ascending: false });
       }
 
       const from = (pageInfo.page - 1) * pageInfo.limit;
@@ -166,7 +196,6 @@ export class ProductService {
 
       const products = (data || [])
         .map(mapProduct)
-        .filter(p => p.isActive !== false)
         // Use the computed inStock (counts variation/color stock + respects status),
         // not raw stock_qty which is 0 for variation products.
         .filter(p => !filters.inStock || p.inStock);
@@ -220,6 +249,8 @@ export class ProductService {
           (p.nameAr && p.nameAr.toLowerCase().includes(searchLower)) ||
           (p.nameKu && p.nameKu.toLowerCase().includes(searchLower)) ||
           (p.partNumber && p.partNumber.toLowerCase().includes(searchLower)) ||
+          // A scanned barcode is the exact query string the scanner passes through.
+          (p.barcode && p.barcode.toLowerCase().includes(searchLower)) ||
           (p.description && p.description.toLowerCase().includes(searchLower)) ||
           (p.category && p.category.toLowerCase().includes(searchLower)) ||
           (p.brand && p.brand.toLowerCase().includes(searchLower))
@@ -278,6 +309,7 @@ export class ProductService {
         .select(LIST_COLUMNS)
         .eq('is_featured', true)
         .eq('is_active', true)
+        .order(SORT_ORDER_COLUMN, SORT_ORDER_OPTS)
         .order('created_at', { ascending: false })
         .limit(10);
 
@@ -311,7 +343,8 @@ export class ProductService {
         .select(LIST_COLUMNS)
         .in('id', unique);
       if (error) throw error;
-      return (data || []).map(mapProduct);
+      // Don't surface hidden/deactivated products in Favorites.
+      return (data || []).map(mapProduct).filter(p => p.isActive !== false);
     };
     // Re-apply the caller's requested order (the cache may hold a different order).
     const ordered = (list: Product[]): Product[] => {
@@ -353,6 +386,7 @@ export class ProductService {
         .from('parts')
         .select(LIST_COLUMNS)
         .eq('tenant_id', tenantId)
+        .order(SORT_ORDER_COLUMN, SORT_ORDER_OPTS)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return (data || []).map(mapProduct).filter(p => p.isActive !== false);
@@ -388,6 +422,7 @@ export class ProductService {
         .select(LIST_COLUMNS)
         .eq('category', category)
         .eq('is_active', true)
+        .order(SORT_ORDER_COLUMN, SORT_ORDER_OPTS)
         .order('stock_qty', { ascending: false })
         .order('created_at', { ascending: false });
 

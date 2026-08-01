@@ -84,26 +84,31 @@ export function computePromoDiscount(promo: Promo, subtotalUSD: number): number 
 }
 
 export const promoService = {
-  async getAll(): Promise<Promo[]> {
+  // tenantId scopes every read to one store: promo codes are per-tenant (see the
+  // uniq_promo_code_per_tenant index), so an unscoped read lets a customer redeem
+  // — and an admin edit/delete — another store's codes.
+  async getAll(tenantId?: string): Promise<Promo[]> {
     if (USE_MOCK_DATA) return (await readMock()).sort((a, b) => a.sortOrder - b.sortOrder);
-    const { data, error } = await supabase.from('promo_codes').select('*').order('sort_order', { ascending: true });
+    let q = supabase.from('promo_codes').select('*').order('sort_order', { ascending: true });
+    if (tenantId) q = q.eq('tenant_id', tenantId);
+    const { data, error } = await q;
     if (error) { console.error('promo getAll', error); return []; }
     return (data || []).map(mapRow);
   },
 
-  async getActive(): Promise<Promo[]> {
-    return (await this.getAll()).filter((p) => p.isActive);
+  async getActive(tenantId?: string): Promise<Promo[]> {
+    return (await this.getAll(tenantId)).filter((p) => p.isActive);
   },
 
   // Resolve a user-entered code to an active promo (case-insensitive), or null.
-  async findByCode(code: string): Promise<Promo | null> {
+  async findByCode(code: string, tenantId?: string): Promise<Promo | null> {
     const target = normalize(code);
     if (!target) return null;
-    const promos = await this.getAll();
+    const promos = await this.getAll(tenantId);
     return promos.find((p) => p.isActive && normalize(p.code) === target) ?? null;
   },
 
-  async save(promo: Partial<Promo> & { code: string }): Promise<Promo> {
+  async save(promo: Partial<Promo> & { code: string; tenantId?: string }): Promise<Promo> {
     if (USE_MOCK_DATA) {
       return enqueue(async () => {
         const promos = await readMock();
@@ -140,13 +145,13 @@ export const promoService = {
       sort_order: promo.sortOrder ?? 0,
     };
     if (promo.id) row.id = promo.id;
-    if ((promo as any).tenantId) row.tenant_id = (promo as any).tenantId;
+    if (promo.tenantId) row.tenant_id = promo.tenantId;
     const { data, error } = await supabase.from('promo_codes').upsert(row).select().single();
     if (error) throw error;
     return mapRow(data);
   },
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, tenantId?: string): Promise<void> {
     if (USE_MOCK_DATA) {
       await enqueue(async () => {
         const promos = (await readMock()).filter((p) => p.id !== id);
@@ -154,7 +159,9 @@ export const promoService = {
       });
       return;
     }
-    const { error } = await supabase.from('promo_codes').delete().eq('id', id);
+    let q = supabase.from('promo_codes').delete().eq('id', id);
+    if (tenantId) q = q.eq('tenant_id', tenantId);
+    const { error } = await q;
     if (error) throw error;
   },
 };

@@ -77,7 +77,7 @@ export const brandService = {
     return (data || []).map(mapRow);
   },
 
-  async saveBrand(brand: Partial<Brand> & { name: string }): Promise<Brand> {
+  async saveBrand(brand: Partial<Brand> & { name: string; tenantId?: string }): Promise<Brand> {
     if (USE_MOCK_DATA) {
       const brands = await readMock();
       if (brand.id) {
@@ -106,19 +106,23 @@ export const brandService = {
       sort_order: brand.sortOrder ?? 0,
     };
     if (brand.id) row.id = brand.id;
-    if ((brand as any).tenantId) row.tenant_id = (brand as any).tenantId;
+    if (brand.tenantId) row.tenant_id = brand.tenantId;
     const { data, error } = await supabase.from('brands').upsert(row).select().single();
     if (error) throw error;
     return mapRow(data);
   },
 
-  async deleteBrand(id: string): Promise<void> {
+  async deleteBrand(id: string, tenantId?: string): Promise<void> {
     if (USE_MOCK_DATA) {
       const brands = (await readMock()).filter(b => b.id !== id);
       await writeMock(brands);
       return;
     }
-    const { error } = await supabase.from('brands').delete().eq('id', id);
+    // Scope the delete to the caller's tenant — RLS is permissive_all, so an
+    // unscoped delete-by-id lets one store permanently erase another's brand.
+    let q = supabase.from('brands').delete().eq('id', id);
+    if (tenantId) q = q.eq('tenant_id', tenantId);
+    const { error } = await q;
     if (error) throw error;
   },
 };

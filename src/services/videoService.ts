@@ -1,20 +1,20 @@
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
-import { Alert, Platform } from 'react-native';
-import { auth } from './firebase';
-import { getIdToken } from '@react-native-firebase/auth';
-import { FIREBASE_FUNCTIONS_URL } from '../constants/config';
+import { Alert } from 'react-native';
+import { decode } from 'base64-arraybuffer';
+import { supabase } from './supabase';
 
-// Video upload configuration
+// Video upload configuration.
+// NOTE: MAX_SIZE must stay <= the Supabase 'media' bucket's per-file limit
+// (currently 20 MB). A larger value here would let the picker accept a file that
+// Storage then rejects, surfacing as a confusing failure late in the upload.
+// Raise the bucket limit in the Supabase dashboard first, then raise this.
 export const VIDEO_CONFIG = {
-  MAX_SIZE_BYTES: 50 * 1024 * 1024, // 50MB
-  MAX_SIZE_MB: 50,
+  MAX_SIZE_BYTES: 20 * 1024 * 1024, // 20MB — matches the media bucket limit
+  MAX_SIZE_MB: 20,
   MAX_DURATION_SECONDS: 60, // 60 seconds
   ALLOWED_TYPES: ['video/mp4', 'video/quicktime', 'video/webm'],
 };
-
-// Cloud Functions base URL — derived from the Firebase project id via env (see config.ts).
-const FUNCTIONS_BASE_URL = FIREBASE_FUNCTIONS_URL;
 
 export interface VideoPickResult {
   uri: string;
@@ -42,10 +42,9 @@ export interface VideoValidation {
 /**
  * VideoService - Handles video picking and uploading for product videos
  * 
- * Security:
- * - No secrets in client code
- * - All uploads go through Firebase Cloud Function
- * - Auth token verified server-side
+ * Videos go straight to Supabase Storage (the same public `media` bucket used for
+ * product images), so there is no Firebase Cloud Function, no Bunny account and no
+ * paid plan involved. Storage policies enforce access; no secrets live in the client.
  */
 export class VideoService {
   /**
@@ -149,92 +148,44 @@ export class VideoService {
     onProgress?: (percent: number) => void
   ): Promise<VideoUploadResult> {
     try {
-      // 1. Verify user is authenticated
-      const user = auth.currentUser;
-      if (!user) {
+      // Must be signed in — Storage policies are what actually gate the write.
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session?.user) {
         return { success: false, error: 'User must be authenticated to upload videos' };
       }
 
-      // 2. Validate video
       const validation = await this.validateVideo(videoUri);
       if (!validation.valid) {
         return { success: false, error: validation.error };
       }
 
-      onProgress?.(5);
-
-      // 3. Get fresh ID token
-      const idToken = await getIdToken(user, true);
-
       onProgress?.(10);
 
-      // 4. Read video file as blob
-      const response = await fetch(videoUri);
-      const blob = await response.blob();
+      // Read the file and hand Supabase an ArrayBuffer — same approach as
+      // ImageService.uploadImage, which avoids the RN fetch/blob quirks.
+      const rawBase64 = await FileSystem.readAsStringAsync(videoUri, { encoding: 'base64' });
+      onProgress?.(40);
 
-      onProgress?.(30);
+      const arrayBuffer = decode(rawBase64);
+      const ext = (videoUri.split('.').pop() || 'mp4').split('?')[0].toLowerCase();
+      const contentType =
+        ext === 'mov' ? 'video/quicktime' : ext === 'webm' ? 'video/webm' : 'video/mp4';
+      const fileName = `videos/${productId}_${Date.now()}.${ext === 'mov' || ext === 'webm' ? ext : 'mp4'}`;
 
-      // 5. Determine content type
-      const contentType = blob.type || 'video/mp4';
+      onProgress?.(55);
 
-      // 6. Upload to Cloud Function
-      const uploadUrl = `${FUNCTIONS_BASE_URL}/uploadProductVideo?productId=${encodeURIComponent(productId)}`;
-      
-      console.log(`Uploading video to: ${uploadUrl} (${validation.sizeMB}MB)`);
+      const { error } = await supabase.storage
+        .from('media')
+        .upload(fileName, arrayBuffer, { contentType, upsert: true });
 
-      // Use XMLHttpRequest for progress tracking
-      const result = await new Promise<VideoUploadResult>((resolve) => {
-        const xhr = new XMLHttpRequest();
-        
-        // Track upload progress
-        // Track upload progress - SAFEGUARD FOR ANDROID RELEASE CRASH
-        // The user reported "reactInstance is null" crashes from NetworkingModule events.
-        // We disable detailed progress events on Android Release builds to prevent this.
-        if (Platform.OS === 'ios' || __DEV__) {
-          xhr.upload.onprogress = (event) => {
-            if (event.lengthComputable) {
-              // Progress from 30% to 90% during upload
-              const uploadPercent = Math.round((event.loaded / event.total) * 60) + 30;
-              onProgress?.(Math.min(uploadPercent, 90));
-            }
-          };
-        }
+      if (error) throw error;
 
-        xhr.onload = () => {
-          onProgress?.(95);
-          try {
-            const responseData = JSON.parse(xhr.responseText);
-            if (xhr.status >= 200 && xhr.status < 300 && responseData.success) {
-              onProgress?.(100);
-              resolve({ success: true, videoUrl: responseData.videoUrl });
-            } else {
-              resolve({ 
-                success: false, 
-                error: responseData.message || responseData.error || 'Upload failed' 
-              });
-            }
-          } catch (parseError) {
-            resolve({ success: false, error: 'Invalid response from server' });
-          }
-        };
+      onProgress?.(90);
 
-        xhr.onerror = () => {
-          resolve({ success: false, error: 'Network error during upload' });
-        };
+      const { data: publicUrlData } = supabase.storage.from('media').getPublicUrl(fileName);
+      onProgress?.(100);
 
-        xhr.ontimeout = () => {
-          resolve({ success: false, error: 'Upload timed out. Please try a smaller video.' });
-        };
-
-        xhr.open('POST', uploadUrl);
-        xhr.timeout = 300000; // 5 minutes
-        xhr.setRequestHeader('Authorization', `Bearer ${idToken}`);
-        xhr.setRequestHeader('Content-Type', contentType);
-        xhr.send(blob);
-      });
-
-      return result;
-
+      return { success: true, videoUrl: publicUrlData.publicUrl };
     } catch (error: any) {
       console.error('Video upload error:', error);
       return {

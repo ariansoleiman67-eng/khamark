@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 import { safeCallFunction } from './safeCallFunction';
 import { User } from '../types';
-import { GOOGLE_AUTH } from '../constants/config';
+import { GOOGLE_AUTH, EMAIL_VERIFY_REDIRECT_URL } from '../constants/config';
 
 export class AuthService {
   static async signIn(email: string, password: string): Promise<User> {
@@ -46,8 +46,10 @@ export class AuthService {
         await supabase.from('users').insert({
           id: profile.uid,
           name: profile.name,
-          email: profile.email,
-          phone: profile.phone,
+          // null, not '': users.email and users.phone are UNIQUE, and every
+          // empty string collides with every other empty string.
+          email: profile.email || null,
+          phone: profile.phone || null,
           language: profile.language,
         });
       } else {
@@ -160,9 +162,22 @@ export class AuthService {
         email,
         password,
         options: {
+          // Read by the on_auth_user_created trigger to populate public.users.
+          // The trigger is what actually creates the row when "Confirm email"
+          // is on, because signUp returns no session in that case.
           data: {
             full_name: userData.name,
+            name: userData.name,
+            // Omit rather than send '' — users.phone is UNIQUE, and an empty
+            // string is a real value to that index, so the second phone-less
+            // signup collided with the first.
+            ...(userData.phone ? { phone: userData.phone } : {}),
+            language: userData.language || 'en',
           },
+          // Without this, Supabase falls back to the project's Site URL, which
+          // shipped as http://localhost:3000 — so confirmation links opened on
+          // any device other than the dev machine failed to connect.
+          emailRedirectTo: EMAIL_VERIFY_REDIRECT_URL,
         },
       });
 
@@ -189,14 +204,24 @@ export class AuthService {
         updatedAt: new Date().toISOString() as any,
       };
 
-      await supabase.from('users').upsert({
+      // Best-effort. With "Confirm email" on there is no session here, so RLS
+      // (users_self_insert: id = auth.uid()) rejects this and the row is created
+      // by the on_auth_user_created trigger instead. Log rather than throw — the
+      // account itself was created successfully. This used to fail silently,
+      // which is how accounts ended up with no profile row and rendered as Guest.
+      const { error: profileError } = await supabase.from('users').upsert({
         id: profile.uid,
         name: profile.name,
         full_name: profile.name,
-        email: profile.email,
-        phone: profile.phone,
+        // null, not '' — both columns are UNIQUE and '' is not exempt the way
+        // NULL is, so two phone-less accounts would collide.
+        email: profile.email || null,
+        phone: profile.phone || null,
         language: profile.language,
       });
+      if (profileError) {
+        console.log('users upsert skipped (expected pre-confirmation):', profileError.message);
+      }
 
       await AsyncStorage.setItem('user_data', JSON.stringify(profile));
       return profile;

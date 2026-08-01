@@ -398,9 +398,18 @@ export class CartService {
     valid: boolean;
     errors: string[];
     updatedCart?: Cart;
+    /**
+     * True when a product's price moved on the server since the cart was built.
+     * Kept separate from `errors` because a reprice must not read as a broken
+     * cart — but the caller MUST NOT charge silently on it: the total on screen
+     * was computed from the old prices, so placing the order without telling the
+     * shopper charges them a number they were never shown.
+     */
+    pricesChanged?: boolean;
   }> {
     try {
       const errors: string[] = [];
+      let pricesChanged = false;
       const updatedCart = { ...cart, items: [...cart.items] };
       let hasUpdates = false;
 
@@ -544,6 +553,8 @@ export class CartService {
         const priceChanged = item.product.priceUSD !== correctPrice;
         const metaChanged = item.product.updatedAt !== latestProduct.updatedAt;
         
+        if (priceChanged) pricesChanged = true;
+
         if (priceChanged || metaChanged) {
            if (updatedCart.items[i]) {
               updatedCart.items[i].product = {
@@ -567,6 +578,7 @@ export class CartService {
         valid: errors.length === 0,
         errors,
         updatedCart: hasUpdates ? updatedCart : undefined,
+        pricesChanged,
       };
     } catch (error: any) {
       return {

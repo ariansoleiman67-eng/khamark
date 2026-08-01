@@ -282,21 +282,31 @@ export class TenantAdminService {
       // extra_data is a single jsonb column — merge into the existing value so a
       // partial update (e.g. just coAdminIds) doesn't clobber the other keys.
       if (Object.keys(extra).length) {
-        const { data: existing } = await supabase
+        const { data: existing, error: readErr } = await supabase
           .from('parts')
           .select('extra_data')
           .eq('id', productId)
+          .eq('tenant_id', this.tenantId)
           .single();
+        // If the read failed we CANNOT merge, and writing `{...extra}` alone would wipe
+        // the other keys (ownerAdminId, adminId, options, coAdminIds). Fail loudly instead
+        // of silently dropping the caller's extra payload — a swallowed read error is how
+        // "saved" was reported for a coAdminIds change that never left the device.
+        if (readErr) throw readErr;
         patch.extra_data = { ...(existing?.extra_data || {}), ...extra };
       }
 
-      const { error } = await supabase
+      // .select('id') so a zero-row match (wrong tenant / RLS / deleted row) is visible:
+      // without it PostgREST returns error === null and the admin is told it saved.
+      const { data: updated, error } = await supabase
         .from('parts')
         .update(patch)
         .eq('id', productId)
-        .eq('tenant_id', this.tenantId);
+        .eq('tenant_id', this.tenantId)
+        .select('id');
 
       if (error) throw error;
+      if (!updated || updated.length === 0) throw new Error('Product update matched no rows');
       // Bust the customer-facing product cache so price/stock edits show up now.
       await ProductService.clearCache();
     } catch (error) {
@@ -342,6 +352,9 @@ export class TenantAdminService {
       );
       const failed = results.find(r => r.error);
       if (failed?.error) throw failed.error;
+      // Bust the customer-facing product cache so the new order is visible now, not
+      // up to 10 minutes later when the cache expires.
+      await ProductService.clearCache();
     } catch (error) {
       console.error('Error updating product sort orders:', error);
       throw error;
@@ -545,7 +558,10 @@ export class TenantAdminService {
     // the owner's tenant (so stock deducts correctly against the owner-owned parts
     // and the owner sees it natively), and is tagged so the partner can see it too.
     partner?: { uid: string; name?: string };
-  }): Promise<{ orderId: string; orderNumber: string }> {
+    // Returned stockMoved === false means the sale is committed but at least one line's stock
+    // was NOT deducted (row left at stock_status 'pending'). The caller MUST surface this —
+    // otherwise the counter sale completes and inventory drifts with nothing on screen.
+  }): Promise<{ orderId: string; orderNumber: string; stockMoved: boolean }> {
     const items = (params.items || []).filter((i) => i.quantity > 0);
     if (!items.length) throw new Error('Add at least one product');
     const subtotalUSD = items.reduce((s, i) => s + (i.priceUSD || 0) * (i.quantity || 0), 0);
@@ -641,7 +657,7 @@ export class TenantAdminService {
         console.warn('Order created but stock deduction was incomplete; stock_status left pending for retry:', data.id);
       }
 
-      return { orderId: data.id, orderNumber: data.order_number };
+      return { orderId: data.id, orderNumber: data.order_number, stockMoved };
     } finally {
       inFlightManualOrders.delete(idempotencyKey);
     }
@@ -750,7 +766,7 @@ export class TenantAdminService {
     cancelledBy?: 'admin' | 'user'
   ): Promise<void> {
     try {
-      const { data: order, error: orderError } = await supabase.from('orders').select('*').eq('id', orderId).single();
+      const { data: order, error: orderError } = await supabase.from('orders').select('*').eq('id', orderId).eq('tenant_id', this.tenantId).single();
       if (orderError || !order) throw new Error('Order not found');
       
       const isFulfilledState = ['confirmed', 'processing', 'shipped', 'delivered'].includes(status);
@@ -770,8 +786,13 @@ export class TenantAdminService {
       const requiresRestore = isCancelled && currentStockStatus === 'deducted';
 
       if (requiresDeduction || requiresRestore) {
-        await this.moveStockForItems(order.items || [], requiresDeduction ? 'deduct' : 'restore');
-        updateData.stock_status = requiresDeduction ? 'deducted' : 'rolled_back';
+        // Only record the new stock_status when the move actually succeeded — else
+        // a failed deduction marked 'deducted' would be skipped forever (permanent
+        // inventory drift) since the guards above key off stock_status.
+        const moved = await this.moveStockForItems(order.items || [], requiresDeduction ? 'deduct' : 'restore');
+        if (moved) {
+          updateData.stock_status = requiresDeduction ? 'deducted' : 'rolled_back';
+        }
       }
 
       await supabase.from('orders').update(updateData).eq('id', orderId).eq('tenant_id', this.tenantId);
@@ -1576,14 +1597,20 @@ export class TenantAdminService {
 
   async updateSettings(settingId: string, settingData: any): Promise<void> {
     try {
-      await supabase
+      // The result MUST be checked: this one call backs invoice settings, partner links
+      // and the partner ledger, so an unchecked RLS/constraint failure told the admin
+      // "saved successfully" while nothing was written. onConflict has no space — a
+      // padded column name doesn't match the unique index and the upsert 42P10s.
+      const { error } = await supabase
         .from('tenant_settings')
         .upsert({
           tenant_id: this.tenantId,
           setting_key: settingId,
           setting_value: settingData,
           updated_at: new Date().toISOString(),
-        }, { onConflict: 'tenant_id, setting_key' });
+        }, { onConflict: 'tenant_id,setting_key' });
+
+      if (error) throw error;
     } catch (error) {
       console.error('Error updating settings:', error);
       throw error;

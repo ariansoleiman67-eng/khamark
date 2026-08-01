@@ -1,4 +1,5 @@
 import { getAuth } from '@react-native-firebase/auth';
+import i18n from '../../locales';
 import { User } from '../../types';
 import { formatPhone } from '../../utils/phoneUtils';
 import { phoneToEmail } from '../../utils/hashUtils';
@@ -27,14 +28,19 @@ export const registerWithPhone = async (data: RegistrationData): Promise<User> =
       if (data.password) updates.password = data.password;
       const { error: upErr } = await supabase.auth.updateUser(updates);
       if (upErr && !/different from the old|should be different/i.test(upErr.message)) throw upErr;
-      await supabase.from('users').upsert({
+      // Deliberately NOT writing role/is_admin: the prevent_privilege_escalation
+      // trigger rejects any client-side change to those fields, which aborted this
+      // WHOLE upsert — so the admin's name was never saved and they rendered blank
+      // everywhere. Admin is granted by the create_admin_account RPC the caller runs
+      // right after (SECURITY DEFINER), which is the supported path.
+      const { error: profileErr } = await supabase.from('users').upsert({
         id: session.user.id,
         name: data.name,
         full_name: data.name,
         phone: formattedPhone,
         language: data.language || 'en',
-        ...(data.role === 'admin' ? { role: 'admin', is_admin: true } : {}),
       });
+      if (profileErr) throw profileErr;
       const fresh = await AuthService.getCurrentUserFresh();
       if (fresh) {
         if (data.role === 'admin') { fresh.role = 'admin'; (fresh as any).isAdmin = true; }
@@ -59,7 +65,15 @@ export const registerWithPhone = async (data: RegistrationData): Promise<User> =
     });
 
     if (data.role === 'admin') {
-      await supabase.from('users').update({ role: 'admin', is_admin: true }).eq('id', user.uid);
+      // Deliberately NOT writing role/is_admin here. The prevent_privilege_escalation
+      // trigger (RLS_HARDENING.sql) rejects any client-side change to those fields —
+      // auth.uid() is set on this request — so the update threw and took the whole
+      // registration down with it.
+      //
+      // The caller (SetNewPasswordScreen) invokes the create_admin_account RPC right
+      // after this, which is SECURITY DEFINER and is the supported way to grant admin.
+      // These local flags just keep the returned object consistent for the caller;
+      // AuthContext re-reads the real values from the users row on refreshUser().
       user.role = 'admin';
       user.isAdmin = true;
     }
@@ -144,11 +158,14 @@ export const resetPasswordAfterOTP = async (phone: string, newPassword: string):
 };
 
 export const isPhoneRegistered = async (phone: string): Promise<boolean> => {
+  // SECURITY DEFINER RPC — locked-down RLS blocks a direct pre-auth users read.
+  // A failed lookup must NOT return false: that reads as "not registered" and pushes
+  // the caller into signup/OTP for a phone that already HAS an account. Fail closed.
   try {
-    // SECURITY DEFINER RPC — locked-down RLS blocks a direct pre-auth users read.
-    const { data } = await supabase.rpc('account_id_for_phone', { p_phone: formatPhone(phone) });
+    const { data, error } = await supabase.rpc('account_id_for_phone', { p_phone: formatPhone(phone) });
+    if (error) throw error;
     return !!data;
-  } catch (error: any) {
-    return false;
+  } catch {
+    throw new Error(i18n.t('auth.accountCheckFailed'));
   }
 };

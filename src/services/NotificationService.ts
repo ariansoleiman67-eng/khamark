@@ -4,6 +4,7 @@ import * as TaskManager from 'expo-task-manager';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, uniqueChannel } from './supabase';
+import { getDeviceId } from '../utils/deviceUtils';
 import { Notification as AppNotification } from '../types';
 
 export const BACKGROUND_NOTIFICATION_TASK = 'BACKGROUND-NOTIFICATION-TASK';
@@ -19,6 +20,7 @@ Notifications.setNotificationHandler({
 
 export class NotificationService {
   private static readonly CACHE_KEY = 'cached_notifications';
+  private static readonly DEVICE_PUSH_PREF_KEY = 'device_push_enabled';
   private static readonly CACHE_EXPIRY = 10 * 60 * 1000;
   private static cachedNotifications: AppNotification[] = [];
   private static lastCacheTime = 0;
@@ -238,6 +240,12 @@ export class NotificationService {
           userId: doc.user_id,
           title: doc.title,
           body: doc.body,
+          // Localized copies travel inside the data jsonb (see adminService.sendNotificationToUsers).
+          // Without lifting them out here every customer read the English title/body.
+          titleAr: doc.data?.titleAr ?? undefined,
+          titleKu: doc.data?.titleKu ?? undefined,
+          bodyAr: doc.data?.bodyAr ?? undefined,
+          bodyKu: doc.data?.bodyKu ?? undefined,
           type: doc.type,
           read: doc.read,
           readAt: doc.read_at ? new Date(doc.read_at) : undefined,
@@ -427,6 +435,50 @@ export class NotificationService {
     }
   }
 
+  /**
+   * The push preference the user deliberately set on THIS device.
+   *
+   * Deliberately local-first. Push registration re-upserts the `devices` row on
+   * every launch, so that row is not a trustworthy source of truth — reading it
+   * directly is what made a switch turned OFF come back ON after every restart.
+   * Only a value the user actually toggled counts; the server row is consulted
+   * once, purely to seed the cache on a device that has never toggled it.
+   */
+  static async getDevicePushEnabled(): Promise<boolean> {
+    try {
+      const stored = await AsyncStorage.getItem(this.DEVICE_PUSH_PREF_KEY);
+      if (stored !== null) return stored === 'true';
+
+      const deviceId = await getDeviceId();
+      const { data } = await supabase
+        .from('devices')
+        .select('notifications_enabled')
+        .eq('id', deviceId)
+        .maybeSingle();
+
+      if (!data) return true;
+
+      const enabled = data.notifications_enabled !== false;
+      await AsyncStorage.setItem(this.DEVICE_PUSH_PREF_KEY, String(enabled));
+      return enabled;
+    } catch (error) {
+      return true;
+    }
+  }
+
+  static async setDevicePushEnabled(enabled: boolean): Promise<void> {
+    const deviceId = await getDeviceId();
+    const { error } = await supabase
+      .from('devices')
+      .update({ notifications_enabled: enabled, updated_at: new Date().toISOString() })
+      .eq('id', deviceId);
+    if (error) throw error;
+
+    // Cached only after the server accepted it, so a failed write leaves the
+    // caller free to revert without the cache disagreeing with the DB.
+    await AsyncStorage.setItem(this.DEVICE_PUSH_PREF_KEY, String(enabled));
+  }
+
   static async getNotificationById(notificationId: string): Promise<AppNotification | null> {
     try {
       const cachedNotification = this.cachedNotifications.find(n => n.id === notificationId);
@@ -442,6 +494,11 @@ export class NotificationService {
         userId: data.user_id,
         title: data.title,
         body: data.body,
+        // Same jsonb-carried translations as getUserNotifications above.
+        titleAr: data.data?.titleAr ?? undefined,
+        titleKu: data.data?.titleKu ?? undefined,
+        bodyAr: data.data?.bodyAr ?? undefined,
+        bodyKu: data.data?.bodyKu ?? undefined,
         type: data.type,
         read: data.read,
         readAt: data.read_at ? new Date(data.read_at) : undefined,

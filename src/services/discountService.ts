@@ -13,6 +13,51 @@ interface ProductWithTenant {
   [key: string]: any;
 }
 
+// The winning discount together with the ONLY lines it is allowed to touch.
+// getBestDiscountForCart picks the winner from a single tenant's lines, so callers
+// must apply it back to that same subset — a tenant-wide discount (no productIds)
+// applied to `cart.items` comes off every store's items in a multi-store cart.
+export interface BestDiscountMatch {
+  discount: Discount;
+  tenantId: string;
+  items: CartItem[];
+}
+
+// The admin's Arabic/Kurdish copy has to travel *inside* the applied discount:
+// this object is persisted verbatim into the order's extra_data JSONB, and by the
+// time the order screens render it the Discount row it came from is long gone.
+// These fields are additive (absent on orders placed before this change), so every
+// reader falls back to the English text.
+export interface LocalizedAppliedDiscount extends AppliedDiscount {
+  discountNameAr?: string;
+  discountNameKu?: string;
+  discountDescription?: string;
+  discountDescriptionAr?: string;
+  discountDescriptionKu?: string;
+}
+
+// i18next language codes can carry a region suffix ('ar-IQ'), so match on prefix.
+export function pickLocalizedText(
+  language: string | undefined,
+  base?: string,
+  ar?: string,
+  ku?: string
+): string | undefined {
+  if (language?.startsWith('ar') && ar) return ar;
+  if (language?.startsWith('ku') && ku) return ku;
+  return base;
+}
+
+export function discountDisplayName(applied: AppliedDiscount, language?: string): string {
+  const a = applied as LocalizedAppliedDiscount;
+  return pickLocalizedText(language, a.discountName, a.discountNameAr, a.discountNameKu) || a.discountName;
+}
+
+export function discountDisplayDescription(applied: AppliedDiscount, language?: string): string | undefined {
+  const a = applied as LocalizedAppliedDiscount;
+  return pickLocalizedText(language, a.discountDescription, a.discountDescriptionAr, a.discountDescriptionKu);
+}
+
 class DiscountService {
   private tenantCache: { [tenantId: string]: { discounts: Discount[]; timestamp: number } } = {};
   private readonly CACHE_TTL = 5 * 60 * 1000;
@@ -199,9 +244,32 @@ class DiscountService {
     }
   }
 
+  // Lines a product-scoped discount is allowed to see. Everything downstream — the
+  // min-purchase/min-quantity thresholds, the discounted subtotal and the bundle
+  // count — must be computed off THIS, not the full cart, or a discount scoped to
+  // two products comes off the customer's entire basket (and, in a multi-store
+  // cart, off the other stores' lines too).
+  private scopedItems(items: CartItem[], discount: Discount): CartItem[] {
+    if (!discount.productIds || discount.productIds.length === 0) return items;
+    const allowed = new Set(discount.productIds);
+    return items.filter((item) => {
+      const productId = item.productId || item.product?.id;
+      return !!productId && allowed.has(productId);
+    });
+  }
+
+  // Charged subtotal of an arbitrary line subset, exposed so screens can size a
+  // store-scoped promo off exactly the price rule the discount math uses.
+  subtotalForItems(items: CartItem[], isVip: boolean = false): number {
+    return lineSubtotal(items, isVip);
+  }
+
   calculateDiscountAmountForItems(items: CartItem[], discount: Discount, isVip: boolean = false): number {
-    const subtotal = lineSubtotal(items, isVip);
-    const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
+    const scoped = this.scopedItems(items, discount);
+    if (scoped.length === 0) return 0;
+
+    const subtotal = lineSubtotal(scoped, isVip);
+    const totalItems = scoped.reduce((sum, item) => sum + item.quantity, 0);
 
     if (discount.minPurchase && subtotal < discount.minPurchase) return 0;
     if (discount.minQuantity && totalItems < discount.minQuantity) return 0;
@@ -242,8 +310,9 @@ class DiscountService {
 
   isDiscountApplicableToItems(items: CartItem[], discount: Discount, isVip: boolean = false): { applicable: boolean; reason?: string } {
     const now = Date.now();
-    const subtotal = lineSubtotal(items, isVip);
-    const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
+    const scoped = this.scopedItems(items, discount);
+    const subtotal = lineSubtotal(scoped, isVip);
+    const totalItems = scoped.reduce((sum, item) => sum + item.quantity, 0);
 
     if (!discount.isActive) return { applicable: false, reason: 'Discount is not active' };
 
@@ -255,6 +324,10 @@ class DiscountService {
 
     if (discount.usageLimit && discount.usageCount >= discount.usageLimit) {
       return { applicable: false, reason: 'Discount usage limit reached' };
+    }
+
+    if (scoped.length === 0) {
+      return { applicable: false, reason: 'Discount does not apply to any item in the cart' };
     }
 
     if (discount.minPurchase && subtotal < discount.minPurchase) {
@@ -278,7 +351,7 @@ class DiscountService {
     return this.isDiscountApplicableToItems(cart.items, discount, isVip);
   }
 
-  async getBestDiscountForCart(cart: Cart, isVip: boolean = false): Promise<Discount | null> {
+  async getBestDiscountForCart(cart: Cart, isVip: boolean = false): Promise<BestDiscountMatch | null> {
     try {
       const itemsByTenant = new Map<string, CartItem[]>();
       
@@ -294,50 +367,66 @@ class DiscountService {
 
       if (itemsByTenant.size === 0) return null;
 
-      let bestDiscount: Discount | null = null;
+      let bestMatch: BestDiscountMatch | null = null;
       let bestSavings = 0;
 
       for (const [tenantId, items] of itemsByTenant) {
         const tenantDiscounts = await this.getActiveDiscountsByTenant(tenantId);
-        
+
         for (const discount of tenantDiscounts) {
           const { applicable } = this.isDiscountApplicableToItems(items, discount, isVip);
           if (applicable) {
             const savings = this.calculateDiscountAmountForItems(items, discount, isVip);
             if (savings > bestSavings) {
               bestSavings = savings;
-              bestDiscount = discount;
+              // Carry the lines the winner was measured against, so the caller
+              // applies it back to the same subset instead of the whole cart.
+              bestMatch = { discount, tenantId, items };
             }
           }
         }
       }
 
-      return bestDiscount;
+      return bestMatch;
     } catch (error) {
       console.error('Error getting best discount for cart:', error);
       return null;
     }
   }
 
-  applyDiscountToCart(cart: Cart, discount: Discount, isVip: boolean = false): AppliedDiscount | null {
-    const { applicable, reason } = this.isDiscountApplicable(cart, discount, isVip);
+  applyDiscountToItems(items: CartItem[], discount: Discount, isVip: boolean = false): LocalizedAppliedDiscount | null {
+    const { applicable, reason } = this.isDiscountApplicableToItems(items, discount, isVip);
 
     if (!applicable) {
       console.log('Discount not applicable:', reason);
       return null;
     }
 
-    const savedAmount = this.calculateDiscountAmount(cart, discount, isVip);
-    
+    const savedAmount = this.calculateDiscountAmountForItems(items, discount, isVip);
+
     if (savedAmount <= 0) return null;
 
-    return {
+    const applied: LocalizedAppliedDiscount = {
       discountId: discount.id,
       discountName: discount.name,
       discountType: discount.type,
       discountValue: discount.value,
       savedAmount,
     };
+
+    // Only attach the translations that exist — this object is JSON-serialized into
+    // the order, and empty keys would just bloat every row.
+    if (discount.nameAr) applied.discountNameAr = discount.nameAr;
+    if (discount.nameKu) applied.discountNameKu = discount.nameKu;
+    if (discount.description) applied.discountDescription = discount.description;
+    if (discount.descriptionAr) applied.discountDescriptionAr = discount.descriptionAr;
+    if (discount.descriptionKu) applied.discountDescriptionKu = discount.descriptionKu;
+
+    return applied;
+  }
+
+  applyDiscountToCart(cart: Cart, discount: Discount, isVip: boolean = false): LocalizedAppliedDiscount | null {
+    return this.applyDiscountToItems(cart.items, discount, isVip);
   }
 
   async incrementUsageCount(discountId: string, tenantId?: string): Promise<void> {
@@ -386,12 +475,20 @@ class DiscountService {
         }
       }
 
-      const opportunities: { discount: Discount; missingQuantity?: number; missingAmount?: number }[] = [];
+      // subtotalAtUnlock / itemsAtUnlock: the basket as it would look once the
+      // shopper closes the gap. Carried per-opportunity so the ranking below can
+      // price each deal in the same unit (dollars saved) instead of comparing a
+      // percent against a dollar amount.
+      const opportunities: {
+        discount: Discount;
+        missingQuantity?: number;
+        missingAmount?: number;
+        subtotalAtUnlock: number;
+        itemsAtUnlock: number;
+      }[] = [];
 
       for (const [tenantId, items] of itemsByTenant) {
         const tenantDiscounts = await this.getActiveDiscountsByTenant(tenantId);
-        const subtotal = lineSubtotal(items, isVip);
-        const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
 
         for (const discount of tenantDiscounts) {
           const check = this.isDiscountApplicableToItems(items, discount, isVip);
@@ -399,23 +496,81 @@ class DiscountService {
 
           if (!discount.isActive || (discount.usageLimit && discount.usageCount >= discount.usageLimit)) continue;
 
+          // Measure the gap against the lines the discount can actually see. Sized
+          // off the tenant's full basket, a product-scoped discount tells the
+          // customer they are $5 away when the eligible products are $40 away.
+          const scoped = this.scopedItems(items, discount);
+          if (scoped.length === 0) continue; // none of the eligible products in the cart — nothing to hint at
+          const subtotal = lineSubtotal(scoped, isVip);
+          const totalItems = scoped.reduce((sum, item) => sum + item.quantity, 0);
+
+          const avgUnit = totalItems > 0 ? subtotal / totalItems : 0;
+
           if (discount.minQuantity && totalItems < discount.minQuantity) {
-            opportunities.push({ discount, missingQuantity: discount.minQuantity - totalItems });
+            opportunities.push({
+              discount,
+              missingQuantity: discount.minQuantity - totalItems,
+              subtotalAtUnlock: avgUnit * discount.minQuantity,
+              itemsAtUnlock: discount.minQuantity,
+            });
             continue;
           }
 
           if (discount.minPurchase && subtotal < discount.minPurchase) {
-            opportunities.push({ discount, missingAmount: discount.minPurchase - subtotal });
+            opportunities.push({
+              discount,
+              missingAmount: discount.minPurchase - subtotal,
+              subtotalAtUnlock: discount.minPurchase,
+              itemsAtUnlock: totalItems,
+            });
             continue;
           }
 
           if (discount.type === 'bundle' && discount.bundleQuantity && totalItems < discount.bundleQuantity) {
-            opportunities.push({ discount, missingQuantity: discount.bundleQuantity - totalItems });
+            opportunities.push({
+              discount,
+              missingQuantity: discount.bundleQuantity - totalItems,
+              subtotalAtUnlock: avgUnit * discount.bundleQuantity,
+              itemsAtUnlock: discount.bundleQuantity,
+            });
           }
         }
       }
 
-      return opportunities.sort((a, b) => b.discount.value - a.discount.value);
+      // Rank by the money each deal would actually save, not by `discount.value`.
+      // `value` is a percent for 'percentage', a USD amount for 'fixed', and is
+      // forced to 1 on save for 'bundle' — so sorting on it ranked "$25 off"
+      // behind "20% off" and buried every bundle last. The cart shows only
+      // opportunities[0], so the wrong winner is the only one the shopper sees.
+      const estimatedSaving = (o: { discount: Discount; subtotalAtUnlock: number; itemsAtUnlock: number }): number => {
+        const { discount, subtotalAtUnlock, itemsAtUnlock } = o;
+        let saving = 0;
+        switch (discount.type) {
+          case 'percentage':
+            saving = (subtotalAtUnlock * discount.value) / 100;
+            break;
+          case 'fixed':
+            saving = Math.min(discount.value, subtotalAtUnlock);
+            break;
+          case 'bundle':
+            if (discount.bundleQuantity && discount.bundlePrice && itemsAtUnlock > 0) {
+              const avgUnit = subtotalAtUnlock / itemsAtUnlock;
+              saving = Math.max(0, avgUnit * discount.bundleQuantity - discount.bundlePrice);
+            }
+            break;
+        }
+        if (discount.maxDiscount && saving > discount.maxDiscount) saving = discount.maxDiscount;
+        return saving;
+      };
+
+      return opportunities.sort((a, b) => {
+        const diff = estimatedSaving(b) - estimatedSaving(a);
+        if (diff !== 0) return diff;
+        // Equal reward: prefer the one the shopper is closest to unlocking.
+        const gap = (o: { missingAmount?: number; missingQuantity?: number }) =>
+          o.missingAmount ?? o.missingQuantity ?? Number.POSITIVE_INFINITY;
+        return gap(a) - gap(b);
+      });
     } catch (error) {
       console.error('Error finding potential discounts:', error);
       return [];

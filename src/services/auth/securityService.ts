@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { EMAIL_VERIFY_REDIRECT_URL } from '../../constants/config';
 /**
  * Security Service (Supabase Auth)
  *
@@ -326,7 +327,13 @@ export async function sendEmailVerification(): Promise<void> {
   const userEmail = cachedUser?.email as string | undefined;
   if (!userEmail || isInternalEmail(userEmail)) throw new Error('No email on account');
 
-  const { error } = await supabase.auth.resend({ type: 'signup', email: userEmail });
+  // Same redirect as the original signup email — without it this resend inherits
+  // the project's Site URL, which pointed at localhost.
+  const { error } = await supabase.auth.resend({
+    type: 'signup',
+    email: userEmail,
+    options: { emailRedirectTo: EMAIL_VERIFY_REDIRECT_URL },
+  });
   if (error) throw error;
 }
 
