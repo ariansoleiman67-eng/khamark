@@ -67,6 +67,12 @@ describe('isDuplicateSubmission', () => {
     const fresh = { ...base, answers: { body: 'like_new', screen: 'original' } };
     expect(isDuplicateSubmission([stored], fresh, 1_010_000)).toBe(true);
   });
+
+  it('does not confuse two different answer sets that share a delimiter pattern', () => {
+    const stored = { ...base, answers: { a: 'X|b=Y', b: 'Z' } };
+    const fresh = { ...base, answers: { a: 'X', b: 'Y|b=Z' } };
+    expect(isDuplicateSubmission([stored], fresh, 1_010_000)).toBe(false);
+  });
 });
 
 describe('buildListingDraft', () => {

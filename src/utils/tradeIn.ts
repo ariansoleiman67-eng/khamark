@@ -28,17 +28,18 @@ const DUPLICATE_WINDOW_MS = 60_000;
 /**
  * Order-independent fingerprint of an answer set.
  *
- * JSON.stringify preserves key insertion order, so the same answers can produce
- * two different strings — `{a,b}` vs `{b,a}`. The "existing" side of a comparison
- * comes back from a jsonb column, which gives no ordering guarantee, while the
- * candidate is built fresh in question order. Comparing the raw JSON would let a
- * real duplicate through whenever those orders happened to differ.
+ * Two problems to avoid. JSON.stringify alone preserves key insertion order, so
+ * the same answers can produce different strings — the stored side comes back
+ * from a jsonb column with no ordering guarantee while the candidate is built
+ * fresh in question order. But a hand-rolled `k=v|k=v` join has the opposite
+ * flaw: nothing escapes the delimiters, so a value containing `|` or `=` can
+ * forge a different set's fingerprint and make two distinct requests collide.
+ *
+ * Sorting the entries and letting JSON.stringify do the quoting gives both
+ * properties, and does not depend on any caller sanitising its input first.
  */
 const answersFingerprint = (answers: Record<string, string>): string =>
-  Object.keys(answers)
-    .sort()
-    .map((k) => `${k}=${answers[k]}`)
-    .join('|');
+  JSON.stringify(Object.keys(answers).sort().map((k) => [k, answers[k]]));
 
 /**
  * Guards against a double tap or a retried submit creating two identical requests.
