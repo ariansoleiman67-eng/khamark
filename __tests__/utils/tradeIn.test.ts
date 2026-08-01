@@ -51,6 +51,22 @@ describe('isDuplicateSubmission', () => {
   it('is false when there is nothing to compare against', () => {
     expect(isDuplicateSubmission([], base, 1_010_000)).toBe(false);
   });
+
+  // Pinned to the exact boundary. A test at 30s/61s passes for any window between
+  // those two, so the constant could drift to 45s without a single test failing.
+  it('flags a request 1ms inside the window', () => {
+    expect(isDuplicateSubmission([base], base, 1_059_999)).toBe(true);
+  });
+
+  it('allows a request exactly on the window boundary', () => {
+    expect(isDuplicateSubmission([base], base, 1_060_000)).toBe(false);
+  });
+
+  it('matches answers regardless of key order', () => {
+    const stored = { ...base, answers: { screen: 'original', body: 'like_new' } };
+    const fresh = { ...base, answers: { body: 'like_new', screen: 'original' } };
+    expect(isDuplicateSubmission([stored], fresh, 1_010_000)).toBe(true);
+  });
 });
 
 describe('buildListingDraft', () => {

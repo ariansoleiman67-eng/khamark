@@ -26,6 +26,21 @@ export const validateAnswers = (
 const DUPLICATE_WINDOW_MS = 60_000;
 
 /**
+ * Order-independent fingerprint of an answer set.
+ *
+ * JSON.stringify preserves key insertion order, so the same answers can produce
+ * two different strings — `{a,b}` vs `{b,a}`. The "existing" side of a comparison
+ * comes back from a jsonb column, which gives no ordering guarantee, while the
+ * candidate is built fresh in question order. Comparing the raw JSON would let a
+ * real duplicate through whenever those orders happened to differ.
+ */
+const answersFingerprint = (answers: Record<string, string>): string =>
+  Object.keys(answers)
+    .sort()
+    .map((k) => `${k}=${answers[k]}`)
+    .join('|');
+
+/**
  * Guards against a double tap or a retried submit creating two identical requests.
  * Matches on model plus the full answer set — a customer legitimately trading two
  * different phones, or the same model in different condition, is not a duplicate.
@@ -34,13 +49,15 @@ export const isDuplicateSubmission = (
   existing: DuplicateCandidate[],
   candidate: DuplicateCandidate,
   nowMs: number
-): boolean =>
-  existing.some(
+): boolean => {
+  const candidateFingerprint = answersFingerprint(candidate.answers);
+  return existing.some(
     (e) =>
       nowMs - e.createdAtMs < DUPLICATE_WINDOW_MS &&
       e.deviceModel === candidate.deviceModel &&
-      JSON.stringify(e.answers) === JSON.stringify(candidate.answers)
+      answersFingerprint(e.answers) === candidateFingerprint
   );
+};
 
 /**
  * Pre-fills the product form from a request the shop has bought, so the admin does
