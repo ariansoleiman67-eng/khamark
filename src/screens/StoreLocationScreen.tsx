@@ -139,11 +139,12 @@ const fetchActiveLocations = async (tenantId?: string): Promise<StoreLocation[]>
   let query = supabase.from('store_locations').select('*').eq('is_active', true);
 
   if (tenantId) {
-    // A store owner's tenantId IS their own user id, but a co-admin creating a
-    // branch stamps their own id, so both have to be in the filter.
-    const { data: admins } = await supabase.from('users').select('id').eq('tenant_id', tenantId);
-    const adminIds = Array.from(new Set([tenantId, ...(admins || []).map((a: any) => a.id)]));
-    query = query.in('created_by_admin_id', adminIds);
+    // A store owner's tenantId IS their own user id — across this schema tenant_id
+    // points at users(id) and the owner is the tenant. There is no users.tenant_id
+    // column, so an earlier version of this filter queried one that does not exist:
+    // the request errored, the admin list came back empty, and the filter quietly
+    // degraded to the owner alone anyway.
+    query = query.eq('created_by_admin_id', tenantId);
   }
 
   const { data, error } = await query;
