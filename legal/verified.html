@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Email verified — Asankary</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    margin: 0; min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    background: #FDF6EC; color: #241A08;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: 24px; text-align: center;
+  }
+  .card { max-width: 420px; }
+  .tick {
+    width: 72px; height: 72px; margin: 0 auto 24px;
+    border-radius: 50%; background: #F5A00A;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 38px; color: #fff;
+  }
+  h1 { font-size: 26px; margin: 0 0 12px; }
+  p { font-size: 16px; line-height: 1.55; opacity: .8; margin: 0 0 28px; }
+  a.btn {
+    display: inline-block; background: #F5A00A; color: #fff;
+    text-decoration: none; font-weight: 700; font-size: 17px;
+    padding: 15px 34px; border-radius: 14px;
+  }
+  .hint { font-size: 14px; opacity: .6; margin-top: 20px; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #1A1A1A; color: #FFF8ED; }
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="tick">&check;</div>
+    <h1>Email verified</h1>
+    <p>Your Asankary account is ready. Open the app and sign in to start shopping.</p>
+    <!-- Deep link into the app. Harmless on a device without Asankary installed:
+         the page still confirms verification succeeded. -->
+    <a class="btn" href="asankary://">Open Asankary</a>
+    <p class="hint">If the button does nothing, just open the Asankary app from your home screen.</p>
+  </div>
+</body>
+</html>
