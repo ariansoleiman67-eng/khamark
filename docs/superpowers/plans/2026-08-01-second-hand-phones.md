@@ -95,15 +95,20 @@ create policy trade_in_update_own on public.trade_in_requests
   with check (auth.uid() = user_id and status in ('accepted','declined','cancelled'));
 
 -- Admin: full access to their own shop's rows only.
+--
+-- `public.users` has NO tenant_id column. Across this schema tenant_id points at
+-- users(id) and the owner admin IS the tenant — see the header comment in
+-- 20260101000000_initial_schema.sql, and TenantContext, which derives tenantId
+-- straight from the signed-in admin's uid. Comparing tenant_id to auth.uid() is
+-- therefore the whole check.
+--
+-- Co-admins are deliberately not covered: this schema has no tenant-level admin
+-- link table. Sharing is per-product via extra_data.coAdminIds, which cannot
+-- authorise a trade-in request. Only the shop owner reviews trade-ins.
 create policy trade_in_admin_all on public.trade_in_requests
-  for all using (
-    exists (
-      select 1 from public.users u
-       where u.id = auth.uid()
-         and u.is_admin = true
-         and (u.tenant_id = trade_in_requests.tenant_id or u.id = trade_in_requests.tenant_id)
-    )
-  );
+  for all
+  using (trade_in_requests.tenant_id = auth.uid())
+  with check (trade_in_requests.tenant_id = auth.uid());
 
 create trigger trg_trade_in_updated
   before update on public.trade_in_requests
