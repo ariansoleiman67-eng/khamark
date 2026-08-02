@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { FlashList } from '@shopify/flash-list';
 import {
   View,
@@ -116,6 +116,13 @@ const AdminProductsScreen: React.FC = () => {
   const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlashList<Product>>(null);
+  // Task 9 trade-in hand-off: AdminTradeInDetailScreen navigates here with a
+  // `prefill` param. Neither hook was used in this file before — AdminProducts is
+  // rendered as a tab (AdminTabNavigator's WrappedProductsScreen renders
+  // <AdminProductsScreen /> with no props), so route/navigation must come from
+  // these hooks, not from component props.
+  const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   // Always-current tenant id, so an in-flight loadProducts() can detect a tenant switch
   // that happened while it was awaiting and drop its now-stale result.
   const tenantIdRef = useRef(tenantId);
@@ -400,6 +407,46 @@ const AdminProductsScreen: React.FC = () => {
     setVideoUploadProgress(0);
   };
 
+  // Trade-in hand-off (Task 9): AdminTradeInDetailScreen navigates here with
+  // { prefill } — a draft built by buildListingDraft() (src/utils/tradeIn.ts) once
+  // an accepted trade-in is turned into a listing. Opens the Add Product modal
+  // pre-filled with what the trade-in already captured, via the SAME resetForm()
+  // a manual "Add Product" tap runs first, so nothing left over from an unrelated
+  // in-progress form leaks into this one.
+  //
+  // The param is cleared with setParams right after being applied. AdminProducts
+  // is a persistent tab (not popped on navigation away), so without this, simply
+  // refocusing the tab later — e.g. the admin taps away and back — would re-run
+  // this effect and silently overwrite whatever they had since typed.
+  useEffect(() => {
+    const prefill = route.params?.prefill;
+    if (!prefill) return;
+    resetForm();
+    setFormData(prev => ({
+      ...prev,
+      name: prefill.name || '',
+      brand: prefill.brand || '',
+      stockQty: prefill.stockQty != null ? String(prefill.stockQty) : prev.stockQty,
+      // 'used' by construction (buildListingDraft), but read defensively rather
+      // than hard-coded in case that default ever changes.
+      condition: prefill.condition || 'used',
+    }));
+    setImageUrls(Array.isArray(prefill.imageUrls) ? prefill.imageUrls : []);
+    // No dedicated "storage" field on the product form — carried instead as a
+    // structured spec entry, the same mechanism STORAGE_PRESETS/SPEC_PRESETS
+    // already use for this exact value, so it stays visible and editable rather
+    // than silently dropped.
+    if (prefill.storage) {
+      setSpecEntries([{ key: 'Storage', value: prefill.storage }]);
+    }
+    setModalVisible(true);
+    navigation.setParams({ prefill: undefined });
+    // Intentionally keyed only on the prefill param itself — resetForm/navigation
+    // are stable enough for this purpose and including them would re-run this on
+    // every unrelated re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route.params?.prefill]);
+
   const addColor = (colorKey: ProductColor) => {
     if (!colorOptions.includes(colorKey) && colorOptions.length < MAX_OPTIONS) {
       setColorOptions([...colorOptions, colorKey]);
@@ -595,6 +642,12 @@ const AdminProductsScreen: React.FC = () => {
       descriptionAr: (product as any).descriptionAr || '',
       descriptionKu: (product as any).descriptionKu || '',
       brand: product.brand || '',
+      // Preserve an existing product's condition across edits. mapProduct always
+      // returns a truthy string here (defaults unset rows to 'new' on read), so
+      // without this an admin editing a 'used' trade-in listing — including one
+      // created via the hand-off below — would silently flip it back to 'new' on
+      // save, since handleSave now sends formData.condition unconditionally.
+      condition: (product as any).condition || 'new',
       status: product.status || 'available',
       warranty: (product as any).warranty || '',
       sku: (product as any).sku || '',
@@ -769,6 +822,13 @@ const AdminProductsScreen: React.FC = () => {
         descriptionAr: formData.descriptionAr?.trim() || null,
         descriptionKu: formData.descriptionKu?.trim() || null,
         brand: formData.brand || '',
+        // Column is real and already read by mapProduct (defaults to 'new' when
+        // absent) — condition was simply never written by this form before.
+        // formData.condition is only ever populated by the trade-in prefill
+        // effect above or by openEditModal seeding it back from an existing
+        // product, so every other create/edit path keeps sending 'new' here,
+        // matching the value mapProduct already assumed for them.
+        condition: formData.condition || 'new',
         imageUrls: imageUrls,
         priceTiers: priceTiers.length > 0
           ? [...priceTiers].sort((a, b) => a.minQty - b.minQty).map(tier => ({
