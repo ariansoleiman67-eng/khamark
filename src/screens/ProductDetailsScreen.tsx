@@ -2635,9 +2635,6 @@ export const ProductDetailsScreen: React.FC = () => {
                   {t('product.specifications')}
                 </Text>
 
-                {/* No Condition card: nothing in the admin form or the `parts` table
-                    sets a condition, so it always read "Available" — owner removed it.
-                    Warranty moves up to keep this a full 2-up row. */}
                 <View style={[styles.infoCardsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                   <View style={[styles.infoCard, { backgroundColor: isDark ? theme.colors.surface : '#F0F0F2' }]}>
                     <Text allowFontScaling={false} style={[styles.infoCardTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{t('product.authentic', { defaultValue: 'Authentic' })}</Text>
@@ -2649,12 +2646,13 @@ export const ProductDetailsScreen: React.FC = () => {
                   </View>
                 </View>
                 <View style={[styles.infoCardsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                  {/* infoCard is flex:1, so the lone card in this row stretched to full
-                      width once Condition was removed and no longer matched the 2-up
-                      row above it. Pinned to half width instead. */}
-                  <View style={[styles.infoCard, styles.infoCardHalf, { backgroundColor: isDark ? theme.colors.surface : '#F0F0F2' }]}>
+                  <View style={[styles.infoCard, { backgroundColor: isDark ? theme.colors.surface : '#F0F0F2' }]}>
                     <Text allowFontScaling={false} style={[styles.infoCardTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{t('product.availability', { defaultValue: 'Availability' })}</Text>
                     <Text allowFontScaling={false} style={[styles.infoCardValue, { color: inStock ? theme.colors.success : theme.colors.error, textAlign: isRTL ? 'right' : 'left' }]}>{inStock ? t('product.available') : t('product.unavailable')}</Text>
+                  </View>
+                  <View style={[styles.infoCard, { backgroundColor: isDark ? theme.colors.surface : '#F0F0F2' }]}>
+                    <Text allowFontScaling={false} style={[styles.infoCardTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{t('product.condition')}</Text>
+                    <Text allowFontScaling={false} style={[styles.infoCardValue, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>{t(`product.condition${(product.condition || 'new').charAt(0).toUpperCase()}${(product.condition || 'new').slice(1)}`)}</Text>
                   </View>
                 </View>
 

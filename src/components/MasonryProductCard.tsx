@@ -385,6 +385,21 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
             />
           </View>
         )}
+
+        {/* Condition cue. Bottom-left of the image — the opposite edge from the
+            top-left status slot above (coming soon / on the way / low stock) and
+            the top-right favorite button — so it never shares a corner with
+            either. Refurbished intentionally gets no card badge: it reads as an
+            inspected/restored unit rather than a buyer-beware cue the way "used"
+            does, it is already disclosed on the product page's condition row, and
+            a third image badge would crowd the two corner slots this card has. */}
+        {product.condition === "used" && (
+          <View style={[styles.conditionBadge, { backgroundColor: theme.colors.textSecondary }]}>
+            <AppText fontSize={10} style={styles.conditionBadgeText} numberOfLines={1}>
+              {t("product.conditionUsed")}
+            </AppText>
+          </View>
+        )}
       </View>
 
       {/* Text + CTA */}
@@ -640,6 +655,29 @@ const styles = StyleSheet.create({
   lowStockLabel: {
     flexShrink: 1,
     minWidth: 0,
+  },
+  // Bottom-left of the image, mirroring statusBadge's top-left slot but pinned to
+  // the opposite edge so a used cue never stacks with coming-soon / on-the-way /
+  // low-stock badges, which all occupy top-left.
+  conditionBadge: {
+    alignItems: "center",
+    borderRadius: 8,
+    bottom: 8,
+    justifyContent: "center",
+    left: 8,
+    maxWidth: "70%",
+    minHeight: 22,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    position: "absolute",
+    zIndex: 1,
+  },
+  conditionBadgeText: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+    includeFontPadding: false,
+    paddingTop: Platform.OS === "android" ? 1 : 0,
+    textAlign: "center",
   },
   textContainer: {
     flex: 1,
