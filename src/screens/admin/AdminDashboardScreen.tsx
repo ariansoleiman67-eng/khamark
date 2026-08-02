@@ -614,14 +614,14 @@ const AdminDashboardScreen: React.FC = () => {
                 adjustsFontSizeToFit
                 numberOfLines={1}
               >
-                {t('tradeIn.myRequests')}
+                {t('admin.tradeIn.title')}
               </Text>
               <Text allowFontScaling={false}
                 style={[styles.menuSubtitle, { color: theme.colors.textSecondary }]}
                 adjustsFontSizeToFit
                 numberOfLines={1}
               >
-                {t('admin.dashboard.tradeInsSubtitle', { defaultValue: 'Review incoming sell & trade requests' })}
+                {t('admin.dashboard.tradeInsSubtitle')}
               </Text>
             </View>
             <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={20} color={theme.colors.textSecondary} />

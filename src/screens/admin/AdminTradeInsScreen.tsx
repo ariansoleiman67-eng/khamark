@@ -263,7 +263,7 @@ const AdminTradeInsScreen: React.FC = () => {
             textAlign: 'center',
           }}
         >
-          {t('admin.tradeIn.empty', { defaultValue: 'No trade-in requests yet' })}
+          {t('admin.tradeIn.empty')}
         </Text>
       </View>
     );
@@ -299,7 +299,7 @@ const AdminTradeInsScreen: React.FC = () => {
             marginLeft: isRTL ? 0 : SPACING.md,
             marginRight: isRTL ? SPACING.md : 0,
           }}>
-            {t('admin.tradeIn.title', { defaultValue: 'Trade-In Requests' })}
+            {t('admin.tradeIn.title')}
           </Text>
         </View>
 

@@ -2676,6 +2676,7 @@
       "registered": "{{count}} registered",
       "sendNotification": "Send Notification",
       "notifyAll": "Notify all users",
+      "tradeInsSubtitle": "Review incoming sell & trade requests",
       "revenueOverview": "Revenue Overview",
       "today": "Today",
       "thisWeek": "This Week",
@@ -3212,6 +3213,10 @@
       "createFailed": "Failed to create sale",
       "stockNotDeductedTitle": "Stock not updated",
       "stockNotDeductedMsg": "The sale was saved, but stock could not be deducted for one or more items. Please adjust the stock manually."
+    },
+    "tradeIn": {
+      "title": "Trade-In Requests",
+      "empty": "No trade-in requests yet"
     },
     "active": "Active",
     "brands": {
