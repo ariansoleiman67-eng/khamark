@@ -281,6 +281,7 @@
     "photoFailed": "That photo didn't upload. Please try again.",
     "duplicate": "You just sent this. Check My trade-ins.",
     "alreadyQuoted": "Another admin has already quoted this request.",
+    "offerNoLongerAvailable": "This offer is no longer available. Pull down to refresh.",
     "newPriceLabel": "You sell this new for",
     "notStocked": "Not stocked new",
     "sendQuote": "Send quote",
