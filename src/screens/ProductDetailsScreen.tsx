@@ -3698,13 +3698,6 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     minHeight: 92,
   },
-  // Keeps a single card in a row the same width as a card in the 2-up row above,
-  // instead of flex:1 stretching it edge to edge. Halves the 12pt row gap.
-  infoCardHalf: {
-    flex: 0,
-    width: '50%',
-    maxWidth: '50%',
-  },
   infoCardTitle: {
     fontSize: 15,
     fontWeight: '700',

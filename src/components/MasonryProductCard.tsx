@@ -57,6 +57,12 @@ const CARD_HEIGHT = IMAGE_SIZE + TEXT_CONTAINER_HEIGHT;
 const MAX_SWATCHES = 4;
 const VIP_PURPLE = "#7C3AED";
 const SALE_RED = "#E53935";
+// Neutral slate, fixed like VIP_PURPLE and SALE_RED above and for the same reason:
+// this badge carries white text, so it cannot follow a theme colour. Against
+// theme.colors.textSecondary it measured 3.44:1 on the default preset and 1.48:1 on
+// Royal Purple — below AA, and near-illegible on the latter. #4B5563 gives 7.56:1
+// against white (computed, not assumed) and reads as informational rather than a warning.
+const USED_SLATE = "#4B5563";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -394,7 +400,7 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
             does, it is already disclosed on the product page's condition row, and
             a third image badge would crowd the two corner slots this card has. */}
         {product.condition === "used" && (
-          <View style={[styles.conditionBadge, { backgroundColor: theme.colors.textSecondary }]}>
+          <View style={[styles.conditionBadge, { backgroundColor: USED_SLATE }]}>
             <AppText fontSize={10} style={styles.conditionBadgeText} numberOfLines={1}>
               {t("product.conditionUsed")}
             </AppText>
