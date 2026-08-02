@@ -6,8 +6,12 @@
 // Full status flow this screen participates in:
 //   submitted -> [admin sends a quote here] -> quoted
 //     -> [CUSTOMER accepts/declines in MyTradeInsScreen, Task 7] -> accepted/declined
-//   accepted -> [admin marks completed once the phone + payment have changed
-//                hands, and/or creates the product listing] -> completed
+//   accepted -> [admin marks completed once the phone + payment have changed hands] -> completed
+// Creating the product listing is a SEPARATE action from marking completed, not a step
+// in that transition — it is offered in both 'accepted' and 'completed' (see the two
+// independent status checks below, not a single shared one) because "pay the customer,
+// then list the phone" is the ordinary order and the button must not disappear the
+// moment the deal is marked done.
 // The admin never accepts/declines on the customer's behalf — that action, and
 // its locale strings (tradeIn.accept / tradeIn.decline), belong only to the
 // customer screen.
@@ -552,23 +556,38 @@ const AdminTradeInDetailScreen: React.FC = () => {
                 </View>
               ) : null}
 
-              {/* Accepted-only actions */}
+              {/* Mark completed — only while still 'accepted'. There is nothing left to
+                  mark once the request is already 'completed', so this one stays on the
+                  single condition. Kept as its own block (not shared with Create listing
+                  below) precisely so widening one never silently widens the other. */}
               {request.status === 'accepted' ? (
-                <View style={{ gap: SPACING.sm }}>
-                  <Button
-                    title={t('tradeIn.markCompleted')}
-                    onPress={handleMarkCompleted}
-                    loading={markingCompleted}
-                    variant="outline"
-                    fullWidth
-                  />
-                  <Button
-                    title={t('tradeIn.createListing')}
-                    onPress={handleCreateListing}
-                    variant="primary"
-                    fullWidth
-                  />
-                </View>
+                <Button
+                  title={t('tradeIn.markCompleted')}
+                  onPress={handleMarkCompleted}
+                  loading={markingCompleted}
+                  variant="outline"
+                  fullWidth
+                  style={{ marginBottom: SPACING.sm }}
+                />
+              ) : null}
+
+              {/* Create listing — deliberately survives past 'accepted' into 'completed',
+                  unlike Mark completed above. Marking a trade-in completed (phone and
+                  payment have changed hands) and turning it into a product listing are
+                  independent admin actions with no fixed order, and "I paid for it, now
+                  let me list it" is the ordinary real-world sequence. The two used to
+                  share one `status === 'accepted'` condition in a single wrapper, which
+                  meant tapping Mark completed first made this button vanish before the
+                  admin ever got to use it — losing the whole point of buildListingDraft
+                  (not retyping model/storage/photos the trade-in already captured). Do
+                  NOT fold this back into one shared condition with Mark completed. */}
+              {request.status === 'accepted' || request.status === 'completed' ? (
+                <Button
+                  title={t('tradeIn.createListing')}
+                  onPress={handleCreateListing}
+                  variant="primary"
+                  fullWidth
+                />
               ) : null}
             </ScrollView>
           </KeyboardAvoidingView>
