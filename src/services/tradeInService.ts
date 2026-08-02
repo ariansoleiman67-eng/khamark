@@ -52,23 +52,34 @@ export interface CreateTradeInInput {
 // one is set, otherwise look up the only active tenant. Returning null when the
 // answer is ambiguous is deliberate — guessing which shop receives a phone someone
 // wants to sell is worse than telling them we cannot take the request right now.
-let cachedShopTenantId: string | null = null;
-
+//
+// Selects owner_id, not id: tenants.id is an independently generated uuid
+// (`default gen_random_uuid()`) with nothing in the schema — no FK, trigger, or
+// generated column — tying it to the owning admin. Every tenant_id column in this
+// schema, trade_in_requests included, is a foreign key to users(id), and RLS
+// compares it to auth.uid() (the admin's USER id, i.e. tenants.owner_id). Selecting
+// `id` here would silently write a tenant_id no admin's RLS policy ever matches —
+// the request would insert fine and then never appear in any inbox.
+// storeProfileService.getMyTenantId() has to look up a tenant row BY owner_id for
+// exactly this reason: the two columns are not interchangeable.
+//
+// No caching: the query is one indexed row read, run once per screen open. A
+// cached value would keep routing submissions to a tenant after it's deactivated
+// or after a second one goes active, with nothing to ever invalidate it.
 export const resolveShopTenantId = async (): Promise<string | null> => {
   if (APP_CONFIG.DEFAULT_TENANT_ID) return APP_CONFIG.DEFAULT_TENANT_ID;
-  if (cachedShopTenantId) return cachedShopTenantId;
 
   const { data, error } = await supabase
     .from('tenants')
-    .select('id')
+    .select('owner_id')
     .eq('is_active', true)
+    .not('owner_id', 'is', null)
     .limit(2);
   if (error) return null;
   // Exactly one, or we cannot tell which shop the customer means.
   if ((data || []).length !== 1) return null;
 
-  cachedShopTenantId = data![0].id;
-  return cachedShopTenantId;
+  return data![0].owner_id;
 };
 
 export const tradeInService = {

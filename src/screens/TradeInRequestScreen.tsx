@@ -57,17 +57,26 @@ const TradeInRequestScreen: React.FC = () => {
 
   // See header note: ctxTenantId is only ever non-null for a logged-in admin. For
   // everyone else, resolve it at runtime instead of depending on an env var nobody
-  // is guaranteed to have set.
+  // is guaranteed to have set. `tenantResolved` is tracked separately from
+  // `tenantId` so the UI can tell "still working it out" (say nothing) apart from
+  // "resolved and it's genuinely null" (say why) — without it, the error message
+  // would flash on every screen open for every customer during the async gap.
   const [tenantId, setTenantId] = useState<string | null>(ctxTenantId);
+  const [tenantResolved, setTenantResolved] = useState(!!ctxTenantId);
 
   useEffect(() => {
     if (ctxTenantId) {
       setTenantId(ctxTenantId);
+      setTenantResolved(true);
       return;
     }
     let cancelled = false;
+    setTenantResolved(false);
     resolveShopTenantId().then((id) => {
-      if (!cancelled) setTenantId(id);
+      if (!cancelled) {
+        setTenantId(id);
+        setTenantResolved(true);
+      }
     });
     return () => {
       cancelled = true;
@@ -439,7 +448,7 @@ const TradeInRequestScreen: React.FC = () => {
 
           {/* Submit */}
           <View style={{ padding: SPACING.md }}>
-            {!tenantId && (
+            {tenantResolved && !tenantId && (
               <Text allowFontScaling={false} style={{
                 fontSize: 12,
                 color: theme.colors.error,
