@@ -1080,10 +1080,17 @@ When `status === 'quoted'`, the row expands to show the offer and two buttons:
 ```tsx
 const respond = async (id: string, status: 'accepted' | 'declined') => {
   try {
-    await tradeInService.setStatus(id, status);
+    // setStatus returns false when the update matched no row — RLS filters on the
+    // OLD status, so an offer the shop has already withdrawn or completed silently
+    // changes nothing. Without this branch the customer is shown a successful
+    // "Accepted" for something that did not happen.
+    const applied = await tradeInService.setStatus(id, status);
+    if (!applied) {
+      Alert.alert(t('common.error'), t('tradeIn.offerNoLongerAvailable'));
+    }
     await load();
   } catch (e: any) {
-    Alert.alert(t('common.error'), e?.message || t('errors.somethingWentWrong'));
+    Alert.alert(t('common.error'), e?.message || t('errors.unknown'));
   }
 };
 ```
