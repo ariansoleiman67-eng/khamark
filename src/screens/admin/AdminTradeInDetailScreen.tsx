@@ -255,7 +255,16 @@ const AdminTradeInDetailScreen: React.FC = () => {
       storage: request.storage,
       photos: request.photos,
     });
-    navigation.navigate('AdminProducts', { prefill: draft });
+    // NOT navigation.navigate('AdminProducts', { prefill: draft }) — AdminProducts is a
+    // Tab.Screen nested inside AdminTabNavigator (rendered as this stack's "Main" screen),
+    // not a screen of this Stack.Navigator. A bare cross-navigator name only bubbles UP
+    // to parent navigators (@react-navigation/core's useOnAction), never down into a child
+    // navigator unless the action carries an explicit target — so that call is silently
+    // unhandled. AdminStockReportScreen.tsx and ReportsGenerator.tsx hit this exact
+    // situation reaching the "AdminOrders" tab and use this same nested { screen, params }
+    // form, which AdminTabNavigator's Tab.Navigator picks up via its own route's params
+    // (useNavigationBuilder.js watches route.params.screen/params for the nested navigator).
+    navigation.navigate('Main', { screen: 'AdminProducts', params: { prefill: draft } });
   };
 
   const handleCall = () => {
