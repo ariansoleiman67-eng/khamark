@@ -21,6 +21,7 @@ import AdminSendNotificationScreen from '../screens/admin/AdminSendNotificationS
 import AdminBusinessInfoScreen from '../screens/admin/AdminBusinessInfoScreen';
 import AdminCurrencySettingsScreen from '../screens/admin/AdminCurrencySettingsScreen';
 import AdminOperatingHoursScreen from '../screens/admin/AdminOperatingHoursScreen';
+import AdminTradeInsScreen from '../screens/admin/AdminTradeInsScreen';
 import AdminStockReportScreen from '../screens/admin/AdminStockReportScreen';
 import AdminAnalyticsScreen from '../screens/admin/AdminAnalyticsScreen';
 import AdminChangePasswordScreen from '../screens/admin/AdminChangePasswordScreen';
@@ -66,6 +67,9 @@ const AdminNavigator: React.FC<Props> = ({ navigationTheme, linking }) => (
       <Stack.Screen name="AdminBusinessInfo" component={AdminBusinessInfoScreen} />
       <Stack.Screen name="AdminCurrencySettings" component={AdminCurrencySettingsScreen} />
       <Stack.Screen name="AdminOperatingHours" component={AdminOperatingHoursScreen} />
+      {/* AdminTradeInDetail (Task 9) doesn't exist yet — rows on this screen navigate
+          there with { requestId }, and that route will dangle until Task 9 lands. */}
+      <Stack.Screen name="AdminTradeIns" component={AdminTradeInsScreen} />
 
       <Stack.Screen name="AdminAnalytics" component={AdminAnalyticsScreen} />
       <Stack.Screen name="AdminStockReport" component={AdminStockReportScreen} />

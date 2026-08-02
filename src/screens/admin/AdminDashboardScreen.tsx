@@ -573,8 +573,8 @@ const AdminDashboardScreen: React.FC = () => {
             <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={20} color={theme.colors.textSecondary} />
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={[styles.menuItem, styles.menuItemLast, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+          <TouchableOpacity
+            style={[styles.menuItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={() => navigation.navigate('AdminSendNotification')}
           >
             <View style={[styles.menuIconContainer, { backgroundColor: '#9C27B0' + '20' }]}>
@@ -588,12 +588,40 @@ const AdminDashboardScreen: React.FC = () => {
               >
                 {t('admin.dashboard.sendNotification')}
               </Text>
-              <Text allowFontScaling={false} 
+              <Text allowFontScaling={false}
                 style={[styles.menuSubtitle, { color: theme.colors.textSecondary }]}
                 adjustsFontSizeToFit
                 numberOfLines={1}
               >
                 {t('admin.dashboard.notifyAll')}
+              </Text>
+            </View>
+            <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={20} color={theme.colors.textSecondary} />
+          </TouchableOpacity>
+
+          {/* Trade-in inbox (second-hand phones feature, Task 8). AdminTradeInsScreen
+              itself tenant-gates and tenant-scopes the query; this is just the link. */}
+          <TouchableOpacity
+            style={[styles.menuItem, styles.menuItemLast, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+            onPress={() => navigation.navigate('AdminTradeIns')}
+          >
+            <View style={[styles.menuIconContainer, { backgroundColor: '#00BCD4' + '20' }]}>
+              <Ionicons name="phone-portrait-outline" size={20} color="#00BCD4" />
+            </View>
+            <View style={[styles.menuContent, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
+              <Text allowFontScaling={false}
+                style={[styles.menuTitle, { color: theme.colors.text }]}
+                adjustsFontSizeToFit
+                numberOfLines={1}
+              >
+                {t('tradeIn.myRequests')}
+              </Text>
+              <Text allowFontScaling={false}
+                style={[styles.menuSubtitle, { color: theme.colors.textSecondary }]}
+                adjustsFontSizeToFit
+                numberOfLines={1}
+              >
+                {t('admin.dashboard.tradeInsSubtitle', { defaultValue: 'Review incoming sell & trade requests' })}
               </Text>
             </View>
             <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={20} color={theme.colors.textSecondary} />
