@@ -9,11 +9,11 @@
 // in TenantContext.tsx). A plain shopper therefore has no "current shop" from that
 // hook; the other customer screens that read it (Home/Search/Categories) tolerate a
 // null tenantId by treating it as "browse everything," but a trade-in is a WRITE that
-// must name exactly one shop to review it. We fall back to APP_CONFIG.DEFAULT_TENANT_ID
-// — the constant config.ts already defines for exactly this "single-tenant customer
-// flow" case ("customers use admin's tenantId to access products"), just not wired up
-// anywhere yet. If neither resolves, submit stays correctly disabled rather than
-// writing a request no admin's inbox will ever show.
+// must name exactly one shop to review it. We use the admin context value when it's
+// present, otherwise ask tradeInService.resolveShopTenantId() to look it up at
+// runtime — see that function's comment for how it picks a shop. If it still can't
+// (ambiguous or the query failed), submit stays disabled and we tell the user why
+// rather than leaving a dead button with no explanation.
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -39,10 +39,9 @@ import Button from '../components/Button';
 import { useAuth } from '../contexts/AuthContext';
 import { useTenant } from '../contexts/TenantContext';
 import { SPACING } from '../constants/theme';
-import { APP_CONFIG } from '../constants/config';
 import { TRADE_IN_QUESTIONS } from '../constants/tradeInQuestions';
 import { validateAnswers, isDuplicateSubmission } from '../utils/tradeIn';
-import { tradeInService } from '../services/tradeInService';
+import { tradeInService, resolveShopTenantId } from '../services/tradeInService';
 import { brandService, Brand } from '../services/brandService';
 import ImageService from '../services/imageService';
 
@@ -56,8 +55,24 @@ const TradeInRequestScreen: React.FC = () => {
   const { user } = useAuth();
   const { tenantId: ctxTenantId } = useTenant();
 
-  // See header note: ctxTenantId is only ever non-null for a logged-in admin.
-  const tenantId = ctxTenantId || APP_CONFIG.DEFAULT_TENANT_ID;
+  // See header note: ctxTenantId is only ever non-null for a logged-in admin. For
+  // everyone else, resolve it at runtime instead of depending on an env var nobody
+  // is guaranteed to have set.
+  const [tenantId, setTenantId] = useState<string | null>(ctxTenantId);
+
+  useEffect(() => {
+    if (ctxTenantId) {
+      setTenantId(ctxTenantId);
+      return;
+    }
+    let cancelled = false;
+    resolveShopTenantId().then((id) => {
+      if (!cancelled) setTenantId(id);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [ctxTenantId]);
 
   const [brands, setBrands] = useState<Brand[]>([]);
   const [deviceBrand, setDeviceBrand] = useState('');
@@ -110,19 +125,10 @@ const TradeInRequestScreen: React.FC = () => {
     submittingRef.current = true;
     setSubmitting(true);
     try {
-      // Photos first: a failed upload must block the request, never fall back to the
-      // local file:// path. Storing that path is what made brand logos render for the
-      // admin and appear blank for every customer.
-      const uploaded: string[] = [];
-      for (const localUri of pickedPhotos) {
-        const res = await ImageService.uploadImage(localUri);
-        if (!res.success || !res.url) {
-          Alert.alert(t('common.error'), t('tradeIn.photoFailed'));
-          return;
-        }
-        uploaded.push(res.url);
-      }
-
+      // Duplicate check BEFORE upload. If this ran after the photo loop below, a
+      // duplicate submission would upload every photo to storage and only then
+      // abort — nothing ever deletes those, so they'd sit there orphaned forever.
+      // Checking first means a duplicate never touches storage at all.
       const mine = await tradeInService.getMyRequests(user!.uid);
       const candidate = { deviceModel: deviceModel.trim(), answers, createdAtMs: Date.now() };
       const existing = mine.map((r) => ({
@@ -133,6 +139,19 @@ const TradeInRequestScreen: React.FC = () => {
       if (isDuplicateSubmission(existing, candidate, Date.now())) {
         Alert.alert(t('common.error'), t('tradeIn.duplicate'));
         return;
+      }
+
+      // Photos next: a failed upload must block the request, never fall back to the
+      // local file:// path. Storing that path is what made brand logos render for the
+      // admin and appear blank for every customer.
+      const uploaded: string[] = [];
+      for (const localUri of pickedPhotos) {
+        const res = await ImageService.uploadImage(localUri);
+        if (!res.success || !res.url) {
+          Alert.alert(t('common.error'), t('tradeIn.photoFailed'));
+          return;
+        }
+        uploaded.push(res.url);
       }
 
       await tradeInService.createRequest({
@@ -308,7 +327,13 @@ const TradeInRequestScreen: React.FC = () => {
                       keyboardType="number-pad"
                       maxLength={3}
                       value={answers[q.key] || ''}
-                      onChangeText={(v) => setAnswers((p) => ({ ...p, [q.key]: v.replace(/[^0-9]/g, '') }))}
+                      onChangeText={(v) => {
+                        const digits = v.replace(/[^0-9]/g, '');
+                        // maxLength caps entry at 3 digits (0-999); clamp down to a
+                        // real percentage so e.g. "999" can't be typed and submitted.
+                        const clamped = digits === '' ? '' : String(Math.min(100, parseInt(digits, 10)));
+                        setAnswers((p) => ({ ...p, [q.key]: clamped }));
+                      }}
                       editable={!submitting}
                       scrollEnabled={false}
                       style={[styles.input, {
@@ -414,6 +439,16 @@ const TradeInRequestScreen: React.FC = () => {
 
           {/* Submit */}
           <View style={{ padding: SPACING.md }}>
+            {!tenantId && (
+              <Text allowFontScaling={false} style={{
+                fontSize: 12,
+                color: theme.colors.error,
+                textAlign: isRTL ? 'right' : 'left',
+                marginBottom: SPACING.sm,
+              }}>
+                {t('errors.serverError')}
+              </Text>
+            )}
             <Button
               title={t('tradeIn.submit')}
               onPress={handleSubmit}
