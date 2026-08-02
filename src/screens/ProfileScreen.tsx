@@ -536,6 +536,20 @@ export const ProfileScreen: React.FC = () => {
                     onPress={() => (navigation as any).navigate('MyAddress')}
                     theme={theme} isDark={isDark} tintBg={tintBg} />
                   <Divider isDark={isDark} />
+                  <LuxuryMenuItem icon="phone-portrait-outline" title={t('tradeIn.title')}
+                    onPress={() => {
+                      // Belt and braces: this row only renders inside the isAuthed-gated
+                      // Account section above, but trade-in inserts require auth.uid() =
+                      // user_id at the database, so re-check before navigating in case
+                      // this section is ever restructured.
+                      if (!contextUser?.uid) {
+                        (navigation as any).navigate('SignIn');
+                        return;
+                      }
+                      (navigation as any).navigate('TradeInRequest');
+                    }}
+                    theme={theme} isDark={isDark} tintBg={tintBg} />
+                  <Divider isDark={isDark} />
                   <LuxuryMenuItem icon="cube-outline" title={t('shippingInfo.title')}
                     subtitle={t('shippingInfo.subtitle')}
                     onPress={() => (navigation as any).navigate('ShippingInfo')}

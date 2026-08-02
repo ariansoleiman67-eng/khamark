@@ -73,6 +73,7 @@ import ConfirmIdentityScreen from '../screens/profile/ConfirmIdentityScreen';
 import UpdateEmailScreen from '../screens/profile/UpdateEmailScreen';
 import UpdatePhoneScreen from '../screens/profile/UpdatePhoneScreen';
 import ShippingInfoScreen from '../screens/profile/ShippingInfoScreen';
+import TradeInRequestScreen from '../screens/TradeInRequestScreen';
 import ThemeCustomizationScreen from '../screens/ThemeCustomizationScreen';
 import CategoryProductsScreen from '../screens/CategoryProductsScreen';
 
@@ -447,7 +448,12 @@ const AppNavigator: React.FC = () => {
         <Stack.Screen name="UpdateEmail" component={UpdateEmailScreen} />
         <Stack.Screen name="UpdatePhone" component={UpdatePhoneScreen} />
         <Stack.Screen name="ShippingInfo" component={ShippingInfoScreen} />
-        
+        <Stack.Screen name="TradeInRequest" component={TradeInRequestScreen} />
+        {/* MyTradeIns route type is registered in RootStackParamList (types/index.ts)
+            for TradeInRequestScreen's post-submit navigation.replace('MyTradeIns'),
+            but MyTradeInsScreen doesn't exist yet — Task 7 adds it and its
+            <Stack.Screen> registration here. */}
+
         {/* Chat Screens */}
         <Stack.Screen name="ChatScreen" component={ChatScreen} />
 

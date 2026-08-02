@@ -619,6 +619,12 @@ export type RootStackParamList = {
   EditProfile: undefined;
   MyAddress: undefined;
   AddEditAddress: { address?: Address; mode?: 'add' | 'edit' } | undefined;
+  // Second-hand phones (Task 6). MyTradeIns' route type is registered here so
+  // TradeInRequestScreen's post-submit `navigation.replace('MyTradeIns')` type-checks,
+  // but MyTradeInsScreen itself doesn't exist yet — Task 7 adds it and registers the
+  // matching <Stack.Screen> in AppNavigator.tsx.
+  TradeInRequest: undefined;
+  MyTradeIns: undefined;
   GoogleMapsAddressPicker: {
     initialLocation?: { latitude: number; longitude: number };
     onAddressSelect?: (address: any) => void;
