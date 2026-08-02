@@ -72,12 +72,24 @@ const TradeInRequestScreen: React.FC = () => {
     }
     let cancelled = false;
     setTenantResolved(false);
-    resolveShopTenantId().then((id) => {
-      if (!cancelled) {
-        setTenantId(id);
-        setTenantResolved(true);
-      }
-    });
+    resolveShopTenantId()
+      .then((id) => {
+        if (!cancelled) {
+          setTenantId(id);
+          setTenantResolved(true);
+        }
+      })
+      // Belt and braces: resolveShopTenantId() already catches internally and
+      // never rejects, but the screen must not depend on that staying true.
+      // Without this, a rejection here would leave tenantResolved stuck at
+      // false forever — Submit disabled with no explanation, recoverable only
+      // by leaving and re-entering the screen.
+      .catch(() => {
+        if (!cancelled) {
+          setTenantId(null);
+          setTenantResolved(true);
+        }
+      });
     return () => {
       cancelled = true;
     };

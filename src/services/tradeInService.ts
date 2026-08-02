@@ -66,20 +66,31 @@ export interface CreateTradeInInput {
 // No caching: the query is one indexed row read, run once per screen open. A
 // cached value would keep routing submissions to a tenant after it's deactivated
 // or after a second one goes active, with nothing to ever invalidate it.
+//
+// Whole body wrapped in try/catch, same as storeProfileService.getMyTenantId():
+// supabase.from(...) can reject outright on a flaky mobile connection, not just
+// resolve with `{ error }`. A resolver that can reject turns a recoverable "we
+// could not work out which shop" into an unhandled promise rejection at the call
+// site — this must always settle to a value, never throw.
 export const resolveShopTenantId = async (): Promise<string | null> => {
-  if (APP_CONFIG.DEFAULT_TENANT_ID) return APP_CONFIG.DEFAULT_TENANT_ID;
+  try {
+    if (APP_CONFIG.DEFAULT_TENANT_ID) return APP_CONFIG.DEFAULT_TENANT_ID;
 
-  const { data, error } = await supabase
-    .from('tenants')
-    .select('owner_id')
-    .eq('is_active', true)
-    .not('owner_id', 'is', null)
-    .limit(2);
-  if (error) return null;
-  // Exactly one, or we cannot tell which shop the customer means.
-  if ((data || []).length !== 1) return null;
+    const { data, error } = await supabase
+      .from('tenants')
+      .select('owner_id')
+      .eq('is_active', true)
+      .not('owner_id', 'is', null)
+      .limit(2);
+    if (error) return null;
+    // Exactly one, or we cannot tell which shop the customer means.
+    if ((data || []).length !== 1) return null;
 
-  return data![0].owner_id;
+    return data![0].owner_id;
+  } catch (e) {
+    console.error('resolveShopTenantId failed:', e);
+    return null;
+  }
 };
 
 export const tradeInService = {
