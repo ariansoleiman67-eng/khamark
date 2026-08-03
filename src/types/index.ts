@@ -619,10 +619,8 @@ export type RootStackParamList = {
   EditProfile: undefined;
   MyAddress: undefined;
   AddEditAddress: { address?: Address; mode?: 'add' | 'edit' } | undefined;
-  // Second-hand phones (Task 6). MyTradeIns' route type is registered here so
-  // TradeInRequestScreen's post-submit `navigation.replace('MyTradeIns')` type-checks,
-  // but MyTradeInsScreen itself doesn't exist yet — Task 7 adds it and registers the
-  // matching <Stack.Screen> in AppNavigator.tsx.
+  // Second-hand phones. TradeInRequestScreen submits the questionnaire; MyTradeInsScreen
+  // lists the customer's own requests and their offers (both registered in AppNavigator.tsx).
   TradeInRequest: undefined;
   MyTradeIns: undefined;
   GoogleMapsAddressPicker: {

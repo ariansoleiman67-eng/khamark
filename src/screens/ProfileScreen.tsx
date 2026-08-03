@@ -550,6 +550,20 @@ export const ProfileScreen: React.FC = () => {
                     }}
                     theme={theme} isDark={isDark} tintBg={tintBg} />
                   <Divider isDark={isDark} />
+                  <LuxuryMenuItem icon="list-outline" title={t('tradeIn.myRequests')}
+                    onPress={() => {
+                      // Same belt-and-braces re-check as the row above: this list reads
+                      // rows scoped to auth.uid() at the database, so a signed-out call
+                      // here (section restructured, prop threading changes) must not
+                      // reach MyTradeInsScreen at all.
+                      if (!contextUser?.uid) {
+                        (navigation as any).navigate('SignIn');
+                        return;
+                      }
+                      (navigation as any).navigate('MyTradeIns');
+                    }}
+                    theme={theme} isDark={isDark} tintBg={tintBg} />
+                  <Divider isDark={isDark} />
                   <LuxuryMenuItem icon="cube-outline" title={t('shippingInfo.title')}
                     subtitle={t('shippingInfo.subtitle')}
                     onPress={() => (navigation as any).navigate('ShippingInfo')}

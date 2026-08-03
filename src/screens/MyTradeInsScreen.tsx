@@ -54,7 +54,14 @@ const MyTradeInsScreen: React.FC = () => {
   const { needsAuth } = useAuthGate();
   useEffect(() => {
     if (needsAuth()) {
-      navigation.navigate('LoginGate', { reason: 'orders' });
+      // No 'tradeIn' reason exists in LoginGate's reason union (checkout / orders /
+      // message / address / payment / profile — useAuthGate.ts, LoginGateScreen.tsx),
+      // and 'orders' rendered "Sign in to View Orders / see your order history and
+      // track current deliveries" — wrong content for a trade-in. Omitting reason
+      // falls through to LoginGateScreen's generic "Sign in Required" default
+      // instead of adding a whole new reason variant (plus locale entries in all
+      // three languages) for this one call site.
+      navigation.navigate('LoginGate');
     }
   }, [needsAuth, navigation]);
 
@@ -105,7 +112,19 @@ const MyTradeInsScreen: React.FC = () => {
     }, [load])
   );
 
+  // Synchronous in-flight guard, same rationale as TradeInRequestScreen's
+  // submittingRef: disabled={} is async React state and won't block a rage/
+  // double-tap that lands before the re-render commits. Keyed per request id
+  // (a Set, not one shared boolean) so accepting/declining one row can never
+  // block a different row's independent action. Without this, a fast double-tap
+  // fires setStatus twice; the second finds no matching row (RLS filters on the
+  // OLD status, already moved past 'quoted' by the first call) and shows a
+  // spurious "offer no longer available" on a decision the customer just made.
+  const respondingRef = useRef<Set<string>>(new Set());
+
   const respond = async (id: string, status: 'accepted' | 'declined') => {
+    if (respondingRef.current.has(id)) return;
+    respondingRef.current.add(id);
     try {
       // setStatus returns false when the update matched no row — RLS filters on the
       // OLD status, so an offer the shop has already withdrawn or completed silently
@@ -118,6 +137,8 @@ const MyTradeInsScreen: React.FC = () => {
       await load();
     } catch (e: any) {
       Alert.alert(t('common.error'), e?.message || t('errors.unknown'));
+    } finally {
+      respondingRef.current.delete(id);
     }
   };
 

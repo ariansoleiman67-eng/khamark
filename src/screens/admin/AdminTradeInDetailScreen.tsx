@@ -44,6 +44,7 @@ import { useCurrency } from '../../contexts/CurrencyContext';
 import AppNumber from '../../components/AppNumber';
 import Button from '../../components/Button';
 import { tradeInService } from '../../services/tradeInService';
+import { sendNotificationToUsers } from '../../services/adminService';
 import { ProductService } from '../../services/productService';
 import { buildListingDraft } from '../../utils/tradeIn';
 import { formatPrice } from '../../utils/currency';
@@ -196,13 +197,35 @@ const AdminTradeInDetailScreen: React.FC = () => {
     };
   }, [request, tenantId]);
 
-  const handleSendQuote = async () => {
+  const handleSendQuote = () => {
     if (!request || !tenantId) return;
     const amount = parseFloat(offerAmount);
     if (!(amount > 0)) {
       Alert.alert(t('admin.common.error'), t('tradeIn.offerAmount'));
       return;
     }
+
+    // sendQuote is scoped to status='submitted', so once this write lands it can
+    // never be corrected or withdrawn from this screen — a mistyped extra digit
+    // becomes a standing offer the customer can accept. One confirmation step,
+    // showing the exact formatted amount about to be sent, is cheap insurance
+    // against that.
+    Alert.alert(
+      t('tradeIn.confirmQuoteTitle'),
+      t('tradeIn.confirmQuoteMessage', { amount: formatPrice(amount, currency, exchangeRateIQD) }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('common.confirm'), onPress: () => submitQuote(amount) },
+      ]
+    );
+  };
+
+  const submitQuote = async (amount: number) => {
+    // Re-checked rather than relying on the closure from handleSendQuote: the
+    // confirmation Alert is a real (if brief) async gap, and this must never
+    // assume request/tenantId are still exactly what they were when the button
+    // was first pressed.
+    if (!request || !tenantId) return;
     setSendingQuote(true);
     try {
       // reviewedBy must be the TENANT id: sendQuote scopes its UPDATE with
@@ -223,6 +246,30 @@ const AdminTradeInDetailScreen: React.FC = () => {
       setOfferAmount('');
       setOfferNote('');
       await load();
+
+      // Best-effort push: the quote above already succeeded and is the thing that
+      // matters. request.userId is nullable (customer deleted their account, FK
+      // set null) — nothing to notify, skip silently. Any other failure here
+      // (network, Edge Function not deployed yet) must never surface to the admin
+      // as an error on a quote that already wrote — log and move on.
+      const customerUserId = request.userId ?? null;
+      if (customerUserId) {
+        try {
+          const deviceTitle = [request.deviceBrand, request.deviceModel].filter(Boolean).join(' ');
+          await sendNotificationToUsers({
+            title: i18n.t('tradeIn.notification.title', { lng: 'en' }),
+            titleAr: i18n.t('tradeIn.notification.title', { lng: 'ar' }),
+            titleKu: i18n.t('tradeIn.notification.title', { lng: 'ku' }),
+            body: i18n.t('tradeIn.notification.body', { lng: 'en', model: deviceTitle }),
+            bodyAr: i18n.t('tradeIn.notification.body', { lng: 'ar', model: deviceTitle }),
+            bodyKu: i18n.t('tradeIn.notification.body', { lng: 'ku', model: deviceTitle }),
+            type: 'general',
+            targetUsers: [customerUserId],
+          });
+        } catch (notifyErr) {
+          console.warn('Trade-in quote notification failed (quote itself already succeeded):', notifyErr);
+        }
+      }
     } catch (e: any) {
       Alert.alert(t('admin.common.error'), e?.message || t('common.somethingWentWrong'));
     } finally {
@@ -237,9 +284,11 @@ const AdminTradeInDetailScreen: React.FC = () => {
       const ok = await tradeInService.setStatus(request.id, 'completed');
       if (!ok) {
         // Same false-is-not-success rule as sendQuote: setStatus matched no row
-        // (status moved since this screen last loaded). Reuses the exact key
-        // MyTradeInsScreen uses for this identical setStatus-returned-false shape.
-        Alert.alert(t('admin.common.error'), t('tradeIn.offerNoLongerAvailable'));
+        // (status moved since this screen last loaded). admin.tradeIn.statusChanged
+        // is the admin-audience twin of tradeIn.offerNoLongerAvailable — that key
+        // reads as "YOUR offer" and is meant for the customer in MyTradeInsScreen;
+        // showing it here told the admin about an "offer" that isn't theirs.
+        Alert.alert(t('admin.common.error'), t('admin.tradeIn.statusChanged'));
         await load();
         return;
       }

@@ -287,8 +287,14 @@
     "sendQuote": "Send quote",
     "offerAmount": "Offer amount (USD)",
     "offerNote": "Note (optional)",
+    "confirmQuoteTitle": "Send this offer?",
+    "confirmQuoteMessage": "You're about to offer {{amount}} for this phone. This cannot be changed once sent.",
     "markCompleted": "Mark completed",
     "createListing": "Create listing from this",
+    "notification": {
+      "title": "Your trade-in offer has arrived",
+      "body": "We've sent you an offer for your {{model}}. Open My trade-ins to view it."
+    },
     "status": {
       "submitted": "Waiting for review",
       "quoted": "Offer sent",
@@ -3216,7 +3222,8 @@
     },
     "tradeIn": {
       "title": "Trade-In Requests",
-      "empty": "No trade-in requests yet"
+      "empty": "No trade-in requests yet",
+      "statusChanged": "This request's status has changed. Pull down to refresh."
     },
     "active": "Active",
     "brands": {
