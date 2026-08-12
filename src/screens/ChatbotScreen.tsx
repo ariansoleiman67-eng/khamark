@@ -830,7 +830,10 @@ const ChatbotScreen: React.FC = () => {
             ...(isRTL ? { marginLeft: SPACING.sm } : { marginRight: SPACING.sm }),
           }}>
             <Image
-              source={require('../../assets/images/ai-logo.png')}
+              // Was assets/images/ai-logo.png — the HARYAD crown-and-wings logo from
+              // the project this app was forked from. It shipped in the binary at 4.1MB
+              // and every customer using the AI assistant saw another company's branding.
+              source={require('../../assets/images/asankarylogo.png')}
               style={{ width: 44, height: 44 }}
               contentFit="cover"
             />
