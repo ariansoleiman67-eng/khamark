@@ -441,7 +441,7 @@
   },
   "products": {
     "product": "بەرهەم",
-    "partNumber": "ژمارەی پارچە",
+    "partNumber": "کۆدی بەرهەم",
     "items": "پارچە",
     "totalSelected": "کۆی دیاریکراو",
     "category": "پۆل",
@@ -492,7 +492,7 @@
   },
   "product": {
     "lowStock": "تەنها {{count}} ماوە",
-    "partNumber": "ژمارەی پارچە",
+    "partNumber": "کۆدی بەرهەم",
     "inStock": "بەردەستە ({{count}})",
     "wholesalePricing": "نرخی کۆمەڵ",
     "bulkDiscount": "داشکاندنی کۆمەڵ",

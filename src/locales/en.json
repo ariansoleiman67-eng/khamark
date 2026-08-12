@@ -182,7 +182,7 @@
   },
   "product": {
     "lowStock": "Only {{count}} left",
-    "partNumber": "Part Number",
+    "partNumber": "Item Code",
     "items": "items",
     "totalSelected": "Total selected",
     "inStock": "In Stock ({{count}})",
@@ -629,7 +629,7 @@
   },
   "products": {
     "product": "Product",
-    "partNumber": "Part Number",
+    "partNumber": "Item Code",
     "category": "Category",
     "price": "Price",
     "stock": "Stock",

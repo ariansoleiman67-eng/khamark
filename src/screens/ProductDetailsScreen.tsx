@@ -1254,6 +1254,19 @@ export const ProductDetailsScreen: React.FC = () => {
   const savingsAmount = Math.max(0, originalPriceNumber - totalPriceNumber);
   const showSavings = savingsAmount > 0;
 
+  // What the sticky action button displays. On a product with colour/size variations
+  // nothing is selected on arrival, so totalPriceNumber is 0 and the button read
+  // "Add to Cart  $0.00" on, for example, a $140 phone — which looks like a broken
+  // price rather than an empty selection. Fall back to the price of a single unit
+  // until the shopper picks something.
+  //
+  // Deliberately a separate value: totalPriceNumber stays 0 so the order and cart
+  // sheets below still receive an empty selection and cannot bill for an unpicked item.
+  const buttonPriceText =
+    activeQtyForPricing > 0
+      ? totalPriceText
+      : formatPrice(tieredUnitPrice + storageDelta, currentCurrency as any, exchangeRateIQD);
+
   // add current selection to cart (variations if picked, else normal)
   const addCurrentSelectionToCart = async (): Promise<boolean> => {
     if (!inStock || addingToCart || (product?.status && product.status !== 'available')) return false;
@@ -1630,14 +1643,18 @@ export const ProductDetailsScreen: React.FC = () => {
                     : product.name}
                 </Text>
 
-                <Text allowFontScaling={false}
-                  style={[
-                    styles.partNumber,
-                    { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' },
-                  ]}
-                >
-                  {t('product.partNumber')}: {product.partNumber}
-                </Text>
+                {/* Hidden when unset — this rendered "Item Code: " with nothing after it
+                    for every product the admin left blank. */}
+                {!!String(product.partNumber ?? '').trim() && (
+                  <Text allowFontScaling={false}
+                    style={[
+                      styles.partNumber,
+                      { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' },
+                    ]}
+                  >
+                    {t('product.partNumber')}: {product.partNumber}
+                  </Text>
+                )}
 
                 <View style={[styles.priceRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                   <View style={{ flexShrink: 1 }}>
@@ -1746,7 +1763,15 @@ export const ProductDetailsScreen: React.FC = () => {
                 )}
               </View>
 
-              {/* Sku / Manufacturer / Barcode card */}
+              {/* Sku / Manufacturer / Barcode card.
+                  Hidden entirely when the product carries none of the three. Most of
+                  the catalogue has no SKU or manufacturer code, so this card used to
+                  render "Sku: Not Available" beside "Manufacturer Code: Not Available"
+                  on the main product page — two empty fields side by side, which reads
+                  as an unfinished app rather than as a product without a code. */}
+              {(!!product.sku?.trim() ||
+                !!(product.specifications?.['Manufacturer Code'] || product.specifications?.['Manufacturer']) ||
+                !!product.barcode?.trim()) && (
               <View style={[styles.skuCard, { borderColor: theme.colors.border }]}>
                 <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                   <View style={styles.skuCell}>
@@ -1781,6 +1806,7 @@ export const ProductDetailsScreen: React.FC = () => {
                   </>
                 )}
               </View>
+              )}
 
               {/* Brand card — logo (or wordmark) + name, opens every product of that brand */}
               {!!product.brand && (
@@ -3141,7 +3167,7 @@ export const ProductDetailsScreen: React.FC = () => {
                             : t('product.addToCart', { defaultValue: 'Add to Cart' })}
                         </AppText>
 
-                        <AppNumber value={totalPriceText} style={styles.alibabaTotalValue} />
+                        <AppNumber value={buttonPriceText} style={styles.alibabaTotalValue} />
                        
                         {showSavings && (
                           <View style={{ 

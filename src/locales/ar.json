@@ -182,7 +182,7 @@
   },
   "product": {
     "lowStock": "متبقي {{count}} فقط",
-    "partNumber": "رقم القطعة",
+    "partNumber": "رمز المنتج",
     "items": "عنصر",
     "totalSelected": "إجمالي المحدد",
     "inStock": "متوفر ({{count}})",
@@ -599,7 +599,7 @@
   },
   "products": {
     "product": "منتج",
-    "partNumber": "رقم القطعة",
+    "partNumber": "رمز المنتج",
     "category": "الفئة",
     "price": "السعر",
     "stock": "المخزون",
