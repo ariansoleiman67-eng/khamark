@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { BRAND } from '../constants/config';
+import { BRAND, brandContact } from '../constants/config';
 
 export interface TenantContactInfo {
   id: string;
@@ -9,12 +9,15 @@ export interface TenantContactInfo {
   email?: string;
 }
 
+// undefined, not the raw BRAND placeholders: callers treat a missing phone/email as
+// "no contact configured" and hide the button, whereas a 'TODO_CONTACT_PHONE' string
+// is truthy and produces a support action that opens WhatsApp with a bogus number.
 const DEFAULT_CONTACT: TenantContactInfo = {
   id: 'default',
   name: BRAND.name,
-  phone: BRAND.contactPhone,
-  whatsapp: BRAND.contactPhone,
-  email: BRAND.contactEmail,
+  phone: brandContact(BRAND.contactPhone) ?? undefined,
+  whatsapp: brandContact(BRAND.contactPhone) ?? undefined,
+  email: brandContact(BRAND.contactEmail) ?? undefined,
 };
 
 export async function getTenantContactInfo(tenantId: string): Promise<TenantContactInfo> {

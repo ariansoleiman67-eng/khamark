@@ -13,7 +13,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../components/ThemeProvider';
 import { SPACING } from '../../constants/theme';
-import { BRAND } from '../../constants/config';
+import { BRAND, brandContact, contactBlockOr, CONTACT_FALLBACK } from '../../constants/config';
 
 const PrivacyPolicyScreen: React.FC = () => {
   const { theme } = useTheme();
@@ -260,21 +260,30 @@ Data may be retained longer if:
 
 PRIVACY OFFICER
 ${BRAND.name}
-Address: ${BRAND.address}
-Phone: ${BRAND.contactPhone2}
-Email: ${BRAND.contactEmail}
-WhatsApp: ${BRAND.contactPhone2}
+${contactBlockOr(
+  CONTACT_FALLBACK,
+  ['Address', BRAND.address],
+  ['Phone', BRAND.contactPhone2],
+  ['Email', BRAND.contactEmail],
+  ['WhatsApp', BRAND.contactPhone2],
+)}
 
 DATA PROTECTION QUERIES
-Email: ${BRAND.contactEmail}
-Alternate Phone: ${BRAND.contactPhone3}
+${contactBlockOr(
+  CONTACT_FALLBACK,
+  ['Email', BRAND.contactEmail],
+  ['Alternate Phone', BRAND.contactPhone3],
+)}
 Response Time: Within 72 hours
 Business Hours: Saturday-Thursday 8AM-6PM, Friday 8AM-12PM
 
 GENERAL SUPPORT
-Email: ${BRAND.contactEmail}
-Phone: ${BRAND.contactPhone2}
-Alternate: ${BRAND.contactPhone3}
+${contactBlockOr(
+  CONTACT_FALLBACK,
+  ['Email', BRAND.contactEmail],
+  ['Phone', BRAND.contactPhone2],
+  ['Alternate', BRAND.contactPhone3],
+)}
 Available: 6 days a week
 
 Last Updated: January 2025
@@ -483,20 +492,24 @@ Policy Version: 2.1`
               }}>
                 Our privacy team is here to help. Contact us anytime with questions about how we handle your personal information.
               </Text>
-              <View style={{
-                backgroundColor: theme.colors.success,
-                paddingHorizontal: SPACING.lg,
-                paddingVertical: SPACING.sm,
-                borderRadius: 25,
-              }}>
-                <Text allowFontScaling={false} style={{
-                  fontSize: 14,
-                  fontWeight: '600',
-                  color: 'white',
+              {/* Hidden entirely rather than shown empty: a pill is an address to
+                  act on, so with no address configured there is nothing to render. */}
+              {brandContact(BRAND.contactEmail) && (
+                <View style={{
+                  backgroundColor: theme.colors.success,
+                  paddingHorizontal: SPACING.lg,
+                  paddingVertical: SPACING.sm,
+                  borderRadius: 25,
                 }}>
-                  {BRAND.contactEmail}
-                </Text>
-              </View>
+                  <Text allowFontScaling={false} style={{
+                    fontSize: 14,
+                    fontWeight: '600',
+                    color: 'white',
+                  }}>
+                    {brandContact(BRAND.contactEmail)}
+                  </Text>
+                </View>
+              )}
             </View>
           </View>
         </ScrollView>

@@ -26,7 +26,7 @@ import { USE_MOCK_DATA } from '../services/mockData';
 
 import Logo from '../components/Logo';
 import { changeLanguage, getDirection } from '../locales';
-import { BRAND } from '../constants/config';
+import { BRAND, brandContact, contactBlockOr, CONTACT_FALLBACK } from '../constants/config';
 
 // Tab bar height constant
 const TAB_BAR_HEIGHT = 60;
@@ -670,7 +670,20 @@ export const ProfileScreen: React.FC = () => {
                 <LuxuryMenuItem icon="chatbubble-outline" title={t('profile.menu.contactUs')}
                   onPress={() => Alert.alert(
                     t('profile.contactUs.title', { name: BRAND.name, defaultValue: 'Contact {{name}}' }),
-                    `${t('profile.contactUs.email', { defaultValue: 'Email:' })} ${BRAND.contactEmail}\n${t('profile.contactUs.whatsapp', { defaultValue: 'WhatsApp:' })} ${BRAND.contactPhone}\n\n${t('profile.contactUs.storeLocation', { defaultValue: 'Store Location:' })}\n${BRAND.address}\n\n${t('profile.contactUs.businessHours', { defaultValue: 'Business Hours:' })}\n${t('profile.contactUs.hoursSatThu', { defaultValue: 'Sat-Thu: 8:00 AM - 6:00 PM' })}\n${t('profile.contactUs.fridayClosed', { defaultValue: 'Friday: Closed' })}`
+                    // Only the details that are actually configured; unset ones are
+                    // dropped rather than shown as their TODO_ placeholder. Hours are
+                    // always true, so they stay regardless.
+                    [
+                      contactBlockOr(
+                        CONTACT_FALLBACK,
+                        [t('profile.contactUs.email', { defaultValue: 'Email:' }).replace(/:$/, ''), BRAND.contactEmail],
+                        [t('profile.contactUs.whatsapp', { defaultValue: 'WhatsApp:' }).replace(/:$/, ''), BRAND.contactPhone],
+                      ),
+                      brandContact(BRAND.address)
+                        ? `${t('profile.contactUs.storeLocation', { defaultValue: 'Store Location:' })}\n${brandContact(BRAND.address)}`
+                        : null,
+                      `${t('profile.contactUs.businessHours', { defaultValue: 'Business Hours:' })}\n${t('profile.contactUs.hoursSatThu', { defaultValue: 'Sat-Thu: 8:00 AM - 6:00 PM' })}\n${t('profile.contactUs.fridayClosed', { defaultValue: 'Friday: Closed' })}`,
+                    ].filter(Boolean).join('\n\n')
                   )}
                   theme={theme} isDark={isDark} tintBg={tintBg} />
                 <Divider isDark={isDark} />

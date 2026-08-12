@@ -1776,12 +1776,10 @@
         "subtitle": "Quick support via WhatsApp"
       },
       "phone": {
-        "title": "Call Support",
-        "subtitle": "TODO_CONTACT_PHONE_2"
+        "title": "Call Support"
       },
       "email": {
-        "title": "Email Support",
-        "subtitle": "TODO_CONTACT_EMAIL"
+        "title": "Email Support"
       },
       "facebook": {
         "title": "Facebook",
@@ -1791,7 +1789,6 @@
         "title": "Visit Our Store",
         "subtitle": "Erbil, Kurdistan Region, Iraq",
         "alertTitle": "Store Location",
-        "alertMessage": "Asankary\nTODO_CONTACT_ADDRESS\n\nOpen: Saturday - Thursday\n8:00 AM - 6:00 PM\n\nFriday: 8:00 AM - 12:00 PM",
         "callStore": "Call Store",
         "getDirections": "Get Directions",
         "close": "Close"
@@ -1811,11 +1808,11 @@
       "questions": {
         "trackOrder": {
           "question": "How do I track my order?",
-          "answer": "You can track your order by:\n\n1. Going to \"My Orders\" in your profile\n2. Selecting the order you want to track\n3. Viewing the real-time status updates\n4. Calling our support line at TODO_CONTACT_PHONE_2\n\nWe provide SMS updates for all order status changes."
+          "answer": "You can track your order by:\n\n1. Going to \"My Orders\" in your profile\n2. Selecting the order you want to track\n3. Viewing the real-time status updates\n4. Messaging our team from Help & Support if anything looks wrong\n\nWe provide SMS updates for all order status changes."
         },
         "cancelOrder": {
           "question": "Can I cancel or modify my order?",
-          "answer": "Yes, you can cancel or modify your order:\n\n• Within 2 hours of placing the order\n• Before it enters \"Processing\" status\n• By contacting us immediately\n\nTo cancel: Go to \"My Orders\" and tap \"Cancel Order\" or call us at TODO_CONTACT_PHONE_2."
+          "answer": "Yes, you can cancel or modify your order:\n\n• Within 2 hours of placing the order\n• Before it enters \"Processing\" status\n• By contacting us immediately\n\nTo cancel: Go to \"My Orders\" and tap \"Cancel Order\" or message us from Help & Support."
         },
         "deliveryAreas": {
           "question": "What areas do you deliver to?",
@@ -1843,7 +1840,7 @@
         },
         "installation": {
           "question": "Do you offer product setup or installation?",
-          "answer": "Yes, we offer professional setup and installation:\n\n• Certified technicians\n• Installation at our service center\n• Mobile installation service available\n• Competitive rates\n• Installation warranty included\n\nContact us to schedule: TODO_CONTACT_PHONE_2"
+          "answer": "Yes, we offer professional setup and installation:\n\n• Certified technicians\n• Installation at our service center\n• Mobile installation service available\n• Competitive rates\n• Installation warranty included\n\nTo schedule, message us from Help & Support."
         },
         "returns": {
           "question": "Can I return or exchange products?",

@@ -13,7 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../components/ThemeProvider';
 import { getDirection } from '../../locales';
 import { SPACING } from '../../constants/theme';
-import { BRAND } from '../../constants/config';
+import { BRAND, brandContact, contactBlockOr, CONTACT_FALLBACK } from '../../constants/config';
 
 const TermsAndConditionsScreen: React.FC = () => {
   const { theme } = useTheme();
@@ -30,12 +30,16 @@ These terms apply to all users, including customers, visitors, and others who ac
     },
     {
       title: "2. COMPANY INFORMATION",
+      // "Business License: [License Number]" used to sit here — a literal bracketed
+      // placeholder shown to every reader. Reinstate it only with a real number.
       content: `${BRAND.name}
-Business License: [License Number]
-Address: ${BRAND.address}
-Phone: ${BRAND.contactPhone2}
-Alternate Phone: ${BRAND.contactPhone}
-Email: ${BRAND.contactEmail}
+${contactBlockOr(
+  CONTACT_FALLBACK,
+  ['Address', BRAND.address],
+  ['Phone', BRAND.contactPhone2],
+  ['Alternate Phone', BRAND.contactPhone],
+  ['Email', BRAND.contactEmail],
+)}
 
 We are a registered online retailer offering a wide range of consumer electronics, accessories, and everyday products.`
     },
@@ -217,12 +221,13 @@ We deliver throughout the Kurdistan Region of Iraq:
       content: `For questions about these Terms and Conditions:
 
 ${BRAND.name}
-Address: ${BRAND.address}
-Phone: ${BRAND.contactPhone2}
-Alternate Phone: ${BRAND.contactPhone2}
-WhatsApp: ${BRAND.contactPhone}
-Email: ${BRAND.contactEmail}
-Support: ${BRAND.contactEmail}
+${contactBlockOr(
+  CONTACT_FALLBACK,
+  ['Address', BRAND.address],
+  ['Phone', BRAND.contactPhone2],
+  ['WhatsApp', BRAND.contactPhone],
+  ['Email', BRAND.contactEmail],
+)}
 
 Business Hours:
 Saturday - Thursday: 8:00 AM - 6:00 PM
@@ -358,7 +363,9 @@ Last Updated: January 2025`
                 color: theme.colors.textSecondary,
                 textAlign: 'center',
               }}>
-                {`Questions? Contact us at ${BRAND.contactEmail}`}
+                {brandContact(BRAND.contactEmail)
+                  ? `Questions? Contact us at ${brandContact(BRAND.contactEmail)}`
+                  : 'Questions? Reach us through Help & Support in the app.'}
               </Text>
             </View>
           </View>

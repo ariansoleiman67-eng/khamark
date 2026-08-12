@@ -38,7 +38,7 @@ import {
   getEffectiveStock,
 } from '../utils/pricingUtils';
 import { useFavorites } from '../contexts/FavoritesContext';
-import { COLLECTIONS } from '../constants/config';
+import { COLLECTIONS, BRAND, brandContact } from '../constants/config';
 import Button from '../components/Button';
 import { Chip, Surface, Divider, Badge } from 'react-native-paper';
 import AppNumber from '../components/AppNumber';
@@ -779,14 +779,24 @@ export const ProductDetailsScreen: React.FC = () => {
     if (!product) return;
 
     try {
-      const shareUrl = `https://ASANKARY_DOMAIN_TBD/product/${product.id}`;
+      // Only link out once a real domain exists. This used to interpolate
+      // BRAND.domain's placeholder directly, so every share sent the recipient
+      // "https://ASANKARY_DOMAIN_TBD/product/<id>" — a link that cannot resolve.
+      const domain = brandContact(BRAND.domain);
+      const shareUrl = domain ? `https://${domain}/product/${product.id}` : null;
+
+      // partNumber is optional on a product; without the guard an unset one
+      // shares the literal "undefined" after the name.
+      const heading = [product.name, product.partNumber].filter(Boolean).join(' - ');
 
       await Share.share({
-        message: `${product.name} - ${product.partNumber}\n${formatPrice(
-          product.priceUSD,
-          currentCurrency as any,
-          exchangeRateIQD
-        )}\n\nCheck out this product on Asankary!\n${shareUrl}`,
+        message: [
+          heading,
+          formatPrice(product.priceUSD, currentCurrency as any, exchangeRateIQD),
+          '',
+          'Check out this product on Asankary!',
+          shareUrl,
+        ].filter(line => line !== null && line !== undefined).join('\n'),
         url: product.imageUrls?.[0],
       });
     } catch (error) {

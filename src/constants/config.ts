@@ -1,15 +1,8 @@
-// Central brand block — single source of truth for store identity/contact.
-// Contact + domain values are placeholders until finalized.
-export const BRAND = {
-  name: 'Asankary',
-  domain: 'ASANKARY_DOMAIN_TBD',
-  contactEmail: 'TODO_CONTACT_EMAIL',
-  contactPhone: 'TODO_CONTACT_PHONE',
-  contactPhone2: 'TODO_CONTACT_PHONE_2',
-  contactPhone3: 'TODO_CONTACT_PHONE_3',
-  address: 'TODO_CONTACT_ADDRESS',
-  storeCoords: { latitude: 36.1911, longitude: 44.0094 }, // Erbil default
-} as const;
+// Store identity/contact now lives in ./brand — it must stay free of `process.env`
+// so tests can import it (see the note in that file). Re-exported here so every
+// existing `import { BRAND } from '.../constants/config'` keeps working unchanged.
+export { BRAND, brandContact, contactBlock, contactBlockOr, CONTACT_FALLBACK } from './brand';
+import { BRAND } from './brand';
 
 // Firebase Configuration
 const firebaseConfig = {
