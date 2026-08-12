@@ -19,7 +19,9 @@
 export const BRAND = {
   name: 'Asankary',
   domain: '',
-  contactEmail: 'asankary@gmail.com',
+  // Note the "e": asankarye@gmail.com, matching the published legal site and the
+  // asankarye-hub GitHub account. Confirmed by the owner.
+  contactEmail: 'asankarye@gmail.com',
   contactPhone: '+964 750 818 0750',
   address: 'Iraq - Erbil - Qala Bazar',
   storeCoords: { latitude: 36.1911, longitude: 44.0094 }, // Erbil default
@@ -28,9 +30,6 @@ export const BRAND = {
 /**
  * Published legal/support pages. Verified live (HTTP 200) — these are the URLs
  * App Store Connect requires under Support URL and Privacy Policy URL.
- *
- * NOTE: the site itself lists asankarye@gmail.com (with an "e") while BRAND above
- * uses asankary@gmail.com. Make the two agree before submitting.
  */
 export const LEGAL_URLS = {
   privacy: 'https://asankarye-hub.github.io/asankary-legal/',
