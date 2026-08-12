@@ -8,9 +8,29 @@
 // and downgrades to the weaker `plain` method. We back `digest` with
 // expo-crypto's native hashing so PKCE stays on S256.
 //
-// `react-native-get-random-values` (imported before this) already provides
-// `crypto.getRandomValues`; here we only add `crypto.subtle.digest`.
+// This file also provides `crypto.getRandomValues`, which used to come from
+// `react-native-get-random-values`. That package was removed: it is an extra
+// native module on the launch path, Expo SDK 54 pins it at ~1.11.0 while the
+// project had 2.0.0 (a codegen TurboModule), and the sibling forked-from
+// project — whose iOS Release build runs — does not include it at all. Its only
+// job was to bridge to a native RNG, and expo-crypto (already a dependency)
+// exposes the same thing natively via CryptoModule.swift's getRandomValues.
 import * as ExpoCrypto from 'expo-crypto';
+
+// Install `crypto.getRandomValues` first — Supabase's PKCE flow and uuid both
+// reach for it, and the digest polyfill below shares the same `crypto` object.
+try {
+  const g = global as any;
+  if (!g.crypto) g.crypto = {};
+  if (typeof g.crypto.getRandomValues !== 'function') {
+    g.crypto.getRandomValues = <T extends ArrayBufferView>(array: T): T => {
+      // expo-crypto fills the array in place and returns it.
+      return ExpoCrypto.getRandomValues(array as never) as unknown as T;
+    };
+  }
+} catch {
+  // Leave whatever the platform provides rather than crashing app startup.
+}
 
 const ALGO_MAP: Record<string, ExpoCrypto.CryptoDigestAlgorithm> = {
   'SHA-1': ExpoCrypto.CryptoDigestAlgorithm.SHA1,

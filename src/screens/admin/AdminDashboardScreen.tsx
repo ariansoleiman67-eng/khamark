@@ -372,10 +372,13 @@ const AdminDashboardScreen: React.FC = () => {
 
   // List Header Component
   const ListHeader = () => {
-    // Get banner image - use first coverUrl from array, or legacy coverUrl, or fallback to static
+    // Banner: first coverUrl from the array, else the legacy single coverUrl, else no
+    // image at all — the ImageBackground's brand-coloured backgroundColor shows through.
+    // This used to fall back to assets/hero-truck.jpg, a Volvo lorry inherited from the
+    // project this was forked from; that file has been deleted.
     const bannerSource = storeProfile?.coverUrls?.[0] || storeProfile?.coverUrl
       ? { uri: storeProfile?.coverUrls?.[0] || storeProfile?.coverUrl }
-      : require('../../../assets/hero-truck.jpg');
+      : undefined;
     
     return (
     <View>
@@ -383,7 +386,7 @@ const AdminDashboardScreen: React.FC = () => {
       <View style={styles.headerContainer}>
         <ImageBackground
           source={bannerSource}
-          style={styles.headerImageBackground}
+          style={[styles.headerImageBackground, { backgroundColor: theme.colors.primary }]}
           imageStyle={styles.headerImage}
           resizeMode="cover"
         >

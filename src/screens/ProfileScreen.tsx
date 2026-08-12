@@ -309,9 +309,15 @@ export const ProfileScreen: React.FC = () => {
           {/* =============== BANNER HERO =============== */}
           <Animated.View entering={enterAnim(80, 450)}
             style={{ marginHorizontal: 20, marginTop: 12, marginBottom: 8 }}>
+            {/* Cover: the customer's own photo when they have one, otherwise the brand
+                colour. It used to fall back to assets/hero-truck.jpg — a Volvo truck,
+                left over from the HaryadAutoparts project this was forked from — so every
+                guest and every customer without a cover photo saw a lorry as the banner of
+                a mobile-phone shop. The dark LinearGradient below still sits on top, so
+                the name and VIP badge keep their contrast either way. */}
             <ImageBackground
-              source={displayUser?.coverUrl ? { uri: displayUser.coverUrl } : require('../../assets/hero-truck.jpg')}
-              style={{ borderRadius: 20, overflow: 'hidden', minHeight: 240 }}
+              source={displayUser?.coverUrl ? { uri: displayUser.coverUrl } : undefined}
+              style={{ borderRadius: 20, overflow: 'hidden', minHeight: 240, backgroundColor: theme.colors.primary }}
               imageStyle={{ borderRadius: 20 }}
               resizeMode="cover"
             >

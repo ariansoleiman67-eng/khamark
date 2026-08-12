@@ -490,9 +490,12 @@ const AdminSettingsScreen: React.FC = () => {
           {/* =============== BANNER HERO =============== */}
           <Animated.View entering={enterAnim(80, 450)}
             style={{ marginHorizontal: 20, marginTop: Platform.OS === 'android' ? 26 : 12, marginBottom: 8 }}>
+            {/* Falls back to the brand colour, not an image. This used to load
+                assets/hero-truck.jpg — a Volvo lorry inherited from the project this was
+                forked from — which has been deleted. */}
             <ImageBackground
-              source={storeProfile?.coverUrl ? { uri: storeProfile.coverUrl } : require('../../../assets/hero-truck.jpg')}
-              style={{ borderRadius: 20, overflow: 'hidden', minHeight: 260 }}
+              source={storeProfile?.coverUrl ? { uri: storeProfile.coverUrl } : undefined}
+              style={{ borderRadius: 20, overflow: 'hidden', minHeight: 260, backgroundColor: theme.colors.primary }}
               imageStyle={{ borderRadius: 20 }}
               resizeMode="cover"
             >

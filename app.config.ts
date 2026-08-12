@@ -56,15 +56,31 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   // changed retroactively.
   runtimeVersion: "1.0.0",
   updates: {
-    // Phase 2: set to the new EAS updates URL after `eas init` under the Asankary account.
-    url: "https://u.expo.dev/REPLACE_WITH_ASANKARY_EAS_PROJECT_ID"
+    // OTA is OFF until `eas init` gives us a real project id. It used to carry the
+    // placeholder URL below with updates ENABLED and EXUpdatesCheckOnLaunch=ALWAYS, so
+    // every cold start fired a request at a host that does not exist. Harmless only
+    // because EXUpdatesLaunchWaitMs is 0 (non-blocking) — still a wasted, failing call
+    // on every launch of every install.
+    //
+    // To turn OTA on: run `eas init`, put the real id in extra.eas.projectId below, set
+    //   enabled: true, url: "https://u.expo.dev/<that id>"
+    // and switch runtimeVersion to { policy: "fingerprint" } at the same time.
+    enabled: false,
   },
 
   ios: {
     supportsTablet: true,
     bundleIdentifier: "com.asankary.app",
-    buildNumber: "3",
-    associatedDomains: ["applinks:ASANKARY_DOMAIN_TBD"],
+    // App Store Connect rejects a reused build number. Bump on every upload.
+    //   1.0 (2) — rejected 2.1(a), crashed on launch (react-native-get-random-values 2.0.0)
+    //   1.0 (4) — launched fine; rejected 2.3.10, non-iOS device imagery
+    //   1.0 (5) — HaryadAutoparts fork residue removed from the binary
+    buildNumber: "5",
+    // associatedDomains removed: it carried "applinks:ASANKARY_DOMAIN_TBD", a
+    // placeholder host. That ships a real com.apple.developer.associated-domains
+    // entitlement pointing at a domain that cannot serve an
+    // apple-app-site-association file, so universal links silently never verify.
+    // Restore as ["applinks:<real domain>"] once the domain exists.
     usesAppleSignIn: true,
     googleServicesFile: "./GoogleService-Info.plist",
     config: {
@@ -114,14 +130,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     versionCode: 2,
     googleServicesFile: "./google-services.json",
     intentFilters: [
-      {
-        action: "VIEW",
-        autoVerify: true,
-        data: [
-          { scheme: "https", host: "ASANKARY_DOMAIN_TBD", pathPrefix: "/product" }
-        ],
-        category: ["BROWSABLE", "DEFAULT"]
-      },
+      // The https/autoVerify filter for host "ASANKARY_DOMAIN_TBD" was removed — a
+      // placeholder host can never serve /.well-known/assetlinks.json, so Android App
+      // Links verification failed on every install. Re-add with the real domain once
+      // it exists. The asankary:// scheme below is what deep links actually use.
       {
         action: "VIEW",
         data: [
@@ -204,12 +216,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "expo-font",
     "expo-secure-store",
     "expo-localization",
-    // react-native-fbsdk-next plugin intentionally disabled: Asankary has no Meta app
-    // yet, so the plugin emitted a placeholder `fb<APPID>` URL scheme that App Store
-    // Connect rejects (error 90158). The Facebook auth code in
-    // src/services/auth/facebookAuth.ts stays dormant (the sign-in buttons are already
-    // gated off). To re-enable: create the Meta app, restore this block with the real
-    // appID + clientToken, then re-run `npx expo prebuild --clean -p ios`.
+    "expo-asset",
+    // react-native-fbsdk-next is REMOVED from the project entirely (not just its
+    // plugin). Disabling only the plugin left FBSDKCoreKit autolinked into the iOS
+    // binary while stripping the FacebookAppID / FacebookClientToken keys it requires
+    // in Info.plist — the Meta SDK still self-initialised at launch with no config.
+    // See src/services/auth/facebookAuth.ts for how to bring it back.
     [
       "expo-location",
       {
@@ -228,6 +240,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         ios: {
           deploymentTarget: "15.1",
           useFrameworks: "static",
+          // Required: without it, react-native-maps fails to compile under
+          // useFrameworks: "static" with
+          //   "declaration of 'RCTViewManager' must be imported from module
+          //    'react_native_maps.AIRMapCalloutManager' before it is required".
+          // This matches the sibling project it was forked from, whose Release-iphoneos
+          // build works with this exact setting.
           buildReactNativeFromSource: true,
         },
       },
