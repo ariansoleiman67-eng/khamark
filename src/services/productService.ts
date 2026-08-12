@@ -59,7 +59,7 @@ export const mapProduct = (data: any): Product => ({
   // so customer listings fall back to their previous ordering until an admin drags.
   sortOrder: data.sort_order,
   // Legacy cosmetic colours live in extra_data.options (mirrors mapTenantProduct).
-  // Only present on the detail fetch (select '*'); LIST_COLUMNS omits extra_data.
+  // Only present on the detail fetch (DETAIL_COLUMNS); LIST_COLUMNS omits extra_data.
   options: data.extra_data?.options,
   tenantId: data.tenant_id,
   createdAt: data.created_at,
@@ -93,6 +93,32 @@ const LIST_COLUMNS =
 // dragging in AdminProductsScreen (parts.sort_order). The column defaults to 0, so
 // on a shop that has never been reordered every row ties and the existing
 // .order(...) chained after it still decides — today's behaviour is preserved.
+// Every column `mapProduct` reads on the DETAIL path, named — and one column
+// deliberately absent: `purchase_price`, the cost this shop paid.
+//
+// WHY THIS IS A LIST AND NOT `select('*')`. `parts.purchase_price` is the shop's
+// margin on every product it sells. Protecting it means taking the public role's
+// permission to read that ONE column away, and Postgres can only express that by
+// granting every other column by name — which makes `select *` fail outright for
+// anyone not signed in. `getProduct` is the product screen, and it runs for
+// customers who have not signed in, so the star had to go first or the screen
+// would stop opening for them the moment the grant changed.
+//
+// Verified against the live table before it was written: this list returns 42
+// columns, `select('*')` returns 43, and the difference is exactly
+// `purchase_price`. Nothing else the mapper reads was dropped.
+//
+// THE COST IS STILL CAPTURED ON AN ORDER. CheckoutScreen batch-fetches it with
+// its own `select('id, purchase_price')` while signed in — signed-in users keep
+// the grant — and its comment already assumed the light list carried no cost.
+// This makes the detail path agree with that assumption instead of contradicting
+// it. `product.purchasePrice` is therefore undefined on this path now; the only
+// reader was that checkout fallback, which the fresh fetch above it supersedes.
+//
+// Admin screens are unaffected: adminService and tenantAdminService run signed in
+// as the owner and keep their own `select('*')`, cost included.
+const DETAIL_COLUMNS = `${LIST_COLUMNS},description,description_ar,description_ku,specifications,compatible_models,dimensions,weight,warranty,video_url,sku,extra_data,initial_stock,historical_stock_qty`;
+
 const SORT_ORDER_COLUMN = 'sort_order';
 const SORT_ORDER_OPTS = { ascending: true, nullsFirst: false } as const;
 
@@ -282,7 +308,7 @@ export class ProductService {
       const cached = await this.getCachedData(cacheKey);
       if (cached && !this.isCacheExpired(cached.timestamp)) return cached.data;
 
-      let query = supabase.from('parts').select('*').eq('id', productId);
+      let query = supabase.from('parts').select(DETAIL_COLUMNS).eq('id', productId);
       if (tenantId) query = query.eq('tenant_id', tenantId);
 
       const { data, error } = await query.single();
