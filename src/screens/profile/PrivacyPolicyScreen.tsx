@@ -34,10 +34,12 @@ When you use our ${BRAND.name} app, we collect:
 
 1.2 AUTOMATICALLY COLLECTED DATA
 • Device information (model, operating system, version)
-• App usage analytics and performance metrics
-• Location data (with your permission for delivery)
+• Location data (only if you grant permission, and only to set a delivery address)
 • Network information and IP addresses
-• Crash reports and error logs
+• A device token, if you enable push notifications, so we can send order updates
+
+We do not use any analytics or advertising SDK, and we do not collect usage
+analytics or crash reports.
 
 1.3 OPTIONAL INFORMATION
 • Profile photos and preferences
@@ -73,11 +75,12 @@ When you use our ${BRAND.name} app, we collect:
       title: "3. INFORMATION SHARING",
       content: `3.1 SERVICE PROVIDERS
 We share information with trusted partners:
-• Payment processors (QI Card, FIB Bank, etc.)
-• Shipping and delivery companies
-• Cloud storage and hosting providers
-• Analytics and performance monitoring services
-• Customer support tools and platforms
+• Cloud hosting and database providers that store your account and orders
+• Shipping and delivery staff, who receive the delivery address for your order
+• Push notification delivery services
+
+Orders in this release are paid cash on delivery or through a money exchanger, so
+no card details are collected by the app or shared with a card processor.
 
 3.2 BUSINESS TRANSFERS
 • In case of merger, acquisition, or sale
@@ -188,35 +191,29 @@ Data may be retained longer if:
     },
     {
       title: "8. COOKIES AND TRACKING",
-      content: `8.1 TYPES OF COOKIES
-• Essential cookies for app functionality
-• Analytics cookies for usage insights
-• Preference cookies for user settings
-• Marketing cookies (with consent)
-• Third-party cookies from integrated services
+      content: `8.1 NO TRACKING AND NO ADVERTISING
+• The app shows no advertising of any kind
+• We do not track you across other companies' apps or websites
+• We never access the device advertising identifier, and the app therefore never
+  shows Apple's App Tracking Transparency prompt
+• No Google Analytics, no advertising network, no social media tracking plugin
 
-8.2 COOKIE MANAGEMENT
-• Cookie preferences in app settings
-• Browser settings for web-based access
-• Opt-out options for non-essential cookies
-• Regular cookie policy updates
-• Clear information about cookie purposes
+8.2 WHAT IS STORED ON YOUR DEVICE
+• Your sign-in session, so you are not asked to log in every time
+• Your language, currency and theme preferences
+• A cached copy of the catalogue so the app opens quickly offline
 
-8.3 THIRD-PARTY TRACKING
-• Google Analytics for app performance
-• Social media plugins (if applicable)
-• Payment processor tracking
-• Advertising network cookies (with consent)
-• Control options for all tracking`
+Signing out or deleting the app removes all of it. There are no cookies — this is
+a native app, not a website.`
     },
     {
       title: "9. CHILDREN'S PRIVACY",
       content: `9.1 AGE RESTRICTIONS
-• App intended for users 18 years and older
-• No knowingly collecting data from minors
-• Parental consent required for users under 18
-• Special protections for children's data
-• Regular age verification procedures
+• The app is intended for general audiences shopping for consumer electronics
+• It is not directed at children, and we do not knowingly collect data from a child
+• The app does not ask for a date of birth and performs no age verification
+• If you believe a child has given us personal information, contact us and we will
+  delete it
 
 9.2 PROTECTION MEASURES
 • Enhanced privacy protections for minors
