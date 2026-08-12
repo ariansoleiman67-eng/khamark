@@ -216,10 +216,19 @@ Card radius 12, padding `md`. Prefer `min-height` and `aspect-ratio` over fixed 
 - **Numbers always render LTR**, even inside RTL text. Wrap them in `dir="ltr"`.
 - **Use logical CSS properties** (`start-*`, `end-*`, `ms-`, `me-`) — never `left-*`/`right-*`.
   Layout must mirror from `dir` alone, with no compensating CSS.
-- All three message files must carry the identical key set, with matching ICU placeholders,
-  and no Arabic or Kurdish value byte-identical to its English counterpart. **The mobile app
-  has 18 Arabic and 19 Kurdish keys holding English text — do not inherit that bug.** Enforce
-  it with a test.
+- All three message files must carry the identical key set, with matching ICU placeholders.
+- **Do not enforce "no Arabic or Kurdish value byte-identical to its English one".** That rule
+  looks right and is wrong. The mobile app has 16 such Arabic values and 17 Kurdish, and on
+  inspection every one is correct: brand names (`Asankary`), platform names (`App Store`,
+  `Google Play`), phone-format masks (`07XX XXX XXXX`), `SKU`, `VIP`, URL/email placeholders
+  (`https://example.com`), and the Arabic- and Kurdish-script product-name placeholders, which
+  are identical across files *by design* — they show the admin what to type in that language.
+  A byte-equality test would flag all of them and teach whoever hits it to paste noise into a
+  correct file.
+- Test instead for what actually goes wrong: **no value in any locale may contain a placeholder
+  token** (`TODO_`, `_TBD`, `[…]`, `Lorem`). The app shipped `TODO_CONTACT_PHONE_2` inside three
+  rendered FAQ answers in all three languages; see `src/constants/brand.ts` for the guard, and
+  `__tests__/utils/brandContact.test.ts` for the shape of that test.
 - Arabic plurals need real ICU categories: `8 نتائج`, not `8 نتيجة`.
 
 ---
