@@ -76,9 +76,14 @@ export const FIREBASE_FUNCTIONS_URL =
 // This URL must also be listed under Redirect URLs in the Supabase dashboard
 // (Authentication → URL Configuration), or Supabase silently falls back to the
 // project's Site URL — which is how these links ended up pointing at localhost.
+// verified.html does NOT exist on that site — it returns 404, so every email
+// verification link landed the user on GitHub's "404 There isn't a GitHub Pages
+// site here" page and the signup flow appeared broken. The site root is a real,
+// live Asankary page (HTTP 200), so point there until a proper "email verified"
+// page is published at .../verified.html, at which point restore that path.
 export const EMAIL_VERIFY_REDIRECT_URL =
   process.env.EXPO_PUBLIC_EMAIL_VERIFY_REDIRECT_URL ||
-  'https://asankarye-hub.github.io/asankary-legal/verified.html';
+  'https://asankarye-hub.github.io/asankary-legal/';
 
 // API Configuration
 export const API_CONFIG = {

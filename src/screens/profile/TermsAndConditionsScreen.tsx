@@ -36,8 +36,7 @@ These terms apply to all users, including customers, visitors, and others who ac
 ${contactBlockOr(
   CONTACT_FALLBACK,
   ['Address', BRAND.address],
-  ['Phone', BRAND.contactPhone2],
-  ['Alternate Phone', BRAND.contactPhone],
+  ['Phone', BRAND.contactPhone],
   ['Email', BRAND.contactEmail],
 )}
 
@@ -224,7 +223,7 @@ ${BRAND.name}
 ${contactBlockOr(
   CONTACT_FALLBACK,
   ['Address', BRAND.address],
-  ['Phone', BRAND.contactPhone2],
+  ['Phone', BRAND.contactPhone],
   ['WhatsApp', BRAND.contactPhone],
   ['Email', BRAND.contactEmail],
 )}

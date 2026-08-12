@@ -48,28 +48,30 @@ describe('contactBlock', () => {
   });
 });
 
-// The point of the whole helper: App Review rejected 1.0 (4) for an unrelated
-// completeness issue, and the legal screens were rendering "TODO_CONTACT_EMAIL"
-// to any reviewer who opened Terms or Privacy Policy.
-describe('no placeholder can reach a user-facing string', () => {
-  const contactFields = [
-    BRAND.contactEmail,
-    BRAND.contactPhone,
-    BRAND.contactPhone2,
-    BRAND.contactPhone3,
-    BRAND.address,
-  ];
+// The point of the whole helper: App Review rejected 1.0 (4) on a completeness
+// guideline, and the legal screens were rendering "TODO_CONTACT_EMAIL" to any
+// reviewer who opened Terms or Privacy Policy. Real values are now configured,
+// so these assert the shipped BRAND block is clean AND actually renders.
+describe('the shipped BRAND block', () => {
+  const contactFields = [BRAND.contactEmail, BRAND.contactPhone, BRAND.address];
 
-  it('renders nothing at all for the current placeholder BRAND block', () => {
-    expect(contactBlock(...contactFields.map((v, i) => [`L${i}`, v] as const))).toBe('');
+  it('contains no placeholder in any field', () => {
+    for (const v of Object.values(BRAND)) {
+      if (typeof v === 'string') expect(v).not.toMatch(/TODO_|_TBD|\[License Number\]/);
+    }
   });
 
-  it('shows the fallback instead, and the fallback names a route that exists', () => {
+  it('renders every contact field, so the legal screens are no longer empty', () => {
     const rendered = contactBlockOr(
       CONTACT_FALLBACK,
       ...contactFields.map((v, i) => [`L${i}`, v] as const),
     );
-    expect(rendered).toBe(CONTACT_FALLBACK);
-    expect(rendered).not.toMatch(/TODO_|_TBD|\[License Number\]/);
+    expect(rendered).not.toBe(CONTACT_FALLBACK);
+    expect(rendered.split('\n')).toHaveLength(contactFields.length);
+    expect(rendered).not.toMatch(/TODO_|_TBD/);
+  });
+
+  it('leaves domain unset, so the share sheet omits the link rather than sending a dead URL', () => {
+    expect(brandContact(BRAND.domain)).toBeNull();
   });
 });

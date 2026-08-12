@@ -263,16 +263,16 @@ ${BRAND.name}
 ${contactBlockOr(
   CONTACT_FALLBACK,
   ['Address', BRAND.address],
-  ['Phone', BRAND.contactPhone2],
+  ['Phone', BRAND.contactPhone],
   ['Email', BRAND.contactEmail],
-  ['WhatsApp', BRAND.contactPhone2],
+  ['WhatsApp', BRAND.contactPhone],
 )}
 
 DATA PROTECTION QUERIES
 ${contactBlockOr(
   CONTACT_FALLBACK,
   ['Email', BRAND.contactEmail],
-  ['Alternate Phone', BRAND.contactPhone3],
+  ['Phone', BRAND.contactPhone],
 )}
 Response Time: Within 72 hours
 Business Hours: Saturday-Thursday 8AM-6PM, Friday 8AM-12PM
@@ -281,8 +281,7 @@ GENERAL SUPPORT
 ${contactBlockOr(
   CONTACT_FALLBACK,
   ['Email', BRAND.contactEmail],
-  ['Phone', BRAND.contactPhone2],
-  ['Alternate', BRAND.contactPhone3],
+  ['Phone', BRAND.contactPhone],
 )}
 Available: 6 days a week
 
