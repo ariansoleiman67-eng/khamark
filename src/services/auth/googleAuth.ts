@@ -113,7 +113,7 @@ const signInWithGoogleWeb = async (): Promise<User> => {
   }
 };
 
-import { GOOGLE_AUTH } from '../../constants/config';
+import { GOOGLE_AUTH, isGoogleAuthConfigured } from '../../constants/config';
 
 // Web Client ID — read from env (Phase 2 OAuth setup)
 const WEB_CLIENT_ID = GOOGLE_AUTH.WEB_CLIENT_ID;
@@ -156,9 +156,19 @@ const getGoogleSignin = async () => {
   }
   
   if (!isConfigured) {
+    // Refuse to configure with missing/malformed ids. configure() hands iosClientId
+    // to the native GoogleSignIn SDK, which raises NSInvalidArgumentException on a
+    // bad value — an uncatchable native crash. Failing here keeps it a normal JS
+    // error the sign-in screen can show.
+    if (!isGoogleAuthConfigured()) {
+      throw new Error('Google Sign-In is not configured in this build.');
+    }
+
     GoogleSigninModule.GoogleSignin.configure({
       webClientId: WEB_CLIENT_ID,
-      iosClientId: GOOGLE_AUTH.IOS_CLIENT_ID,
+      // Omitted when absent so the SDK keeps the CLIENT_ID it already read from
+      // GoogleService-Info.plist rather than being overridden with an empty string.
+      ...(GOOGLE_AUTH.IOS_CLIENT_ID ? { iosClientId: GOOGLE_AUTH.IOS_CLIENT_ID } : {}),
     });
     isConfigured = true;
   }

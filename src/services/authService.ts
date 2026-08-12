@@ -513,7 +513,14 @@ export class AuthService {
     try {
       const { GoogleSignin } = require('@react-native-google-signin/google-signin');
       const webClientId = GOOGLE_AUTH.WEB_CLIENT_ID;
-      
+
+      // Guard before touching the native SDK — see the note in constants/config.ts.
+      // Configuring with a missing/malformed client id is a native crash, not a
+      // rejected promise.
+      if (!webClientId) {
+        throw new Error('Google Sign-In is not configured in this build.');
+      }
+
       GoogleSignin.configure({ webClientId, offlineAccess: true });
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
       

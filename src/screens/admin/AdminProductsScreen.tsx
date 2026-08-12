@@ -797,7 +797,11 @@ const AdminProductsScreen: React.FC = () => {
         nameAr: formData.nameAr.trim() || null,
         nameKu: formData.nameKu.trim() || null,
         partNumber: trimmedPartNumber,
-        category: formData.category || 'General',
+        // TRIMMED, like every other text field here. `category` and `brand` are the two
+        // columns the storefront GROUPS by, so stray whitespace does not just look untidy —
+        // it splits one brand into two. Three live rows already carry it ("Tecno ",
+        // "Motorola ", "Honor "), which made the same phone brand appear twice in filters.
+        category: formData.category.trim() || 'General',
         // Blank stays NULL, never the English text. Back-filling English here made
         // the customer-side fallback (`categoryAr?.trim() ? categoryAr : category`)
         // unreachable, so an Arabic shopper saw English for a field the admin had
@@ -821,7 +825,7 @@ const AdminProductsScreen: React.FC = () => {
         // being handed English pretending to be a translation.
         descriptionAr: formData.descriptionAr?.trim() || null,
         descriptionKu: formData.descriptionKu?.trim() || null,
-        brand: formData.brand || '',
+        brand: formData.brand.trim() || '',
         // Column is real and already read by mapProduct (defaults to 'new' when
         // absent) — condition was simply never written by this form before.
         // formData.condition is only ever populated by the trade-in prefill

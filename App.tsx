@@ -1,6 +1,7 @@
 // Samsung Accessibility Patches - must be first imports
-import 'react-native-get-random-values';
-// Adds crypto.subtle.digest (expo-crypto) so Supabase PKCE uses SHA-256, not plain
+// Installs crypto.getRandomValues AND crypto.subtle.digest, both backed by
+// expo-crypto, so Supabase PKCE uses SHA-256 rather than plain. This replaces
+// react-native-get-random-values — see the note in cryptoPolyfill.ts.
 import './src/ui/cryptoPolyfill';
 // import './src/ui/patchText';
 // import './src/ui/patchPressable'; // DISABLED: May block animations - testing

@@ -1,118 +1,42 @@
 /**
- * Facebook Login Authentication (Supabase)
+ * Facebook Login Authentication (Supabase) — DISABLED.
  *
- * Uses react-native-fbsdk-next (lazy-loaded to stay Expo-Go safe) to obtain the
- * Facebook access token, then signs into Supabase via signInWithIdToken.
- * NOTE: Facebook login is currently disabled in the UI; kept Supabase-ready.
+ * `react-native-fbsdk-next` was removed from the project. Autolinking compiled
+ * FBSDKCoreKit into the iOS binary, but its Expo config plugin was deliberately
+ * off (it emitted a placeholder `fb<APPID>` URL scheme that App Store Connect
+ * rejects with error 90158). That left the Meta SDK linked and self-initialising
+ * at launch with no `FacebookAppID` / `FacebookClientToken` in Info.plist — a
+ * configuration FBSDK 17+ does not tolerate.
+ *
+ * The sign-in buttons that would reach this file are already gated off behind
+ * `{false && ...}` in SignInScreen and PhoneLoginScreen, so nothing user-facing
+ * changes. These stubs keep the module's public shape intact for
+ * src/services/auth/index.ts and AuthContext.
+ *
+ * To re-enable: create the Meta app, `npx expo install react-native-fbsdk-next`,
+ * add its plugin block to app.config.ts with the real appID + clientToken,
+ * restore this file from git history, then `npx expo prebuild --clean -p ios`.
  */
 
 import { User } from '../../types';
-import { supabase } from '../supabase';
-import { AuthService } from '../authService';
 
-// Lazy-loaded Facebook Sign In module
-let FBSDKModule: typeof import('react-native-fbsdk-next') | null = null;
-let isNativeModuleAvailable: boolean | null = null;
+const UNAVAILABLE_MESSAGE = 'Facebook Login is not available in this build.';
 
 /**
- * Check if Facebook Sign-In native module is available.
+ * Whether Facebook Sign-In can run. Always false — the native SDK is not linked.
  */
-export const isFacebookSignInAvailable = (): boolean => {
-  if (isNativeModuleAvailable !== null) {
-    return isNativeModuleAvailable;
-  }
-
-  try {
-    const { TurboModuleRegistry, NativeModules } = require('react-native');
-    const nativeModule = TurboModuleRegistry.get('FBAccessToken') || NativeModules.FBLoginManager;
-    isNativeModuleAvailable = nativeModule !== null && nativeModule !== undefined;
-  } catch {
-    isNativeModuleAvailable = false;
-  }
-
-  return isNativeModuleAvailable;
-};
+export const isFacebookSignInAvailable = (): boolean => false;
 
 /**
- * Lazy-load Facebook SDK.
- */
-const getFBSDK = async () => {
-  if (!isFacebookSignInAvailable()) {
-    throw new Error('Facebook Login is not available in this build. Please use a development build or production APK.');
-  }
-
-  if (!FBSDKModule) {
-    FBSDKModule = await import('react-native-fbsdk-next');
-  }
-
-  return FBSDKModule;
-};
-
-/**
- * Sign in with Facebook via Supabase.
+ * Sign in with Facebook via Supabase. Always rejects while the SDK is unlinked.
  */
 export const signInWithFacebook = async (): Promise<User> => {
-  try {
-    const { LoginManager, AccessToken } = await getFBSDK();
-
-    const result = await LoginManager.logInWithPermissions(['public_profile', 'email']);
-    if (result.isCancelled) {
-      throw new Error('User cancelled the login process');
-    }
-
-    const data = await AccessToken.getCurrentAccessToken();
-    if (!data) {
-      throw new Error('Something went wrong obtaining Facebook access token');
-    }
-
-    const { data: authData, error } = await supabase.auth.signInWithIdToken({
-      provider: 'facebook',
-      token: data.accessToken,
-    });
-    if (error) throw error;
-    if (!authData.user) throw new Error('Failed to sign in with Facebook');
-
-    let profile = await AuthService.getCurrentUserFresh();
-
-    if (!profile) {
-      profile = {
-        uid: authData.user.id,
-        name: authData.user.user_metadata?.full_name || 'Facebook User',
-        email: authData.user.email || '',
-        phone: authData.user.phone || '',
-        addresses: [],
-        language: 'en',
-        createdAt: new Date().toISOString() as any,
-        updatedAt: new Date().toISOString() as any,
-      };
-
-      await supabase.from('users').upsert({
-        id: profile.uid,
-        name: profile.name,
-        email: profile.email,
-      });
-    }
-
-    return profile;
-  } catch (error: any) {
-    if (error.message?.includes('not available')) {
-      throw error;
-    }
-    console.error('Facebook Login Error', error);
-    throw new Error(error.message || 'Facebook Login failed');
-  }
+  throw new Error(UNAVAILABLE_MESSAGE);
 };
 
 /**
- * Sign out from Facebook.
+ * Sign out from Facebook. No-op while the SDK is unlinked.
  */
 export const signOutFacebook = async (): Promise<void> => {
-  try {
-    if (!isFacebookSignInAvailable()) return;
-
-    const { LoginManager } = await getFBSDK();
-    LoginManager.logOut();
-  } catch {
-    // Ignore errors during sign out
-  }
+  // Nothing to sign out of.
 };

@@ -47,13 +47,24 @@ export const SUPABASE_CONFIG = {
 // Google Maps client key (Static Maps + native SDK). Empty until configured.
 export const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
-// Google Sign-In OAuth client IDs (from env; placeholders until Phase 2 OAuth setup).
+// Google Sign-In OAuth client IDs (from env).
+//
+// These fall back to '' — NOT to a placeholder string. A placeholder is worse than
+// nothing here: GoogleSignin.configure() forwards iosClientId straight to the native
+// GoogleSignIn SDK, where it OVERRIDES the valid CLIENT_ID that Firebase already read
+// from GoogleService-Info.plist. The SDK then raises NSInvalidArgumentException on a
+// malformed id and takes the app down the moment someone taps "Continue with Google".
+// An empty value lets isGoogleAuthConfigured() below refuse the attempt in JS instead.
+const asClientId = (value: string | undefined): string =>
+  value && value.endsWith('.apps.googleusercontent.com') ? value : '';
+
 export const GOOGLE_AUTH = {
-  WEB_CLIENT_ID:
-    process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || 'REPLACE_WITH_ASANKARY_GOOGLE_WEB_CLIENT_ID',
-  IOS_CLIENT_ID:
-    process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || 'REPLACE_WITH_ASANKARY_GOOGLE_IOS_CLIENT_ID',
+  WEB_CLIENT_ID: asClientId(process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID),
+  IOS_CLIENT_ID: asClientId(process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID),
 };
+
+/** True when a real Google OAuth web client id is present. */
+export const isGoogleAuthConfigured = (): boolean => GOOGLE_AUTH.WEB_CLIENT_ID !== '';
 
 // Firebase Cloud Functions base URL (region + project). Derived from the Firebase project id.
 export const FIREBASE_PROJECT_ID =

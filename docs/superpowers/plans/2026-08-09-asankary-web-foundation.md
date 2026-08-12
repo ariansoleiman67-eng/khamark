@@ -2,11 +2,19 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** A running Next.js 15 storefront at `/Users/maci/Desktop/Asankary - Web` that renders real products from the existing Supabase project in English, Arabic and Kurdish with correct RTL, priced identically to the mobile app.
+**Goal:** A running Next.js 16 storefront at `/Users/maci/Desktop/Asankary - Web` that renders real products from the existing Supabase project in English, Arabic and Kurdish with correct RTL, priced identically to the mobile app.
 
 **Architecture:** Next.js App Router with server components for the public catalogue (cached, SEO-indexable) and client components for anything user-specific. One Supabase project shared with the mobile app — no new backend. Pricing and discount logic is ported verbatim from the app's pure-TypeScript utilities and locked with parity tests so the two surfaces can never quote different prices.
 
-**Tech Stack:** Next.js 15 (App Router), React 19, TypeScript strict, Tailwind CSS v4, next-intl, `@supabase/ssr`, Vitest.
+**Tech Stack:** Next.js 16 (App Router), React 19, TypeScript strict, Tailwind CSS v4 (CSS-first), next-intl, `@supabase/ssr`, Vitest.
+
+> **Amended during Task 1.** The plan originally said Next.js 15. `create-next-app@latest`
+> installs **16.3.0**, which `npm view next dist-tags` confirms is the stable `latest`
+> (beta is `16.0.0-beta.0`, canary `16.3.1-canary.9`). `next-intl@4.13.5` lists
+> `^16.0.0` in its peer range and `@supabase/ssr` constrains only `@supabase/supabase-js`,
+> so nothing downstream breaks. Kept 16 rather than downgrading — it also matches the
+> "newest" requirement. Tailwind v4 in Next 16 is **CSS-first**: there is no
+> `tailwind.config.ts`; tokens are declared in an `@theme` block in `globals.css`.
 
 **Spec:** `docs/superpowers/specs/2026-08-09-asankary-web-design.md` (in the mobile repo)
 
@@ -31,7 +39,6 @@
 Asankary - Web/
 ├── .env.local.example          # documents required vars; never holds real values
 ├── next.config.ts              # Supabase Storage host allow-list, image formats
-├── tailwind.config.ts          # design tokens from Global Constraints
 ├── vitest.config.ts
 ├── messages/
 │   ├── en.json                 # UI strings (web-owned, not copied wholesale from app)
@@ -139,7 +146,7 @@ Expected: exits 0 (no test files yet is fine).
 
 ```bash
 git init && git add -A
-git commit -m "chore: scaffold Next.js 15 storefront with Vitest"
+git commit -m "chore: scaffold Next.js 16 storefront with Vitest"
 ```
 
 ---
@@ -147,10 +154,10 @@ git commit -m "chore: scaffold Next.js 15 storefront with Vitest"
 ## Task 2: Design tokens
 
 **Files:**
-- Modify: `tailwind.config.ts`, `src/app/globals.css`
+- Modify: `src/app/globals.css` (Tailwind v4 is CSS-first — there is NO tailwind.config.ts)
 
 **Interfaces:**
-- Produces: Tailwind utilities `bg-brand`, `rounded-card`, `p-md`, `text-h1`… consumed by every later component.
+- Produces: Tailwind utilities `bg-brand`, `bg-canvas`, `bg-surface`, `p-md`, `gap-md`, `rounded-card`, `rounded-pill`, `tablet:`, `desktop:` — consumed by every later component. NOTE: TYPOGRAPHY is exported from tokens.ts but deliberately NOT wired into `@theme`; components use explicit `text-[Npx]` with the token values. There is no `text-h1` utility.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -223,24 +230,74 @@ Expected: PASS, 4 tests.
 
 - [ ] **Step 5: Wire the tokens into Tailwind**
 
-In `tailwind.config.ts`:
+Tailwind v4 is **CSS-first** — there is no `tailwind.config.ts`. Declare the tokens in
+an `@theme` block in `src/app/globals.css`, immediately after the existing
+`@import "tailwindcss";`. The values must equal `src/domain/tokens.ts` exactly; Step 6
+adds a test that fails if they drift.
+
+```css
+@import "tailwindcss";
+
+@theme {
+  /* Brand — amber-retail preset, the mobile app's default theme */
+  --color-brand: #F5A00A;
+  --color-brand-variant: #FF9F0D;
+  --color-surface: #FFFFFF;
+  --color-canvas: #F4F4F6;
+  --color-ink: #2B2B2B;
+
+  /* Spacing — app scale: xs 4, sm 8, md 16, lg 24, xl 32 */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+
+  /* Radius — the LIVE scale from themePresets.ts (md 12, lg 20) */
+  --radius-card: 12px;
+  --radius-pill: 20px;
+
+  /* Breakpoints — app constants */
+  --breakpoint-tablet: 768px;
+  --breakpoint-desktop: 1024px;
+}
+```
+
+This yields the utilities used by later tasks: `bg-brand`, `bg-canvas`, `bg-surface`,
+`p-md`, `gap-md`, `rounded-card`, `rounded-pill`, `tablet:`, `desktop:`.
+
+- [ ] **Step 5b: Lock the CSS tokens to the TypeScript tokens**
+
+Append to `src/domain/tokens.test.ts` so the two sources cannot drift:
 
 ```ts
-import type { Config } from 'tailwindcss'
-import { SPACING, RADIUS, BRAND, BREAKPOINTS } from './src/domain/tokens'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
-export default {
-  content: ['./src/**/*.{ts,tsx}'],
-  theme: {
-    extend: {
-      colors: { brand: BRAND.primary, 'brand-variant': BRAND.primaryVariant, surface: BRAND.surface, canvas: BRAND.background },
-      spacing: { xs: `${SPACING.xs}px`, sm: `${SPACING.sm}px`, md: `${SPACING.md}px`, lg: `${SPACING.lg}px`, xl: `${SPACING.xl}px` },
-      borderRadius: { card: `${RADIUS.md}px`, pill: `${RADIUS.lg}px` },
-      screens: { tablet: `${BREAKPOINTS.tablet}px`, desktop: `${BREAKPOINTS.desktop}px` },
-    },
-  },
-} satisfies Config
+describe('globals.css @theme matches tokens.ts', () => {
+  const css = readFileSync(join(process.cwd(), 'src/app/globals.css'), 'utf8')
+
+  it('declares every spacing value from SPACING', () => {
+    for (const [key, value] of Object.entries(SPACING)) {
+      expect(css).toContain(`--spacing-${key}: ${value}px;`)
+    }
+  })
+  it('declares the card and pill radii from RADIUS', () => {
+    expect(css).toContain(`--radius-card: ${RADIUS.md}px;`)
+    expect(css).toContain(`--radius-pill: ${RADIUS.lg}px;`)
+  })
+  it('declares the brand colour', () => {
+    expect(css).toContain(`--color-brand: ${BRAND.primary};`)
+  })
+  it('declares the app breakpoints', () => {
+    expect(css).toContain(`--breakpoint-tablet: ${BREAKPOINTS.tablet}px;`)
+    expect(css).toContain(`--breakpoint-desktop: ${BREAKPOINTS.desktop}px;`)
+  })
+})
 ```
+
+Run: `npm test`
+Expected: PASS. Vitest's `environment: 'node'` already permits `node:fs`.
 
 - [ ] **Step 6: Commit**
 
@@ -1042,8 +1099,14 @@ import type { Product } from '@/domain/types'
 export interface ListParams {
   page?: number; limit?: number
   category?: string; brand?: string; search?: string
-  tenantId?: string   // omit for the whole marketplace; set for one shop
+  tenantId?: string   // omit for all shops; set for one shop
 }
+
+// LIVE-DATA NOTE (diagnostic, 2026-08-09): there is exactly ONE tenant and 14
+// products, all active. So the home page is THE storefront, not a multi-vendor
+// listing, and pagination is inert at this size — `limit` defaults high enough
+// to return everything in one query. The parameters stay because the shape is
+// right and costs nothing; do not build pagination UI for 14 rows.
 
 export interface ListResult { products: Product[]; total: number; hasMore: boolean }
 
@@ -1088,14 +1151,73 @@ export async function getProduct(id: string): Promise<Product | null> {
 }
 ```
 
-- [ ] **Step 2: Verify against the real database**
+- [ ] **Step 2: Unit-test the query builder against a fake Supabase client**
 
-Create a temporary script `scripts/smoke.ts` that calls `listProducts({ limit: 3 })` and prints `products.length` and the first product's `name`, `priceUSD` and `inStock`.
+Credentials are not available, so correctness is proven with a fake rather than a live
+call. Extract the query construction so it can be tested: `listProducts` takes an optional
+client factory defaulting to `createServerSupabase`.
 
-Run it with the real `.env.local` present.
-Expected: three real products from the live catalogue, with sane prices.
+Create `src/data/products.test.ts` with a chainable fake that records what was asked for:
 
-**If this returns zero rows**, RLS is blocking anon reads of `parts` — record it and stop; it is exactly the gate described in spec §5 and must be resolved by the security phase.
+```ts
+import { describe, it, expect } from 'vitest'
+import { listProducts } from './products'
+
+function fakeClient(rows: unknown[] = [], count = 0) {
+  const calls: Record<string, unknown[]> = { eq: [], or: [], order: [], range: [], select: [] }
+  const q: Record<string, unknown> = {}
+  const chain = (name: string) => (...args: unknown[]) => { calls[name]?.push(args); return q }
+  Object.assign(q, {
+    select: chain('select'), eq: chain('eq'), or: chain('or'),
+    order: chain('order'), range: chain('range'),
+    then: (res: (v: unknown) => void) => res({ data: rows, error: null, count }),
+  })
+  return { client: { from: () => q }, calls }
+}
+
+describe('listProducts', () => {
+  it('only ever returns active products', async () => {
+    const { client, calls } = fakeClient()
+    await listProducts({}, () => client as never)
+    expect(calls.eq).toContainEqual(['is_active', true])
+  })
+  it('does NOT filter by tenant when none is given', async () => {
+    const { client, calls } = fakeClient()
+    await listProducts({}, () => client as never)
+    expect(calls.eq.some((a) => (a as string[])[0] === 'tenant_id')).toBe(false)
+  })
+  it('orders by the admin drag order first', async () => {
+    const { client, calls } = fakeClient()
+    await listProducts({}, () => client as never)
+    expect(calls.order[0]).toEqual(['sort_order', { ascending: true, nullsFirst: false }])
+  })
+  it('maps rows through mapProduct, so status gates stock', async () => {
+    const { client } = fakeClient([{ id: '1', name: 'X', price_usd: '9.5', stock_qty: 5, status: 'coming_soon' }], 1)
+    const { products } = await listProducts({}, () => client as never)
+    expect(products[0]!.priceUSD).toBe(9.5)
+    expect(products[0]!.inStock).toBe(false)
+  })
+  it('strips characters that would break a PostgREST or() filter', async () => {
+    const { client, calls } = fakeClient()
+    await listProducts({ search: 'a,b(c)%d' }, () => client as never)
+    expect(String(calls.or[0])).not.toMatch(/[(),%]/)
+  })
+})
+```
+
+Run: `npm test`
+Expected: PASS. These assert the query the website sends, which is what a live smoke test
+would have checked — without needing a key.
+
+- [ ] **Step 2b: Live smoke test — DEFERRED until `.env.local` exists**
+
+When the publishable key is supplied, run a throwaway script calling `listProducts({ limit: 3 })`
+and confirm three real products come back with sane prices.
+
+**If it returns zero rows**, RLS is blocking anonymous reads of `parts`. Note that
+`parts_read` is `USING (is_active OR tenant_id = auth.uid())`, so inactive products are
+invisible to anonymous visitors by design — all 14 live products are active, so a zero
+result would mean something else is wrong.
 
 - [ ] **Step 3: Commit**
 

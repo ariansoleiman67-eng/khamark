@@ -362,13 +362,34 @@ A custom domain is required for Google OAuth redirects. The app's
 `WEB_READINESS_DIAGNOSTIC.sql` (repo root, read-only) answers these. **Task 1 of the
 implementation plan is to run it and record the results.**
 
-| # | Question | Decision rule |
+**ALL RESOLVED 2026-08-09** by running the diagnostic against the live database.
+
+| # | Question | ANSWER |
 |---|---|---|
-| Q1 | Is `RLS_HARDENING.sql` actually applied live? | If not, hardening is the first phase and no public deploy happens before it lands |
-| Q2 | Do addresses live in `users.addresses` (jsonb) or `public.addresses`? | Whichever holds rows is what checkout uses; if both are empty, use `public.addresses` (normalised, RLS-scoped) |
-| Q3 | Signatures and `anon` EXECUTE grants for `account_id_for_phone` / `lookup_login_email` | If `anon` cannot execute them, the web skips the pre-check and calls `signInWithOtp` directly |
-| Q4 | Which tables are in the `supabase_realtime` publication? | Any table needed for live sync that is absent gets added in the hardening migration |
-| Q5 | Live `parts` columns | Generated types come from the live DB; any drift from §4.2 is reconciled before coding |
+| Q1 | Is `RLS_HARDENING.sql` actually applied live? | **YES.** All 23 tables have RLS enabled, and `users`, `orders`, `carts`, `addresses`, `conversations`, `messages`, `push_tokens`, `saved_cards`, `trade_in_requests` are owner-scoped. An `rls_auto_enable` event trigger keeps new tables covered. **But** 12 tables remained `permissive_all using(true) with check(true)` and the `media` bucket had unconditioned write policies — both closed by `RLS_PHASE2_HARDENING.sql`, verified `HARDENED, anon_writable: []`. |
+| Q2 | Do addresses live in `users.addresses` or `public.addresses`? | **`public.addresses`.** `users` has no `addresses` column at all (error 42703 confirmed it; only a singular `address` text field). NOTE: `AuthService.addAddress/updateAddress/deleteAddress` write the non-existent `users.addresses` and would throw — they are dead code; the UI correctly uses `addressService` → `public.addresses`. |
+| Q3 | Grants for `account_id_for_phone` / `lookup_login_email` | **Neither function exists in the live database.** The app calls them and they fail (it fails closed, so login still proceeds). The web must NOT call them — go straight to `signInWithOtp`. `email_exists` DOES exist and `anon` may execute it. |
+| Q4 | Which tables are in `supabase_realtime`? | **NONE — the publication is empty.** Live app↔web sync therefore requires adding tables to the publication first. This is real work, not configuration. |
+| Q5 | Live `parts` columns | **43 columns, matching §4.2.** Notable: `price_usd` is `numeric NOT NULL`, `stock_qty` `integer NOT NULL`, `status` and `condition` both `text NOT NULL`. So a null price is unreachable in practice. |
+
+### Scale (live, 2026-08-09)
+
+14 products (all active) · 10 categories · 9 brands · **1 shop** · 12 customers · 1 order.
+
+**This changes two design assumptions.** There is only one tenant, so the
+"marketplace across many shops" framing is aspirational — build the home page as
+*the* storefront, with per-shop pages deferred. And at 14 products, pagination and a
+search index are premature; the whole catalogue fits in one query.
+
+### Still open after the diagnostic
+
+- `orders_update` has `USING` but no `WITH CHECK`, so a customer can rewrite their own
+  order's `total_usd`. Needs a trigger pinning the money columns, not a policy.
+- `users_admin_select` is `using (is_admin())` with no tenant scoping — latent while
+  only one tenant exists.
+- `get_partner_product_sales` is `SECURITY DEFINER` and anon-executable.
+- `promo_codes` is publicly readable, so every code is discoverable. Closing it means
+  moving validation into an RPC, which changes app behaviour.
 
 ## 15. Phasing
 

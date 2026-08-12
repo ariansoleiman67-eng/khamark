@@ -1,153 +1,119 @@
 -- ============================================================================
 -- ASANKARY — WEB READINESS DIAGNOSTIC  (READ-ONLY. Changes nothing.)
 -- ============================================================================
--- Run this in the Supabase SQL Editor and paste the output back.
+-- Select ALL of this, press Run, and paste back the single cell it returns.
 --
--- Every statement here is a SELECT. There is no INSERT, UPDATE, DELETE, ALTER,
--- DROP or CREATE anywhere in this file — it cannot modify your database or your
--- data. It exists because the repo genuinely cannot answer three questions, and
--- the website spec must not guess at them.
+-- This is ONE statement on purpose. The Supabase SQL Editor only shows the
+-- result of the LAST statement when you run several, so the earlier version of
+-- this file silently threw away sections 1-6 and returned only the scale counts.
+-- Everything now comes back as one JSON document.
 --
--- WHAT IT ANSWERS
---   1. Which RLS policies are ACTUALLY live (the repo's RLS_HARDENING.sql is
---      untracked, so we cannot tell from files whether it was ever applied).
---   2. Do addresses live in users.addresses (jsonb) or public.addresses (table)?
---   3. What are the real signatures/grants of the pre-login auth RPCs
---      (account_id_for_phone, lookup_login_email) that exist only in the live DB?
+-- It is a single SELECT. There is no INSERT, UPDATE, DELETE, ALTER, DROP or
+-- CREATE anywhere in this file — it cannot modify your database or your data.
+-- No customer data is returned: only schema metadata, policy definitions and
+-- row COUNTS. No names, phones, emails or addresses.
 --
--- No customer data is returned — only schema metadata and row COUNTS.
+-- ALREADY ANSWERED by the previous run (2026-08-09):
+--   * scale: 14 products (all active), 10 categories, 9 brands, 1 shop,
+--     12 customers, 1 order
+--   * addresses: public.users has NO `addresses` column (error 42703 named it);
+--     public.addresses is a real table and is where addresses live
 -- ============================================================================
 
+select jsonb_pretty(jsonb_build_object(
 
--- ----------------------------------------------------------------------------
--- 1. RLS: is it enabled per table, and how many policies does each table have?
---    A table with rls_enabled = false, or with a policy whose qual is 'true',
---    is readable by anyone holding the public anon key.
--- ----------------------------------------------------------------------------
-select
-  c.relname                                             as table_name,
-  c.relrowsecurity                                      as rls_enabled,
-  c.relforcerowsecurity                                 as rls_forced,
-  count(p.polname)                                      as policy_count
-from pg_class c
-join pg_namespace n on n.oid = c.relnamespace
-left join pg_policy p on p.polrelid = c.oid
-where n.nspname = 'public'
-  and c.relkind = 'r'
-group by c.relname, c.relrowsecurity, c.relforcerowsecurity
-order by c.relrowsecurity asc, policy_count asc, c.relname;
+  -- 1. RLS per table. rls_enabled=false, or policy_count=0 with RLS on, or a
+  --    policy whose USING is literally 'true', means the public anon key can
+  --    read it. This is the section that decides whether the website can launch.
+  'rls_by_table', (
+    select coalesce(jsonb_agg(t order by t->>'table_name'), '[]'::jsonb)
+    from (
+      select jsonb_build_object(
+               'table_name',   c.relname,
+               'rls_enabled',  c.relrowsecurity,
+               'policy_count', count(p.polname)
+             ) as t
+      from pg_class c
+      join pg_namespace n on n.oid = c.relnamespace
+      left join pg_policy p on p.polrelid = c.oid
+      where n.nspname = 'public' and c.relkind = 'r'
+      group by c.relname, c.relrowsecurity
+    ) s
+  ),
 
+  -- 2. Every live policy with its USING / WITH CHECK. Anything reading 'true'
+  --    is wide open to anyone holding the publishable key.
+  'policies', (
+    select coalesce(jsonb_agg(jsonb_build_object(
+             'table',      tablename,
+             'policy',     policyname,
+             'cmd',        cmd,
+             'roles',      roles::text,
+             'using',      coalesce(qual, '(none)'),
+             'with_check', coalesce(with_check, '(none)')
+           ) order by tablename, policyname), '[]'::jsonb)
+    from pg_policies where schemaname = 'public'
+  ),
 
--- ----------------------------------------------------------------------------
--- 2. Every live policy, with its USING and WITH CHECK expressions.
---    Look for qual = 'true' (anyone can read) or with_check = 'true'
---    (anyone can write). Those are the ones that matter for a public website.
--- ----------------------------------------------------------------------------
-select
-  tablename,
-  policyname,
-  cmd                              as command,
-  roles::text                      as applies_to_roles,
-  coalesce(qual, '(none)')         as using_expression,
-  coalesce(with_check, '(none)')   as with_check_expression
-from pg_policies
-where schemaname = 'public'
-order by
-  case when qual = 'true' or with_check = 'true' then 0 else 1 end,
-  tablename,
-  policyname;
+  -- 3. Tables with RLS enabled but ZERO policies (deny-all), vs tables with RLS
+  --    DISABLED entirely (allow-all through the API). The second list is the
+  --    dangerous one.
+  'rls_disabled_tables', (
+    select coalesce(jsonb_agg(c.relname order by c.relname), '[]'::jsonb)
+    from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity = false
+  ),
 
+  -- 4. Storage bucket policies — product images live in the `media` bucket.
+  --    A write policy with no auth condition means anyone can delete images.
+  'storage_policies', (
+    select coalesce(jsonb_agg(jsonb_build_object(
+             'policy',     policyname,
+             'cmd',        cmd,
+             'roles',      roles::text,
+             'using',      coalesce(qual, '(none)'),
+             'with_check', coalesce(with_check, '(none)')
+           ) order by policyname), '[]'::jsonb)
+    from pg_policies where schemaname = 'storage' and tablename = 'objects'
+  ),
 
--- ----------------------------------------------------------------------------
--- 3. ADDRESSES: which storage is real? Both may exist; we need to know which
---    one actually holds data. Counts only — no addresses are returned.
--- ----------------------------------------------------------------------------
-select
-  'public.addresses table exists' as question,
-  (to_regclass('public.addresses') is not null)::text as answer;
+  -- 5. Public functions: exact signatures and whether anon may execute them.
+  --    The website needs account_id_for_phone and lookup_login_email before
+  --    login. Function bodies are NOT selected.
+  'functions', (
+    select coalesce(jsonb_agg(jsonb_build_object(
+             'name',          p.proname,
+             'args',          pg_get_function_identity_arguments(p.oid),
+             'returns',       pg_get_function_result(p.oid),
+             'security_definer', p.prosecdef,
+             'anon_execute',  has_function_privilege('anon', p.oid, 'EXECUTE'),
+             'authed_execute',has_function_privilege('authenticated', p.oid, 'EXECUTE')
+           ) order by p.proname), '[]'::jsonb)
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+  ),
 
-select
-  'users.addresses column exists' as question,
-  exists (
-    select 1 from information_schema.columns
-    where table_schema = 'public' and table_name = 'users' and column_name = 'addresses'
-  )::text as answer;
+  -- 6. Realtime publication. A table absent here emits NO change events, so it
+  --    cannot drive live updates on the website.
+  'realtime_tables', (
+    select coalesce(jsonb_agg(tablename order by tablename), '[]'::jsonb)
+    from pg_publication_tables where pubname = 'supabase_realtime'
+  ),
 
--- Row counts on each store (0 = unused). Safe: counts only.
-select 'rows in public.addresses' as metric,
-       (select count(*) from public.addresses)::text as value
-where to_regclass('public.addresses') is not null;
+  -- 7. Live `parts` columns, so the website's types match reality not the repo.
+  'parts_columns', (
+    select coalesce(jsonb_agg(jsonb_build_object(
+             'column', column_name, 'type', data_type, 'nullable', is_nullable
+           ) order by ordinal_position), '[]'::jsonb)
+    from information_schema.columns
+    where table_schema = 'public' and table_name = 'parts'
+  ),
 
-select 'users rows with a non-empty addresses jsonb' as metric,
-       (select count(*) from public.users
-         where addresses is not null
-           and jsonb_typeof(addresses) = 'array'
-           and jsonb_array_length(addresses) > 0)::text as value
-where exists (
-  select 1 from information_schema.columns
-  where table_schema = 'public' and table_name = 'users' and column_name = 'addresses'
-);
+  -- 8. Which tables exist at all, so nothing is assumed from the repo's SQL.
+  'tables', (
+    select coalesce(jsonb_agg(c.relname order by c.relname), '[]'::jsonb)
+    from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relkind = 'r'
+  )
 
-
--- ----------------------------------------------------------------------------
--- 4. The pre-login auth RPCs the website must call from the browser.
---    We need the exact argument types, return type, and whether `anon` may
---    execute them. Function BODIES are not selected.
--- ----------------------------------------------------------------------------
-select
-  p.proname                                        as function_name,
-  pg_get_function_identity_arguments(p.oid)        as arguments,
-  pg_get_function_result(p.oid)                    as returns,
-  p.prosecdef                                      as is_security_definer,
-  has_function_privilege('anon',           p.oid, 'EXECUTE') as anon_can_execute,
-  has_function_privilege('authenticated',  p.oid, 'EXECUTE') as authed_can_execute
-from pg_proc p
-join pg_namespace n on n.oid = p.pronamespace
-where n.nspname = 'public'
-order by p.proname;
-
-
--- ----------------------------------------------------------------------------
--- 5. Realtime: which tables actually publish change events?
---    A table absent here CANNOT drive live updates on the website — the
---    "changes in the app appear on the web instantly" promise depends on this.
--- ----------------------------------------------------------------------------
-select
-  schemaname,
-  tablename
-from pg_publication_tables
-where pubname = 'supabase_realtime'
-order by schemaname, tablename;
-
-
--- ----------------------------------------------------------------------------
--- 6. Product catalogue shape — confirms parts columns actually present live,
---    so the website's generated types match reality rather than the repo.
--- ----------------------------------------------------------------------------
-select
-  column_name,
-  data_type,
-  is_nullable,
-  coalesce(column_default, '(none)') as column_default
-from information_schema.columns
-where table_schema = 'public' and table_name = 'parts'
-order by ordinal_position;
-
-
--- ----------------------------------------------------------------------------
--- 7. Scale check — informs caching, pagination and whether search needs an
---    index. Counts only.
--- ----------------------------------------------------------------------------
-select 'active products'  as metric, (select count(*) from public.parts where is_active)::text as value
-union all
-select 'total products',            (select count(*) from public.parts)::text
-union all
-select 'categories',                (select count(*) from public.categories)::text
-union all
-select 'brands',                    (select count(*) from public.brands)::text
-union all
-select 'shops (tenants)',           (select count(*) from public.tenants)::text
-union all
-select 'customers',                 (select count(*) from public.users)::text
-union all
-select 'orders',                    (select count(*) from public.orders)::text;
+)) as diagnostic;
