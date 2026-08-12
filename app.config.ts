@@ -92,8 +92,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     infoPlist: {
       NSCameraUsageDescription:
         "Asankary uses your camera to take product photos and profile pictures.",
+      // Must describe the ACTUAL use. There is no video recording anywhere in the
+      // app; the microphone is used only for voice messages in chat and to the
+      // shopping assistant. A purpose string describing a feature that does not
+      // exist is a routine Guideline 5.1.1 rejection.
       NSMicrophoneUsageDescription:
-        "Asankary needs access to your microphone when recording product videos.",
+        "Asankary uses your microphone to record voice messages you send in chat and to the shopping assistant.",
       NSPhotoLibraryUsageDescription:
         "Asankary needs access to your photo library to select images for products and profile pictures.",
       NSLocationWhenInUseUsageDescription:

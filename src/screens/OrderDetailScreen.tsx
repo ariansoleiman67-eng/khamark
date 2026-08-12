@@ -31,6 +31,7 @@ import { getProductImageUrl } from '../utils/imageUtils';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { formatFirestoreDate } from '../utils/dateUtils';
 import { SPACING } from '../constants/theme';
+import { brandWhatsAppDigits } from '../constants/brand';
 
 
 type OrderDetailScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'OrderDetail'>;
@@ -220,7 +221,7 @@ const OrderDetailScreen: React.FC = () => {
 
   const handleContactSupport = () => {
     // Get the tenant's WhatsApp number, fallback to default
-    const whatsappNumber = tenantContact?.whatsapp || '9647701279797';
+    const whatsappNumber = tenantContact?.whatsapp || brandWhatsAppDigits();
     const message = t('orders.support.whatsappMessage', { orderNumber: order?.orderNumber });
     const url = `whatsapp://send?phone=${whatsappNumber}&text=${encodeURIComponent(message)}`;
     

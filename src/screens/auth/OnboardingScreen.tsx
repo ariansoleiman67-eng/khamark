@@ -41,7 +41,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   }, [onComplete]);
 
   const points: { key: string; fallback: string }[] = [
-    { key: 'onboarding.point1', fallback: 'Browse thousands of products from top brands.' },
+    { key: 'onboarding.point1', fallback: 'Browse the latest phones and accessories.' },
     { key: 'onboarding.point2', fallback: 'Add to cart and check out securely.' },
     { key: 'onboarding.point3', fallback: 'Fast delivery across Iraq.' },
   ];

@@ -32,6 +32,7 @@ import { useAudioRecorder, requestRecordingPermissionsAsync, setAudioModeAsync, 
 import * as Haptics from 'expo-haptics';
 import { VoiceBubble } from '../components/VoiceBubble';
 import { VoiceMessagePlaybackProvider } from '../components/voice/VoiceMessagePlaybackProvider';
+import { brandWhatsAppDigits } from '../constants/brand';
 
 const ChatbotScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
@@ -471,7 +472,7 @@ const ChatbotScreen: React.FC = () => {
   const handleSecondaryAction = (key: string) => {
     switch (key) {
       case 'whatsapp':
-        openWhatsApp('9647701279797', 'Hi, I need help');
+        openWhatsApp(brandWhatsAppDigits(), 'Hi, I need help');
         break;
       case 'cart':
         navigation.navigate('Cart');

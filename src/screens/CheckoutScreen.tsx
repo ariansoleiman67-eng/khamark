@@ -51,6 +51,7 @@ import { getCountryByCode } from '../constants/countries';
 import discountService, { discountDisplayName, discountDisplayDescription } from '../services/discountService';
 import { promoService, computePromoDiscount, Promo } from '../services/promoService';
 import { QiCardPaymentService } from '../services/qiCardPaymentService';
+import { QI_CARD_ENABLED } from '../constants/config';
 
 type CheckoutScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Checkout'>;
 type CheckoutScreenRouteProp = RouteProp<RootStackParamList, 'Checkout'>;
@@ -118,14 +119,16 @@ const CheckoutScreen: React.FC = () => {
   const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
 
   const PAYMENT_METHODS: PaymentMethodOption[] = [
-    {
+    // Card payment is hidden unless QI_CARD_ENABLED — see the note on that flag.
+    // Offering a method that cannot complete is a Guideline 2.1 rejection.
+    ...(QI_CARD_ENABLED ? [{
       id: 'qi_card',
       name: t('payment.methods.qiCardNew', { defaultValue: 'New QiCard' }),
       icon: 'credit-card-plus-outline',
       description: t('checkout.qiCardNewDescription', { defaultValue: 'Pay securely with a new QiCard' }),
       isAvailable: true,
       color: '#1976D2', // QiCard blue
-    },
+    }] as PaymentMethodOption[] : []),
     {
       id: 'cash_on_delivery',
       name: t('payment.methods.cod'),
@@ -225,7 +228,7 @@ const CheckoutScreen: React.FC = () => {
   const allPaymentMethods: PaymentMethodOption[] = [
     // Untrusted DB rows (cast to any[] on load): a null/absent card_mask or
     // payment_token must never crash this render-path map.
-    ...(savedCards || [])
+    ...(QI_CARD_ENABLED ? (savedCards || []) : [])
       .filter(card => !!card?.payment_token)
       .map(card => ({
         id: `saved_card_${card.payment_token}`,

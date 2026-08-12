@@ -23,6 +23,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../components/ThemeProvider';
 import { useTranslation } from 'react-i18next';
 import { SPACING, SHADOW_STYLES } from '../../constants/theme';
+import { brandWhatsAppDigits } from '../../constants/brand';
 interface SavedMoneyExchangerInfo {
   officeName: string;
   officePhone: string;
@@ -836,7 +837,7 @@ const PaymentMethodsScreen: React.FC = () => {
 
                     <TouchableOpacity
                       onPress={() => {
-                        openWhatsApp('9647701279797', 'Hi, I have a question about payment methods');
+                        openWhatsApp(brandWhatsAppDigits(), 'Hi, I have a question about payment methods');
                       }}
                       style={{
                         flexDirection: 'row',

@@ -257,21 +257,11 @@ const StoreHomeTab: React.FC<StoreHomeTabProps & { onSwitchTab?: (tabName: strin
               </Text>
             </View>
 
-            {/* Rating/Reviews (placeholder) */}
-            <View style={[styles.statCard, { backgroundColor: isDark ? 'rgba(240,147,251,0.15)' : 'rgba(240,147,251,0.1)' }]}>
-              <LinearGradient
-                colors={WARM_GRADIENT}
-                style={styles.statIconWrapper}
-              >
-                <Ionicons name="star" size={18} color="#fff" />
-              </LinearGradient>
-              <Text allowFontScaling={false} style={[styles.statValue, { color: theme.colors.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
-                4.8
-              </Text>
-              <Text allowFontScaling={false} style={[styles.statLabel, { color: theme.colors.textSecondary }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
-                {t('store.rating', 'Rating')}
-              </Text>
-            </View>
+            {/* A "4.8 Rating" card used to sit here — the code's own comment called it
+                a placeholder. The app has no review or rating system at all, so the
+                number was invented. Presenting fabricated social proof is inaccurate
+                metadata; restore this only when real ratings exist to average.
+                statCard is flex:1, so the remaining cards simply widen. */}
 
             {/* Years in business */}
             <View style={[styles.statCard, { backgroundColor: isDark ? 'rgba(79,172,254,0.15)' : 'rgba(79,172,254,0.1)' }]}>

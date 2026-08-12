@@ -17,6 +17,14 @@ import React, { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import 'react-native-gesture-handler';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+// Required at the root: useSafeAreaInsets() throws without a provider above it.
+// React Navigation supplies one internally for screens it renders, which is why the
+// app worked at all — but ImageEditorModal, FlyToCartLayer, ForceUpdateModal and the
+// onboarding overlay below are siblings of AppNavigator, not children, so nothing
+// covered them. Opening the in-chat photo editor threw during render and dropped the
+// whole app to the ErrorBoundary. initialWindowMetrics seeds the real insets on the
+// first frame so nothing renders once with zero padding and then jumps.
+import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import { I18nManager, View, LogBox, InteractionManager } from 'react-native';
 import { configureReanimatedLogger, ReanimatedLogLevel } from 'react-native-reanimated';
 
@@ -95,8 +103,8 @@ I18nManager.forceRTL(false);
 
 // Intro splash: an animated logo that paints on the first frame. The old video
 // splash cost several seconds of startup AND kept a 1.5 MB mp4 + expo-video on
-// the boot graph, so it is no longer imported here at all — src/components/
-// SplashScreen.tsx still exists if it's ever wanted back.
+// the boot graph. src/components/SplashScreen.tsx and its Volvo-truck intro.mp4
+// were deleted outright — they were residue from the forked-from project.
 const SHOW_LOGO_SPLASH = true;
 const SPLASH_ENABLED = SHOW_LOGO_SPLASH;
 
@@ -215,6 +223,7 @@ export default function App() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }} onLayout={onLayoutRootView}>
+      <SafeAreaProvider initialMetrics={initialWindowMetrics}>
       <ErrorBoundary>
         <ThemeProvider>
           <AppAlertHost />
@@ -250,6 +259,7 @@ export default function App() {
           </AuthProvider>
         </ThemeProvider>
       </ErrorBoundary>
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }

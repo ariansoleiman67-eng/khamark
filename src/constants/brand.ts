@@ -28,6 +28,18 @@ export const BRAND = {
 } as const;
 
 /**
+ * The shop's WhatsApp number as bare digits, which is what whatsapp:// and wa.me
+ * require — a leading "+" decodes to a space and the link silently fails.
+ *
+ * Use this instead of writing a number inline. Three screens each carried the
+ * literal '9647701279797' — a number belonging to the project this app was forked
+ * from — so "contact support" opened a chat with somebody else's business.
+ * Returns '' when no phone is configured; callers should hide the button then.
+ */
+export const brandWhatsAppDigits = (): string =>
+  (brandContact(BRAND.contactPhone) ?? '').replace(/[^0-9]/g, '');
+
+/**
  * Published legal/support pages. Verified live (HTTP 200) — these are the URLs
  * App Store Connect requires under Support URL and Privacy Policy URL.
  */

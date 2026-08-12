@@ -85,6 +85,22 @@ export const EMAIL_VERIFY_REDIRECT_URL =
   process.env.EXPO_PUBLIC_EMAIL_VERIFY_REDIRECT_URL ||
   'https://asankarye-hub.github.io/asankary-legal/';
 
+// QiCard card payments are OFF unless explicitly enabled.
+//
+// The integration is not production-ready: the documented gateway host is QiCard's
+// UAT sandbox, the merchant return address is still the literal placeholder
+// ASANKARY_DOMAIN_TBD, and the app watches for an "asankary://" return URL while the
+// gateway is built to send back an https one — so a successful payment can never be
+// detected and the shopper is left on a spinner having been charged.
+//
+// A payment method that is offered but cannot complete is a Guideline 2.1 rejection,
+// and "New QiCard" was the FIRST option at checkout. Cash on Delivery and Money
+// Exchanger are unaffected and remain available.
+//
+// To turn it back on: deploy the return-URL handler on a real domain, switch the
+// QICARD_API_HOST secret to production, then set EXPO_PUBLIC_QI_CARD_ENABLED=true.
+export const QI_CARD_ENABLED = process.env.EXPO_PUBLIC_QI_CARD_ENABLED === 'true';
+
 // API Configuration
 export const API_CONFIG = {
   BASE_URL: process.env.EXPO_PUBLIC_API_URL || 'https://your-cloud-functions-url.com',
