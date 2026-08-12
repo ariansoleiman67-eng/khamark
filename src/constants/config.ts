@@ -127,16 +127,24 @@ export const APP_CONFIG = {
 // App Owner(s)
 // The store owner is a normal admin in the DB (role='admin'); there is no DB-level
 // "owner" flag, so the owner-only Partner Management tools are gated on these UIDs.
-// Both accounts the owner uses are recognized:
-//   a25f166b… — "Asankary Store", the main phone-login admin that owns the store/products
-//   b99b3b5c… — TODO_CONTACT_EMAIL, the owner's personal account
+//
+// Checked against production on 2026-08-12: `select id, store_name, owner_id from
+// public.tenants` returns exactly one row, and both its id and its owner_id are
+// 08d8a446-939c-46fa-962e-49f0f747b33f, which also owns all 14 products. Neither of
+// the two ids previously listed here exists in that table, so isOwnerUid() was false
+// for the real owner and the owner-only Partner Management tools were unreachable.
+// The older ids are kept rather than deleted — they are harmless if no such user
+// exists, and removing an id that turns out to be a live second admin account would
+// silently lock it out. Confirm against auth.users and prune whatever is stale.
 export const OWNER_UIDS: string[] = [
+  '08d8a446-939c-46fa-962e-49f0f747b33f',
   'a25f166b-c5b4-4cca-ae27-a593a1329f66',
   'b99b3b5c-6df1-4714-a5f9-16da05526805',
 ];
 
 // The canonical store tenant that holds the catalog/orders the owner manages.
-export const OWNER_STORE_TENANT_ID = 'a25f166b-c5b4-4cca-ae27-a593a1329f66';
+// This one is not in doubt: it is the id of the only row in public.tenants.
+export const OWNER_STORE_TENANT_ID = '08d8a446-939c-46fa-962e-49f0f747b33f';
 
 export const isOwnerUid = (uid?: string | null): boolean => !!uid && OWNER_UIDS.includes(uid);
 
