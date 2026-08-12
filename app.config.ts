@@ -70,6 +70,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 
   ios: {
     supportsTablet: true,
+    // iPad ran with all four orientations and Split View enabled (UIRequiresFullScreen
+    // false) despite `orientation: "portrait"` above — that key only constrains iPhone.
+    // Several components capture the window width ONCE at module scope
+    // (MasonryProductCard.tsx:36, GoldenCarousel.tsx:47), so any rotation or Split View
+    // resize left the product grid sized for the old width and rows clipped off-screen.
+    // App Review tests this app on an iPad Air M3; both prior rejections came from one.
+    // Portrait-only, full-screen only, matching what the layout actually supports.
+    requireFullScreen: true,
     bundleIdentifier: "com.asankary.app",
     // App Store Connect rejects a reused build number. Bump on every upload.
     //   1.0 (2) — rejected 2.1(a), crashed on launch (react-native-get-random-values 2.0.0)
