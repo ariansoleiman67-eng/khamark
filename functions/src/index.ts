@@ -943,7 +943,7 @@ async function maybeGenerateAiReply(conversationId: string, messageId: string, m
     CONFIG.openAiApiKey,
     {
       userId: latestConversation.userId,
-      openAIModel: process.env.OPENAI_MODEL,
+      aiModel: process.env.ANTHROPIC_MODEL,
     },
   );
 
@@ -1100,7 +1100,7 @@ export const askChatbot = functions.https.onCall(async (data, context) => {
     {
       userId: uid,
       preferredLanguage: request.language,
-      openAIModel: process.env.OPENAI_MODEL,
+      aiModel: process.env.ANTHROPIC_MODEL,
     },
   );
 
@@ -1597,7 +1597,7 @@ export const chatWithAI = functions.https.onCall(async (data, context) => {
     {
       userId: context.auth?.uid,
       preferredLanguage: request.language,
-      openAIModel: process.env.OPENAI_MODEL,
+      aiModel: process.env.ANTHROPIC_MODEL,
     },
   );
 

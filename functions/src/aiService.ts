@@ -1,5 +1,5 @@
 import * as admin from 'firebase-admin';
-import axios, { AxiosError } from 'axios';
+import Anthropic from '@anthropic-ai/sdk';
 
 /**
  * Hybrid chat response engine for Asankary.
@@ -14,9 +14,24 @@ import axios, { AxiosError } from 'axios';
  * - Returns extra metadata (`source`, `strategy`, `language`) while staying backward-compatible.
  */
 
-const DEFAULT_OPENAI_KEY = process.env.OPENAI_API_KEY;
-const DEFAULT_MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
-const FALLBACK_MODELS = (process.env.OPENAI_FALLBACK_MODELS || 'gpt-4o-mini')
+// Anthropic (Claude) is the only AI provider. It replaced two: OpenAI drove the
+// chatbot and Google Gemini drove visual search, so the shop needed two paid
+// accounts and two keys for one feature set.
+//
+// The key is a Cloud Functions secret and must NEVER be an EXPO_PUBLIC_* value —
+// those are compiled into the app binary and can be extracted from any install:
+//   firebase functions:secrets:set ANTHROPIC_API_KEY
+//
+// claude-haiku-4-5 is deliberate. The catalogue is small and the questions are
+// concrete ("do you have the X8d in black?"), which Haiku answers well at about a
+// fifth of Opus's price. Override per-deploy with ANTHROPIC_MODEL if that changes.
+//
+// NOTE for anyone raising the model: Haiku 4.5 does NOT accept the `effort`
+// parameter (it 400s) and has no adaptive thinking, which is why neither appears
+// below. Both become available if you move to claude-sonnet-5 or claude-opus-5.
+const DEFAULT_ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
+const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5';
+const FALLBACK_MODELS = (process.env.ANTHROPIC_FALLBACK_MODELS || '')
   .split(',')
   .map((value) => value.trim())
   .filter(Boolean);
@@ -50,9 +65,8 @@ export interface GenerateAIResponseOptions {
   apiKeyOverride?: string;
   forceAI?: boolean;
   forceRule?: boolean;
-  openAIModel?: string;
-  openAIFallbackModels?: string[];
-  useResponsesApi?: boolean;
+  aiModel?: string;
+  aiFallbackModels?: string[];
   productCollectionCandidates?: string[];
   orderCollectionCandidates?: string[];
   maxCatalogScan?: number;
@@ -212,16 +226,11 @@ interface RuleDecision {
   draftForAI: string;
 }
 
-interface OpenAIInputMessage {
+interface AIInputMessage {
   role: 'user' | 'assistant';
   content: string;
 }
 
-interface ResponsesApiMessage {
-  type: 'message';
-  role: 'user' | 'assistant';
-  content: Array<{ type: 'input_text'; text: string }>;
-}
 
 const catalogCache = new Map<string, CacheEntry<ProductRecord[]>>();
 const exactProductCache = new Map<string, CacheEntry<ProductRecord | null>>();
@@ -1372,46 +1381,19 @@ function buildDeveloperInstructions(
   return blocks.join('\n\n').slice(0, MAX_PROMPT_CONTEXT_CHARS + 2500);
 }
 
-function buildOpenAIHistory(history: HistoryMessage[], currentMessage: string): OpenAIInputMessage[] {
+function buildAIHistory(history: HistoryMessage[], currentMessage: string): AIInputMessage[] {
   const normalizedHistory = trimHistory(history)
-    .map<OpenAIInputMessage | null>((item) => {
+    .map<AIInputMessage | null>((item) => {
       if (item.role === 'user') return { role: 'user', content: item.content };
       if (item.role === 'assistant' || item.role === 'model') return { role: 'assistant', content: item.content };
       return null;
     })
-    .filter((item): item is OpenAIInputMessage => Boolean(item));
+    .filter((item): item is AIInputMessage => Boolean(item));
 
   return [...normalizedHistory, { role: 'user', content: safeText(currentMessage).slice(0, MAX_MESSAGE_CHARS) }];
 }
 
-function buildResponsesInput(messages: OpenAIInputMessage[]): ResponsesApiMessage[] {
-  return messages.map((message) => ({
-    type: 'message',
-    role: message.role,
-    content: [{ type: 'input_text', text: message.content }],
-  }));
-}
 
-function extractOpenAIText(data: any): string {
-  const directOutputText = safeText(data?.output_text || '');
-  if (directOutputText) return directOutputText;
-
-  const outputs = Array.isArray(data?.output) ? data.output : [];
-  for (const item of outputs) {
-    if (item?.type !== 'message') continue;
-    const contentList = Array.isArray(item?.content) ? item.content : [];
-    const text = contentList
-      .map((contentItem: any) => safeText(contentItem?.text || contentItem?.value || ''))
-      .filter(Boolean)
-      .join('\n');
-    if (text) return text;
-  }
-
-  const completionText = safeText(data?.choices?.[0]?.message?.content || '');
-  if (completionText) return completionText;
-
-  return '';
-}
 
 function sanitizeAssistantText(text: string): string {
   return (text || '')
@@ -1446,115 +1428,81 @@ function isModelSelectionError(error: unknown): boolean {
   return message.includes('model') && (message.includes('not found') || message.includes('not available') || message.includes('does not exist') || message.includes('access'));
 }
 
-async function callResponsesApi(
+/**
+ * One Claude call. Returns the assistant's text, or throws.
+ *
+ * Replaces the previous pair of OpenAI helpers (Responses API with a Chat
+ * Completions fallback). That fallback existed because the two OpenAI endpoints
+ * disagree about which models they serve; Anthropic has a single Messages API,
+ * so the fallback has nothing left to do and is gone.
+ *
+ * Deliberately absent: `effort` and `thinking`. Haiku 4.5 rejects `effort` with a
+ * 400 and has no adaptive thinking. Neither is wanted here anyway — the bot
+ * answers concrete catalogue questions and latency is user-visible.
+ */
+async function callClaude(
   apiKey: string,
   model: string,
   instructions: string,
-  messages: OpenAIInputMessage[],
+  messages: AIInputMessage[],
   maxOutputTokens: number,
-  requestId?: string,
 ): Promise<string> {
-  const response = await axios.post(
-    'https://api.openai.com/v1/responses',
-    {
-      model,
-      instructions,
-      input: buildResponsesInput(messages),
-      max_output_tokens: maxOutputTokens,
-      temperature: 0.2,
-      top_p: 0.9,
-      text: { format: { type: 'text' } },
-      metadata: requestId ? { request_id: requestId, app: 'asankary-chatbot' } : { app: 'asankary-chatbot' },
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      timeout: 30000,
-    },
-  );
+  const client = new Anthropic({ apiKey, timeout: 30000 });
 
-  const text = extractOpenAIText(response.data);
-  if (!text) throw new Error('Responses API returned empty text');
+  // Anthropic requires the first message to be from the user. History is trimmed
+  // elsewhere and can begin on an assistant turn; dropping the leading assistant
+  // turns is correct — they are context the model produced, not the question.
+  const trimmed = [...messages];
+  while (trimmed.length > 0 && trimmed[0].role !== 'user') trimmed.shift();
+  if (trimmed.length === 0) throw new Error('No user message to send');
+
+  const response = await client.messages.create({
+    model,
+    max_tokens: maxOutputTokens,
+    // The persona and grounding go in `system`, not as a leading user turn, so a
+    // customer cannot overwrite them by quoting instructions back at the bot.
+    system: instructions,
+    messages: trimmed.map((m) => ({ role: m.role, content: m.content })),
+  });
+
+  // content is a discriminated union — narrow before reading .text. A turn can
+  // hold several text blocks, so join rather than taking content[0].
+  const text = response.content
+    .filter((block): block is Anthropic.TextBlock => block.type === 'text')
+    .map((block) => block.text)
+    .join('')
+    .trim();
+
+  if (!text) throw new Error('Claude returned empty text');
   return text;
 }
 
-async function callChatCompletionsApi(
-  apiKey: string,
-  model: string,
-  instructions: string,
-  messages: OpenAIInputMessage[],
-  maxOutputTokens: number,
-): Promise<string> {
-  const chatMessages = [
-    { role: 'developer', content: instructions },
-    ...messages,
-  ];
-
-  const response = await axios.post(
-    'https://api.openai.com/v1/chat/completions',
-    {
-      model,
-      messages: chatMessages,
-      max_tokens: maxOutputTokens,
-      temperature: 0.2,
-      top_p: 0.9,
-      presence_penalty: 0,
-      frequency_penalty: 0.1,
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      timeout: 30000,
-    },
-  );
-
-  const text = extractOpenAIText(response.data);
-  if (!text) throw new Error('Chat Completions API returned empty text');
-  return text;
-}
-
-async function callOpenAI(
+async function callAI(
   apiKey: string,
   options: GenerateAIResponseOptions,
   instructions: string,
-  messages: OpenAIInputMessage[],
+  messages: AIInputMessage[],
 ): Promise<string> {
   const models = uniqueStrings([
-    options.openAIModel || DEFAULT_MODEL,
-    ...(options.openAIFallbackModels || FALLBACK_MODELS),
+    options.aiModel || DEFAULT_MODEL,
+    ...(options.aiFallbackModels || FALLBACK_MODELS),
   ]);
   const maxOutputTokens = options.maxOutputTokens || 500;
-  const useResponsesApi = options.useResponsesApi !== false;
   let lastError: unknown = null;
 
   for (const model of models) {
     try {
-      if (useResponsesApi) {
-        return await callResponsesApi(apiKey, model, instructions, messages, maxOutputTokens, options.requestId);
-      }
-      return await callChatCompletionsApi(apiKey, model, instructions, messages, maxOutputTokens);
+      return await callClaude(apiKey, model, instructions, messages, maxOutputTokens);
     } catch (error) {
       lastError = error;
-      const shouldTryChatCompletionsFallback = useResponsesApi && error instanceof AxiosError && [400, 404, 422].includes(error.response?.status || 0);
-      if (shouldTryChatCompletionsFallback) {
-        try {
-          return await callChatCompletionsApi(apiKey, model, instructions, messages, maxOutputTokens);
-        } catch (completionError) {
-          lastError = completionError;
-        }
-      }
-
-      if (!isModelSelectionError(lastError)) {
-        break;
-      }
+      // Only a bad/unavailable model id is worth retrying on the next model in the
+      // list. Rate limits, auth failures and overloads would fail identically on
+      // every model, so trying them all just multiplies the latency.
+      if (!isModelSelectionError(lastError)) break;
     }
   }
 
-  throw lastError instanceof Error ? lastError : new Error('OpenAI request failed');
+  throw lastError instanceof Error ? lastError : new Error('Claude request failed');
 }
 
 function buildSuccessResult(
@@ -1636,10 +1584,10 @@ export const generateAIResponse = async (
     return buildSuccessResult(ruleDecision.answer, 'rule', 'rule_only', analysis.language, ruleDecision.reason, grounding);
   }
 
-  const apiKey = options.apiKeyOverride || apiKeyOverride || DEFAULT_OPENAI_KEY;
+  const apiKey = options.apiKeyOverride || apiKeyOverride || DEFAULT_ANTHROPIC_KEY;
   if (!apiKey) {
     if (ruleDecision.answer) {
-      return buildSuccessResult(ruleDecision.answer, 'fallback', 'rule_only', analysis.language, 'missing_openai_key', grounding);
+      return buildSuccessResult(ruleDecision.answer, 'fallback', 'rule_only', analysis.language, 'missing_anthropic_key', grounding);
     }
 
     return {
@@ -1649,8 +1597,8 @@ export const generateAIResponse = async (
       strategy: 'rule_only',
       language: analysis.language,
       debug: {
-        intent: 'missing_openai_key',
-        reason: 'missing_openai_key',
+        intent: 'missing_anthropic_key',
+        reason: 'missing_anthropic_key',
         productCollections: grounding.productCollections,
         matchedProductCount: grounding.products.length,
         matchedPartNumbers: grounding.partNumbers,
@@ -1660,10 +1608,10 @@ export const generateAIResponse = async (
   }
 
   const instructions = buildDeveloperInstructions(analysis.language, extraContext, grounding, ruleDecision);
-  const openAIMessages = buildOpenAIHistory(safeHistory, safeMessage);
+  const aiMessages = buildAIHistory(safeHistory, safeMessage);
 
   try {
-    const aiText = sanitizeAssistantText(await callOpenAI(apiKey, options, instructions, openAIMessages));
+    const aiText = sanitizeAssistantText(await callAI(apiKey, options, instructions, aiMessages));
     if (aiText) {
       console.info('[AI] Hybrid response generated', {
         ms: Date.now() - startedAt,
@@ -1741,59 +1689,76 @@ export interface VisualSearchResult {
 }
 
 export async function analyzeVisualSearch(base64Image: string): Promise<VisualSearchResult> {
-  const geminiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error("No Anthropic API key configured");
 
-  if (!geminiKey) throw new Error("No Gemini API key configured");
+  // Structured outputs guarantee this shape, so the prompt no longer has to beg
+  // for "ONLY valid JSON, no markdown, no code fences" and the caller no longer
+  // strips fences before JSON.parse. The model is constrained, not asked.
+  const schema = {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      primaryQuery: { type: "string" },
+      category: { type: "string" },
+      keywords: { type: "array", items: { type: "string" } },
+      brand: { type: "string" },
+      partNumber: { type: "string" },
+      compatibleModels: { type: "array", items: { type: "string" } },
+      description: { type: "string" },
+      alternativeNames: { type: "array", items: { type: "string" } },
+    },
+    required: [
+      "primaryQuery", "category", "keywords", "brand",
+      "partNumber", "compatibleModels", "description", "alternativeNames",
+    ],
+  };
 
   const prompt = `You are an expert at identifying retail products, especially consumer electronics and accessories.
 
-Analyze this image carefully and return a JSON object with these fields:
-- "primaryQuery": A concise 2-4 word search term describing ONLY the product type. Do NOT include brand names or model numbers. For example use "Wireless Earbuds" NOT "Brand X Wireless Earbuds", use "Phone Charger" NOT "65W Fast Phone Charger".
-- "category": The product category this belongs to (e.g. "Phones", "Audio", "Accessories", "Chargers & Cables", "Wearables", "Computers", "Home Appliances", "Cameras", "Gaming", "Storage"). Pick the most fitting one.
-- "keywords": Array of 3-8 individual search keywords related to this product (e.g. ["wireless", "earbuds", "bluetooth", "audio"])
-- "brand": The brand if visible or obvious from the product design, otherwise empty string
-- "partNumber": Any product/serial/model number visible on the item, otherwise empty string
-- "compatibleModels": Array of devices or standards this product is compatible with (e.g. ["USB-C", "iPhone", "Android"]), empty array if unknown
-- "description": A short 1-sentence description of what this product is and what it does
-- "alternativeNames": Array of alternative names people might use to search for this product (e.g. for "earbuds" include ["earphones", "wireless headphones", "buds"])
+Identify the product in this image.
 
-Be as specific as possible. If you can't identify the product, do your best guess based on shape, color, and context.
-Output ONLY valid JSON, no markdown, no code fences, no extra text.`;
+- primaryQuery: a concise 2-4 word search term for the product TYPE only, with no brand or model number. Use "Wireless Earbuds", not "Brand X Wireless Earbuds"; "Phone Charger", not "65W Fast Phone Charger".
+- category: the best fit from Phones, Audio, Accessories, Chargers & Cables, Wearables, Computers, Home Appliances, Cameras, Gaming, Storage.
+- keywords: 3-8 single search words, e.g. ["wireless", "earbuds", "bluetooth", "audio"].
+- brand: the brand if visible or obvious from the design, otherwise "".
+- partNumber: any product, serial or model number visible on the item, otherwise "".
+- compatibleModels: devices or standards it works with, e.g. ["USB-C", "iPhone", "Android"]. Empty if unknown.
+- description: one sentence on what the product is and does.
+- alternativeNames: other names a shopper might search for, e.g. for earbuds ["earphones", "wireless headphones", "buds"].
 
-  // Use the official @google/generative-ai SDK
-  const { GoogleGenerativeAI } = require("@google/generative-ai");
-  const genAI = new GoogleGenerativeAI(geminiKey);
-  const model = genAI.getGenerativeModel({ 
-    model: "gemini-2.0-flash",
-    generationConfig: {
-      temperature: 0.2,
-      maxOutputTokens: 500,
-      responseMimeType: "application/json",
-    },
-  });
+Be specific. If you cannot identify it, give your best guess from shape, colour and context.`;
 
   try {
-    console.log("analyzeVisualSearch: calling Gemini SDK, image base64 length:", base64Image.length);
-    
-    const result = await model.generateContent([
-      prompt,
-      {
-        inlineData: {
-          mimeType: "image/jpeg",
-          data: base64Image,
+    const client = new Anthropic({ apiKey, timeout: 30000 });
+    console.log("analyzeVisualSearch: calling Claude, image base64 length:", base64Image.length);
+
+    const response = await client.messages.create({
+      model: process.env.ANTHROPIC_VISION_MODEL || DEFAULT_MODEL,
+      max_tokens: 500,
+      output_config: { format: { type: "json_schema", schema } },
+      messages: [
+        {
+          role: "user",
+          // Image before text: the model reads the attachment as the subject of
+          // the instruction that follows it.
+          content: [
+            { type: "image", source: { type: "base64", media_type: "image/jpeg", data: base64Image } },
+            { type: "text", text: prompt },
+          ],
         },
-      },
-    ]);
+      ],
+    });
 
-    const response = result.response;
-    const rawText = (response.text() || "").trim();
+    const rawText = response.content
+      .filter((block): block is Anthropic.TextBlock => block.type === "text")
+      .map((block) => block.text)
+      .join("")
+      .trim();
 
-    console.log("Gemini SDK response length:", rawText.length);
+    console.log("Claude visual search response length:", rawText.length);
 
-    // Strip markdown code fences if Gemini wraps it
-    const jsonText = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-
-    const parsed = JSON.parse(jsonText);
+    const parsed = JSON.parse(rawText);
     return {
       primaryQuery: safeText(parsed.primaryQuery || ''),
       category: safeText(parsed.category || ''),
@@ -1805,7 +1770,7 @@ Output ONLY valid JSON, no markdown, no code fences, no extra text.`;
       alternativeNames: Array.isArray(parsed.alternativeNames) ? parsed.alternativeNames.map((n: any) => safeText(n)).filter(Boolean) : [],
     };
   } catch (error: any) {
-    console.error("Gemini SDK visual search error:", error?.message || error);
+    console.error("Claude visual search error:", error?.message || error);
     throw new Error("Failed to analyze image: " + (error?.message || "Unknown error"));
   }
 }
