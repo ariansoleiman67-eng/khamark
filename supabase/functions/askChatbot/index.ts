@@ -1,23 +1,41 @@
 // =============================================================================
 // Supabase Edge Function: askChatbot
 // =============================================================================
-// Thin OpenAI proxy for the in-app AI assistant. The CLIENT (chatbotService.ts)
-// already does all the heavy lifting — it builds the system prompt, retrieves
-// product context (RAG), and assembles the full OpenAI `messages` array. This
-// function only forwards that to OpenAI and returns the assistant text, keeping
-// the OPENAI_API_KEY server-side. Replaces the old Firebase `askChatbot`.
+// Thin Claude proxy for the in-app AI assistant. The CLIENT (chatbotService.ts)
+// already does the heavy lifting — it builds the system prompt, retrieves product
+// context (RAG), and assembles the full message array. This function only forwards
+// that to Anthropic and returns the assistant text, keeping the API key
+// server-side. It must never move into the app: anything shipped in the binary can
+// be extracted from any install.
+//
+// Previously proxied OpenAI (gpt-4.1-mini). Switched to Claude so the shop needs
+// one AI account rather than two — visual search was separately on Google Gemini.
 //
 // SETUP (one-time, with your Supabase login):
-//   supabase secrets set OPENAI_API_KEY="sk-..."
-//   # optional: supabase secrets set OPENAI_MODEL="gpt-4.1-mini"
+//   supabase secrets set ANTHROPIC_API_KEY="sk-ant-..."
+//   # optional: supabase secrets set ANTHROPIC_MODEL="claude-haiku-4-5"
 //   supabase functions deploy askChatbot
 //
-// Request body (sent by safeCallFunction): { data: { messages, max_tokens, temperature, top_p, presence_penalty } }
+// Request body (sent by safeCallFunction): { data: { messages, max_tokens, temperature } }
+//   `messages` is OpenAI-shaped — messages[0] is a { role: 'system' } entry. That
+//   shape is the client's, and is converted below rather than changed, so the app
+//   does not need a rebuild to adopt this function.
 // Response: { success: boolean, text?: string, error?: string }
+//
+// NOTE on the model: claude-haiku-4-5 answers concrete catalogue questions well at
+// roughly a fifth of Opus's price. It does NOT accept the `effort` parameter (400)
+// and has no adaptive thinking — neither appears below. Both become available if
+// ANTHROPIC_MODEL is set to claude-sonnet-5 or claude-opus-5.
 // =============================================================================
 
-const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
-const DEFAULT_MODEL = Deno.env.get('OPENAI_MODEL') || 'gpt-4.1-mini';
+import Anthropic from 'npm:@anthropic-ai/sdk@^0.117.1';
+
+const DEFAULT_MODEL = Deno.env.get('ANTHROPIC_MODEL') || 'claude-haiku-4-5';
+
+interface IncomingMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
 
 Deno.serve(async (req: Request) => {
   const json = (payload: unknown, status = 200) =>
@@ -27,7 +45,7 @@ Deno.serve(async (req: Request) => {
     });
 
   try {
-    const apiKey = Deno.env.get('OPENAI_API_KEY');
+    const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
     if (!apiKey) {
       return json({ success: false, error: 'AI service is not configured' }, 200);
     }
@@ -35,40 +53,72 @@ Deno.serve(async (req: Request) => {
     // safeCallFunction wraps the payload as { data: {...} }
     const body = await req.json().catch(() => ({}));
     const payload = body?.data ?? body ?? {};
-    const { messages, max_tokens, temperature, top_p, presence_penalty } = payload;
+    const { messages, max_tokens, temperature } = payload as {
+      messages?: IncomingMessage[];
+      max_tokens?: number;
+      temperature?: number;
+    };
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return json({ success: false, error: 'messages[] is required' }, 200);
     }
 
-    const res = await fetch(OPENAI_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: DEFAULT_MODEL,
-        messages,
-        max_tokens: max_tokens ?? 700,
-        temperature: temperature ?? 0.2,
-        top_p: top_p ?? 0.9,
-        presence_penalty: presence_penalty ?? 0,
-      }),
-    });
+    // Anthropic takes the system prompt as its own top-level field rather than a
+    // message. Keeping it out of the conversation also means a customer cannot
+    // overwrite the persona by quoting instructions back at the bot.
+    const systemPrompt = messages
+      .filter((m) => m?.role === 'system')
+      .map((m) => m?.content ?? '')
+      .join('\n\n')
+      .trim();
 
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      return json({ success: false, error: data?.error?.message || 'OpenAI request failed' }, 200);
+    const conversation = messages
+      .filter((m) => m?.role === 'user' || m?.role === 'assistant')
+      .map((m) => ({ role: m.role as 'user' | 'assistant', content: String(m.content ?? '') }))
+      .filter((m) => m.content.length > 0);
+
+    // The first message must be from the user. Trimmed history can begin on an
+    // assistant turn, so drop leading assistant turns rather than erroring —
+    // they are context the model produced, not the question being asked.
+    while (conversation.length > 0 && conversation[0].role !== 'user') {
+      conversation.shift();
     }
 
-    const text = data?.choices?.[0]?.message?.content?.trim();
+    if (conversation.length === 0) {
+      return json({ success: false, error: 'No user message to answer' }, 200);
+    }
+
+    const client = new Anthropic({ apiKey });
+
+    // presence_penalty and top_p are deliberately not forwarded. Anthropic has no
+    // presence_penalty, and its guidance is to set at most one of temperature or
+    // top_p — the client sends both, so temperature alone is used.
+    const response = await client.messages.create({
+      model: DEFAULT_MODEL,
+      max_tokens: max_tokens ?? 700,
+      temperature: temperature ?? 0.2,
+      ...(systemPrompt ? { system: systemPrompt } : {}),
+      messages: conversation,
+    });
+
+    // content is a discriminated union and a turn may hold several text blocks,
+    // so filter and join rather than reading content[0].
+    const text = response.content
+      .filter((block): block is Anthropic.TextBlock => block.type === 'text')
+      .map((block) => block.text)
+      .join('')
+      .trim();
+
     if (!text) {
       return json({ success: false, error: 'Empty AI response' }, 200);
     }
 
     return json({ success: true, text }, 200);
   } catch (err) {
-    return json({ success: false, error: String(err) }, 200);
+    // Always HTTP 200 with success:false — the client reads data.success, and a
+    // non-2xx would surface to the shopper as a network error instead of a
+    // handled one.
+    const message = err instanceof Error ? err.message : String(err);
+    return json({ success: false, error: message }, 200);
   }
 });
