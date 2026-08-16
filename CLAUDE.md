@@ -19,7 +19,8 @@ npm run lint:fix
 npm run type-check         # tsc --noEmit  (use this to validate changes; no test for most code)
 npm test                   # jest
 npx jest __tests__/utils/pricingUtils.test.ts   # run a single test file
-npm run deploy:functions   # build + deploy Firebase Cloud Functions (cd functions && tsc && firebase deploy)
+npm run deploy:functions   # Firebase Cloud Functions — LEGACY, undeployable (project has no billing)
+npx supabase functions deploy askChatbot   # the real thing: Supabase Edge Functions
 ```
 
 Builds/updates go through EAS: `npm run build:android` / `build:ios` / `build:preview` (production/preview profiles in `eas.json`), and OTA via `npm run update:production` / `update:preview`. `postinstall` runs `npm install` inside `functions/`.
@@ -32,7 +33,11 @@ Test coverage is minimal — only `__tests__/utils/` exists. There is no jest pr
 The app is mid-migration from Firebase to Supabase. Both are live:
 
 - **Supabase is the primary data store.** Products, orders, users, carts, addresses, tenants/admins, settings, notifications, chat — all live in Postgres. Client: `src/services/supabase.ts`. Schema lives in `schema.sql` and the many `update_schema_*.sql` files at repo root. DB columns are **snake_case**; services map them to camelCase domain types (see the `mapProduct` helper in `src/services/productService.ts` for the pattern every service follows).
-- **Firebase remains for compute + messaging.** Cloud Functions (`functions/src/index.ts`) handle Gemini AI chatbot/visual search, ImgBB image upload proxy, payment processing, order-status side effects, push notification fan-out, and email/phone OTP. Firebase Auth + FCM (`@react-native-firebase/*`, configured natively via `google-services.json` / `GoogleService-Info.plist`, see `src/services/firebase.ts`) back push registration. Product video uses Bunny CDN via a Cloud Function.
+- **Server-side compute is Supabase Edge Functions, NOT the `functions/` directory.** This is the single easiest thing to get wrong here, because the repo contains both. `src/services/safeCallFunction.ts` calls `supabase.functions.invoke`, so every server call the app makes lands in `supabase/functions/*` — `askChatbot` (Claude AI assistant), `login`, `resetPassword`, `phone-otp-session`, `verifyAdminActionPassword`, `send-push`, `send-sms-otp`, and the QiCard payment set. Deploy with `supabase functions deploy <name>`; secrets with `supabase secrets set`.
+- **`functions/` (Firebase Cloud Functions) is superseded legacy.** No app code calls it — `askChatbot`'s own header records that the Supabase version "replaces the old Firebase askChatbot". The Firebase project has no billing account, so Cloud Functions have never been deployed and cannot be without enabling Blaze. Treat this directory as dead unless you are deliberately reviving it.
+- **Firebase is still used natively, and costs nothing.** FCM delivers push (free, unlimited, no billing) and Firebase Auth backs the phone-OTP screens reached from phone login / forgot password / partner signup. `@react-native-firebase/{firestore,storage,app}` are installed but unused. Note the app runs two OTP systems in parallel: Firebase Auth on those screens, Supabase OTP (via an OTPIQ Send-SMS hook) elsewhere.
+- **AI is Claude** (`claude-haiku-4-5`, `ANTHROPIC_API_KEY` as a Supabase secret). It replaced OpenAI for chat and Gemini for visual search. Haiku rejects the `effort` parameter and has no adaptive thinking — see the note in `supabase/functions/askChatbot/index.ts` before raising the model.
+- Product video uses Bunny CDN; ImgBB and payment proxies live in the Firebase directory and are therefore also undeployed.
 
 When adding data features, default to Supabase. Reach for a Cloud Function only for secrets/third-party proxies (Gemini, ImgBB, payments, email) or server-side triggers.
 
@@ -60,7 +65,8 @@ Each provider has a matching `useX()` hook in `src/contexts/` that throws if use
 - `src/features/image-editor/` — self-contained feature module (own state/hooks/services).
 - `src/constants/config.ts` — central config: `COLLECTIONS`, `PAGINATION`, `CACHE_EXPIRATION`, `ORDER_STATUS`, `IRAQI_CITIES`, etc. Prefer these constants over literals.
 - `src/locales/{en,ar,ku}.json` + `src/locales/index.ts` — i18next setup.
-- `functions/src/` — Cloud Functions (`index.ts`), AI logic (`aiService.ts`), phone linking.
+- `supabase/functions/` — the Edge Functions the app actually calls. **Start here for anything server-side.**
+- `functions/src/` — superseded Firebase Cloud Functions. Dead; see the backend note above.
 
 ## Conventions
 
