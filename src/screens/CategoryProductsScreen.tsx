@@ -171,10 +171,17 @@ const CategoryProductsScreen: React.FC = () => {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
+          // flexGrow/flexShrink 0: a horizontal ScrollView inside this column
+          // otherwise expands to fill the leftover vertical space, and with the
+          // content container's default alignItems:'stretch' every chip stretched
+          // to that full height. alignItems:'center' sizes each chip to its text.
+          style={{ flexGrow: 0, flexShrink: 0 }}
           contentContainerStyle={{
             paddingHorizontal: 16,
             paddingTop: 12,
+            paddingBottom: 4,
             gap: 8,
+            alignItems: 'center',
             flexDirection: isRTL ? 'row-reverse' : 'row',
           }}
         >
