@@ -24,6 +24,7 @@ import { useTenant } from '../../contexts/TenantContext';
 import MasonryProductCard from '../../components/MasonryProductCard';
 import SectionHeader from '../../components/home/SectionHeader';
 import BrandCard from '../../components/home/BrandCard';
+import AutoScrollRail from '../../components/home/AutoScrollRail';
 import { brandService, Brand } from '../../services/brandService';
 import AppNumber from '../../components/AppNumber';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -62,7 +63,6 @@ const chunkPairs = (arr: any[]): any[][] => {
   for (let i = 0; i < arr.length; i += 2) out.push(arr.slice(i, i + 2));
   return out;
 };
-const renderBrandColSep = () => <View style={{ width: BRAND_GRID_GAP }} />;
 // How many brand-spotlight carousels to surface at the top of the feed.
 const MAX_SPOTLIGHTS = 4;
 
@@ -438,6 +438,10 @@ const HomeScreen: React.FC = () => {
     // the dropped brand was simply unreachable. A single tile in the last column of
     // a horizontally scrolling rail is a far smaller problem than a hidden brand.
     const brandTiles = allBrandTiles;
+    // Columns of two, which is what the rail scrolls. Built here rather than
+    // inline in the JSX so AutoScrollRail's duplicated copy is not rebuilt on
+    // every header render.
+    const brandColumns = (() => { const cols = chunkPairs(brandTiles); return isRTL ? cols.reverse() : cols; })();
     return (
       <View>
         {/* a. Hero banner */}
@@ -479,10 +483,16 @@ const HomeScreen: React.FC = () => {
             {/* No onSeeAll: the rail already shows every brand, and there is no
                 all-brands screen to link to. */}
             <SectionHeader title={t('home.ourBrands')} />
-            <FlatList
-              data={(() => { const cols = chunkPairs(brandTiles); return isRTL ? cols.reverse() : cols; })()}
+            {/* Drifts slowly on its own and can still be dragged. The rail pauses
+                while touched, resumes a couple of seconds after release from wherever
+                the user left it, and does not move at all under Reduce Motion. */}
+            <AutoScrollRail
+              data={brandColumns}
               keyExtractor={(_, i) => `brand-col-${i}`}
-              renderItem={({ item: col }) => (
+              itemWidth={BRAND_TILE_WIDTH}
+              gap={BRAND_GRID_GAP}
+              contentContainerStyle={styles.brandRow}
+              renderItem={(col: any) => (
                 <View style={[styles.brandCol, { width: BRAND_TILE_WIDTH }]}>
                   {col.map((b: any) => (
                     <BrandCard
@@ -495,10 +505,6 @@ const HomeScreen: React.FC = () => {
                   ))}
                 </View>
               )}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.brandRow}
-              ItemSeparatorComponent={renderBrandColSep}
             />
           </View>
         )}
