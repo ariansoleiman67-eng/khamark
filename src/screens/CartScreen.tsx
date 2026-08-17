@@ -202,7 +202,6 @@ const CartItemComponent: React.FC<CartItemComponentProps> = ({
   // Get tiered pricing
   const tieredPrice = LocalCartService.getTieredPrice(item.product, localQuantity, isVip);
   const hasDiscount = item.product.priceTiers && item.product.priceTiers.length > 0 && tieredPrice < item.product.priceUSD;
-  const discountedTotal = tieredPrice * localQuantity;
 
   // Get background color for this item — now using a very subtle tint
   const bgColor = PRODUCT_BG_COLORS[index % PRODUCT_BG_COLORS.length];

@@ -487,3 +487,74 @@ export default {
   formatCurrencyIQD,
   formatPrice,
 };
+
+/**
+ * The exact dinar total for a set of order lines.
+ *
+ * The dinar-priced lines are summed in dinar and everything else — the other
+ * lines, shipping, any discount — is folded into `remainderUSD` and converted
+ * once. Converting the whole USD total instead would re-apply the rate to
+ * figures the shop typed, and snap them, so the amount charged could differ
+ * from the amount the customer was shown.
+ *
+ * Returns null when no line was priced in dinar, which means "nothing special
+ * here, convert the USD total exactly as before" and keeps every existing order
+ * byte-identical.
+ */
+export const computeOrderTotalIQD = (
+  lines: Array<{ priceUSD?: number | null; priceIQD?: number | null; quantity?: number | null }>,
+  totalUSD: number,
+  exchangeRate: number = 1500
+): number | null => {
+  let dinarIQD = 0;
+  let dinarUSD = 0;
+  for (const line of lines || []) {
+    if (!isIQDPriced(line)) continue;
+    const qty = Number(line.quantity) || 0;
+    if (qty <= 0) continue;
+    dinarIQD += Number(line.priceIQD) * qty;
+    dinarUSD += (Number(line.priceUSD) || 0) * qty;
+  }
+  if (dinarIQD <= 0) return null;
+  return dinarIQD + convertUSDToIQD(totalUSD - dinarUSD, exchangeRate);
+};
+
+/**
+ * What to show as an order's total in the shopper's currency: the snapshotted
+ * dinar figure when there is one, otherwise the long-standing conversion.
+ */
+export const formatOrderTotal = (
+  order: { totalUSD?: number | null; totalIQD?: number | null; exchangeRate?: number | null },
+  currency: 'USD' | 'IQD' = 'USD',
+  fallbackRate: number = 1500,
+  options: any = {}
+): string => {
+  const rate = Number(order?.exchangeRate) > 0 ? Number(order!.exchangeRate) : fallbackRate;
+  const totalUSD = Number(order?.totalUSD) || 0;
+  if (currency === 'IQD' && Number(order?.totalIQD) > 0) {
+    return formatCurrencyIQD(Number(order!.totalIQD), options);
+  }
+  return formatPrice(totalUSD, currency, rate, options);
+};
+
+/**
+ * An order line's total: quantity x the price that was actually charged.
+ *
+ * Kept in dinar when the line was charged in dinar, so it agrees with the unit
+ * price printed beside it and with the order's snapshotted total.
+ */
+export const formatOrderLineTotal = (
+  line: { priceUSD?: number | null; priceIQD?: number | null; quantity?: number | null },
+  currency: 'USD' | 'IQD' = 'USD',
+  exchangeRateIQD: number = 1500,
+  options: any = {}
+): string => {
+  const qty = Number(line?.quantity) || 0;
+  if (isIQDPriced(line)) {
+    const iqd = Number(line!.priceIQD) * qty;
+    return currency === 'IQD'
+      ? formatCurrencyIQD(iqd, options)
+      : formatCurrencyUSD(convertIQDToUSD(iqd, exchangeRateIQD), options);
+  }
+  return formatPrice((Number(line?.priceUSD) || 0) * qty, currency, exchangeRateIQD, options);
+};

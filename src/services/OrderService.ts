@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, uniqueChannel } from './supabase';
 import { formatFirestoreDate } from '../utils/dateUtils';
+import { computeOrderTotalIQD } from '../utils/currency';
 import { Order, OrderItem, OrderStatus, PaymentStatus, ShippingAddress, AppliedDiscount } from '../types';
 
 const safeToDate = (val: any): Date | undefined => {
@@ -51,7 +52,7 @@ export class OrderService {
     currency?: 'USD' | 'IQD',
     exchangeRate?: number,
     shouldClearCart: boolean = true
-  ): Promise<{ orderId: string; orderNumber: string; totalUSD: number }> {
+  ): Promise<{ orderId: string; orderNumber: string; totalUSD: number; totalIQD: number | null }> {
     // Concurrent callers share one promise. A `useState` flag at the call site does
     // not protect this: the state update only lands on the next render, so two taps
     // in the same frame both get through, and there is an `await` on the session
@@ -92,7 +93,7 @@ export class OrderService {
    * checkout is one screen, so overlapping calls are always the same order
    * double-submitted, never two distinct orders placed at once.
    */
-  private static createOrderInFlight: Promise<{ orderId: string; orderNumber: string; totalUSD: number }> | null = null;
+  private static createOrderInFlight: Promise<{ orderId: string; orderNumber: string; totalUSD: number; totalIQD: number | null }> | null = null;
 
   private static async createOrderDirectly(
     cartItems: OrderItem[],
@@ -106,7 +107,7 @@ export class OrderService {
     currency?: 'USD' | 'IQD',
     exchangeRate?: number,
     shouldClearCart: boolean = true
-  ): Promise<{ orderId: string; orderNumber: string; totalUSD: number }> {
+  ): Promise<{ orderId: string; orderNumber: string; totalUSD: number; totalIQD: number | null }> {
     const { data: sessionData } = await supabase.auth.getSession();
     const userId = sessionData?.session?.user?.id;
     if (!userId) throw new Error('User must be authenticated');
@@ -155,6 +156,12 @@ export class OrderService {
       throw new Error('Order total must be greater than $0');
     }
 
+    // The exact dinar total, when any line was priced in dinar. Snapshotted here
+    // rather than recomputed at render time or at payment time, so the figure the
+    // customer agreed to is the figure stored, displayed and charged. Null for
+    // every order without a dinar-priced line, which keeps them unchanged.
+    const totalIQD = computeOrderTotalIQD(cartItems as any, totalUSD, exchangeRate || 1500);
+
     // Supabase RPC or Sequential Writes (Fallback to sequential for migration)
     const orderData: any = {
       user_id: userId,
@@ -167,6 +174,7 @@ export class OrderService {
       tax_usd: taxUSD,
       discount_usd: discountUSD > 0 ? discountUSD : null,
       total_usd: totalUSD,
+      total_iqd: totalIQD,
       payment_method: {
         type: paymentMethod,
         status: 'pending',
@@ -204,6 +212,7 @@ export class OrderService {
       orderId,
       orderNumber,
       totalUSD,
+      totalIQD,
     };
   }
 
@@ -284,6 +293,7 @@ export class OrderService {
       shippingUSD: doc.shipping_usd,
       taxUSD: doc.tax_usd,
       totalUSD: doc.total_usd,
+      totalIQD: doc.total_iqd != null ? Number(doc.total_iqd) : undefined,
       exchangeRate: doc.exchange_rate,
       // Payment fields are snake_case in the DB; map them so the order detail
       // shows the real paid/pending status and method (not a stale default).
@@ -336,6 +346,7 @@ export class OrderService {
         shippingUSD: data.shipping_usd,
         taxUSD: data.tax_usd,
         totalUSD: data.total_usd,
+        totalIQD: data.total_iqd != null ? Number(data.total_iqd) : undefined,
         exchangeRate: data.exchange_rate,
         paymentStatus: data.payment_status,
         paymentMethod: data.payment_method,

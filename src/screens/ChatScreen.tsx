@@ -967,7 +967,14 @@ const ChatScreen = (props: any) => {
     (async () => {
       try {
         // Products live in a single Supabase `parts` table (no subcollections).
-        const { data, error } = await supabase.from('parts').select('*').eq('id', productId).maybeSingle();
+        // Named columns rather than '*': the public role must not be able to read
+        // parts.purchase_price (the shop's cost), and a star select would demand
+        // it. This runs for signed-out shoppers, so it has to work without it.
+        const { data, error } = await supabase
+          .from('parts')
+          .select('price_usd, price_iqd, stock_qty, variations, color_variations, part_number, category, image_urls')
+          .eq('id', productId)
+          .maybeSingle();
         if (!error && data && alive) {
           // Calculate TOTAL stock (main + size variations + color variations)
           const mainStock = data.stock_qty ?? 0;
@@ -977,7 +984,10 @@ const ChatScreen = (props: any) => {
 
           setProductDetails({
             price: data.price_usd,
-            priceIQD: undefined,
+            // Real now that a product can be priced in dinar. This field already
+            // existed and was always undefined; the chat's verbatim-IQD render
+            // path has therefore never had anything to show until now.
+            priceIQD: data.price_iqd != null ? Number(data.price_iqd) : undefined,
             stockQty: totalStock,
             partNumber: data.part_number,
             category: data.category,

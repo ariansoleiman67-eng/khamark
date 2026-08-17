@@ -16,6 +16,7 @@ import { SPACING, SHADOW_STYLES } from '../../constants/theme';
 import { COUNTRIES } from '../../constants/countries';
 import { useTenant } from '../../contexts/TenantContext';
 import { useCurrency } from '../../contexts/CurrencyContext';
+import { computeOrderTotalIQD, isIQDPriced } from '../../utils/currency';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createTenantAdminService, TenantProduct } from '../../services/tenantAdminService';
 import { calculateTieredPrice } from '../../utils/pricingUtils';
@@ -331,6 +332,8 @@ const AdminCreateOrderScreen: React.FC = () => {
   const { exchangeRateIQD } = useCurrency();
   // The customer pays cash in IQD — show the dinar amount alongside USD using the live rate.
   const iqd = (n: number) => `${Math.round((n || 0) * exchangeRateIQD).toLocaleString()} IQD`;
+  // Already a dinar figure — printed as-is rather than multiplied by the rate.
+  const iqdExact = (n: number) => `${Math.round(n || 0).toLocaleString()} IQD`;
 
   const [step, setStep] = useState<'browse' | 'review'>('browse');
   const [products, setProducts] = useState<TenantProduct[]>([]);
@@ -411,6 +414,16 @@ const AdminCreateOrderScreen: React.FC = () => {
     const base = l.variation ? l.variation.priceUSD : (l.product.priceUSD || 0);
     return calculateTieredPrice(l.quantity, base, (l.product as any).priceTiers, isVip);
   }, [isVip]);
+
+  // The per-unit dinar price to charge for a line, or null when the line is
+  // charged in dollars. Defined once so the counter total, the stored order and
+  // the line items cannot drift apart.
+  const dinarUnit = useCallback((l: CartLine): number | null => {
+    if (l.manual || l.variation) return null;
+    const p = l.product as any;
+    if (!isIQDPriced(p)) return null;
+    return priceOf(l) === (l.product.priceUSD || 0) ? Number(p.priceIQD) : null;
+  }, [priceOf]);
 
   // Persist the in-progress sale so an app crash/kill mid-sale doesn't lose the cart.
   const hydratedRef = useRef(false);
@@ -641,6 +654,14 @@ const AdminCreateOrderScreen: React.FC = () => {
   const discountInput = parseFloat(normalizeDigits(discountText).replace(/[^0-9.]/g, '')) || 0;
   const discountUSD = Math.max(0, Math.min(discountMode === 'percent' ? (subtotal * discountInput) / 100 : discountInput, subtotal));
   const total = Math.max(0, subtotal - discountUSD);
+  // The exact dinar total when a dinar-priced product is in the sale, so the
+  // amount read out at the counter is the amount the order is written with.
+  // Null otherwise, leaving an ordinary sale showing precisely what it did before.
+  const totalIQD = computeOrderTotalIQD(
+    lines.map((l) => ({ priceUSD: priceOf(l), priceIQD: dinarUnit(l) ?? undefined, quantity: l.quantity })),
+    total,
+    exchangeRateIQD
+  );
   const netProfit = profit - discountUSD;
   const cashUSD = parseFloat(normalizeDigits(cashText).replace(/[^0-9.]/g, '')) || 0;
   const changeDue = cashText.trim() ? cashUSD - total : 0;
@@ -686,6 +707,10 @@ const AdminCreateOrderScreen: React.FC = () => {
         partNumber: l.product.partNumber,
         imageUrl: l.product.imageUrls?.[0],
         priceUSD: priceOf(l),
+        // Same rule as the customer checkout: stamp the dinar price only when
+        // the dinar figure is what is being charged. A variation, a wholesale
+        // tier or a manual override is a dollar amount and converts normally.
+        ...(dinarUnit(l) != null ? { priceIQD: dinarUnit(l) as number } : {}),
         originalPriceUSD: l.variation ? l.variation.priceUSD : l.product.priceUSD,
         purchasePrice: (l.product as any).purchasePrice,
         quantity: l.quantity,
@@ -694,6 +719,7 @@ const AdminCreateOrderScreen: React.FC = () => {
       const fullPhone = customerPhone ? `${country.dialCode}${customerPhone}` : '';
       const { orderId, stockMoved } = await createTenantAdminService(tenantId).createManualOrder({
         items, customerName, customerPhone: fullPhone, customerAddress, customerCity, isVip,
+        totalIQD,
         discountUSD,
         amountPaidUSD: cashText.trim() ? cashUSD : 0,
         notes: note.trim() || undefined,
@@ -1034,7 +1060,7 @@ const AdminCreateOrderScreen: React.FC = () => {
             <Text allowFontScaling={false} style={[styles.totalLabel, { color: C.text, fontWeight: '800', fontSize: 15 }]}>{t('admin.inStore.total', { defaultValue: 'Total' })}</Text>
             <View style={{ alignItems: 'flex-end' }}>
               <Text allowFontScaling={false} style={[styles.totalValue, { color: C.text, fontSize: 18 }]}>{money(total)}</Text>
-              <Text allowFontScaling={false} style={{ color: C.textSecondary, fontSize: 12, fontWeight: '700', marginTop: 1 }}>{iqd(total)}</Text>
+              <Text allowFontScaling={false} style={{ color: C.textSecondary, fontSize: 12, fontWeight: '700', marginTop: 1 }}>{totalIQD != null ? iqdExact(totalIQD) : iqd(total)}</Text>
             </View>
           </View>
 
@@ -1106,7 +1132,7 @@ const AdminCreateOrderScreen: React.FC = () => {
                   <Text allowFontScaling={false} style={styles.createBtnText}>
                     {t('admin.inStore.create', { defaultValue: 'Create Sale' })} · {money(total)}
                   </Text>
-                  <Text allowFontScaling={false} style={{ color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: '700', marginTop: 1 }}>{iqd(total)}</Text>
+                  <Text allowFontScaling={false} style={{ color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: '700', marginTop: 1 }}>{totalIQD != null ? iqdExact(totalIQD) : iqd(total)}</Text>
                 </View>
               </>
             )}

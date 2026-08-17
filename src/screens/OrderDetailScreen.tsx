@@ -26,7 +26,7 @@ import { useCart } from '../contexts/CartContext';
 import { getOrCreateConversation, sendMessage, findConversationByTenant } from '../services/chatService';
 import { getOrderSupportContact, TenantContactInfo } from '../services/tenantInfoService';
 import { discountDisplayName } from '../services/discountService';
-import { formatPrice } from '../utils/currency';
+import { formatItemPrice, formatOrderLineTotal, formatOrderTotal, formatPrice } from '../utils/currency';
 import { getProductImageUrl } from '../utils/imageUtils';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { formatFirestoreDate } from '../utils/dateUtils';
@@ -243,7 +243,7 @@ const OrderDetailScreen: React.FC = () => {
     
     try {
       await Share.share({
-        message: `${t('orders.shareText')}\nOrder #${order.orderNumber}\nTotal: ${formatPrice(order.totalUSD, order.currency || currency, order.exchangeRate || exchangeRateIQD)}`,
+        message: `${t('orders.shareText')}\nOrder #${order.orderNumber}\nTotal: ${formatOrderTotal(order, order.currency || currency, exchangeRateIQD)}`,
       });
     } catch {
       // Share cancelled or failed
@@ -298,7 +298,7 @@ const OrderDetailScreen: React.FC = () => {
         // Build order details message with variant info
         const itemsList = order.items
           .map((item, idx) => {
-            let line = `${idx + 1}. ${item.productName || 'Product'} x${item.quantity}  ${formatPrice(item.priceUSD * item.quantity, order.currency || currency, order.exchangeRate || exchangeRateIQD)}`;
+            let line = `${idx + 1}. ${item.productName || 'Product'} x${item.quantity}  ${formatOrderLineTotal(item, order.currency || currency, order.exchangeRate || exchangeRateIQD)}`;
             if (item.partNumber) {
               line += ` | P/N: ${item.partNumber}`;
             }
@@ -327,7 +327,7 @@ const OrderDetailScreen: React.FC = () => {
 📝 ${t('orders.items', { defaultValue: 'Items' })}:
 ${itemsList}
 
-💰 ${t('orders.total', { defaultValue: 'Total' })}: ${formatPrice(order.totalUSD || 0, order.currency || currency, order.exchangeRate || exchangeRateIQD)}
+💰 ${t('orders.total', { defaultValue: 'Total' })}: ${formatOrderTotal(order, order.currency || currency, exchangeRateIQD)}
 
 ${t('orders.messagePrompt', { defaultValue: 'Hi, I have a question about this order:' })}`;
 
@@ -591,7 +591,7 @@ ${t('orders.messagePrompt', { defaultValue: 'Hi, I have a question about this or
             <View style={styles.metaItem}>
               <Ionicons name="pricetag-outline" size={16} color={theme.colors.primary} />
               <Text allowFontScaling={false} style={[styles.metaText, { color: theme.colors.primary, fontWeight: '600' }]}>
-                {formatPrice(order.totalUSD || 0, displayCurrency, displayExchangeRate)}
+                {formatOrderTotal(order, displayCurrency, displayExchangeRate)}
               </Text>
             </View>
           </View>
@@ -703,9 +703,9 @@ ${t('orders.messagePrompt', { defaultValue: 'Hi, I have a question about this or
                   {/* Price line — the leading number is already the quantity, so no separate "Quantity" label */}
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
                     <Text allowFontScaling={false} style={[styles.itemPrice, { flex: 1 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                      {`${item.quantity} x ${formatPrice(item.priceUSD, displayCurrency, displayExchangeRate)} = `}
+                      {`${item.quantity} x ${formatItemPrice(item, displayCurrency, displayExchangeRate)} = `}
                       <Text allowFontScaling={false} style={hasWholesaleDiscount ? { color: theme.colors.success } : undefined}>
-                        {formatPrice(item.priceUSD * item.quantity, displayCurrency, displayExchangeRate)}
+                        {formatOrderLineTotal(item, displayCurrency, displayExchangeRate)}
                       </Text>
                     </Text>
                     {hasWholesaleDiscount && (
@@ -945,7 +945,7 @@ ${t('orders.messagePrompt', { defaultValue: 'Hi, I have a question about this or
                 numberOfLines={1}
                 adjustsFontSizeToFit
               >
-                {formatPrice(order.totalUSD || 0, displayCurrency, displayExchangeRate)}
+                {formatOrderTotal(order, displayCurrency, displayExchangeRate)}
               </Text>
             </View>
           </View>

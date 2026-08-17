@@ -314,6 +314,13 @@ export interface OrderItem {
   productNameKu?: string;  // Kurdish product name for localized display
   partNumber: string;
   priceUSD: number;
+  /**
+   * Per-unit price in dinar, snapshotted when the product was priced in IQD and
+   * that base price is what was charged. Absent when the line was charged a
+   * dollar figure (a VIP price, a wholesale tier, or an ordinary USD product).
+   * Display it verbatim — it must not be re-derived from priceUSD.
+   */
+  priceIQD?: number;
   originalPriceUSD?: number; // Original price before wholesale/tiered discount
   quantity: number;
   totalUSD?: number;
@@ -355,6 +362,13 @@ export interface Order {
   discountUSD?: number; // Discount amount applied
   appliedDiscount?: AppliedDiscount; // Full discount details
   totalUSD: number;
+  /**
+   * The exact IQD total charged, snapshotted at checkout. Set only when the
+   * order contained a product priced in dinar. When present it is what the
+   * customer agreed to and what was charged, so it is displayed verbatim rather
+   * than recomputed from totalUSD x exchangeRate.
+   */
+  totalIQD?: number;
   // Currency snapshotting
   currency?: 'USD' | 'IQD'; // The currency the order was placed in
   exchangeRate?: number;    // The exchange rate at the time of order

@@ -164,3 +164,49 @@ describe('formatUnitPrice / formatLineTotal', () => {
     expect(formatLineTotal(usd, false, 'USD', RATE, {}, 3)).toBe('$300.00');
   });
 });
+
+// --- orders -------------------------------------------------------------------
+import { computeOrderTotalIQD, formatOrderLineTotal, formatOrderTotal } from '../../src/utils/currency';
+
+describe('order totals', () => {
+  const dinarLine = { priceUSD: 824.75, priceIQD: 1237123, quantity: 2 };
+  const usdLine = { priceUSD: 100, quantity: 1 };
+
+  it('returns null when nothing was priced in dinar, leaving orders untouched', () => {
+    expect(computeOrderTotalIQD([usdLine], 100, RATE)).toBeNull();
+    expect(computeOrderTotalIQD([], 0, RATE)).toBeNull();
+  });
+
+  it('sums the dinar lines in dinar and converts only the remainder', () => {
+    // 2 x 1,237,123 = 2,474,246 exactly. Shipping of $10 converts to 15,000.
+    const totalUSD = 824.75 * 2 + 10;
+    expect(computeOrderTotalIQD([dinarLine], totalUSD, RATE)).toBe(2474246 + 15000);
+  });
+
+  it('mixes a dinar line and a dollar line without corrupting either', () => {
+    const totalUSD = 824.75 * 2 + 100;
+    expect(computeOrderTotalIQD([dinarLine, usdLine], totalUSD, RATE)).toBe(2474246 + 150000);
+  });
+
+  it('ignores a line whose dinar price is absent or quantity is zero', () => {
+    expect(computeOrderTotalIQD([{ ...dinarLine, quantity: 0 }], 0, RATE)).toBeNull();
+  });
+
+  it('displays the snapshotted total verbatim, at the order rate', () => {
+    const order = { totalUSD: 1659.5, totalIQD: 2489246, exchangeRate: 1500 };
+    expect(formatOrderTotal(order, 'IQD', 9999)).toBe('IQD 2,489,246');
+    // A later rate change must not move a total that was already charged.
+    expect(formatOrderTotal({ ...order, exchangeRate: 1800 }, 'IQD', RATE)).toBe('IQD 2,489,246');
+  });
+
+  it('falls back to the old conversion for an order with no dinar total', () => {
+    const order = { totalUSD: 100, exchangeRate: 1500 };
+    expect(formatOrderTotal(order, 'IQD', RATE)).toBe('IQD 150,000');
+    expect(formatOrderTotal(order, 'USD', RATE)).toBe('$100.00');
+  });
+
+  it('keeps an order line total in dinar', () => {
+    expect(formatOrderLineTotal(dinarLine, 'IQD', RATE)).toBe('IQD 2,474,246');
+    expect(formatOrderLineTotal(usdLine, 'IQD', RATE)).toBe('IQD 150,000');
+  });
+});

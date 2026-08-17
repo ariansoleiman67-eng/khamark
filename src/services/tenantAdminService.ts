@@ -542,7 +542,7 @@ export class TenantAdminService {
   // Create a manual / in-store (POS) sale — no customer account. Counts toward
   // profit & stats; lives on the separate In-Store Sales screen via the source tag.
   async createManualOrder(params: {
-    items: Array<{ productId?: string; productName: string; partNumber?: string; imageUrl?: string; priceUSD: number; purchasePrice?: number; quantity: number; variationId?: string }>;
+    items: Array<{ productId?: string; productName: string; partNumber?: string; imageUrl?: string; priceUSD: number; priceIQD?: number; purchasePrice?: number; quantity: number; variationId?: string }>;
     customerName?: string;
     customerPhone?: string;
     customerAddress?: string;
@@ -558,6 +558,12 @@ export class TenantAdminService {
     // the owner's tenant (so stock deducts correctly against the owner-owned parts
     // and the owner sees it natively), and is tagged so the partner can see it too.
     partner?: { uid: string; name?: string };
+    /**
+     * The exact IQD total when the sale contains a product priced in dinar.
+     * Passed in rather than recomputed here so the figure stored is the one the
+     * admin read out to the customer at the counter. Null/undefined otherwise.
+     */
+    totalIQD?: number | null;
     // Returned stockMoved === false means the sale is committed but at least one line's stock
     // was NOT deducted (row left at stock_status 'pending'). The caller MUST surface this —
     // otherwise the counter sale completes and inventory drifts with nothing on screen.
@@ -603,6 +609,7 @@ export class TenantAdminService {
         tax_usd: 0,
         discount_usd: discountUSD,
         total_usd: totalUSD,
+      total_iqd: params.totalIQD ?? null,
         amount_paid_usd: amountPaidUSD,
         currency: params.currency || 'USD',
         exchange_rate: params.exchangeRate || 1500,

@@ -64,7 +64,7 @@ Deno.serve(async (req: Request) => {
     // ── Verify the order exists ──
     const { data: order, error: orderError } = await supabase
       .from('orders')
-      .select('id, order_number, total_usd, currency, exchange_rate, payment_status, status, user_id')
+      .select('id, order_number, total_usd, total_iqd, currency, exchange_rate, payment_status, status, user_id')
       .eq('id', orderId)
       .single();
 
@@ -118,7 +118,14 @@ Deno.serve(async (req: Request) => {
     // client-supplied amountIQD, which a caller could tamper to underpay). This
     // matches the client's convertToIQD (Math.round(total_usd * exchange_rate))
     // and what the webhook / status endpoints validate against. ──
-    const formattedAmount = Math.round((order.total_usd || 0) * (order.exchange_rate || 0));
+    // An order containing a product priced in dinar carries the exact dinar total it
+    // was written with. Re-deriving it from total_usd x exchange_rate would re-apply
+    // the rate and the 250-IQD snap to a figure the shop typed, so the charge could
+    // differ from what the customer agreed to. NULL on every order without such a
+    // product, which keeps the original arithmetic.
+    const formattedAmount = order.total_iqd != null && Number(order.total_iqd) > 0
+      ? Number(order.total_iqd)
+      : Math.round((order.total_usd || 0) * (order.exchange_rate || 0));
     if (!(formattedAmount > 0)) {
       return new Response(
         JSON.stringify({ error: 'Order amount could not be determined' }),

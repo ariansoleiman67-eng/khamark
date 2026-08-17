@@ -11,7 +11,7 @@ import i18n from '../locales';
 import { useTheme } from '../components/ThemeProvider';
 import { RootStackParamList, Order, OrderStatus } from '../types';
 import { OrderService } from '../services/OrderService';
-import { formatPrice } from '../utils/currency';
+import { formatItemPrice, formatOrderLineTotal, formatOrderTotal, formatPrice } from '../utils/currency';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { getProductImageUrl } from '../utils/imageUtils';
 import { formatFirestoreDate } from '../utils/dateUtils';
@@ -163,7 +163,7 @@ const OrderConfirmationScreen: React.FC = () => {
                 <View style={[styles.metaItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                   <Ionicons name="pricetag-outline" size={16} color={theme.colors.primary} />
                   <Text allowFontScaling={false} style={[styles.metaText, { color: theme.colors.primary, fontWeight: '600', textAlign: isRTL ? 'right' : 'left' }]}>
-                    {formatPrice(order.totalUSD || 0, displayCurrency, displayExchangeRate)}
+                    {formatOrderTotal(order, displayCurrency, displayExchangeRate)}
                   </Text>
                 </View>
               </View>
@@ -239,9 +239,9 @@ const OrderConfirmationScreen: React.FC = () => {
 
                         <View style={[styles.priceRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                           <Text allowFontScaling={false} style={[styles.itemPrice, { color: theme.colors.primary, flex: 1, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                            {`${item.quantity} x ${formatPrice(item.priceUSD, displayCurrency, displayExchangeRate)} = `}
+                            {`${item.quantity} x ${formatItemPrice(item, displayCurrency, displayExchangeRate)} = `}
                             <Text allowFontScaling={false} style={hasWholesaleDiscount ? { color: theme.colors.success } : undefined}>
-                              {formatPrice(item.priceUSD * item.quantity, displayCurrency, displayExchangeRate)}
+                              {formatOrderLineTotal(item, displayCurrency, displayExchangeRate)}
                             </Text>
                           </Text>
                           {hasWholesaleDiscount && (
@@ -326,7 +326,7 @@ const OrderConfirmationScreen: React.FC = () => {
                   {t('orders.total', { defaultValue: 'Total' })}
                 </Text>
                 <Text allowFontScaling={false} style={[styles.summaryItemValue, styles.summaryTotalValue, { color: theme.colors.primary, textAlign: isRTL ? 'left' : 'right' }]} numberOfLines={1} adjustsFontSizeToFit>
-                  {formatPrice(order.totalUSD || 0, displayCurrency, displayExchangeRate)}
+                  {formatOrderTotal(order, displayCurrency, displayExchangeRate)}
                 </Text>
               </View>
             </View>

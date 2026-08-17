@@ -122,7 +122,7 @@ Deno.serve(async (req: Request) => {
     // We stored the paymentId in payment_method.transactionId (and extra_data).
     const { data: orders } = await supabase
       .from('orders')
-      .select('id, order_number, payment_status, extra_data, user_id, total_usd, exchange_rate, currency')
+      .select('id, order_number, payment_status, extra_data, user_id, total_usd, total_iqd, exchange_rate, currency')
       .eq('payment_method->>transactionId', paymentId)
       .limit(1);
 
@@ -132,7 +132,7 @@ Deno.serve(async (req: Request) => {
     if (!order) {
       const { data: fallbackOrders } = await supabase
         .from('orders')
-        .select('id, order_number, payment_status, extra_data, user_id, total_usd, exchange_rate, currency')
+        .select('id, order_number, payment_status, extra_data, user_id, total_usd, total_iqd, exchange_rate, currency')
         .filter('extra_data->qiCardPayment->>paymentId', 'eq', paymentId)
         .limit(1);
       order = fallbackOrders?.[0];
@@ -153,7 +153,14 @@ Deno.serve(async (req: Request) => {
     // (`status` is a plain let, so it can be safely downgraded on mismatch.)
     let effectiveStatus = status;
     if (effectiveStatus === 'SUCCESS') {
-      const expectedAmountIQD = Math.round((order.total_usd * order.exchange_rate) * 1000) / 1000;
+      // An order containing a product priced in dinar carries the exact dinar total it
+      // was written with. Re-deriving it from total_usd x exchange_rate would re-apply
+      // the rate and the 250-IQD snap to a figure the shop typed, so the charge could
+      // differ from what the customer agreed to. NULL on every order without such a
+      // product, which keeps the original arithmetic.
+      const expectedAmountIQD = order.total_iqd != null && Number(order.total_iqd) > 0
+        ? Number(order.total_iqd)
+        : Math.round((order.total_usd * order.exchange_rate) * 1000) / 1000;
       const actualAmount = Number(amount);
       if (!Number.isFinite(actualAmount) || Math.abs(actualAmount - expectedAmountIQD) > 0.5) {
         console.error(`[SECURITY ALERT] Order ${order.id}: Amount mismatch! Expected ${expectedAmountIQD}, got ${amount}`);

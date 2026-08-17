@@ -31,7 +31,7 @@ import { useNotification } from '../contexts/NotificationContext';
 
 import Button from '../components/Button';
 import { OrderStatusBadge } from '../components/OrderStatusBadge';
-import { formatCurrency, formatPrice } from '../utils/currency';
+import { formatCurrency, formatItemPrice, formatOrderLineTotal, formatOrderTotal, formatPrice } from '../utils/currency';
 import { getThumbnailUrl } from '../utils/imageUtils';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { formatFirestoreDate } from '../utils/dateUtils';
@@ -548,7 +548,7 @@ export const OrdersScreen: React.FC = () => {
                   letterSpacing: -0.2,
                 }}
               >
-                {formatPrice(order.totalUSD || 0, displayCurrency, displayExchangeRate)}
+                {formatOrderTotal(order, displayCurrency, displayExchangeRate)}
               </Text>
             </View>
             
@@ -683,7 +683,7 @@ export const OrdersScreen: React.FC = () => {
                       textAlign: isRTL ? 'left' : 'right',
                     }}
                   >
-                    {`${item.quantity} × ${formatPrice(item.priceUSD, displayCurrency, displayExchangeRate)} = `}{formatPrice(item.priceUSD * item.quantity, displayCurrency, displayExchangeRate)}
+                    {`${item.quantity} × ${formatItemPrice(item, displayCurrency, displayExchangeRate)} = `}{formatOrderLineTotal(item, displayCurrency, displayExchangeRate)}
                   </Text>
                 </View>
               </View>

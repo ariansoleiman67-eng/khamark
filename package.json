@@ -139,6 +139,7 @@
     "dotenv": "^17.2.1",
     "eslint": "^8.57.0",
     "eslint-plugin-react": "^7.34.1",
+    "eslint-plugin-react-hooks": "^4.6.2",
     "eslint-plugin-react-native": "^4.1.0",
     "firebase-admin": "^13.7.0",
     "flipper-plugin-react-native-performance": "^0.4.0",

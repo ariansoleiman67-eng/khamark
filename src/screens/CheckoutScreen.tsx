@@ -35,7 +35,7 @@ import { useNavigation, useFocusEffect, useRoute, RouteProp } from '@react-navig
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { useTheme } from '../components/ThemeProvider';
-import { formatPrice } from '../utils/currency';
+import { formatPrice, isIQDPriced } from '../utils/currency';
 import { getProductImageUrl, logImageDebug } from '../utils/imageUtils';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
@@ -859,6 +859,13 @@ const CheckoutScreen: React.FC = () => {
           purchasePrice: purchasePriceById[cartItem.productId] ?? cartItem.product.purchasePrice ?? null,
           shippingCost: cartItem.product.shippingCost || 0,
           imageUrl: cartItem.product.imageUrls?.[0] || '',
+          // Snapshot the dinar price only when the dinar figure is what is
+          // actually being charged. If a wholesale tier or a VIP price won,
+          // tieredPrice is a dollar amount and the line converts normally —
+          // stamping the dinar price here would bill the wrong number.
+          ...(isIQDPriced(cartItem.product) && tieredPrice === cartItem.product.priceUSD
+            ? { priceIQD: Number(cartItem.product.priceIQD) }
+            : {}),
           tenantId: cartItem.product.tenantId || null, // carried so OrderService can stamp order.tenant_id
         };
         
@@ -913,8 +920,13 @@ const CheckoutScreen: React.FC = () => {
       // ── QI CARD: Initiate payment and open WebView or Instant Pay ──
       if (isQiCard) {
         try {
-          // Convert to IQD for QiCard
-          const amountIQD = QiCardPaymentService.convertToIQD(orderResult.totalUSD, exchangeRateIQD);
+          // Charge the dinar total the order was written with, when there is one.
+          // Re-converting totalUSD here would re-apply the rate and the 250 snap
+          // to prices the shop typed in dinar, so the customer could be charged a
+          // different figure from the one they agreed to on the previous screen.
+          const amountIQD = orderResult.totalIQD != null && orderResult.totalIQD > 0
+            ? orderResult.totalIQD
+            : QiCardPaymentService.convertToIQD(orderResult.totalUSD, exchangeRateIQD);
           
           let tokenOptions: any = undefined;
           
