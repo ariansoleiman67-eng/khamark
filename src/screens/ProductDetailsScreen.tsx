@@ -378,6 +378,16 @@ export const ProductDetailsScreen: React.FC = () => {
   };
 
   // ALIBABA VARIATION: Update quantity for a specific variation
+  /**
+   * Storage/size is a single choice: picking one clears the rest, and tapping the
+   * selected card again deselects it — the same behaviour as the colour swatches.
+   * Writes into the same variationQuantities map that pricing and the cart already
+   * read, so no downstream code changed.
+   */
+  const selectSizeVariation = (variationId: string) => {
+    setVariationQuantities((prev) => ((prev[variationId] || 0) > 0 ? {} : { [variationId]: 1 }));
+  };
+
   const updateVariationQuantity = (variationId: string, delta: number) => {
     if (!product?.variations) return;
 
@@ -2048,134 +2058,86 @@ export const ProductDetailsScreen: React.FC = () => {
                     </Text>
                   </View>
 
-                  {/* Table Header */}
-                  <View style={[styles.alibabaTableHeader, { backgroundColor: theme.colors.surface, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                    <Text allowFontScaling={false} style={[styles.alibabaHeaderText, { color: theme.colors.textSecondary, flex: VARIANT_COL.model, textAlign: isRTL ? 'right' : 'left' }]}>
-                      {t('product.modelNumber', { defaultValue: 'Model' })}
-                    </Text>
-                    <Text allowFontScaling={false} style={[styles.alibabaHeaderText, { color: theme.colors.textSecondary, flex: VARIANT_COL.price, textAlign: 'center' }]}>
-                      {t('product.priceLabel', { defaultValue: 'Price' })}
-                    </Text>
-                    <Text allowFontScaling={false} style={[styles.alibabaHeaderText, { color: theme.colors.textSecondary, flex: VARIANT_COL.qty, textAlign: isRTL ? 'left' : 'right' }]}>
-                      {t('product.quantity', { defaultValue: 'Qty' })}
-                    </Text>
-                  </View>
-
-                  {/* Rows */}
-                  {product.variations.map((variation, index) => {
-                    const isOutOfStock = variation.stockQuantity <= 0;
-                    const currentQty = variationQuantities[variation.variationId] || 0;
-                    const sizeDisplay = `${variation.sizeValue} ${variation.sizeUnit}`.trim();
-
-                    return (
-                      <View
-                        key={variation.variationId}
-                        style={[
-                          styles.alibabaTableRow,
-                          {
-                            backgroundColor: currentQty > 0 ? theme.colors.primary + '08' : 'transparent',
-                            borderBottomColor: theme.colors.border,
-                            borderBottomWidth: index < product.variations!.length - 1 ? 1 : 0,
-                            flexDirection: isRTL ? 'row-reverse' : 'row',
-                          },
-                        ]}
-                      >
-                        <Text allowFontScaling={false}
-                          style={[
-                            styles.alibabaModelText,
-                            {
-                              color: isOutOfStock ? theme.colors.textSecondary : theme.colors.text,
-                              textDecorationLine: isOutOfStock ? 'line-through' : 'none',
-                              flex: VARIANT_COL.model,
-                              textAlign: isRTL ? 'right' : 'left',
-                            },
-                          ]}
-                          numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}
+                  {/* Storage is a single choice, not a quantity. The table with a
+                      per-row +/- stepper let a shopper order two 128GB and one 256GB
+                      of the same phone — wholesale behaviour, confusing in a retail
+                      shop. Selecting a card sets that variant's quantity to 1 and
+                      clears the others, so pricing, the cart and the totals below are
+                      unchanged: they still read variationQuantities. */}
+                  <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', flexWrap: 'wrap', gap: 10 }}>
+                    {product.variations.map((variation) => {
+                      const isOutOfStock = variation.stockQuantity <= 0;
+                      const selected = (variationQuantities[variation.variationId] || 0) > 0;
+                      const sizeDisplay = `${variation.sizeValue} ${variation.sizeUnit}`.trim();
+                      const unitPrice = variation.priceUSD != null ? variation.priceUSD : product.priceUSD;
+                      return (
+                        <TouchableOpacity
+                          key={variation.variationId}
+                          disabled={isOutOfStock}
+                          activeOpacity={0.8}
+                          onPress={() => selectSizeVariation(variation.variationId)}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected, disabled: isOutOfStock }}
+                          accessibilityLabel={
+                            isOutOfStock
+                              ? `${sizeDisplay} — ${t('product.outOfStock', { defaultValue: 'Out of stock' })}`
+                              : sizeDisplay
+                          }
+                          style={{
+                            minWidth: 104,
+                            paddingHorizontal: 16,
+                            paddingVertical: 12,
+                            borderRadius: 12,
+                            borderWidth: selected ? 2 : 1.5,
+                            borderColor: selected ? theme.colors.primary : theme.colors.border,
+                            backgroundColor: selected ? theme.colors.primary + '12' : theme.colors.card,
+                            opacity: isOutOfStock ? 0.4 : 1,
+                            alignItems: 'center',
+                          }}
                         >
-                          {sizeDisplay}
-                        </Text>
-
-                        <View style={{ flex: VARIANT_COL.price, alignItems: 'center', justifyContent: 'center' }}>
-                          <Text allowFontScaling={false}
+                          <Text
+                            allowFontScaling={false}
+                            numberOfLines={1}
                             style={{
+                              fontSize: 15,
+                              fontWeight: selected ? '800' : '600',
                               color: isOutOfStock ? theme.colors.textSecondary : theme.colors.text,
                               textDecorationLine: isOutOfStock ? 'line-through' : 'none',
-                              fontSize: 13,
-                              fontWeight: '600',
                             }}
-                            numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}
                           >
-                            ${(variation.priceUSD != null ? variation.priceUSD : product.priceUSD)?.toFixed(2)}
+                            {sizeDisplay}
                           </Text>
-                        </View>
-
-                        <View style={[styles.alibabaQtyCell, { flex: VARIANT_COL.qty, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                          <TouchableOpacity
-                            onPress={() => updateVariationQuantity(variation.variationId, -1)}
-                            disabled={currentQty <= 0}
-                            activeOpacity={0.7}
-                            style={[
-                              styles.alibabaQtyButton,
-                              {
-                                borderColor: currentQty <= 0 ? theme.colors.border : theme.colors.primary,
-                                opacity: currentQty <= 0 ? 0.4 : 1,
-                              },
-                            ]}
+                          {/* Per-size price is why this is a card and not a bare chip:
+                              256GB usually costs more than 128GB, and the shopper needs
+                              to see that before choosing. */}
+                          <Text
+                            allowFontScaling={false}
+                            numberOfLines={1}
+                            style={{
+                              marginTop: 3,
+                              fontSize: 13,
+                              fontWeight: '700',
+                              color: isOutOfStock
+                                ? theme.colors.textSecondary
+                                : selected
+                                  ? theme.colors.primary
+                                  : theme.colors.textSecondary,
+                            }}
                           >
-                            <Ionicons name="remove" size={16} color={currentQty <= 0 ? theme.colors.textSecondary : theme.colors.primary} />
-                          </TouchableOpacity>
-
-                          <TextInput allowFontScaling={false}
-                            value={variationQtyTexts[variation.variationId] !== undefined ? variationQtyTexts[variation.variationId] : String(currentQty)}
-                            onChangeText={(text) => handleVariationExact(variation.variationId, text, variation.stockQuantity)}
-                            onBlur={() => handleVariationBlur(variation.variationId, variation.stockQuantity)}
-                            keyboardType="number-pad"
-                            selectTextOnFocus
-                            style={[styles.alibabaQtyText, { 
-                              color: theme.colors.text,
-                              backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
-                              width: VARIANT_QTY_FIELD_WIDTH,
-                              height: 32,
-                              textAlign: 'center',
-                              textAlignVertical: 'center',
-                              paddingVertical: 0,
-                              paddingHorizontal: 0,
-                              includeFontPadding: false,
-                              borderRadius: 4,
-                              borderWidth: 1,
-                              borderColor: theme.colors.border
-                            }]}
-                          />
-
-                          <TouchableOpacity
-                            onPress={() => updateVariationQuantity(variation.variationId, 1)}
-                            disabled={isOutOfStock || currentQty >= variation.stockQuantity}
-                            activeOpacity={0.7}
-                            style={[
-                              styles.alibabaQtyButton,
-                              {
-                                borderColor:
-                                  isOutOfStock || currentQty >= variation.stockQuantity
-                                    ? theme.colors.border
-                                    : theme.colors.primary,
-                                opacity: isOutOfStock || currentQty >= variation.stockQuantity ? 0.4 : 1,
-                              },
-                            ]}
-                          >
-                            <Ionicons
-                              name="add"
-                              size={16}
-                              color={
-                                isOutOfStock || currentQty >= variation.stockQuantity
-                                  ? theme.colors.textSecondary
-                                  : theme.colors.primary
-                              }
-                            />
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    );
-                  })}
+                            {formatPrice(unitPrice ?? 0, currentCurrency as any, exchangeRateIQD)}
+                          </Text>
+                          {isOutOfStock && (
+                            <Text
+                              allowFontScaling={false}
+                              style={{ marginTop: 2, fontSize: 10, color: theme.colors.error }}
+                            >
+                              {t('product.outOfStock', { defaultValue: 'Out of stock' })}
+                            </Text>
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
 
                   {getTotalVariationQuantity() > 0 && (
                     <View style={[styles.alibabaTotalRow, { backgroundColor: theme.colors.primary + '10', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
