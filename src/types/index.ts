@@ -122,6 +122,15 @@ export interface Product {
   categoryKu: string;
   imageUrls: string[];  // Match what ProductCard expects
   priceUSD: number;
+  /**
+   * Selling price authored directly in IQD. Undefined means the product is
+   * priced in USD via priceUSD, as everything was before. When set it is
+   * authoritative: shown verbatim with no exchange-rate conversion and no
+   * 250-IQD rounding, and priceUSD is derived from it at save time for the
+   * cart/report/sort arithmetic that is USD-only. Read it through
+   * getPriceUSD / getPriceIQD / formatItemPrice in utils/currency.
+   */
+  priceIQD?: number;
   compareAtPriceUSD?: number; // "was" price for showing a strikethrough + Save% discount
   vipPriceUSD?: number;      // Special price shown only to VIP users (locked/hinted for others)
   purchasePrice?: number;    // Cost/buy price from supplier (admin-only, not shown to customers)

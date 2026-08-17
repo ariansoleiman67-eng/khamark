@@ -3028,7 +3028,10 @@
         "videoUploadedClickSave": "Video uploaded! Click Save to persist.",
         "videoUploadedSaved": "Video uploaded and saved!",
         "videoUploadFailed": "Video upload failed",
-        "videoValidationFailed": "Video validation failed"
+        "videoValidationFailed": "Video validation failed",
+        "priceIQD": "Price (IQD) — optional",
+        "priceIQDHint": "Leave blank to price this product in dollars as usual. Fill it in for stock you bought in dinar — customers then see this exact amount and the exchange rate is not applied to it.",
+        "priceIQDActive": "Customers see {{iqd}} exactly. In dollars it shows as {{usd}} (at the current rate of {{rate}}); the dinar price itself will not change when you edit the rate."
       },
       "invalidSizeValue": "Please enter a size",
       "duplicateSizeValue": "This size already exists",

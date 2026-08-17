@@ -15,8 +15,7 @@ import { StoreProfile } from '../../services/storeProfileService';
 import { Product } from '../../types';
 import { useTheme } from '../../components/ThemeProvider';
 import { useCurrency } from '../../contexts/CurrencyContext';
-import { formatPrice } from '../../utils/currency';
-import { getDisplayUnitPrice } from '../../utils/pricingUtils';
+import { formatUnitPrice } from '../../utils/pricingUtils';
 import { useAuth } from '../../contexts/AuthContext';
 import { SPACING, FONT_SIZE } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
@@ -110,7 +109,7 @@ const StoreHomeTab: React.FC<StoreHomeTabProps & { onSwitchTab?: (tabName: strin
               numberOfLines={1}
               adjustsFontSizeToFit
             >
-              {formatPrice(getDisplayUnitPrice(product, isVip), currency, exchangeRateIQD)}
+              {formatUnitPrice(product, isVip, currency, exchangeRateIQD)}
             </Text>
           </View>
         </View>

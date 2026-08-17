@@ -17,8 +17,7 @@ import {
   getDisplayUnitPrice,
   getDiscountPercent,
   getEffectiveStock,
-  hasCompareAtDiscount,
-} from "../utils/pricingUtils";
+  hasCompareAtDiscount, formatUnitPrice } from "../utils/pricingUtils";
 import { Product } from "../types";
 import { SHADOW_STYLES } from "../constants/theme";
 import { getProductImageUrl, getThumbnailUrl, logImageDebug } from "../utils/imageUtils";
@@ -139,10 +138,10 @@ const ProductCard: React.FC<ProductCardProps> = ({
     if (product.priceTiers && product.priceTiers.length > 0) {
       const minPrice = Math.min(...product.priceTiers.map((t) => t.priceUSD));
       const minFormatted = formatPrice(minPrice, currency, exchangeRateIQD);
-      const maxFormatted = formatPrice(product.priceUSD, currency, exchangeRateIQD, { symbol: false });
+      const maxFormatted = formatUnitPrice(product, isVip, currency, exchangeRateIQD, { symbol: false });
       return `${minFormatted} - ${maxFormatted}`;
     }
-    return formatPrice(getDisplayUnitPrice(product, isVip), currency, exchangeRateIQD);
+    return formatUnitPrice(product, isVip, currency, exchangeRateIQD);
   };
   // VIP messaging: badge when a VIP is seeing their price; a locked hint for
   // normal users when the product has a VIP-only price.

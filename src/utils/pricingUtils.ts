@@ -1,4 +1,5 @@
 import { PriceTier, Product } from '../types';
+import { convertIQDToUSD, formatCurrencyIQD, formatCurrencyUSD, formatPrice, isIQDPriced } from './currency';
 
 /**
  * Validates an array of price tiers.
@@ -159,3 +160,73 @@ export const hasVipPrice = (
   // Tiered wholesale also yields a VIP-only price below the first tier.
   return !!(product.priceTiers && product.priceTiers.length > 0);
 };
+
+/**
+ * Is the shopper looking at the product's own base price, unmodified?
+ *
+ * Only the base price can be authored in dinar. A VIP price, a wholesale tier
+ * or a storage-size surcharge are all still dollar figures, so as soon as one of
+ * them applies the dinar figure is no longer what is being shown and the normal
+ * conversion has to take over. Showing a dollar-authored VIP price as a verbatim
+ * dinar amount would be plain wrong.
+ */
+const baseDinarPriceApplies = (
+  product: Pick<Product, 'priceUSD' | 'vipPriceUSD' | 'priceTiers'> & { priceIQD?: number },
+  unitUSD: number,
+  unitDelta: number
+): boolean => isIQDPriced(product) && unitUSD === product.priceUSD && !unitDelta;
+
+/**
+ * The price string to show, in the shopper's currency.
+ *
+ * Use this rather than formatPrice(getEffectiveUnitPrice(...)) anywhere a whole
+ * Product is in hand. formatPrice takes a bare USD number, so it cannot tell that
+ * a product was priced in dinar and would put the exchange rate and the 250-IQD
+ * snap back on a figure the shop typed exactly.
+ *
+ * `multiplier` is what makes a line total agree with the unit price above it. A
+ * dinar total is quantity x the typed figure, computed in dinar; converting the
+ * dollar total instead would round differently and print two prices that do not
+ * add up on the same screen.
+ */
+const formatPricePart = (
+  product: Pick<Product, 'priceUSD' | 'vipPriceUSD' | 'priceTiers'> & { priceIQD?: number },
+  isVip: boolean,
+  currency: 'USD' | 'IQD',
+  exchangeRateIQD: number,
+  options: any,
+  quantity: number,
+  unitDelta: number,
+  multiplier: number
+): string => {
+  const unitUSD = getEffectiveUnitPrice(product, quantity, isVip);
+  if (baseDinarPriceApplies(product, unitUSD, unitDelta)) {
+    const iqd = Number(product.priceIQD) * multiplier;
+    return currency === 'IQD'
+      ? formatCurrencyIQD(iqd, options)
+      : formatCurrencyUSD(convertIQDToUSD(iqd, exchangeRateIQD), options);
+  }
+  return formatPrice((unitUSD + unitDelta) * multiplier, currency, exchangeRateIQD, options);
+};
+
+/** Price of a single unit. `quantity` only selects the wholesale tier. */
+export const formatUnitPrice = (
+  product: Pick<Product, 'priceUSD' | 'vipPriceUSD' | 'priceTiers'> & { priceIQD?: number },
+  isVip: boolean = false,
+  currency: 'USD' | 'IQD' = 'USD',
+  exchangeRateIQD: number = 1500,
+  options: any = {},
+  quantity: number = 1,
+  unitDelta: number = 0
+): string => formatPricePart(product, isVip, currency, exchangeRateIQD, options, quantity, unitDelta, 1);
+
+/** Unit price x quantity, kept in dinar end to end for a dinar-priced product. */
+export const formatLineTotal = (
+  product: Pick<Product, 'priceUSD' | 'vipPriceUSD' | 'priceTiers'> & { priceIQD?: number },
+  isVip: boolean = false,
+  currency: 'USD' | 'IQD' = 'USD',
+  exchangeRateIQD: number = 1500,
+  options: any = {},
+  quantity: number = 1,
+  unitDelta: number = 0
+): string => formatPricePart(product, isVip, currency, exchangeRateIQD, options, quantity, unitDelta, quantity);

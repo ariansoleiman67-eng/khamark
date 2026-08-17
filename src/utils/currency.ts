@@ -155,6 +155,78 @@ export const formatPrice = (
   return formatCurrencyUSD(amountUSD, options);
 };
 
+// =============================================================================
+// Products priced in IQD
+// =============================================================================
+// Everything above assumes a price is a USD number and IQD is a display
+// transform. Some stock is bought in dinar, so those products carry the dinar
+// figure itself (Product.priceIQD / parts.price_iqd) and it is authoritative:
+// the exchange rate is never applied to it, and roundIQD never touches it.
+// Snapping a typed 1,237,000 to the nearest 250 would rewrite the shop's own
+// number, which is the whole thing this is meant to prevent.
+
+/** The shape both a Product and a cart/order line item satisfy. */
+export interface PricedItem {
+  priceUSD?: number | null;
+  priceIQD?: number | null;
+}
+
+/** True when this item's price was authored in dinar rather than dollars. */
+export const isIQDPriced = (item: PricedItem | null | undefined): boolean => {
+  const iqd = Number(item?.priceIQD);
+  return item?.priceIQD != null && Number.isFinite(iqd) && iqd > 0;
+};
+
+/** Dinar -> dollars, to cents. The inverse of convertUSDToIQD, minus the 250 snap. */
+export const convertIQDToUSD = (amountIQD: number, exchangeRate: number = 1500): number => {
+  const iqd = Number(amountIQD);
+  if (!Number.isFinite(iqd) || !iqd || !Number.isFinite(exchangeRate) || exchangeRate <= 0) return 0;
+  return Math.round((iqd / exchangeRate) * 100) / 100;
+};
+
+/**
+ * The USD number to use for arithmetic — cart subtotals, reports, sorting.
+ *
+ * For a dinar-priced item this is derived from the dinar figure at the CURRENT
+ * rate, never read from the stored price_usd. That column is written at save
+ * time and goes stale the moment the rate is edited, which would make a cart
+ * total disagree with the price on the product page.
+ */
+export const getPriceUSD = (item: PricedItem | null | undefined, exchangeRate: number = 1500): number => {
+  if (isIQDPriced(item)) return convertIQDToUSD(Number(item!.priceIQD), exchangeRate);
+  const usd = Number(item?.priceUSD);
+  return Number.isFinite(usd) ? usd : 0;
+};
+
+/** The exact dinar figure to display and to charge. */
+export const getPriceIQD = (item: PricedItem | null | undefined, exchangeRate: number = 1500): number => {
+  if (isIQDPriced(item)) return Number(item!.priceIQD);
+  const usd = Number(item?.priceUSD);
+  return convertUSDToIQD(Number.isFinite(usd) ? usd : 0, exchangeRate);
+};
+
+/**
+ * Format an item's price in the shopper's chosen currency.
+ *
+ * Use this instead of formatPrice wherever a whole product/line item is in hand.
+ * formatPrice takes a bare USD scalar, so it cannot tell that a number is
+ * already dinar — that is exactly the bug this avoids.
+ */
+export const formatItemPrice = (
+  item: PricedItem | null | undefined,
+  currency: 'USD' | 'IQD' = 'USD',
+  exchangeRateIQD: number = 1500,
+  options: any = {}
+): string => {
+  if (isIQDPriced(item)) {
+    return currency === 'IQD'
+      ? formatCurrencyIQD(Number(item!.priceIQD), options)                                  // verbatim
+      : formatCurrencyUSD(convertIQDToUSD(Number(item!.priceIQD), exchangeRateIQD), options);
+  }
+  const usd = Number(item?.priceUSD);
+  return formatPrice(Number.isFinite(usd) ? usd : 0, currency, exchangeRateIQD, options);
+};
+
 // Date formatting utilities
 export const formatDate = (date: Date | string | any, locale: string = 'en-US'): string => {
   if (!date) return '';

@@ -24,7 +24,8 @@ import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { useTheme } from '../components/ThemeProvider';
-import { formatPrice } from '../utils/currency';
+import { convertUSDToIQD, formatCurrencyIQD, formatPrice, isIQDPriced } from '../utils/currency';
+import { formatLineTotal } from '../utils/pricingUtils';
 import { getProductImageUrl, getThumbnailUrl, logImageDebug } from '../utils/imageUtils';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
@@ -377,7 +378,7 @@ const CartItemComponent: React.FC<CartItemComponentProps> = ({
           {/* Price */}
           <View style={styles.priceColumn}>
             <AppNumber
-              value={formatPrice(discountedTotal, currency, exchangeRateIQD)}
+              value={formatLineTotal(item.product, isVip, currency, exchangeRateIQD, {}, localQuantity)}
               style={[styles.itemPrice, { color: theme.dark ? theme.colors.primary : FIGMA_DARK }]}
             />
           </View>
@@ -619,6 +620,34 @@ const CartScreen: React.FC = () => {
     return () => { ignore = true; };
   }, [cart, shippingRegion, shippingCountry, isVip]);
 
+  /**
+   * Format a cart-wide USD total without letting the exchange rate touch the
+   * dinar-priced lines inside it.
+   *
+   * The dinar part is summed in dinar and the rest is converted as it always
+   * was, so a cart holding no dinar-priced product produces byte-identical
+   * output to before — including the single 250-IQD snap over the whole sum
+   * rather than a snap per line, which would have shifted existing totals.
+   */
+  const formatCartTotal = useCallback((usdTotal: number): string => {
+    if (currency !== 'IQD' || !cart?.items?.length) {
+      return formatPrice(usdTotal, currency, exchangeRateIQD);
+    }
+    let dinarIQD = 0;
+    let dinarUSD = 0;
+    for (const it of cart.items) {
+      if (!isIQDPriced(it.product)) continue;
+      const unitUSD = LocalCartService.getTieredPrice(it.product, it.quantity, isVip);
+      // A tier or VIP price is a dollar figure, so that line converts normally.
+      if (unitUSD !== it.product.priceUSD) continue;
+      dinarIQD += Number(it.product.priceIQD) * it.quantity;
+      dinarUSD += unitUSD * it.quantity;
+    }
+    if (dinarIQD === 0) return formatPrice(usdTotal, currency, exchangeRateIQD);
+    // Shipping and any discount stay inside the converted remainder.
+    return formatCurrencyIQD(dinarIQD + convertUSDToIQD(usdTotal - dinarUSD, exchangeRateIQD));
+  }, [currency, exchangeRateIQD, cart, isVip]);
+
   // Render cart item
   const renderCartItem = useCallback(({ item, index }: { item: CartItem; index: number }) => (
     <CartItemComponent
@@ -821,12 +850,10 @@ const CartScreen: React.FC = () => {
                     <AppText style={[styles.totalLabel, { color: isDark ? theme.colors.textSecondary : '#888' }]}>{t('cart.total', 'Total')}</AppText>
                     <View style={styles.totalPriceRow}>
                       <AppNumber
-                        value={formatPrice(
+                        value={formatCartTotal(
                           appliedDiscount
                             ? Math.max(0, cartSummary.total - appliedDiscount.savedAmount)
-                            : cartSummary.total,
-                          currency,
-                          exchangeRateIQD
+                            : cartSummary.total
                         )}
                         style={[styles.totalPrice, { color: theme.colors.text }]}
                       />

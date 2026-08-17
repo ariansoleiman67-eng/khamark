@@ -34,8 +34,7 @@ import {
   getDiscountPercent,
   getEffectiveStock,
   hasCompareAtDiscount,
-  LOW_STOCK_THRESHOLD,
-} from "../utils/pricingUtils";
+  LOW_STOCK_THRESHOLD, formatUnitPrice } from "../utils/pricingUtils";
 import { getDirection } from "../locales";
 import { getThumbnailUrl } from "../utils/imageUtils";
 import { SPACING } from "../constants/theme";
@@ -109,12 +108,10 @@ const RelatedProductCard: React.FC<RelatedProductCardProps> = ({
     if (product.priceTiers && product.priceTiers.length > 0) {
       const minPrice = Math.min(...product.priceTiers.map((tier) => tier.priceUSD));
       const minFormatted = formatPrice(minPrice, currency, exchangeRateIQD);
-      const maxFormatted = formatPrice(product.priceUSD, currency, exchangeRateIQD, {
-        symbol: false,
-      });
+      const maxFormatted = formatUnitPrice(product, isVip, currency, exchangeRateIQD, { symbol: false });
       return `${minFormatted} - ${maxFormatted}`;
     }
-    return formatPrice(getDisplayUnitPrice(product, isVip), currency, exchangeRateIQD);
+    return formatUnitPrice(product, isVip, currency, exchangeRateIQD);
   };
   const vipActive =
     isVip && typeof product.vipPriceUSD === "number" && product.vipPriceUSD > 0;

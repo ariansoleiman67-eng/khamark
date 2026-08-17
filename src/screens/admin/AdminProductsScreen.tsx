@@ -33,6 +33,8 @@ import { getThumbnailUrl } from '../../utils/imageUtils';
 import { Image as ExpoImage } from 'expo-image';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTenant } from '../../contexts/TenantContext';
+import { useCurrency } from '../../contexts/CurrencyContext';
+import { convertIQDToUSD, formatCurrencyIQD, formatCurrencyUSD } from '../../utils/currency';
 import { createTenantAdminService, TenantCategory } from '../../services/tenantAdminService';
 import { categoryStore } from '../../services/categoryStore';
 import { ImageService } from '../../services/imageService';
@@ -112,6 +114,9 @@ const newTierKey = () => `tier_${Date.now()}_${Math.random().toString(36).slice(
 const AdminProductsScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
   const { tenantId, isLoading: tenantLoading } = useTenant();
+  // Only used to show the admin what their dinar price works out to in dollars,
+  // and to derive the price_usd column that the USD-only cart/report maths reads.
+  const { exchangeRateIQD } = useCurrency();
   const { user } = useAuth();
   const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -212,6 +217,7 @@ const AdminProductsScreen: React.FC = () => {
     categoryAr: '',
     categoryKu: '',
     priceUSD: '',
+    priceIQD: '',
     compareAtPriceUSD: '',
     vipPriceUSD: '',
     purchasePrice: '',
@@ -631,6 +637,7 @@ const AdminProductsScreen: React.FC = () => {
       categoryAr: (product as any).categoryAr || '',
       categoryKu: (product as any).categoryKu || '',
       priceUSD: product.priceUSD?.toString() || '',
+      priceIQD: (product as any).priceIQD != null ? String((product as any).priceIQD) : '',
       compareAtPriceUSD: product.compareAtPriceUSD != null ? String(product.compareAtPriceUSD) : '',
       vipPriceUSD: product.vipPriceUSD != null ? String(product.vipPriceUSD) : '',
       purchasePrice: (product as any).purchasePrice?.toString() || '',
@@ -694,6 +701,21 @@ const AdminProductsScreen: React.FC = () => {
       return parseFloat(cleaned) || 0;
     };
 
+    // Dinar has no minor unit and the column is numeric(12,0), so anything after
+    // a decimal point would be silently rounded by Postgres. Strip it here
+    // instead, where the admin can still see what was kept.
+    const sanitizeIQD = (val: string) => {
+      if (!val) return 0;
+      const cleaned = val.replace(/[^0-9]/g, '');
+      return parseInt(cleaned, 10) || 0;
+    };
+    const iqdPrice = sanitizeIQD(formData.priceIQD);
+    // A dinar price wins: it is the figure the shop typed, and the dollar price
+    // is derived from it rather than the other way round.
+    const effectivePriceUSD = iqdPrice > 0
+      ? convertIQDToUSD(iqdPrice, exchangeRateIQD)
+      : sanitizePrice(formData.priceUSD);
+
     // Trimmed: " " is not a name — untrimmed truthiness let whitespace-only values save.
     // Price is checked below, and only for `available`, so a coming_soon product can be
     // saved without one (which the unconditional `!formData.priceUSD` test blocked).
@@ -702,7 +724,7 @@ const AdminProductsScreen: React.FC = () => {
       return;
     }
     // Available products must have a real price; coming_soon/on_the_way may stay $0.
-    if (formData.status === 'available' && !(sanitizePrice(formData.priceUSD) > 0)) {
+    if (formData.status === 'available' && !(effectivePriceUSD > 0)) {
       Alert.alert(t('admin.common.error'), t('admin.products.priceMustBePositive', { defaultValue: 'Available products need a price greater than 0.' }));
       return;
     }
@@ -728,7 +750,7 @@ const AdminProductsScreen: React.FC = () => {
 
     // Pre-save safety warnings (skippable). Both re-call handleSave(true) to proceed.
     if (!force) {
-      const price = sanitizePrice(formData.priceUSD);
+      const price = effectivePriceUSD;
       const cost = sanitizePrice(formData.purchasePrice);
       const tierBelow = priceTiers.some(tr => cost > 0 && tr.priceUSD > 0 && tr.priceUSD <= cost);
       if (cost > 0 && ((price > 0 && price <= cost) || tierBelow)) {
@@ -809,7 +831,12 @@ const AdminProductsScreen: React.FC = () => {
         // "translated to the same words".
         categoryAr: (formData as any).categoryAr?.trim() || null,
         categoryKu: (formData as any).categoryKu?.trim() || null,
-        priceUSD: sanitizePrice(formData.priceUSD),
+        // Derived, not typed, when the product is priced in dinar. Written so the
+        // USD-only arithmetic elsewhere (cart subtotals, reports, sorting) still
+        // has a sane number; it is never the source of the displayed dinar price.
+        priceUSD: effectivePriceUSD,
+        // null when blank, so clearing the field puts the product back on dollars.
+        priceIQD: iqdPrice > 0 ? iqdPrice : null,
         // "Was" price (strike-through) and VIP-only price. Sent as null when blank
         // so clearing the field removes it; the service maps these to
         // compare_at_price_usd / vip_price_usd.
@@ -1859,7 +1886,7 @@ const AdminProductsScreen: React.FC = () => {
   // Price is only required for `available` products (see handleSave) — the button used to
   // demand one for every status, so a "Coming soon" product could never be saved.
   const canSubmitForm = !!formData.name.trim() && !!formData.partNumber.trim()
-    && (formData.status !== 'available' || !!formData.priceUSD.trim());
+    && (formData.status !== 'available' || !!formData.priceUSD.trim() || !!formData.priceIQD.trim());
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: pageBg }]} edges={['left', 'right']}>
@@ -2654,6 +2681,50 @@ const AdminProductsScreen: React.FC = () => {
                   disableFullscreenUI
                     />
                   </View>
+                </View>
+
+                {/* Price in dinar — for stock the shop buys in IQD rather than USD.
+                    Full width because the hint under it does real work: it is the
+                    only place the admin can see what the customer will be charged
+                    in dollars, and that the exchange rate is not being applied. */}
+                <View style={{ marginTop: SPACING.md }}>
+                  <Text allowFontScaling={false}
+                    style={[styles.inputLabel, { color: theme.colors.textSecondary, marginTop: 0 }]}
+                    adjustsFontSizeToFit
+                    numberOfLines={1}
+                  >
+                    {t('admin.products.form.priceIQD', { defaultValue: 'Price (IQD) — optional' })}
+                  </Text>
+                  <TextInput allowFontScaling={false}
+                    style={[styles.input, { backgroundColor: theme.colors.background, color: theme.colors.text }]}
+                    value={formData.priceIQD}
+                    onChangeText={(text) => setFormData(prev => ({ ...prev, priceIQD: text.replace(/[^0-9]/g, '') }))}
+                    placeholder="0"
+                    keyboardType="number-pad"
+                    placeholderTextColor={theme.colors.textSecondary}
+                    multiline={false}
+                    scrollEnabled={false}
+                    disableFullscreenUI
+                  />
+                  <Text allowFontScaling={false}
+                    style={{ fontSize: 11, color: theme.colors.textSecondary, marginTop: 4 }}
+                    numberOfLines={3}
+                  >
+                    {(() => {
+                      const iqd = parseInt(formData.priceIQD.replace(/[^0-9]/g, ''), 10) || 0;
+                      if (iqd <= 0) {
+                        return t('admin.products.form.priceIQDHint', {
+                          defaultValue: 'Leave blank to price this product in dollars as usual. Fill it in for stock you bought in dinar — customers then see this exact amount and the exchange rate is not applied to it.',
+                        });
+                      }
+                      return t('admin.products.form.priceIQDActive', {
+                        iqd: formatCurrencyIQD(iqd),
+                        usd: formatCurrencyUSD(convertIQDToUSD(iqd, exchangeRateIQD)),
+                        rate: exchangeRateIQD,
+                        defaultValue: 'Customers see {{iqd}} exactly. In dollars it shows as {{usd}} (at the current rate of {{rate}}); the dinar price itself will not change when you edit the rate.',
+                      });
+                    })()}
+                  </Text>
                 </View>
 
                 {/* "Was" (compare-at) price + VIP price */}

@@ -33,6 +33,8 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   getDisplayUnitPrice,
   getEffectiveUnitPrice,
+  formatUnitPrice,
+  formatLineTotal,
   hasCompareAtDiscount,
   getDiscountPercent,
   getEffectiveStock,
@@ -44,7 +46,7 @@ import { Chip, Surface, Divider, Badge } from 'react-native-paper';
 import AppNumber from '../components/AppNumber';
 import AppText from '../components/AppText';
 
-import { formatPrice } from '../utils/currency';
+import { formatItemPrice, formatPrice } from '../utils/currency';
 import { getProductImageUrls } from '../utils/imageUtils';
 import { ProductService } from '../services/productService';
 import { brandService } from '../services/brandService';
@@ -805,7 +807,7 @@ export const ProductDetailsScreen: React.FC = () => {
       await Share.share({
         message: [
           heading,
-          formatPrice(product.priceUSD, currentCurrency as any, exchangeRateIQD),
+          formatItemPrice(product, currentCurrency as any, exchangeRateIQD),
           '',
           'Check out this product on Asankary!',
           shareUrl,
@@ -1220,6 +1222,8 @@ export const ProductDetailsScreen: React.FC = () => {
   // - For variation products: sum of (variation price × qty) for each selected variation,
   //   but apply the tiered discount if total qty reaches a wholesale tier
   let totalPriceNumber = 0;
+  let isSimpleProduct = false;
+  let simpleProductQty = 0;
   let originalPriceNumber = 0; // Track original price to show savings
 
   if (hasSizeVariations || hasColorVariations) {
@@ -1261,9 +1265,16 @@ export const ProductDetailsScreen: React.FC = () => {
     const qty = activeQtyForPricing > 0 ? activeQtyForPricing : 0;
     totalPriceNumber = (tieredUnitPrice + storageDelta) * qty;
     originalPriceNumber = (product.priceUSD + storageDelta) * qty;
+    simpleProductQty = qty;
+    isSimpleProduct = true;
   }
-  
-  const totalPriceText = formatPrice(totalPriceNumber, currentCurrency as any, exchangeRateIQD);
+
+  // A dinar-priced product has to keep its total in dinar too. Formatting the USD
+  // total instead would re-apply the rate and the 250 snap, so the total could
+  // disagree with the unit price printed directly above it.
+  const totalPriceText = isSimpleProduct
+    ? formatLineTotal(product, isVip, currentCurrency as any, exchangeRateIQD, {}, simpleProductQty, storageDelta)
+    : formatPrice(totalPriceNumber, currentCurrency as any, exchangeRateIQD);
   const savingsAmount = Math.max(0, originalPriceNumber - totalPriceNumber);
   const showSavings = savingsAmount > 0;
 
@@ -1278,7 +1289,7 @@ export const ProductDetailsScreen: React.FC = () => {
   const buttonPriceText =
     activeQtyForPricing > 0
       ? totalPriceText
-      : formatPrice(tieredUnitPrice + storageDelta, currentCurrency as any, exchangeRateIQD);
+      : formatUnitPrice(product, isVip, currentCurrency as any, exchangeRateIQD, {}, pricingQty, storageDelta);
 
   // add current selection to cart (variations if picked, else normal)
   const addCurrentSelectionToCart = async (): Promise<boolean> => {
@@ -1673,7 +1684,7 @@ export const ProductDetailsScreen: React.FC = () => {
                   <View style={{ flexShrink: 1 }}>
                     <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'flex-end', flexWrap: 'wrap' }}>
                       <AppNumber
-                        value={formatPrice(heroUnitPrice + storageDelta, currentCurrency as any, exchangeRateIQD)}
+                        value={formatUnitPrice(product, isVip, currentCurrency as any, exchangeRateIQD, {}, 1, storageDelta)}
                         style={[styles.price, { color: vipActive ? '#7C3AED' : theme.colors.primary }]}
                       />
                       {vipActive && (
@@ -1950,7 +1961,7 @@ export const ProductDetailsScreen: React.FC = () => {
                         1 - {(product.priceTiers[0]?.minQty || 2) - 1}
                       </Text>
                       <AppNumber
-                        value={formatPrice(product.priceUSD, currentCurrency as any, exchangeRateIQD)}
+                        value={formatItemPrice(product, currentCurrency as any, exchangeRateIQD)}
                         style={[
                           styles.stockStatusPrice, 
                           { 
@@ -2947,7 +2958,7 @@ export const ProductDetailsScreen: React.FC = () => {
                         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', marginTop: 8 }}>
                           <View style={{ backgroundColor: theme.colors.primary + '12', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
                             <AppNumber
-                              value={formatPrice(getDisplayUnitPrice(item, isVip), currentCurrency as any, exchangeRateIQD)}
+                              value={formatUnitPrice(item, isVip, currentCurrency as any, exchangeRateIQD)}
                               style={[
                                 styles.relatedPrice,
                                 { color: theme.colors.primary }

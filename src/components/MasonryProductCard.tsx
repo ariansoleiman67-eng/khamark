@@ -24,8 +24,7 @@ import {
   getDisplayUnitPrice,
   getDiscountPercent,
   getEffectiveStock,
-  hasCompareAtDiscount,
-} from "../utils/pricingUtils";
+  hasCompareAtDiscount, formatUnitPrice } from "../utils/pricingUtils";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -187,10 +186,10 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
     if (product.priceTiers && product.priceTiers.length > 0) {
       const minPrice = Math.min(...product.priceTiers.map((tier) => tier.priceUSD));
       const minFormatted = formatPrice(minPrice, currency, exchangeRateIQD);
-      const maxFormatted = formatPrice(product.priceUSD, currency, exchangeRateIQD, { symbol: false });
+      const maxFormatted = formatUnitPrice(product, isVip, currency, exchangeRateIQD, { symbol: false });
       return `${minFormatted} - ${maxFormatted}`;
     }
-    return formatPrice(getDisplayUnitPrice(product, isVip), currency, exchangeRateIQD);
+    return formatUnitPrice(product, isVip, currency, exchangeRateIQD);
   };
   const vipActive = isVip && typeof product.vipPriceUSD === "number" && product.vipPriceUSD > 0;
   // VIP price shown only to VIP users — no locked/teaser hint for normal users.

@@ -26,6 +26,9 @@ export const mapProduct = (data: any): Product => ({
   // Postgres numeric can arrive as a string; coerce money/stock so price math and
   // the stock_qty > 0 in-stock check stay consistent with the other coerced fields.
   priceUSD: data.price_usd != null ? Number(data.price_usd) : data.price_usd,
+  // Set only for products the shop priced in dinar. Left undefined otherwise so
+  // isIQDPriced() stays false and every existing USD path behaves as before.
+  priceIQD: data.price_iqd != null ? Number(data.price_iqd) : undefined,
   vipPriceUSD: data.vip_price_usd != null ? Number(data.vip_price_usd) : undefined,
   compareAtPriceUSD: data.compare_at_price_usd != null ? Number(data.compare_at_price_usd) : undefined,
   storageOptions: data.storage_options || [],
@@ -87,7 +90,7 @@ export const mapProduct = (data: any): Product => ({
 // scanned value to Search, which matches it against this already-loaded list — a
 // column that isn't selected is undefined, so every scan returned zero results.
 const LIST_COLUMNS =
-  'id,name,name_ar,name_ku,part_number,barcode,category,category_ar,category_ku,price_usd,vip_price_usd,compare_at_price_usd,storage_options,stock_qty,status,is_featured,is_active,brand,image_urls,price_tiers,variations,color_variations,shipping_cost,shipping_rates,sort_order,tenant_id,created_at,updated_at,condition';
+  'id,name,name_ar,name_ku,part_number,barcode,category,category_ar,category_ku,price_usd,price_iqd,vip_price_usd,compare_at_price_usd,storage_options,stock_qty,status,is_featured,is_active,brand,image_urls,price_tiers,variations,color_variations,shipping_cost,shipping_rates,sort_order,tenant_id,created_at,updated_at,condition';
 
 // Primary ordering for every customer-facing listing: the order the admin set by
 // dragging in AdminProductsScreen (parts.sort_order). The column defaults to 0, so
@@ -134,7 +137,7 @@ const PART_COLUMN_MAP: Record<string, string> = {
   name: 'name', nameAr: 'name_ar', nameKu: 'name_ku',
   partNumber: 'part_number',
   category: 'category', categoryAr: 'category_ar', categoryKu: 'category_ku',
-  priceUSD: 'price_usd', vipPriceUSD: 'vip_price_usd', compareAtPriceUSD: 'compare_at_price_usd', storageOptions: 'storage_options',
+  priceUSD: 'price_usd', priceIQD: 'price_iqd', vipPriceUSD: 'vip_price_usd', compareAtPriceUSD: 'compare_at_price_usd', storageOptions: 'storage_options',
   purchasePrice: 'purchase_price',
   stockQty: 'stock_qty', historicalStockQty: 'historical_stock_qty', initialStock: 'initial_stock',
   description: 'description', descriptionAr: 'description_ar', descriptionKu: 'description_ku',
