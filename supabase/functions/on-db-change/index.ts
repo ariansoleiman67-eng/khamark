@@ -2,8 +2,15 @@
 // Supabase Edge Function: on-db-change
 // =============================================================================
 // Replaces the old Firebase Firestore triggers (onOrderCreate / onMessageCreate).
-// Invoked by Supabase Database Webhooks on INSERT into `orders` and `messages`.
+// Invoked on INSERT into `orders`, `messages` and `trade_in_requests`.
 // Writes an in-app notification row and triggers FCM (via the send-push function).
+//
+// WIRED BY SQL TRIGGERS, NOT DASHBOARD WEBHOOKS. Database Webhooks were never
+// enabled on this project (the `supabase_functions` schema does not exist), so
+// the dashboard steps below could not be followed and NOTHING invoked this
+// function — orders, messages and trade-ins all produced silence. The triggers
+// now live in supabase/migrations/*_notification_triggers.sql and call this
+// function through pg_net directly.
 //
 // SETUP:
 //   1. Deploy:  supabase functions deploy on-db-change --no-verify-jwt
@@ -125,6 +132,27 @@ Deno.serve(async (req: Request) => {
             { conversationId: msg.conversation_id },
           );
         }
+      }
+    } else if (payload.table === 'trade_in_requests') {
+      const request = payload.record;
+      // trade_in_requests.tenant_id holds the shop owner's user id, the same
+      // convention orders uses, so the owner is the notification target.
+      const adminId = request.tenant_id;
+      if (adminId) {
+        const device = [request.device_brand, request.device_model]
+          .filter(Boolean)
+          .join(' ')
+          .trim();
+        await notify(
+          supabase,
+          [adminId],
+          'New trade-in request',
+          device
+            ? `${device}${request.contact_name ? ` — ${request.contact_name}` : ''}`
+            : 'A customer wants to sell or trade a phone',
+          'trade_in',
+          { tradeInId: request.id },
+        );
       }
     }
 
