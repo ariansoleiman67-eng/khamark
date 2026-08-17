@@ -3,6 +3,7 @@ import {
   View,
   StyleSheet,
   FlatList,
+  ScrollView,
   TouchableOpacity,
   I18nManager,
   ActivityIndicator,
@@ -48,6 +49,7 @@ const CategoryProductsScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>('recommended');
+  const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -83,14 +85,46 @@ const CategoryProductsScreen: React.FC = () => {
     setRefreshing(false);
   }, [load]);
 
+  /**
+   * Brands present in THIS category, with a count each, ordered by count so the
+   * brands the shop actually stocks come first.
+   *
+   * Hidden when the screen is already showing a single brand (opened from a brand
+   * card), and when there is only one brand to choose from — a filter with one
+   * option is noise.
+   */
+  const brandFacets = useMemo(() => {
+    if (brand) return [];
+    const counts = new Map<string, number>();
+    products.forEach((p) => {
+      const b = (p.brand || '').trim();
+      if (b) counts.set(b, (counts.get(b) || 0) + 1);
+    });
+    if (counts.size < 2) return [];
+    return [...counts.entries()]
+      .sort((a, b2) => b2[1] - a[1] || a[0].localeCompare(b2[0]))
+      .map(([name, count]) => ({ name, count }));
+  }, [products, brand]);
+
+  // A brand that disappears after a refresh (last unit sold, product hidden) would
+  // otherwise leave the list filtered to nothing with no way back.
+  useEffect(() => {
+    if (selectedBrand && !brandFacets.some((f) => f.name === selectedBrand)) {
+      setSelectedBrand(null);
+    }
+  }, [brandFacets, selectedBrand]);
+
   const sorted = useMemo(() => {
+    const base = selectedBrand
+      ? products.filter((p) => (p.brand || '').trim() === selectedBrand)
+      : products;
     // Re-sorting by price here was unconditional, which threw away the admin's
     // sort_order the service had already applied — return the list untouched instead.
-    if (sortMode === 'recommended') return products;
-    const list = products.slice();
+    if (sortMode === 'recommended') return base;
+    const list = base.slice();
     list.sort((a, b) => (sortMode === 'priceDesc' ? b.priceUSD - a.priceUSD : a.priceUSD - b.priceUSD));
     return list;
-  }, [products, sortMode]);
+  }, [products, sortMode, selectedBrand]);
 
   const handleProductPress = useCallback(
     (productId: string) => navigation.navigate('ProductDetails', { productId }),
@@ -130,6 +164,53 @@ const CategoryProductsScreen: React.FC = () => {
           <Ionicons name="cart-outline" size={24} color={theme.colors.primary} />
         </TouchableOpacity>
       </View>
+
+      {/* Brand filter. Horizontal only — the screen's single vertical scroll owner
+          is the FlatList below (GOLDEN_RULES §1), so this must never scroll down. */}
+      {brandFacets.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingHorizontal: 16,
+            paddingTop: 12,
+            gap: 8,
+            flexDirection: isRTL ? 'row-reverse' : 'row',
+          }}
+        >
+          {[{ name: null as string | null, count: products.length }, ...brandFacets].map((f) => {
+            const active = selectedBrand === f.name;
+            const label = f.name ?? t('common.all', { defaultValue: 'All' });
+            return (
+              <TouchableOpacity
+                key={f.name ?? '__all__'}
+                onPress={() => setSelectedBrand(f.name)}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                style={{
+                  paddingHorizontal: 14,
+                  paddingVertical: 8,
+                  borderRadius: 20,
+                  borderWidth: active ? 0 : 1,
+                  borderColor: theme.colors.border,
+                  backgroundColor: active ? theme.colors.primary : theme.colors.card,
+                }}
+              >
+                <AppText
+                  fontSize={13}
+                  style={{
+                    color: active ? theme.colors.textOnPrimary : theme.colors.text,
+                    fontWeight: active ? '700' : '500',
+                  }}
+                >
+                  {label}
+                </AppText>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      )}
 
       {/* Count + sort row */}
       <View style={[styles.countRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>

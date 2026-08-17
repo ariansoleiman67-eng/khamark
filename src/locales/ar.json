@@ -178,7 +178,8 @@
     "tryDifferentSearch": "جرّب مصطلح بحث مختلف",
     "pullToRefresh": "اسحب للأسفل للتحديث",
     "somethingWentWrong": "حدث خطأ ما",
-    "loadError": "تعذر تحميل المنتجات. تحقق من اتصالك."
+    "loadError": "تعذر تحميل المنتجات. تحقق من اتصالك.",
+    "all": "الكل"
   },
   "product": {
     "partNumber": "رمز المنتج",

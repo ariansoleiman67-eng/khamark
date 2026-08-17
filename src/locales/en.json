@@ -178,7 +178,8 @@
     "tryDifferentSearch": "Try a different search term",
     "pullToRefresh": "Pull down to refresh",
     "somethingWentWrong": "Something went wrong",
-    "loadError": "Could not load products. Check your connection."
+    "loadError": "Could not load products. Check your connection.",
+    "all": "All"
   },
   "product": {
     "partNumber": "Item Code",
