@@ -18,7 +18,6 @@ import {
   getDiscountPercent,
   getEffectiveStock,
   hasCompareAtDiscount,
-  LOW_STOCK_THRESHOLD,
 } from "../utils/pricingUtils";
 import { Product } from "../types";
 import { SHADOW_STYLES } from "../constants/theme";
@@ -290,30 +289,9 @@ const ProductCard: React.FC<ProductCardProps> = ({
           </View>
         )}
 
-        {/* Low Stock badge - only show if no special status */}
-        {effectiveStock <= LOW_STOCK_THRESHOLD &&
-          effectiveStock > 0 &&
-          (!product.status || product.status === "available") && (
-            <View
-              style={[
-                styles.stockBadge,
-                { backgroundColor: theme.colors.warning },
-              ]}
-            >
-              <AppNumber
-                value={t("product.lowStock", {
-                  count: effectiveStock,
-                  defaultValue: `Only ${effectiveStock} left`,
-                })}
-                style={[
-                  styles.stockBadgeText,
-                  { color: "#ffffff", fontSize: 12 },
-                ]}
-                adjustsFontSizeToFit
-                minimumFontScale={0.5}
-              />
-            </View>
-          )}
+        {/* The "Only N left" badge was removed: exact quantities are business data
+            and are no longer shown to customers anywhere in the app. Out of stock
+            is still shown by the badge below. */}
 
         {/* Out of Stock badge - only show if no special status */}
         {effectiveStock === 0 &&
@@ -377,10 +355,12 @@ const ProductCard: React.FC<ProductCardProps> = ({
           </View>
         )}
 
-        {/* Available badge - show when comfortably in stock with no special status.
-            Above LOW_STOCK_THRESHOLD only: both badges are absolutely positioned at the
-            same corner, so at 1-5 units they used to render stacked on top of each other. */}
-        {effectiveStock > LOW_STOCK_THRESHOLD &&
+        {/* Available badge — shown whenever there is stock and no special status.
+            This used to require more than LOW_STOCK_THRESHOLD units, purely so it
+            would not stack on the low-stock badge that shared this corner. That
+            badge is gone, so the guard would now leave 1-5 unit products with no
+            badge at all. */}
+        {effectiveStock > 0 &&
           (!product.status || product.status === "available") && (
             <View style={[styles.stockBadge, { backgroundColor: "#4CAF50" }]}>
               <Ionicons

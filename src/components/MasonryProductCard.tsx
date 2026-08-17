@@ -25,7 +25,6 @@ import {
   getDiscountPercent,
   getEffectiveStock,
   hasCompareAtDiscount,
-  LOW_STOCK_THRESHOLD,
 } from "../utils/pricingUtils";
 import Animated, {
   useSharedValue,
@@ -373,24 +372,9 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
           </View>
         )}
 
-        {/* Scarcity cue. Mutually exclusive with the status badges above (inStock
-            already requires no special status), so they never stack in this corner. */}
-        {inStock && effectiveStock <= LOW_STOCK_THRESHOLD && (
-          <View style={[styles.statusBadge, { backgroundColor: theme.colors.warning }]}>
-            <Ionicons name="alert-circle-outline" size={11} color="#fff" />
-            <AppNumber
-              value={t("product.lowStock", {
-                count: effectiveStock,
-                defaultValue: `Only ${effectiveStock} left`,
-              })}
-              numberOfLines={1}
-              // AppNumber's outer View is the flex item; without this the badge cannot
-              // shrink the label and a long RTL string overflows the 85% max width.
-              containerStyle={styles.lowStockLabel}
-              style={[styles.statusText, { fontSize: 11 }]}
-            />
-          </View>
-        )}
+        {/* The scarcity cue ("Only N left") was removed: exact quantities are
+            business data and are no longer shown to customers anywhere. The
+            status badges above still cover coming soon / on the way. */}
 
         {/* Condition cue. Bottom-left of the image — the opposite edge from the
             top-left status slot above (coming soon / on the way / low stock) and
@@ -657,10 +641,6 @@ const styles = StyleSheet.create({
     marginStart: 4,
     paddingTop: Platform.OS === "android" ? 1 : 0,
     textAlign: "center",
-  },
-  lowStockLabel: {
-    flexShrink: 1,
-    minWidth: 0,
   },
   // Bottom-left of the image, mirroring statusBadge's top-left slot but pinned to
   // the opposite edge so a used cue never stacks with coming-soon / on-the-way /

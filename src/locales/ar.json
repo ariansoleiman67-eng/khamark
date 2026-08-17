@@ -181,11 +181,10 @@
     "loadError": "تعذر تحميل المنتجات. تحقق من اتصالك."
   },
   "product": {
-    "lowStock": "متبقي {{count}} فقط",
     "partNumber": "رمز المنتج",
     "items": "عنصر",
     "totalSelected": "إجمالي المحدد",
-    "inStock": "متوفر ({{count}})",
+    "inStock": "متوفر",
     "wholesalePricing": "أسعار الجملة",
     "bulkDiscount": "خصومات الكمية",
     "quantity": "الكمية",
@@ -261,12 +260,6 @@
     "colorCount_few": "{{count}} ألوان",
     "colorCount_many": "{{count}} لوناً",
     "colorCount_other": "{{count}} لون",
-    "unitsLeft_zero": "نفدت الكمية",
-    "unitsLeft_one": "قطعة واحدة متبقية",
-    "unitsLeft_two": "قطعتان متبقيتان",
-    "unitsLeft_few": "{{count}} قطع متبقية",
-    "unitsLeft_many": "{{count}} قطعة متبقية",
-    "unitsLeft_other": "{{count}} متبقية",
     "imageNOfM": "صورة {{current}} من {{total}}"
   },
   "tradeIn": {

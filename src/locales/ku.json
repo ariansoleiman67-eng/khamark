@@ -491,9 +491,8 @@
     }
   },
   "product": {
-    "lowStock": "تەنها {{count}} ماوە",
     "partNumber": "کۆدی بەرهەم",
-    "inStock": "بەردەستە ({{count}})",
+    "inStock": "بەردەستە",
     "wholesalePricing": "نرخی کۆمەڵ",
     "bulkDiscount": "داشکاندنی کۆمەڵ",
     "quantity": "بڕ",
@@ -567,8 +566,6 @@
     "storage": "بیرگە",
     "colorCount_one": "{{count}} ڕەنگ",
     "colorCount_other": "{{count}} ڕەنگ",
-    "unitsLeft_one": "{{count}} ماوە",
-    "unitsLeft_other": "{{count}} ماوە",
     "imageNOfM": "وێنەی {{current}} لە {{total}}"
   },
   "tradeIn": {

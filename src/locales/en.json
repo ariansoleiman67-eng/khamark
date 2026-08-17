@@ -181,11 +181,10 @@
     "loadError": "Could not load products. Check your connection."
   },
   "product": {
-    "lowStock": "Only {{count}} left",
     "partNumber": "Item Code",
     "items": "items",
     "totalSelected": "Total selected",
-    "inStock": "In Stock ({{count}})",
+    "inStock": "In Stock",
     "wholesalePricing": "Wholesale Pricing",
     "bulkDiscount": "Bulk Discounts",
     "quantity": "Quantity",
@@ -257,8 +256,6 @@
     "storage": "Storage",
     "colorCount_one": "{{count}} color",
     "colorCount_other": "{{count}} colors",
-    "unitsLeft_one": "{{count}} left",
-    "unitsLeft_other": "{{count}} left",
     "imageNOfM": "Image {{current}} of {{total}}"
   },
   "tradeIn": {

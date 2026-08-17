@@ -69,10 +69,13 @@ const LOW_STOCK_THRESHOLD = 5;
 // them (VARIANT_QTY_FIELD_WIDTH below). At the old flex of 1.5 the cell measured
 // narrower than its own contents, and because a flex row doesn't clip, the stepper
 // spilled left over the STOCK number — the two collided on screen.
+// The STOCK column was removed: exact per-variant quantities are business data and
+// are no longer shown to customers. An unavailable variant is already conveyed by
+// its row being disabled and its price greyed, so nothing was lost but the number.
+// Its 1.0 of flex goes to model, which was the column that truncated most often.
 const VARIANT_COL = {
-  model: 1.6,
+  model: 2.6,
   price: 1.3,
-  stock: 1,
   qty: 2.2,
 } as const;
 
@@ -1742,7 +1745,7 @@ export const ProductDetailsScreen: React.FC = () => {
                         : product.status === 'coming_soon'
                         ? t('products.status.comingSoon', { defaultValue: 'Coming Soon' }).replace(/ /g, '\u00A0')
                         : inStock
-                        ? t('product.inStock', { count: effectiveStock })
+                        ? t('product.inStock')
                         : t('product.outOfStock').replace(/ /g, '\u00A0')}
                     </AppText>
                   </View>
@@ -2058,9 +2061,6 @@ export const ProductDetailsScreen: React.FC = () => {
                     <Text allowFontScaling={false} style={[styles.alibabaHeaderText, { color: theme.colors.textSecondary, flex: VARIANT_COL.price, textAlign: 'center' }]}>
                       {t('product.priceLabel', { defaultValue: 'Price' })}
                     </Text>
-                    <Text allowFontScaling={false} style={[styles.alibabaHeaderText, { color: theme.colors.textSecondary, flex: VARIANT_COL.stock, textAlign: 'center' }]}>
-                      {t('product.stock', { defaultValue: 'Stock' })}
-                    </Text>
                     <Text allowFontScaling={false} style={[styles.alibabaHeaderText, { color: theme.colors.textSecondary, flex: VARIANT_COL.qty, textAlign: isRTL ? 'left' : 'right' }]}>
                       {t('product.quantity', { defaultValue: 'Qty' })}
                     </Text>
@@ -2112,16 +2112,6 @@ export const ProductDetailsScreen: React.FC = () => {
                           >
                             ${(variation.priceUSD != null ? variation.priceUSD : product.priceUSD)?.toFixed(2)}
                           </Text>
-                        </View>
-
-                        <View style={[styles.alibabaStockCell, { flex: VARIANT_COL.stock }]}>
-                          <AppNumber
-                            value={variation.stockQuantity}
-                            style={[
-                              styles.alibabaStockText,
-                              { color: isOutOfStock ? theme.colors.error : theme.colors.success },
-                            ]}
-                          />
                         </View>
 
                         <View style={[styles.alibabaQtyCell, { flex: VARIANT_COL.qty, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
@@ -2344,15 +2334,14 @@ export const ProductDetailsScreen: React.FC = () => {
                         {t('product.color', { defaultValue: 'Color' })}
                         {effectiveColor ? <Text style={{ color: theme.colors.textSecondary, fontWeight: '500' }}>{'  •  ' + effectiveColor}</Text> : null}
                       </Text>
-                      {/* Stock is per-colour, and the table this replaced showed it in a
-                          STOCK column. The generic "In Stock" pill above is product-wide,
-                          so without this the customer cannot tell that the colour they
-                          picked has 3 left while another has 40. */}
+                      {/* Availability only. Exact quantities are deliberately not shown
+                          to customers — they expose stock levels to anyone browsing,
+                          including competitors. The pill above is product-wide, so this
+                          line still matters: it tells the customer the colour they picked
+                          is unavailable even while the product itself is in stock. */}
                       {(() => {
                         const sc = product.colorVariations?.find((c) => c.colorValue === effectiveColor);
-                        const left = Number(sc?.stockQuantity) || 0;
-                        if (!sc) return null;
-                        const low = left > 0 && left <= LOW_STOCK_THRESHOLD;
+                        if (!sc || (Number(sc.stockQuantity) || 0) > 0) return null;
                         return (
                           <Text
                             allowFontScaling={false}
@@ -2361,16 +2350,10 @@ export const ProductDetailsScreen: React.FC = () => {
                               fontSize: 13,
                               fontWeight: '600',
                               textAlign: isRTL ? 'right' : 'left',
-                              color: left <= 0
-                                ? theme.colors.error
-                                : low
-                                  ? theme.colors.warning
-                                  : theme.colors.success,
+                              color: theme.colors.error,
                             }}
                           >
-                            {left <= 0
-                              ? t('product.outOfStock', { defaultValue: 'Out of stock' })
-                              : t('product.unitsLeft', { count: left, defaultValue: `${left} left` })}
+                            {t('product.outOfStock', { defaultValue: 'Out of stock' })}
                           </Text>
                         );
                       })()}
@@ -2378,6 +2361,14 @@ export const ProductDetailsScreen: React.FC = () => {
                         {product.colorVariations.map((cv) => {
                           const sel = effectiveColor === cv.colorValue;
                           const soldOut = (cv.stockQuantity ?? 0) <= 0;
+                          // A white or near-white swatch vanishes against the card, so
+                          // pale colours get a visible ring and a dark tick instead of
+                          // the white one used on saturated colours.
+                          const hex = (cv.colorHex || '#cccccc').replace('#', '');
+                          const rgb = hex.length === 6
+                            ? [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16))
+                            : [204, 204, 204];
+                          const isPale = (rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1000 > 186;
                           return (
                             <TouchableOpacity
                               key={cv.variationId}
@@ -2389,16 +2380,65 @@ export const ProductDetailsScreen: React.FC = () => {
                               accessibilityLabel={
                                 soldOut
                                   ? `${cv.colorValue} — ${t('product.outOfStock', { defaultValue: 'Out of stock' })}`
-                                  : `${cv.colorValue} — ${t('product.unitsLeft', { count: Number(cv.stockQuantity) || 0, defaultValue: `${Number(cv.stockQuantity) || 0} left` })}`
+                                  : cv.colorValue
                               }
-                              style={{
-                                width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center',
-                                borderWidth: sel ? 2.5 : 1.5,
-                                borderColor: sel ? theme.colors.primary : theme.colors.border,
-                                opacity: soldOut ? 0.35 : 1,
-                              }}
+                              style={{ alignItems: 'center', width: 68 }}
                             >
-                              <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: cv.colorHex || '#ccc', borderWidth: 1, borderColor: theme.colors.border }} />
+                              <View
+                                style={{
+                                  width: 52, height: 52, borderRadius: 26,
+                                  alignItems: 'center', justifyContent: 'center',
+                                  borderWidth: sel ? 2.5 : 1.5,
+                                  borderColor: sel ? theme.colors.primary : theme.colors.border,
+                                  opacity: soldOut ? 0.35 : 1,
+                                  backgroundColor: theme.colors.card,
+                                }}
+                              >
+                                <View
+                                  style={{
+                                    width: 38, height: 38, borderRadius: 19,
+                                    backgroundColor: cv.colorHex || '#ccc',
+                                    borderWidth: isPale ? 1 : 0,
+                                    borderColor: theme.colors.border,
+                                    alignItems: 'center', justifyContent: 'center',
+                                  }}
+                                >
+                                  {/* The tick sits inside the swatch so the chosen colour
+                                      is unmistakable at a glance, not just a thin ring. */}
+                                  {sel && !soldOut && (
+                                    <Ionicons name="checkmark" size={20} color={isPale ? '#111' : '#fff'} />
+                                  )}
+                                </View>
+                                {soldOut && (
+                                  <View
+                                    style={{
+                                      position: 'absolute', width: 52, height: 1.5,
+                                      backgroundColor: theme.colors.error,
+                                      transform: [{ rotate: '-45deg' }],
+                                    }}
+                                  />
+                                )}
+                              </View>
+                              {/* Names matter here: shoppers ask for "the blue one", and a
+                                  bare circle is unreadable to anyone colour-blind. */}
+                              <Text
+                                allowFontScaling={false}
+                                numberOfLines={1}
+                                style={{
+                                  marginTop: 6,
+                                  fontSize: 11,
+                                  textAlign: 'center',
+                                  fontWeight: sel ? '700' : '500',
+                                  color: soldOut
+                                    ? theme.colors.textSecondary
+                                    : sel
+                                      ? theme.colors.primary
+                                      : theme.colors.text,
+                                  textDecorationLine: soldOut ? 'line-through' : 'none',
+                                }}
+                              >
+                                {cv.colorValue}
+                              </Text>
                             </TouchableOpacity>
                           );
                         })}
@@ -2461,9 +2501,6 @@ export const ProductDetailsScreen: React.FC = () => {
                     <Text allowFontScaling={false} style={[styles.alibabaHeaderText, { color: theme.colors.textSecondary, flex: VARIANT_COL.model, textAlign: isRTL ? 'right' : 'left' }]}>
                       {t('product.color', { defaultValue: 'Color' })}
                     </Text>
-                    <Text allowFontScaling={false} style={[styles.alibabaHeaderText, { color: theme.colors.textSecondary, flex: VARIANT_COL.stock, textAlign: 'center' }]}>
-                      {t('product.stock', { defaultValue: 'Stock' })}
-                    </Text>
                     <Text allowFontScaling={false} style={[styles.alibabaHeaderText, { color: theme.colors.textSecondary, flex: VARIANT_COL.qty, textAlign: isRTL ? 'left' : 'right' }]}>
                       {t('product.quantity', { defaultValue: 'Qty' })}
                     </Text>
@@ -2516,16 +2553,6 @@ export const ProductDetailsScreen: React.FC = () => {
                           >
                             {t(`product.colors.${cv.toLowerCase()}`, cv)}
                           </Text>
-                        </View>
-
-                        <View style={[styles.alibabaStockCell, { flex: VARIANT_COL.stock }]}>
-                          <AppNumber
-                            value={colorVar.stockQuantity}
-                            style={[
-                              styles.alibabaStockText,
-                              { color: isOutOfStock ? theme.colors.error : theme.colors.success },
-                            ]}
-                          />
                         </View>
 
                         <View style={[styles.alibabaQtyCell, { flex: VARIANT_COL.qty, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
