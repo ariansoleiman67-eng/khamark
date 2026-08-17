@@ -598,7 +598,6 @@
     "stock": "المخزون",
     "inStock": "متوفر",
     "outOfStock": "غير متوفر",
-    "lowStock": "باقي {{count}} فقط",
     "addToCart": "إضافة للسلة",
     "addedToCart": "أُضيف للسلة",
     "viewDetails": "عرض التفاصيل",

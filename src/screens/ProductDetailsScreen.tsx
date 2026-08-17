@@ -2046,11 +2046,6 @@ export const ProductDetailsScreen: React.FC = () => {
                     <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text, marginBottom: 0 }]}>
                       📏 {t('product.selectSize', { defaultValue: 'Select Size' })}
                     </Text>
-                    <View style={{ backgroundColor: theme.colors.success, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 6 }}>
-                      <Text allowFontScaling={false} style={{ color: 'white', fontWeight: 'bold', fontSize: 13 }}>
-                        {t('product.total', { defaultValue: 'Total' })}: {sizeStock}
-                      </Text>
-                    </View>
                   </View>
 
                   {/* Table Header */}
@@ -2489,11 +2484,6 @@ export const ProductDetailsScreen: React.FC = () => {
                     <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text, marginBottom: 0 }]}>
                       🎨 {t('product.selectColor', { defaultValue: 'Select Color' })}
                     </Text>
-                    <View style={{ backgroundColor: theme.colors.success, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 6 }}>
-                      <Text allowFontScaling={false} style={{ color: 'white', fontWeight: 'bold', fontSize: 13 }}>
-                        {t('product.total', { defaultValue: 'Total' })}: {colorStock}
-                      </Text>
-                    </View>
                   </View>
 
                   {/* Table Header */}

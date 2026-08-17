@@ -632,7 +632,6 @@
     "stock": "Stock",
     "inStock": "In Stock ({{count}})",
     "outOfStock": "Out of Stock",
-    "lowStock": "Only {{count}} left",
     "addToCart": "Add to Cart",
     "addedToCart": "Added to Cart",
     "viewDetails": "View Details",

@@ -629,13 +629,12 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                         backgroundColor: maxStock > 10 ? '#4CAF50' : maxStock > 0 ? '#FF9800' : '#F44336' 
                       }]} />
                       <AppText style={[styles.stockText, { 
-                        color: maxStock > 10 ? '#4CAF50' : maxStock > 0 ? '#FF9800' : '#F44336' 
+                        color: maxStock > 0 ? '#4CAF50' : '#F44336' 
                       }]}>
-                        {maxStock > 10 
-                          ? t('product.inStock', { count: maxStock, defaultValue: `In Stock (${maxStock})` })
-                          : maxStock > 0 
-                            ? t('product.lowStock', { count: maxStock, defaultValue: `Only ${maxStock} left` })
-                            : t('product.outOfStock', { defaultValue: 'Out of Stock' })
+                        {/* Availability only — never a quantity. */}
+                        {maxStock > 0
+                          ? t('product.inStock', { defaultValue: 'In Stock' })
+                          : t('product.outOfStock', { defaultValue: 'Out of Stock' })
                         }
                       </AppText>
                     </View>
@@ -799,7 +798,7 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                             <AppText style={[styles.varStock, { color: outOfStock ? '#F44336' : theme.colors.textSecondary }]} numberOfLines={1} adjustsFontSizeToFit>
                               {outOfStock
                                 ? t('product.outOfStock', { defaultValue: 'Out of Stock' })
-                                : `${t('product.stock', { defaultValue: 'Stock' })}: ${v.stockQuantity}`
+                                : ''
                               }
                             </AppText>
                             {!outOfStock && product.priceTiers && product.priceTiers.length > 0 && (
@@ -870,7 +869,7 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                               <AppText style={[styles.varStock, { color: outOfStock ? '#F44336' : theme.colors.textSecondary }]} numberOfLines={1} adjustsFontSizeToFit>
                                 {outOfStock
                                   ? t('product.outOfStock', { defaultValue: 'Out of Stock' })
-                                  : `${t('product.stock', { defaultValue: 'Stock' })}: ${v.stockQuantity}`
+                                  : ''
                                 }
                               </AppText>
                               {!outOfStock && product.priceTiers && product.priceTiers.length > 0 && (

@@ -270,12 +270,9 @@ const CartItemComponent: React.FC<CartItemComponentProps> = ({
               </View>
             )}
 
-            {/* Stock warnings */}
-            {availableStock <= 5 && availableStock > 0 && (
-              <AppText style={styles.lowStockWarning}>
-                {t('products.lowStock', { count: availableStock })}
-              </AppText>
-            )}
+            {/* The low-stock warning printed the remaining quantity. Customers are
+                not shown stock numbers; the + button is still capped at real stock,
+                so nobody can order more than exists. */}
 
             {/* Wholesale badge */}
             {hasDiscount && (

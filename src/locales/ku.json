@@ -449,7 +449,6 @@
     "stock": "کۆگا",
     "inStock": "لە کۆگادایە",
     "outOfStock": "لە کۆگادا نیە",
-    "lowStock": "تەنها {{count}} ماوە",
     "addToCart": "بۆ سەبەتە زیادبکە",
     "addedToCart": "بۆ سەبەتە زیادکرا",
     "viewDetails": "وردەکاری پیشاندان",

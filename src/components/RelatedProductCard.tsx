@@ -236,25 +236,8 @@ const RelatedProductCard: React.FC<RelatedProductCardProps> = ({
         </View>
       )}
 
-      {lowStock && (
-        <View style={[styles.statusBadge, { backgroundColor: theme.colors.warning }]}>
-          <Ionicons
-            name="alert-circle-outline"
-            size={11}
-            color="#ffffff"
-            style={styles.statusBadgeIcon}
-          />
-          <AppNumber
-            value={t("product.lowStock", {
-              count: effectiveStock,
-              defaultValue: `Only ${effectiveStock} left`,
-            })}
-            numberOfLines={1}
-            containerStyle={styles.shrinkable}
-            style={styles.statusBadgeText}
-          />
-        </View>
-      )}
+      {/* The "Only N left" badge was removed: customers are not shown stock
+          quantities anywhere. The in-stock badge below still conveys availability. */}
 
       {inStock && (
         <View style={[styles.statusBadge, { backgroundColor: "#4CAF50" }]}>
