@@ -413,8 +413,24 @@ const HomeScreen: React.FC = () => {
   const stableIsFavorite = useCallback((id: string) => favActionsRef.current.isFavorite(id), []);
   const stableToggleFavorite = useCallback((id: string) => favActionsRef.current.toggleFavorite(id), []);
 
-  const headerDataRef = useRef({ brands, brandSpotlights, hasArrivals, managedBrands, featuredProducts });
-  headerDataRef.current = { brands, brandSpotlights, hasArrivals, managedBrands, featuredProducts };
+  // Brand tiles, paired into the rail's two-row columns. Memoised at component
+  // level rather than built inside renderListHeader: the rail repeats this array
+  // many times over, so a fresh identity on every Home render would rebuild the
+  // whole repeated list and re-render every tile.
+  const brandColumns = useMemo(() => {
+    const tiles = managedBrands.length > 0
+      ? managedBrands.map((b: any) => ({ key: b.id, label: b.name, logoUrl: b.logoUrl }))
+      // Every brand is shown. This used to drop the last brand on an odd count to
+      // avoid a half-empty final column, on the assumption that "See All" listed
+      // the rest — but that link went to Categories and no all-brands screen
+      // exists, so the dropped brand was simply unreachable.
+      : brands.map((b: string) => ({ key: b, label: b, logoUrl: undefined as string | undefined }));
+    const cols = chunkPairs(tiles);
+    return isRTL ? cols.reverse() : cols;
+  }, [managedBrands, brands, isRTL]);
+
+  const headerDataRef = useRef({ brands, brandSpotlights, hasArrivals, managedBrands, featuredProducts, brandColumns });
+  headerDataRef.current = { brands, brandSpotlights, hasArrivals, managedBrands, featuredProducts, brandColumns };
 
   const renderSpotlightCard = useCallback(({ item }: { item: Product }) => (
     <MasonryProductCard
@@ -428,20 +444,7 @@ const HomeScreen: React.FC = () => {
   ), [handleProductPress, handleAddToCartPress, stableIsFavorite, stableToggleFavorite]);
 
   const renderListHeader = useCallback(() => {
-    const { brands: brandList, brandSpotlights: spotlights, hasArrivals: hasItems, managedBrands: mBrands, featuredProducts: featured } = headerDataRef.current;
-    const allBrandTiles = mBrands.length > 0
-      ? mBrands.map(b => ({ key: b.id, label: b.name, logoUrl: b.logoUrl }))
-      : brandList.map(b => ({ key: b, label: b, logoUrl: undefined as string | undefined }));
-    // Every brand is shown. This used to drop the last brand on an odd count to
-    // avoid a half-empty final column, on the assumption that "See All" listed the
-    // rest — but that link went to Categories and no all-brands screen exists, so
-    // the dropped brand was simply unreachable. A single tile in the last column of
-    // a horizontally scrolling rail is a far smaller problem than a hidden brand.
-    const brandTiles = allBrandTiles;
-    // Columns of two, which is what the rail scrolls. Built here rather than
-    // inline in the JSX so AutoScrollRail's duplicated copy is not rebuilt on
-    // every header render.
-    const brandColumns = (() => { const cols = chunkPairs(brandTiles); return isRTL ? cols.reverse() : cols; })();
+    const { brandSpotlights: spotlights, hasArrivals: hasItems, featuredProducts: featured, brandColumns: brandCols } = headerDataRef.current;
     return (
       <View>
         {/* a. Hero banner */}
@@ -478,19 +481,20 @@ const HomeScreen: React.FC = () => {
         )}
 
         {/* b. Our Brands — horizontal 2-row rail (shows admin logo when uploaded) */}
-        {brandTiles.length > 0 && (
+        {brandCols.length > 0 && (
           <View>
             {/* No onSeeAll: the rail already shows every brand, and there is no
                 all-brands screen to link to. */}
             <SectionHeader title={t('home.ourBrands')} />
-            {/* Drifts slowly on its own and can still be dragged. The rail pauses
-                while touched, resumes a couple of seconds after release from wherever
-                the user left it, and does not move at all under Reduce Motion. */}
+            {/* Revolves endlessly: drifts slowly on its own, and drags forever in
+                either direction without hitting an end. Pauses while touched and
+                resumes a couple of seconds after release. */}
             <AutoScrollRail
-              data={brandColumns}
+              data={brandCols}
               keyExtractor={(_, i) => `brand-col-${i}`}
               itemWidth={BRAND_TILE_WIDTH}
               gap={BRAND_GRID_GAP}
+              leadingInset={BRAND_GRID_PADDING}
               contentContainerStyle={styles.brandRow}
               renderItem={(col: any) => (
                 <View style={[styles.brandCol, { width: BRAND_TILE_WIDTH }]}>
