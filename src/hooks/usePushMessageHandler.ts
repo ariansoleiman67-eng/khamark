@@ -38,10 +38,12 @@ try {
 }
 
 export interface PushMessageData {
-  type?: 'order' | 'shipping' | 'promo' | 'system' | 'chat';
+  type?: 'order' | 'shipping' | 'promo' | 'system' | 'chat' | 'trade_in';
   orderId?: string;
   productId?: string;
   conversationId?: string;
+  /** Set by on-db-change on a new trade_in_requests row. */
+  tradeInId?: string;
   title?: string;
   body?: string;
 }
@@ -195,6 +197,21 @@ export function getNavigationTarget(
       }
       return {
         screen: 'Notifications',
+        params: undefined,
+      };
+    case 'trade_in':
+      // Admin-only: the notification is addressed to the shop owner, so these
+      // screens are always reachable for whoever receives it. Falling back to the
+      // inbox rather than returning null means a tap always goes somewhere —
+      // a notification that does nothing reads as a broken app.
+      if (data.tradeInId) {
+        return {
+          screen: 'AdminTradeInDetail',
+          params: { requestId: data.tradeInId },
+        };
+      }
+      return {
+        screen: 'AdminTradeIns',
         params: undefined,
       };
     case 'chat':
