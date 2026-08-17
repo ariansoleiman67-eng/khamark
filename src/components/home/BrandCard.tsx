@@ -6,6 +6,13 @@ import { useTheme } from '../ThemeProvider';
 
 interface BrandCardProps {
   label: string;
+  /**
+   * Compact tiles are for the category screen's brand filter strip, where the row
+   * sits above a product grid and must not eat the screen. Same look, smaller: the
+   * caption is dropped because at this size the wordmark already IS the name, and
+   * repeating it was the main thing making the tile tall.
+   */
+  compact?: boolean;
   imageUrl?: string;
   width?: number;
   onPress?: () => void;
@@ -15,7 +22,7 @@ interface BrandCardProps {
 // admin uploaded a logo it's shown centered on the card (no chip/frame). With no
 // logo the brand name is drawn as a clean uppercase wordmark. The brand name
 // always appears as a soft caption beneath — logo + caption, aynAlfahad style.
-const BrandCard: React.FC<BrandCardProps> = ({ label, imageUrl, width, onPress }) => {
+const BrandCard: React.FC<BrandCardProps> = ({ label, imageUrl, width, onPress, compact = false }) => {
   const { theme, isDark } = useTheme();
   const [imgFailed, setImgFailed] = useState(false);
   useEffect(() => { setImgFailed(false); }, [imageUrl]);
@@ -28,6 +35,7 @@ const BrandCard: React.FC<BrandCardProps> = ({ label, imageUrl, width, onPress }
       accessibilityLabel={label}
       style={({ pressed }) => [
         styles.tile,
+        compact && styles.tileCompact,
         {
           width,
           backgroundColor: isDark ? theme.colors.surface : '#F1F2F4',
@@ -35,7 +43,7 @@ const BrandCard: React.FC<BrandCardProps> = ({ label, imageUrl, width, onPress }
         },
       ]}
     >
-      <View style={styles.logoArea}>
+      <View style={[styles.logoArea, compact && styles.logoAreaCompact]}>
         {showImage ? (
           <Image
             source={{ uri: imageUrl }}
@@ -48,10 +56,13 @@ const BrandCard: React.FC<BrandCardProps> = ({ label, imageUrl, width, onPress }
           />
         ) : (
           <AppText
-            fontSize={19}
+            fontSize={compact ? 13 : 19}
             numberOfLines={1}
             adjustsFontSizeToFit
-            minimumFontScale={0.6}
+            // 0.45 rather than 0.6: a long wordmark like PROOVE was rendering
+            // clipped ("PROOV") in the narrow compact tile because it could not
+            // shrink far enough to fit on one line.
+            minimumFontScale={compact ? 0.45 : 0.6}
             style={[styles.wordmark, { color: theme.colors.text }]}
           >
             {label.toUpperCase()}
@@ -59,13 +70,15 @@ const BrandCard: React.FC<BrandCardProps> = ({ label, imageUrl, width, onPress }
         )}
       </View>
 
-      <AppText
-        fontSize={13}
-        numberOfLines={1}
-        style={[styles.caption, { color: theme.colors.textSecondary }]}
-      >
-        {label}
-      </AppText>
+      {!compact && (
+        <AppText
+          fontSize={13}
+          numberOfLines={1}
+          style={[styles.caption, { color: theme.colors.textSecondary }]}
+        >
+          {label}
+        </AppText>
+      )}
     </Pressable>
   );
 };
@@ -78,6 +91,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  tileCompact: {
+    borderRadius: 14,
+    minHeight: 62,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+  },
+  logoAreaCompact: {
+    height: 36,
   },
   logoArea: {
     height: 52,

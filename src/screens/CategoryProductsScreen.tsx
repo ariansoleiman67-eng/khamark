@@ -23,12 +23,18 @@ import { useCart } from '../contexts/CartContext';
 import { useFavorites } from '../contexts/FavoritesContext';
 import { useTenant } from '../contexts/TenantContext';
 import { Product } from '../types';
+import BrandCard from '../components/home/BrandCard';
+import { brandService } from '../services/brandService';
 
 // 'recommended' = the order the service already returned (parts.sort_order ascending,
 // previous ordering as tiebreaker) — i.e. the order the admin set by dragging.
 type SortMode = 'recommended' | 'priceAsc' | 'priceDesc';
 
 // Dedicated screen for one category: tap a category tile -> all its products.
+// Narrower than Home's tiles: this is a filter strip above a product grid, not the
+// page's main content, so several brands should be visible without scrolling.
+const BRAND_FILTER_TILE = 96;
+
 const CategoryProductsScreen: React.FC = () => {
   const { theme } = useTheme();
   const { t, i18n } = useTranslation();
@@ -50,6 +56,24 @@ const CategoryProductsScreen: React.FC = () => {
   const [error, setError] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>('recommended');
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
+  // Admin-managed brand logos, keyed lower-case. The brands table is curated
+  // separately from product.brand strings and today only overlaps on Anker, so
+  // most tiles fall back to BrandCard's wordmark — the same behaviour as Home.
+  const [brandLogos, setBrandLogos] = useState<Record<string, string | undefined>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    brandService
+      .getActiveBrands(tenantId || undefined)
+      .then((list) => {
+        if (cancelled) return;
+        const map: Record<string, string | undefined> = {};
+        list.forEach((b) => { map[b.name.trim().toLowerCase()] = b.logoUrl; });
+        setBrandLogos(map);
+      })
+      .catch(() => { /* wordmarks are a fine fallback; never block the list */ });
+    return () => { cancelled = true; };
+  }, [tenantId]);
 
   const load = useCallback(async () => {
     try {
@@ -165,55 +189,47 @@ const CategoryProductsScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Brand filter. Horizontal only — the screen's single vertical scroll owner
-          is the FlatList below (GOLDEN_RULES §1), so this must never scroll down. */}
+      {/* Brand filter, rendered with the same BrandCard the Home screen uses so the
+          two read as one design — and so an uploaded logo appears here automatically.
+          Horizontal only: the FlatList below stays the single vertical scroll owner
+          (GOLDEN_RULES §1). */}
       {brandFacets.length > 0 && (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          // flexGrow/flexShrink 0: a horizontal ScrollView inside this column
-          // otherwise expands to fill the leftover vertical space, and with the
-          // content container's default alignItems:'stretch' every chip stretched
-          // to that full height. alignItems:'center' sizes each chip to its text.
+          // A horizontal ScrollView in a column otherwise grows to fill the leftover
+          // height and stretches its children to match.
           style={{ flexGrow: 0, flexShrink: 0 }}
           contentContainerStyle={{
             paddingHorizontal: 16,
             paddingTop: 12,
             paddingBottom: 4,
-            gap: 8,
-            alignItems: 'center',
+            gap: 10,
+            alignItems: 'flex-start',
             flexDirection: isRTL ? 'row-reverse' : 'row',
           }}
         >
-          {[{ name: null as string | null, count: products.length }, ...brandFacets].map((f) => {
+          {[{ name: null as string | null }, ...brandFacets].map((f) => {
             const active = selectedBrand === f.name;
             const label = f.name ?? t('common.all', { defaultValue: 'All' });
             return (
-              <TouchableOpacity
+              <View
                 key={f.name ?? '__all__'}
-                onPress={() => setSelectedBrand(f.name)}
-                activeOpacity={0.8}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
                 style={{
-                  paddingHorizontal: 14,
-                  paddingVertical: 8,
-                  borderRadius: 20,
-                  borderWidth: active ? 0 : 1,
-                  borderColor: theme.colors.border,
-                  backgroundColor: active ? theme.colors.primary : theme.colors.card,
+                  borderRadius: 14,
+                  borderWidth: active ? 2 : 0,
+                  borderColor: theme.colors.primary,
+                  padding: active ? 0 : 2,
                 }}
               >
-                <AppText
-                  fontSize={13}
-                  style={{
-                    color: active ? theme.colors.textOnPrimary : theme.colors.text,
-                    fontWeight: active ? '700' : '500',
-                  }}
-                >
-                  {label}
-                </AppText>
-              </TouchableOpacity>
+                <BrandCard
+                  compact
+                  label={label}
+                  imageUrl={f.name ? brandLogos[f.name.trim().toLowerCase()] : undefined}
+                  width={BRAND_FILTER_TILE}
+                  onPress={() => setSelectedBrand(f.name)}
+                />
+              </View>
             );
           })}
         </ScrollView>
