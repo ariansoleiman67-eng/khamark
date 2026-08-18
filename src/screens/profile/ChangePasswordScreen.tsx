@@ -171,7 +171,7 @@ const ChangePasswordScreen = () => {
       setLoading(true);
       await AuthService.changePassword(currentPassword, newPassword);
       Alert.alert(t('profile.passwordScreen.passwordUpdated'), t('profile.passwordScreen.passwordUpdatedMsg'), [
-        { text: 'OK', onPress: () => navigation.goBack() },
+        { text: t('common.ok', { defaultValue: 'OK' }), onPress: () => navigation.goBack() },
       ]);
     } catch (error: any) {
       const msg = error.message || '';
@@ -185,7 +185,7 @@ const ChangePasswordScreen = () => {
           // Retry after reauth
           await AuthService.changePassword(currentPassword, newPassword);
           Alert.alert(t('profile.passwordScreen.passwordUpdated'), t('profile.passwordScreen.passwordUpdatedMsg'), [
-            { text: 'OK', onPress: () => navigation.goBack() },
+            { text: t('common.ok', { defaultValue: 'OK' }), onPress: () => navigation.goBack() },
           ]);
         } catch (reauthError: any) {
           if (reauthError.message !== 'Reauth cancelled') {
@@ -214,7 +214,7 @@ const ChangePasswordScreen = () => {
         t('profile.passwordScreen.emailRequired'),
         t('profile.passwordScreen.emailRequiredMsg'),
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: t('common.cancel', { defaultValue: 'Cancel' }), style: 'cancel' },
           {
             text: t('profile.passwordScreen.addEmail'), 
             onPress: () => {
@@ -235,7 +235,7 @@ const ChangePasswordScreen = () => {
       await reloadUser();
       await refreshUser();
       Alert.alert(t('profile.passwordScreen.passwordSet'), t('profile.passwordScreen.passwordSetMsg'), [
-        { text: 'OK', onPress: () => navigation.goBack() },
+        { text: t('common.ok', { defaultValue: 'OK' }), onPress: () => navigation.goBack() },
       ]);
     } catch (error: any) {
       if (error.message === 'Reauth cancelled') return;
@@ -244,7 +244,7 @@ const ChangePasswordScreen = () => {
           t('profile.passwordScreen.emailRequired'),
         t('profile.passwordScreen.emailRequiredVerifyMsg'),
           [
-            { text: 'Cancel', style: 'cancel' },
+            { text: t('common.cancel', { defaultValue: 'Cancel' }), style: 'cancel' },
             {
               text: t('profile.passwordScreen.addEmail'), 
               onPress: () => {
@@ -397,7 +397,7 @@ const ChangePasswordScreen = () => {
       await resetPasswordAfterOTP(userPhone, resetNewPassword);
       await refreshUser();
       Alert.alert(t('profile.passwordScreen.passwordReset'), t('profile.passwordScreen.passwordResetMsg'), [
-        { text: 'OK', onPress: () => navigation.goBack() },
+        { text: t('common.ok', { defaultValue: 'OK' }), onPress: () => navigation.goBack() },
       ]);
     } catch (error: any) {
       setErrorMessage(error.message || t('profile.passwordScreen.errors.failedSetPassword'));

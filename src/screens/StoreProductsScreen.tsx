@@ -5,7 +5,7 @@
  * Accessed via "View Store" button on ProductDetails.
  */
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, ActivityIndicator, Text } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
@@ -36,10 +36,12 @@ const StoreProductsScreen: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [productCount, setProductCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
+      setLoadError(false);
       const [profile, products] = await Promise.all([
         storeProfileService.getStoreProfile(tenantId),
         ProductService.getProductsByTenantId(tenantId),
@@ -50,6 +52,7 @@ const StoreProductsScreen: React.FC = () => {
       setProductCount(products ? products.filter(p => p.isActive !== false).length : 0);
     } catch (error) {
       console.error('Error loading store data:', error);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -65,6 +68,20 @@ const StoreProductsScreen: React.FC = () => {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
+    );
+  }
+
+  // A failed fetch is not an empty store: say so, and offer a way back in.
+  if (loadError && !storeProfile) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+        <Text allowFontScaling={false} style={[styles.errorText, { color: theme.colors.text }]}>
+          {t('errors.network')}
+        </Text>
+        <TouchableOpacity onPress={loadData} style={[styles.retryButton, { backgroundColor: theme.colors.primary }]}>
+          <Text allowFontScaling={false} style={styles.retryButtonText}>{t('common.retry')}</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -146,10 +163,24 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  errorText: {
+    marginBottom: 16,
+    paddingHorizontal: 32,
+    textAlign: 'center',
+  },
   loadingContainer: {
     alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
+  },
+  retryButton: {
+    borderRadius: 999,
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
 });
 

@@ -167,6 +167,8 @@ const CheckoutScreen: React.FC = () => {
   const [userAddresses, setUserAddresses] = useState<Address[]>([]);
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [addressesLoading, setAddressesLoading] = useState(true);
+  // A failed/timed-out address fetch must not be rendered as "you have no addresses".
+  const [addressesError, setAddressesError] = useState(false);
   const [useManualAddress, setUseManualAddress] = useState(false);
 
   // Saved Cards state
@@ -232,9 +234,12 @@ const CheckoutScreen: React.FC = () => {
       .filter(card => !!card?.payment_token)
       .map(card => ({
         id: `saved_card_${card.payment_token}`,
-        name: `QiCard ending in ${(card.card_mask ?? '').slice(-4) || '••••'}`,
+        name: t('checkout.savedCardEndingIn', {
+          defaultValue: 'QiCard ending in {{last4}}',
+          last4: (card.card_mask ?? '').slice(-4) || '••••',
+        }),
         icon: 'credit-card',
-        description: `Saved Card`,
+        description: t('checkout.savedCard', { defaultValue: 'Saved Card' }),
         isAvailable: true,
         color: '#1976D2',
       })),
@@ -273,6 +278,7 @@ const CheckoutScreen: React.FC = () => {
 
     try {
       setAddressesLoading(true);
+      setAddressesError(false);
       // Race against timeout to prevent infinite loading
       const addresses = await Promise.race([
         addressService.getUserAddresses(user.uid),
@@ -306,6 +312,7 @@ const CheckoutScreen: React.FC = () => {
     } catch (error) {
       if (!isLatest()) return;
       console.error('Error loading addresses:', error);
+      setAddressesError(true);
     } finally {
       if (isLatest()) setAddressesLoading(false);
     }
@@ -1286,8 +1293,28 @@ const CheckoutScreen: React.FC = () => {
                   </View>
                 )}
 
+                {/* Load failed — distinct from "no saved addresses", and retryable */}
+                {addressesError && userAddresses.length === 0 && (
+                  <View style={[styles.noAddressContainer, { backgroundColor: theme.colors.surface, borderColor: theme.colors.error }]}>
+                    <Ionicons name="cloud-offline-outline" size={48} color={theme.colors.error} />
+                    <Text allowFontScaling={false} style={[styles.noAddressTitle, { color: theme.colors.text }]}>
+                      {t('addresses.failedToLoad')}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={loadUserAddresses}
+                      style={[styles.addAddressButton, { backgroundColor: theme.colors.primary }]}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="refresh" size={20} color="white" />
+                      <Text allowFontScaling={false} style={styles.addAddressText}>
+                        {t('common.retry')}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
                 {/* No addresses */}
-                {userAddresses.length === 0 && (
+                {userAddresses.length === 0 && !addressesError && (
                   <View style={[styles.noAddressContainer, { backgroundColor: theme.colors.surface, borderColor: theme.colors.primary }]}>
                     <Ionicons name="location-outline" size={48} color={theme.colors.primary} />
                     <Text allowFontScaling={false} style={[styles.noAddressTitle, { color: theme.colors.text }]}>
@@ -1479,7 +1506,7 @@ const CheckoutScreen: React.FC = () => {
                           if (!user?.uid) return;
                           setExchangerSaving(true);
                           try {
-                            await supabase
+                            const { error: saveError } = await supabase
                               .from('users')
                               .update({
                                 money_exchanger_info: {
@@ -1491,6 +1518,7 @@ const CheckoutScreen: React.FC = () => {
                                 },
                               })
                               .eq('id', user.uid);
+                            if (saveError) throw saveError;
                             setExchangerSaved(true);
                             Alert.alert(
                               t('common.success', { defaultValue: 'Success' }),
@@ -1851,7 +1879,7 @@ const CheckoutScreen: React.FC = () => {
                   <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
                     <Feather name="check-circle" size={16} color={theme.colors.success} />
                     <Text allowFontScaling={false} style={{ color: theme.colors.success, fontWeight: '700' }}>
-                      {appliedDiscount.discountName}
+                      {discountDisplayName(appliedDiscount, i18n.language)}
                     </Text>
                   </View>
                   <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 12 }}>

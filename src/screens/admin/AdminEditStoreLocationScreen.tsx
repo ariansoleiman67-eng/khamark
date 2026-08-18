@@ -600,7 +600,7 @@ const AdminEditStoreLocationScreen = () => {
             </View>
             <View style={styles.coordsRow}>
               <Text allowFontScaling={false} style={[styles.coordsText, { color: theme.colors.textSecondary }]}>
-                Lat: {latitude.toFixed(6)} | Lng: {longitude.toFixed(6)}
+                {t('admin.storeLocations.latitude')}: {latitude.toFixed(6)} | {t('admin.storeLocations.longitude')}: {longitude.toFixed(6)}
               </Text>
             </View>
           </View>

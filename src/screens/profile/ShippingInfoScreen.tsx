@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../services/supabase';
 import {
   View,
@@ -51,37 +51,47 @@ const ShippingInfoScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   // Load shipping info on mount
-  useEffect(() => {
-    const loadShippingInfo = async () => {
-      if (!user?.uid) return;
-      setLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('users')
-          .select('shipping_info')
-          .eq('id', user.uid)
-          .single();
-          
-        if (data?.shipping_info) {
-          const info = data.shipping_info;
-          setFormData({
-            recipientName: info.recipientName || '',
-            mobileNumber: info.mobileNumber || '',
-            officeName: info.officeName || '',
-            officePhone: info.officePhone || '',
-          });
-        }
-      } catch (error) {
-        console.error('Error loading shipping info:', error);
-      } finally {
-        setLoading(false);
-        setInitialLoadDone(true);
+  const loadShippingInfo = useCallback(async () => {
+    if (!user?.uid) return;
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('shipping_info')
+        .eq('id', user.uid)
+        .single();
+
+      // postgrest resolves a failed read as { data: null, error } instead of
+      // throwing, so the error has to be checked explicitly — otherwise a read
+      // failure looks exactly like "nothing saved yet". PGRST116 = no row, which
+      // genuinely means nothing saved yet.
+      if (error && (error as any).code !== 'PGRST116') throw error;
+
+      setLoadError(false);
+      if (data?.shipping_info) {
+        const info = data.shipping_info;
+        setFormData({
+          recipientName: info.recipientName || '',
+          mobileNumber: info.mobileNumber || '',
+          officeName: info.officeName || '',
+          officePhone: info.officePhone || '',
+        });
       }
-    };
-    loadShippingInfo();
+    } catch (error) {
+      console.error('Error loading shipping info:', error);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+      setInitialLoadDone(true);
+    }
   }, [user?.uid]);
+
+  useEffect(() => {
+    loadShippingInfo();
+  }, [loadShippingInfo]);
 
   // Validate phone number
   const isValidPhone = (phone: string): boolean => {
@@ -224,6 +234,54 @@ const ShippingInfoScreen: React.FC = () => {
             keyboardShouldPersistTaps="handled"
           >
             <View style={{ padding: SPACING.md }}>
+              {/* Load failure — distinct from "nothing saved yet", with a retry */}
+              {loadError && (
+                <View style={{
+                  backgroundColor: theme.colors.error + '10',
+                  padding: SPACING.md,
+                  borderRadius: 12,
+                  marginBottom: SPACING.lg,
+                  borderWidth: 1,
+                  borderColor: theme.colors.error + '20',
+                }}>
+                  <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'flex-start' }}>
+                    <Ionicons
+                      name="alert-circle-outline"
+                      size={24}
+                      color={theme.colors.error}
+                      style={{ marginTop: 2 }}
+                    />
+                    <View style={{
+                      flex: 1,
+                      marginLeft: isRTL ? 0 : SPACING.sm,
+                      marginRight: isRTL ? SPACING.sm : 0,
+                    }}>
+                      <Text allowFontScaling={false} style={{
+                        fontSize: 14,
+                        color: theme.colors.error,
+                        lineHeight: 20,
+                        textAlign: isRTL ? 'right' : 'left',
+                      }}>
+                        {t('shippingInfo.loadFailed')}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={loadShippingInfo}
+                        disabled={loading}
+                        style={{ marginTop: SPACING.sm, alignSelf: isRTL ? 'flex-end' : 'flex-start' }}
+                      >
+                        <Text allowFontScaling={false} style={{
+                          fontSize: 14,
+                          fontWeight: '600',
+                          color: theme.colors.primary,
+                        }}>
+                          {t('common.retry')}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              )}
+
               {/* Info Banner */}
               <View style={{
                 backgroundColor: theme.colors.primary + '10',

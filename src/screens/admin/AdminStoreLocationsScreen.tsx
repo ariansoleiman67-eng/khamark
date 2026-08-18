@@ -38,6 +38,7 @@ const AdminStoreLocationsScreen = () => {
   const [locations, setLocations] = useState<StoreLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const loadLocations = async () => {
     if (!currentAdminId) {
@@ -48,8 +49,9 @@ const AdminStoreLocationsScreen = () => {
       // OWNERSHIP: Load only locations owned by this admin
       const data = await locationService.getLocationsByAdmin(currentAdminId);
       setLocations(data);
+      setLoadFailed(false);
     } catch (error) {
-      Alert.alert(t('admin.common.error'), t('admin.storeLocations.loadFailed'));
+      setLoadFailed(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -170,7 +172,24 @@ const AdminStoreLocationsScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {locations.length === 0 ? (
+      {loadFailed ? (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="cloud-offline-outline" size={64} color={theme.colors.textSecondary} />
+          <Text allowFontScaling={false} style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
+            {t('admin.storeLocations.loadFailed')}
+          </Text>
+          <TouchableOpacity
+            style={[styles.addFirstButton, { backgroundColor: theme.colors.primary }]}
+            onPress={() => {
+              setLoading(true);
+              loadLocations();
+            }}
+          >
+            <Ionicons name="refresh" size={20} color={COLORS.white} />
+            <Text allowFontScaling={false} style={styles.addFirstText}>{t('common.retry')}</Text>
+          </TouchableOpacity>
+        </View>
+      ) : locations.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="location-outline" size={64} color={theme.colors.textSecondary} />
           <Text allowFontScaling={false} style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
@@ -197,9 +216,9 @@ const AdminStoreLocationsScreen = () => {
       )}
 
       {/* FAB */}
-      {locations.length > 0 && (
+      {!loadFailed && locations.length > 0 && (
         <TouchableOpacity
-          style={[styles.fab, { backgroundColor: theme.colors.primary }]}
+          style={[styles.fab, isRTL ? { left: 24 } : { right: 24 }, { backgroundColor: theme.colors.primary }]}
           onPress={() => navigation.navigate('AdminEditStoreLocation', {})}
         >
           <Ionicons name="add" size={28} color={COLORS.white} />
@@ -289,7 +308,6 @@ const styles = StyleSheet.create({
     height: 56,
     justifyContent: 'center',
     position: 'absolute',
-    right: 24,
     shadowColor: COLORS.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,

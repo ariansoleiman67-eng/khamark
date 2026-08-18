@@ -132,7 +132,7 @@ const OrderDetailScreen: React.FC = () => {
   const messagingSellerRef = useRef(false);
   const reorderingRef = useRef(false);
 
-  const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
+  const styles = useMemo(() => createStyles(theme, isDark, isRTL), [theme, isDark, isRTL]);
 
   // Load order details
   // orderId can change on a MOUNTED instance: tapping an order push while this
@@ -243,7 +243,7 @@ const OrderDetailScreen: React.FC = () => {
     
     try {
       await Share.share({
-        message: `${t('orders.shareText')}\nOrder #${order.orderNumber}\nTotal: ${formatOrderTotal(order, order.currency || currency, exchangeRateIQD)}`,
+        message: `${t('orders.shareText')}\n${t('orders.orderLabel')} #${order.orderNumber || ''}\n${t('orders.total')}: ${formatOrderTotal(order, order.currency || currency, exchangeRateIQD)}`,
       });
     } catch {
       // Share cancelled or failed
@@ -269,6 +269,10 @@ const OrderDetailScreen: React.FC = () => {
     // Prevent double-send / double-navigate from rapid taps
     if (messagingSellerRef.current) return;
     messagingSellerRef.current = true;
+
+    // Supabase order rows can carry a null order_number, and OrderService maps it
+    // straight through — guard before stripping the dashes.
+    const plainOrderNumber = (order.orderNumber || '').replace(/-/g, '');
 
     try {
       // Get or create conversation for this product
@@ -321,7 +325,7 @@ const OrderDetailScreen: React.FC = () => {
 
         const orderDetailsMessage = `📦 ${t('orders.orderInquiry', { defaultValue: 'Order Inquiry' })}
 
-🔢 ${t('orders.orderNumberLabel', { defaultValue: 'Order Number' })}: ${order.orderNumber.replace(/-/g, '')}
+🔢 ${t('orders.orderNumberLabel', { defaultValue: 'Order Number' })}: ${plainOrderNumber}
 📅 ${t('orders.status.label', { defaultValue: 'Status' })}: ${t(`orders.status.${order.status}`, { defaultValue: order.status })}
 
 📝 ${t('orders.items', { defaultValue: 'Items' })}:
@@ -340,7 +344,7 @@ ${t('orders.messagePrompt', { defaultValue: 'Hi, I have a question about this or
         navigation.navigate('ChatScreen' as any, {
           conversationId: conv.id,
           productId: productId,
-          productName: `${t('orders.orderLabel', { defaultValue: 'Order' })} #${order.orderNumber.replace(/-/g, '')}`,
+          productName: `${t('orders.orderLabel', { defaultValue: 'Order' })} #${plainOrderNumber}`,
           productImage: firstItem.imageUrl || null,
           tenantId: firstItem.tenantId || conv.tenantId,
           attachProduct: false,
@@ -1097,7 +1101,7 @@ ${t('orders.messagePrompt', { defaultValue: 'Hi, I have a question about this or
 
 /* eslint-disable react-native/no-unused-styles */
 /* eslint-disable react-native/no-color-literals */
-const createStyles = (theme: Theme, isDark: boolean) => StyleSheet.create({
+const createStyles = (theme: Theme, isDark: boolean, isRTL: boolean) => StyleSheet.create({
   container: {
     backgroundColor: theme.colors.background,
     flex: 1,
@@ -1188,12 +1192,13 @@ const createStyles = (theme: Theme, isDark: boolean) => StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: SPACING.sm,
+    textAlign: isRTL ? 'right' : 'left',
   },
 
   // Status card
   statusHeader: {
     alignItems: 'center',
-    flexDirection: 'row',
+    flexDirection: isRTL ? 'row-reverse' : 'row',
     marginBottom: SPACING.md,
   },
   statusIconContainer: {
@@ -1201,7 +1206,8 @@ const createStyles = (theme: Theme, isDark: boolean) => StyleSheet.create({
     borderRadius: 28,
     height: 56,
     justifyContent: 'center',
-    marginRight: SPACING.md,
+    marginLeft: isRTL ? SPACING.md : 0,
+    marginRight: isRTL ? 0 : SPACING.md,
     width: 56,
   },
   statusInfo: {
@@ -1212,11 +1218,13 @@ const createStyles = (theme: Theme, isDark: boolean) => StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     marginBottom: 4,
+    textAlign: isRTL ? 'right' : 'left',
   },
   orderNumber: {
     color: theme.colors.primary,
     fontSize: 16,
     fontWeight: '500',
+    textAlign: isRTL ? 'right' : 'left',
   },
   orderMeta: {
     borderTopColor: theme.colors.border,
@@ -1345,7 +1353,7 @@ const createStyles = (theme: Theme, isDark: boolean) => StyleSheet.create({
   // Address
   addressContainer: {
     alignItems: 'flex-start',
-    flexDirection: 'row',
+    flexDirection: isRTL ? 'row-reverse' : 'row',
   },
   addressIcon: {
     alignItems: 'center',
@@ -1353,7 +1361,8 @@ const createStyles = (theme: Theme, isDark: boolean) => StyleSheet.create({
     borderRadius: 20,
     height: 40,
     justifyContent: 'center',
-    marginRight: SPACING.sm,
+    marginLeft: isRTL ? SPACING.sm : 0,
+    marginRight: isRTL ? 0 : SPACING.sm,
     width: 40,
   },
   addressDetails: {
@@ -1365,16 +1374,18 @@ const createStyles = (theme: Theme, isDark: boolean) => StyleSheet.create({
     fontWeight: '600',
     marginBottom: 4,
     paddingVertical: 2, // Prevent clipping
+    textAlign: isRTL ? 'right' : 'left',
   },
   addressText: {
     color: theme.colors.textSecondary,
     fontSize: 14,
     lineHeight: 20,
     paddingVertical: 2, // Prevent clipping
+    textAlign: isRTL ? 'right' : 'left',
   },
   phoneRow: {
     alignItems: 'center',
-    flexDirection: 'row',
+    flexDirection: isRTL ? 'row-reverse' : 'row',
     gap: 6,
     marginTop: 6,
     paddingVertical: 2, // Prevent clipping
@@ -1384,6 +1395,7 @@ const createStyles = (theme: Theme, isDark: boolean) => StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     paddingVertical: 2, // Prevent clipping
+    textAlign: isRTL ? 'right' : 'left',
   },
 
   // Summary section - Redesigned
@@ -1393,14 +1405,14 @@ const createStyles = (theme: Theme, isDark: boolean) => StyleSheet.create({
   },
   summaryItemRow: {
     alignItems: 'center',
-    flexDirection: 'row',
+    flexDirection: isRTL ? 'row-reverse' : 'row',
     justifyContent: 'space-between',
     minHeight: 40,
     paddingVertical: 12,
   },
   summaryLabelWrapper: {
     alignItems: 'center',
-    flexDirection: 'row',
+    flexDirection: isRTL ? 'row-reverse' : 'row',
     flex: 1,
     minWidth: 0,
   },
@@ -1411,7 +1423,8 @@ const createStyles = (theme: Theme, isDark: boolean) => StyleSheet.create({
   },
   summaryIcon: {
     flexShrink: 0,
-    marginRight: 12,
+    marginLeft: isRTL ? 12 : 0,
+    marginRight: isRTL ? 0 : 12,
     padding: 6,
     borderRadius: 999,
     backgroundColor: theme.colors.primary + '14',
@@ -1420,7 +1433,8 @@ const createStyles = (theme: Theme, isDark: boolean) => StyleSheet.create({
   },
   waterfallLine: {
     position: 'absolute',
-    left: 14,
+    left: isRTL ? undefined : 14,
+    right: isRTL ? 14 : undefined,
     top: 26,
     bottom: 26,
     width: 2,
@@ -1432,6 +1446,7 @@ const createStyles = (theme: Theme, isDark: boolean) => StyleSheet.create({
     flexShrink: 0,
     fontSize: 15,
     lineHeight: 24,
+    textAlign: isRTL ? 'right' : 'left',
   },
   shippingCityText: {
     color: theme.colors.textSecondary,
@@ -1488,7 +1503,7 @@ const createStyles = (theme: Theme, isDark: boolean) => StyleSheet.create({
   // Payment
   paymentContainer: {
     alignItems: 'center',
-    flexDirection: 'row',
+    flexDirection: isRTL ? 'row-reverse' : 'row',
   },
   paymentIconContainer: {
     alignItems: 'center',
@@ -1496,7 +1511,8 @@ const createStyles = (theme: Theme, isDark: boolean) => StyleSheet.create({
     borderRadius: 22,
     height: 44,
     justifyContent: 'center',
-    marginRight: SPACING.sm,
+    marginLeft: isRTL ? SPACING.sm : 0,
+    marginRight: isRTL ? 0 : SPACING.sm,
     width: 44,
   },
   paymentInfo: {
@@ -1507,6 +1523,7 @@ const createStyles = (theme: Theme, isDark: boolean) => StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     marginBottom: 2,
+    textAlign: isRTL ? 'right' : 'left',
   },
   paymentStatus: {
     fontSize: 13,

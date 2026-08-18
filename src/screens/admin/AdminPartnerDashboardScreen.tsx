@@ -55,6 +55,7 @@ export default function AdminPartnerDashboardScreen() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [langPickerOpen, setLangPickerOpen] = useState(false);
@@ -272,6 +273,7 @@ export default function AdminPartnerDashboardScreen() {
       if (!silent) setLoading(true);
       const assigned = await getAssignedProducts(viewUid);
       if (!fresh()) return;
+      setLoadError(false);
       setProducts(assigned as Product[]);
       // Earned profit + units-sold per product, from delivered orders. Recomputed on EVERY
       // load (incl. the live poll) so stock and sold always move together — keeping Total
@@ -327,6 +329,9 @@ export default function AdminPartnerDashboardScreen() {
       } catch { /* no order-read access (e.g. partner's own view) → leave as-is */ }
     } catch (error) {
       console.error('Failed to load assigned products:', error);
+      // Without this the empty list would tell the partner their products were
+      // taken away, when in fact the fetch failed.
+      if (fresh()) setLoadError(true);
     } finally {
       if (!silent && fresh()) setLoading(false);
     }
@@ -633,15 +638,31 @@ export default function AdminPartnerDashboardScreen() {
           </>
         ) : null}
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <View style={[styles.emptyIconCircle, { backgroundColor: 'rgba(139,92,246,0.1)' }]}>
-              <Ionicons name="briefcase-outline" size={48} color={ACCENT} />
+          loadError ? (
+            <View style={styles.emptyContainer}>
+              <View style={[styles.emptyIconCircle, { backgroundColor: 'rgba(139,92,246,0.1)' }]}>
+                <Ionicons name="cloud-offline-outline" size={48} color={ACCENT} />
+              </View>
+              <Text allowFontScaling={false} style={[styles.emptyTitle, { color: theme.colors.text }]}>{t('admin.partners.loadProductsFailed', { defaultValue: 'Failed to load products' })}</Text>
+              <Text allowFontScaling={false} style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
+                {t('admin.partners.errorSubtitle', { defaultValue: 'Check your connection and try again.' })}
+              </Text>
+              <TouchableOpacity activeOpacity={0.9} onPress={() => load()} style={[styles.retryBtn, { backgroundColor: ACCENT }]}>
+                <Ionicons name="refresh" size={18} color="#fff" />
+                <Text allowFontScaling={false} style={styles.retryBtnText}>{t('common.retry', { defaultValue: 'Retry' })}</Text>
+              </TouchableOpacity>
             </View>
-            <Text allowFontScaling={false} style={[styles.emptyTitle, { color: theme.colors.text }]}>{t('admin.partnerDashboard.emptyTitle', { defaultValue: 'No Products Assigned' })}</Text>
-            <Text allowFontScaling={false} style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
-              {t('admin.partnerDashboard.emptySubtitle', { defaultValue: 'You have not been assigned any products yet. Contact the main administrator.' })}
-            </Text>
-          </View>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <View style={[styles.emptyIconCircle, { backgroundColor: 'rgba(139,92,246,0.1)' }]}>
+                <Ionicons name="briefcase-outline" size={48} color={ACCENT} />
+              </View>
+              <Text allowFontScaling={false} style={[styles.emptyTitle, { color: theme.colors.text }]}>{t('admin.partnerDashboard.emptyTitle', { defaultValue: 'No Products Assigned' })}</Text>
+              <Text allowFontScaling={false} style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
+                {t('admin.partnerDashboard.emptySubtitle', { defaultValue: 'You have not been assigned any products yet. Contact the main administrator.' })}
+              </Text>
+            </View>
+          )
         }
       />
 
@@ -908,4 +929,6 @@ const styles = StyleSheet.create({
   emptyIconCircle: { width: 100, height: 100, borderRadius: 50, justifyContent: 'center', alignItems: 'center', marginBottom: SPACING.lg },
   emptyTitle: { fontSize: 20, fontWeight: '700', marginBottom: SPACING.sm, textAlign: 'center' },
   emptySubtitle: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  retryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 14, paddingVertical: 12, paddingHorizontal: 28, marginTop: SPACING.lg },
+  retryBtnText: { color: '#fff', fontWeight: '700', fontSize: 15, marginLeft: 8 },
 });

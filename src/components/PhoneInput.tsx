@@ -11,6 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { 
   useSharedValue, 
@@ -77,6 +78,7 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const { theme, isDark } = useTheme();
+  const { t } = useTranslation();
   
   // Get all countries and find default
   const allCountries = useMemo(() => getAllCountries(), []);
@@ -307,7 +309,7 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
               <View style={styles.modalHandle} />
               <View style={styles.headerRow}>
                 <Text allowFontScaling={false} style={styles.modalTitle} adjustsFontSizeToFit numberOfLines={1}>
-                  Select Country
+                  {t('addresses.selectCountry')}
                 </Text>
                 <TouchableOpacity 
                   onPress={() => setShowCountryPicker(false)}
@@ -323,7 +325,7 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
               <Ionicons name="search" size={18} color={COLORS.textGray} />
               <TextInput allowFontScaling={false}
                 style={styles.searchInput}
-                placeholder="Search country or code..."
+                placeholder={t('phoneInput.searchCountryOrCode')}
                 placeholderTextColor={COLORS.placeholder}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
@@ -358,7 +360,7 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
                   styles.viewModeText,
                   viewMode === 'list' && styles.viewModeTextActive,
                 ]} adjustsFontSizeToFit numberOfLines={1}>
-                  All
+                  {t('common.all')}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -377,14 +379,14 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
                   styles.viewModeText,
                   viewMode === 'regions' && styles.viewModeTextActive,
                 ]} adjustsFontSizeToFit numberOfLines={1}>
-                  By Region
+                  {t('phoneInput.byRegion')}
                 </Text>
               </TouchableOpacity>
             </View>
 
             {/* Country Count */}
             <Text allowFontScaling={false} style={styles.countryCount} adjustsFontSizeToFit numberOfLines={1}>
-              {filteredCountries.length} countries
+              {t('phoneInput.countryCount', { n: filteredCountries.length })}
             </Text>
 
             {/* Country List */}

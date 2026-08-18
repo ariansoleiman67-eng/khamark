@@ -246,6 +246,9 @@ export const ProductDetailsScreen: React.FC = () => {
   const loadReqIdRef = useRef(0);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  // A failed fetch is not the same as a deleted product: without this the catch
+  // below fell through to the "not found" screen, which offers no way to retry.
+  const [loadError, setLoadError] = useState(false);
   const [addingToCart, setAddingToCart] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [overviewExpanded, setOverviewExpanded] = useState(false);
@@ -660,6 +663,7 @@ export const ProductDetailsScreen: React.FC = () => {
 
     try {
       setLoading(true);
+      setLoadError(false);
 
       // Fetch product directly by ID from the `parts` table (mapped snake_case→camelCase).
       const product = await ProductService.getProduct(productId);
@@ -724,7 +728,7 @@ export const ProductDetailsScreen: React.FC = () => {
       } catch (error: any) {
         if (!isLatest()) return;
         console.error('Error loading product:', error);
-        Alert.alert(t('errors.error'), t('errors.failedToLoadProduct') + ': ' + error.message);
+        setLoadError(true);
         setLoading(false); // Ensure loading is disabled on error
     }
   };
@@ -808,7 +812,7 @@ export const ProductDetailsScreen: React.FC = () => {
           heading,
           formatItemPrice(product, currentCurrency as any, exchangeRateIQD),
           '',
-          'Check out this product on Asankary!',
+          t('product.shareText'),
           shareUrl,
         ].filter(line => line !== null && line !== undefined).join('\n'),
         url: product.imageUrls?.[0],
@@ -1075,6 +1079,33 @@ export const ProductDetailsScreen: React.FC = () => {
           </ScrollView>
         </View>
       </SafeAreaView>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+        <Ionicons name="cloud-offline-outline" size={64} color={theme.colors.error} />
+        <Text allowFontScaling={false} style={[styles.errorText, { color: theme.colors.text }]}>{t('errors.failedToLoadProduct')}</Text>
+        <Text allowFontScaling={false} style={[styles.errorText, { color: theme.colors.textSecondary, fontSize: 14 }]}>{t('search.loadErrorSubtitle')}</Text>
+        <Button
+          title={t('common.retry')}
+          onPress={() => loadProductData(++loadReqIdRef.current)}
+          style={{ marginTop: SPACING.lg }}
+        />
+        <Button
+          title={t('common.goBack', 'Go Back')}
+          variant="outline"
+          onPress={() => {
+            if (navigation.canGoBack()) {
+                navigation.goBack();
+            } else {
+                navigation.navigate('Home' as never);
+            }
+          }}
+          style={{ marginTop: SPACING.sm }}
+        />
+      </View>
     );
   }
 
@@ -1554,7 +1585,7 @@ export const ProductDetailsScreen: React.FC = () => {
               />
 
               {/* Navigation Buttons */}
-              <View style={[styles.fabContainer, { top: SPACING.md }]}>
+              <View style={[styles.fabContainer, { top: SPACING.md, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <TouchableOpacity
                   onPress={() => {
                     // Debounce back press to preventing spamming and crashes

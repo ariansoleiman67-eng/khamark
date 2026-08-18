@@ -14,6 +14,7 @@ if (Platform.OS === 'android') {
   } catch {}
 }
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 
@@ -139,6 +140,7 @@ const fetchGpsopsLastPosition = async (baseUrl: string, imei: string): Promise<{
 };
 
 export const LiveOrderMap: React.FC<LiveOrderMapProps> = ({ orderId, trackingUrl, deliveryAddress }) => {
+  const { t } = useTranslation();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [webViewLoading, setWebViewLoading] = useState(true);
@@ -449,9 +451,9 @@ export const LiveOrderMap: React.FC<LiveOrderMapProps> = ({ orderId, trackingUrl
             <View style={styles.trackerHeader}>
               <View style={styles.liveIndicator}>
                 <View style={styles.pulsingDot} />
-                <Text allowFontScaling={false} style={styles.liveLabel}>LIVE TRACKING</Text>
+                <Text allowFontScaling={false} style={styles.liveLabel}>{t('liveTracking.headerLabel')}</Text>
               </View>
-              <Text allowFontScaling={false} style={styles.etaText}>Tracking driver location</Text>
+              <Text allowFontScaling={false} style={styles.etaText}>{t('liveTracking.trackingDriver')}</Text>
             </View>
             
             {/* Progress Bar Visual */}
@@ -461,7 +463,7 @@ export const LiveOrderMap: React.FC<LiveOrderMapProps> = ({ orderId, trackingUrl
                 <View style={styles.driverIconBg}>
                   <Ionicons name="car-sport" size={24} color={COLORS.white} />
                 </View>
-                <Text allowFontScaling={false} style={styles.driverLabel}>Driver</Text>
+                <Text allowFontScaling={false} style={styles.driverLabel}>{t('liveTracking.driver')}</Text>
               </View>
               
               {/* Journey Line */}
@@ -480,7 +482,7 @@ export const LiveOrderMap: React.FC<LiveOrderMapProps> = ({ orderId, trackingUrl
                 <View style={styles.customerIconBg}>
                   <Ionicons name="home" size={20} color={COLORS.white} />
                 </View>
-                <Text allowFontScaling={false} style={styles.customerLabel}>You</Text>
+                <Text allowFontScaling={false} style={styles.customerLabel}>{t('chat.you')}</Text>
               </View>
             </View>
             
@@ -488,18 +490,18 @@ export const LiveOrderMap: React.FC<LiveOrderMapProps> = ({ orderId, trackingUrl
             <View style={styles.bigDistanceContainer}>
               <Ionicons name="navigate" size={28} color={COLORS.blue} />
               <Text allowFontScaling={false} style={styles.bigDistanceValue}>{formatDistance(distance)}</Text>
-              <Text allowFontScaling={false} style={styles.bigDistanceLabel}>to your location</Text>
+              <Text allowFontScaling={false} style={styles.bigDistanceLabel}>{t('liveTracking.toYourLocation')}</Text>
             </View>
             
             {/* Info Row */}
             <View style={styles.trackerInfoRow}>
               <View style={styles.infoItem}>
                 <Ionicons name="time-outline" size={16} color={COLORS.grayDark} />
-                <Text allowFontScaling={false} style={styles.infoText}>Updates every 10s</Text>
+                <Text allowFontScaling={false} style={styles.infoText}>{t('liveTracking.updatesEvery')}</Text>
               </View>
               <View style={styles.infoItem}>
                 <Ionicons name="location" size={16} color={COLORS.success} />
-                <Text allowFontScaling={false} style={styles.infoText}>GPS Active</Text>
+                <Text allowFontScaling={false} style={styles.infoText}>{t('liveTracking.gpsActive')}</Text>
               </View>
             </View>
           </View>
@@ -513,15 +515,15 @@ export const LiveOrderMap: React.FC<LiveOrderMapProps> = ({ orderId, trackingUrl
                 <Ionicons name="person" size={16} color={COLORS.white} />
               </View>
               <View style={styles.locationDetails}>
-                <Text allowFontScaling={false} style={styles.locationLabel}>Your Location</Text>
+                <Text allowFontScaling={false} style={styles.locationLabel}>{t('liveTracking.yourLocation')}</Text>
                 {userLocation ? (
                   <Text allowFontScaling={false} style={styles.locationCoords}>
                     📍 GPS: {userLocation.latitude.toFixed(4)}, {userLocation.longitude.toFixed(4)}
                   </Text>
                 ) : locationPermission === false ? (
-                  <Text allowFontScaling={false} style={styles.locationError}>Location permission denied</Text>
+                  <Text allowFontScaling={false} style={styles.locationError}>{t('location.permissionDenied')}</Text>
                 ) : (
-                  <Text allowFontScaling={false} style={styles.locationLoading}>Getting your location...</Text>
+                  <Text allowFontScaling={false} style={styles.locationLoading}>{t('location.gettingLocation')}</Text>
                 )}
               </View>
             </View>
@@ -530,7 +532,7 @@ export const LiveOrderMap: React.FC<LiveOrderMapProps> = ({ orderId, trackingUrl
             {distance !== null && (
               <View style={styles.distanceRow}>
                 <Ionicons name="navigate" size={20} color={COLORS.blue} />
-                <Text allowFontScaling={false} style={styles.distanceLabel}>Distance to delivery:</Text>
+                <Text allowFontScaling={false} style={styles.distanceLabel}>{t('liveTracking.distanceToDelivery')}</Text>
                 <Text allowFontScaling={false} style={styles.distanceValue}>{formatDistance(distance)}</Text>
               </View>
             )}
@@ -540,7 +542,7 @@ export const LiveOrderMap: React.FC<LiveOrderMapProps> = ({ orderId, trackingUrl
               <View style={styles.noDistanceRow}>
                 <Ionicons name="information-circle" size={16} color={COLORS.textSecondary} />
                 <Text allowFontScaling={false} style={styles.noDistanceText}>
-                  Add GPS location to your address to see distance
+                  {t('liveTracking.addGpsHint')}
                 </Text>
               </View>
             )}
@@ -556,7 +558,7 @@ export const LiveOrderMap: React.FC<LiveOrderMapProps> = ({ orderId, trackingUrl
     return (
       <View style={styles.inactiveContainer}>
         <Ionicons name="location-outline" size={24} color={COLORS.grayDark} />
-        <Text allowFontScaling={false} style={styles.inactiveText}>Live tracking is not active</Text>
+        <Text allowFontScaling={false} style={styles.inactiveText}>{t('liveTracking.notActive')}</Text>
         {distance !== null && (
           <View style={[styles.distanceBadge, styles.distanceBadgeWait]}>
             <Ionicons name="navigate" size={12} color={COLORS.white} />
@@ -580,16 +582,16 @@ export const LiveOrderMap: React.FC<LiveOrderMapProps> = ({ orderId, trackingUrl
           <View style={styles.badgesRow}>
             <View style={styles.liveBadge}>
               <View style={styles.dot} />
-              <Text allowFontScaling={false} style={styles.liveText}>LIVE</Text>
+              <Text allowFontScaling={false} style={styles.liveText}>{t('liveTracking.live')}</Text>
             </View>
             <DistanceBadge />
           </View>
-          {isStale && <Text allowFontScaling={false} style={styles.staleText}>Signal lost...</Text>}
+          {isStale && <Text allowFontScaling={false} style={styles.staleText}>{t('liveTracking.signalLost')}</Text>}
         </View>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.grayLight }}>
           <Ionicons name="car" size={40} color={COLORS.primary} />
           <Text allowFontScaling={false} style={{ color: COLORS.grayVeryDark, fontSize: 14, marginTop: 8, fontWeight: '600' }}>
-            {isStale ? 'Last known location' : 'On the way'}
+            {isStale ? t('liveTracking.lastKnownLocation') : t('product.onTheWay')}
           </Text>
           <Text allowFontScaling={false} style={{ color: COLORS.grayDark, fontSize: 12, marginTop: 4 }}>
             📍 {data.latitude.toFixed(4)}, {data.longitude.toFixed(4)}
@@ -605,11 +607,11 @@ export const LiveOrderMap: React.FC<LiveOrderMapProps> = ({ orderId, trackingUrl
         <View style={styles.badgesRow}>
           <View style={styles.liveBadge}>
             <View style={styles.dot} />
-            <Text allowFontScaling={false} style={styles.liveText}>LIVE</Text>
+            <Text allowFontScaling={false} style={styles.liveText}>{t('liveTracking.live')}</Text>
           </View>
           <DistanceBadge />
         </View>
-        {isStale && <Text allowFontScaling={false} style={styles.staleText}>Signal lost...</Text>}
+        {isStale && <Text allowFontScaling={false} style={styles.staleText}>{t('liveTracking.signalLost')}</Text>}
       </View>
 
       <MapView

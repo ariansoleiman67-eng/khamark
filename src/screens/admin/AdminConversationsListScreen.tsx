@@ -47,8 +47,8 @@ function formatTimeAgo(timestamp: any, t: (key: string, fallback: string) => str
     const days = Math.floor(diff / 86400000);
     
     if (minutes < 1) return t('chat.justNow', 'Just now');
-    if (minutes < 60) return `${minutes}m`;
-    if (hours < 24) return `${hours}h`;
+    if (minutes < 60) return `${minutes}${t('chat.minuteShort', 'm')}`;
+    if (hours < 24) return `${hours}${t('chat.hourShort', 'h')}`;
     if (days < 7) return date.toLocaleDateString([], { weekday: 'short' });
     return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
   } catch {
@@ -139,6 +139,7 @@ const ConversationItem = React.memo(({
         style={[
           styles.conversationRow,
           {
+            flexDirection: isRTL ? 'row-reverse' : 'row',
             backgroundColor: hasUnread 
               ? (isDark ? theme.colors.primary + '15' : theme.colors.primary + '08')
               : theme.colors.surface,
@@ -147,7 +148,7 @@ const ConversationItem = React.memo(({
         onPress={handlePress}
       >
         {/* Avatar */}
-        <View style={styles.avatarContainer}>
+        <View style={[styles.avatarContainer, { marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }]}>
           <LinearGradient
             colors={getAvatarGradient(userName)}
             start={{ x: 0, y: 0 }}
@@ -224,7 +225,7 @@ const ConversationItem = React.memo(({
 
               {/* Unread Badge */}
               {hasUnread && (
-                <View style={[styles.badge, { backgroundColor: theme.colors.primary }]}>
+                <View style={[styles.badge, { backgroundColor: theme.colors.primary, marginLeft: isRTL ? 0 : 8, marginRight: isRTL ? 8 : 0 }]}>
                   <Text allowFontScaling={false} style={styles.badgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
                     {unreadCount > 99 ? '99+' : unreadCount}
                   </Text>

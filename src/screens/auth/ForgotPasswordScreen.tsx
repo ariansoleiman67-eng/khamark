@@ -301,12 +301,12 @@ const ForgotPasswordScreen: React.FC = () => {
     try {
       if (resetMethod === 'phone') {
         if (!phone.trim()) {
-          Alert.alert(t('auth.error'), 'Please enter your phone number');
+          Alert.alert(t('auth.error'), t('auth.enterPhone', { defaultValue: 'Enter your phone number' }));
           return;
         }
 
         if (!validatePhone(phone)) {
-          Alert.alert(t('auth.error'), 'Please enter a valid phone number');
+          Alert.alert(t('auth.error'), t('auth.invalidPhone', { defaultValue: 'Please enter a valid phone number' }));
           return;
         }
 
@@ -322,7 +322,9 @@ const ForgotPasswordScreen: React.FC = () => {
         if (!exists) {
           Alert.alert(
             t('auth.error'),
-            'This phone number is not registered. Please check your number or register.'
+            t('auth.forgotPassword.phoneNotRegistered', {
+              defaultValue: 'This phone number is not registered. Please check your number or register.',
+            })
           );
           setLoading(false);
           return;
@@ -334,13 +336,13 @@ const ForgotPasswordScreen: React.FC = () => {
         });
       } else {
         if (!email.trim()) {
-          Alert.alert(t('auth.error'), 'Please enter your email address');
+          Alert.alert(t('auth.error'), t('auth.enterEmail', { defaultValue: 'Enter your email' }));
           return;
         }
 
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email.trim())) {
-          Alert.alert(t('auth.error'), 'Please enter a valid email address');
+          Alert.alert(t('auth.error'), t('auth.invalidEmail', { defaultValue: 'Please enter a valid email address' }));
           return;
         }
 
@@ -361,14 +363,14 @@ const ForgotPasswordScreen: React.FC = () => {
           }),
           [
             {
-              text: 'OK',
+              text: t('common.ok', { defaultValue: 'OK' }),
               onPress: () => navigation.goBack(),
             },
           ]
         );
       }
     } catch (error: any) {
-      Alert.alert(t('auth.error'), error.message || 'Failed to process request');
+      Alert.alert(t('auth.error'), error.message || t('errors.unknown', { defaultValue: 'Something went wrong. Please try again.' }));
     } finally {
       setLoading(false);
       inFlight.current = false;

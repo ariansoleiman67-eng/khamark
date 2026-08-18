@@ -1551,6 +1551,8 @@ const AdminProductsScreen: React.FC = () => {
 
     const stockStatus = statusText;
     const luxuryCardBg = isDark ? theme.colors.surface : '#FFFFFF';
+    // Global auto-RTL is off (App.tsx), so mirror this row off the active language.
+    const cardIsRTL = i18n.language === 'ar' || i18n.language === 'ku';
 
     // Money line + pending-status chip (computed once per card).
     const cost = (item as any).purchasePrice || 0;
@@ -1574,6 +1576,7 @@ const AdminProductsScreen: React.FC = () => {
 
       return (
         <View style={[styles.productCard, {
+          flexDirection: cardIsRTL ? 'row-reverse' : 'row',
           backgroundColor: luxuryCardBg, borderRadius: 16,
           shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
           shadowOpacity: isDark ? 0 : 0.06, shadowRadius: 8, elevation: 2,
@@ -1582,7 +1585,8 @@ const AdminProductsScreen: React.FC = () => {
           <View style={{
             width: 32, height: 32, borderRadius: 10,
             backgroundColor: theme.colors.primary + '18',
-            alignItems: 'center', justifyContent: 'center', marginRight: 8,
+            alignItems: 'center', justifyContent: 'center',
+            marginRight: cardIsRTL ? 0 : 8, marginLeft: cardIsRTL ? 8 : 0,
           }}>
             <Text allowFontScaling={false} style={{ fontSize: 14, fontWeight: '700', color: theme.colors.primary }}>
               {realIndex + 1}
@@ -1602,8 +1606,8 @@ const AdminProductsScreen: React.FC = () => {
           </View>
 
           {/* Name */}
-          <View style={[styles.productInfo, { marginLeft: 8 }]}>
-            <Text allowFontScaling={false} style={[styles.productName, { color: theme.colors.text, fontSize: 14 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+          <View style={[styles.productInfo, { marginLeft: cardIsRTL ? 0 : 8, marginRight: cardIsRTL ? 8 : 0 }]}>
+            <Text allowFontScaling={false} style={[styles.productName, { color: theme.colors.text, fontSize: 14, textAlign: cardIsRTL ? 'right' : 'left' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
               {i18n.language === 'ar' && item.nameAr ? item.nameAr :
                i18n.language === 'ku' && item.nameKu ? item.nameKu :
                item.name}
@@ -1648,6 +1652,7 @@ const AdminProductsScreen: React.FC = () => {
     return (
       <TouchableOpacity
         style={[styles.productCard, {
+          flexDirection: cardIsRTL ? 'row-reverse' : 'row',
           backgroundColor: luxuryCardBg, borderRadius: 16,
           shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
           shadowOpacity: isDark ? 0 : 0.06, shadowRadius: 8, elevation: 2,
@@ -1662,7 +1667,7 @@ const AdminProductsScreen: React.FC = () => {
         activeOpacity={0.7}
       >
         {selectionMode && (
-          <View style={[styles.selCheck, { backgroundColor: selectedIds.has(item.id) ? theme.colors.primary : 'transparent', borderColor: selectedIds.has(item.id) ? theme.colors.primary : theme.colors.border + '99' }]}>
+          <View style={[styles.selCheck, { backgroundColor: selectedIds.has(item.id) ? theme.colors.primary : 'transparent', borderColor: selectedIds.has(item.id) ? theme.colors.primary : theme.colors.border + '99', marginRight: cardIsRTL ? 0 : 8, marginLeft: cardIsRTL ? 8 : 0 }]}>
             {selectedIds.has(item.id) && <Ionicons name="checkmark" size={13} color="#fff" />}
           </View>
         )}
@@ -1677,9 +1682,9 @@ const AdminProductsScreen: React.FC = () => {
           )}
         </View>
 
-        <View style={styles.productInfo}>
+        <View style={[styles.productInfo, { marginLeft: cardIsRTL ? 0 : SPACING.md, marginRight: cardIsRTL ? SPACING.md : 0 }]}>
           <Text allowFontScaling={false} 
-            style={[styles.productName, { color: theme.colors.text }]} 
+            style={[styles.productName, { color: theme.colors.text, textAlign: cardIsRTL ? 'right' : 'left' }]} 
             numberOfLines={2}
             adjustsFontSizeToFit
           >
@@ -1689,7 +1694,7 @@ const AdminProductsScreen: React.FC = () => {
           </Text>
 
           <Text allowFontScaling={false}
-            style={[styles.productPartNumber, { color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }]}
+            style={[styles.productPartNumber, { color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)', textAlign: cardIsRTL ? 'right' : 'left' }]}
             adjustsFontSizeToFit
             numberOfLines={1}
           >
@@ -3354,7 +3359,7 @@ const AdminProductsScreen: React.FC = () => {
                             <TextInput allowFontScaling={false}                              style={[styles.input, { backgroundColor: theme.colors.surface, color: theme.colors.text, paddingHorizontal: 0, minHeight: 48, paddingVertical: 10, minWidth: 60, textAlign: 'center', lineHeight: 22, includeFontPadding: true, fontWeight: Platform.OS === 'android' ? 'normal' : undefined }]}
                               value={variation.sizeValue.toString()}
                               onChangeText={(text) => updateVariationSize(variation.variationId, text)}
-                              placeholder="Size"
+                              placeholder={t('product.size', 'Size')}
                               placeholderTextColor={theme.colors.textSecondary}
                               multiline={false}
                               scrollEnabled={false}

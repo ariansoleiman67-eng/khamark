@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
+import { useTranslation } from 'react-i18next';
 
 // Window size is read per-render via useWindowDimensions, NOT frozen at module
 // scope: a module-level Dimensions.get() is evaluated once at import, so after a
@@ -34,6 +35,7 @@ const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
   imageUrl,
   onClose,
 }) => {
+  const { t } = useTranslation();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [saving, setSaving] = React.useState(false);
@@ -50,13 +52,13 @@ const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
       if (isAvailable) {
         await Sharing.shareAsync(localUri, {
           mimeType: 'image/jpeg',
-          dialogTitle: 'Share Image',
+          dialogTitle: t('imageViewer.shareTitle'),
         });
       } else {
-        Alert.alert('Sharing not available on this device');
+        Alert.alert(t('imageViewer.sharingUnavailable'));
       }
     } catch {
-      Alert.alert('Error', 'Failed to share image');
+      Alert.alert(t('common.error'), t('imageViewer.shareFailed'));
     } finally {
       setSaving(false);
     }
@@ -77,7 +79,7 @@ const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
             const base64 = await FileSystem.readAsStringAsync(localUri, { encoding: 'base64' });
             const savedUri = await FileSystem.StorageAccessFramework.createFileAsync(permissions.directoryUri, filename, 'image/jpeg');
             await FileSystem.writeAsStringAsync(savedUri, base64, { encoding: 'base64' });
-            Alert.alert('✅ Saved', 'Image saved successfully');
+            Alert.alert(`✅ ${t('imageViewer.saved')}`, t('imageViewer.savedMessage'));
             return;
           } else {
             // User cancelled folder selection
@@ -95,7 +97,7 @@ const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         await Sharing.shareAsync(localUri, { mimeType: 'image/jpeg' });
       }
     } catch {
-      Alert.alert('Error', 'Failed to save image');
+      Alert.alert(t('common.error'), t('imageViewer.saveFailed'));
     } finally {
       setSaving(false);
     }

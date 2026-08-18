@@ -253,7 +253,7 @@ const AdminSettingsScreen: React.FC = () => {
 
   const handleConfirmSetup = async () => {
     if (!storeName.trim()) {
-      Alert.alert('Error', 'Please enter a store name');
+      Alert.alert(t('common.error'), t('auth.adminSetup.requireStoreName'));
       return;
     }
     setUpgrading(true);
@@ -282,10 +282,10 @@ const AdminSettingsScreen: React.FC = () => {
         await storeProfileService.updateStoreProfile(tenantId!, { coverUrl: result.url });
         setStoreProfile(prev => prev ? ({ ...prev, coverUrl: result.url }) : ({ coverUrl: result.url } as any));
       } else {
-        Alert.alert(t('common.error'), 'Failed to upload cover');
+        Alert.alert(t('common.error'), t('admin.storeProfile.coverUploadFailed'));
       }
     } catch (e) {
-      Alert.alert(t('common.error'), 'Failed to update cover');
+      Alert.alert(t('common.error'), t('admin.storeProfile.coverUpdateFailed'));
     } finally {
       setUploadingCover(false);
     }
@@ -301,10 +301,10 @@ const AdminSettingsScreen: React.FC = () => {
         await storeProfileService.updateStoreProfile(tenantId!, { logoUrl: result.url });
         setStoreProfile(prev => prev ? ({ ...prev, logoUrl: result.url }) : ({ logoUrl: result.url } as any));
       } else {
-        Alert.alert(t('common.error'), 'Failed to upload logo');
+        Alert.alert(t('common.error'), t('admin.storeProfile.logoUploadFailed'));
       }
     } catch (e) {
-      Alert.alert(t('common.error'), 'Failed to update logo');
+      Alert.alert(t('common.error'), t('admin.storeProfile.logoUpdateFailed'));
     } finally {
       setUploadingLogo(false);
     }
@@ -312,7 +312,7 @@ const AdminSettingsScreen: React.FC = () => {
 
   const handleSyncProducts = async () => {
     if (!user?.uid) {
-      Alert.alert(t('common.error'), 'User not authenticated');
+      Alert.alert(t('common.error'), t('auth.userNotAuthenticated'));
       return;
     }
     setSyncing(true);
@@ -324,7 +324,7 @@ const AdminSettingsScreen: React.FC = () => {
         t('admin.settings.syncSuccess', { count }) || `Synced ${count} products successfully!`
       );
     } catch (error: any) {
-      Alert.alert(t('common.error'), error.message || 'Failed to sync products');
+      Alert.alert(t('common.error'), error.message || t('admin.settings.syncFailed'));
     } finally {
       setSyncing(false);
     }
@@ -353,13 +353,13 @@ const AdminSettingsScreen: React.FC = () => {
       
       // Share file
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(fileUri, { mimeType: 'application/json', dialogTitle: 'Export Store Data' });
+        await Sharing.shareAsync(fileUri, { mimeType: 'application/json', dialogTitle: t('admin.settings.exportData') });
       } else {
-        Alert.alert('Error', 'Sharing is not available on this device');
+        Alert.alert(t('common.error'), t('admin.settings.sharingUnavailable'));
       }
       
     } catch (error: any) {
-      Alert.alert('Export Failed', error.message || 'An error occurred while exporting data.');
+      Alert.alert(t('admin.settings.exportFailed'), error.message || t('admin.settings.exportFailedMessage'));
     } finally {
       setExporting(false);
     }
@@ -441,7 +441,7 @@ const AdminSettingsScreen: React.FC = () => {
     } catch (error: any) {
       Alert.alert(
         t('common.error'),
-        error.message || 'Failed to delete account'
+        error.message || t('admin.settings.deleteFailed')
       );
       setDeleting(false);
     }

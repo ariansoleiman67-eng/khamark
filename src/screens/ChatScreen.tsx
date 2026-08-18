@@ -1207,7 +1207,7 @@ const ChatScreen = (props: any) => {
     const wa = isAdminView ? targetPhone : (storeProfile?.whatsapp || storeProfile?.phone);
     const phone = normalizePhoneForWhatsApp(wa);
     if (!phone) return;
-    const msg = encodeURIComponent(isAdminView ? '' : 'Hello 👋');
+    const msg = encodeURIComponent(isAdminView ? '' : t('chat.whatsappGreeting'));
     const native = `whatsapp://send?phone=${phone}&text=${msg}`;
     const web = `https://wa.me/${phone.replace('+', '')}?text=${msg}`;
     Linking.openURL(native).catch(() => Linking.openURL(web).catch(() => {}));
@@ -1454,7 +1454,7 @@ const ChatScreen = (props: any) => {
       setPreviewCaption('');
       setPreviewVisible(true);
     } catch {
-      Alert.alert(t('common.error'), 'Failed to pick image');
+      Alert.alert(t('common.error'), t('chat.errors.pickImage'));
     }
   };
 
@@ -1467,7 +1467,7 @@ const ChatScreen = (props: any) => {
       setPreviewCaption('');
       setPreviewVisible(true);
     } catch {
-      Alert.alert(t('common.error'), 'Failed to capture photo');
+      Alert.alert(t('common.error'), t('chat.errors.capturePhoto'));
     }
   };
 
@@ -1513,10 +1513,10 @@ const ChatScreen = (props: any) => {
         setMessages((prev) => prev.filter(m => m.id !== tempId));
       } else {
         setMessages((prev) => prev.map(m => m.id === tempId ? { ...m, status: 'failed' } : m));
-        Alert.alert(t('common.error'), result.error || 'Failed to upload image');
+        Alert.alert(t('common.error'), result.error || t('chat.errors.uploadImage'));
       }
     } catch {
-      Alert.alert(t('common.error'), 'Failed to send image');
+      Alert.alert(t('common.error'), t('chat.errors.sendImage'));
     } finally {
       sendingPreviewRef.current = false;
     }
@@ -1591,13 +1591,13 @@ const ChatScreen = (props: any) => {
         );
         requestAnimationFrame(() => listRef.current?.scrollToOffset({ offset: 0, animated: true }));
       } else {
-        Alert.alert(t('common.error'), uploadResult.error || 'Failed to upload file');
+        Alert.alert(t('common.error'), uploadResult.error || t('chat.errors.uploadFile'));
       }
     } catch (err: any) {
       if (__DEV__) console.warn('Document pick error:', err);
       Alert.alert(
         t('common.error'),
-        err?.message || 'Failed to pick document'
+        err?.message || t('chat.errors.pickDocument')
       );
     } finally {
       setAttaching(false);
@@ -1626,7 +1626,7 @@ const ChatScreen = (props: any) => {
       const permission = await requestRecordingPermissionsAsync();
       if (!permission.granted) {
         setIsRecording(false);
-        Alert.alert(t('common.error'), 'Microphone permission is required to send voice messages');
+        Alert.alert(t('common.error'), t('chat.errors.micPermission'));
         isRecordingIntentRef.current = false;
         return;
       }
@@ -1666,7 +1666,7 @@ const ChatScreen = (props: any) => {
     } catch (err) {
       console.error('Failed to start recording', err);
       setIsRecording(false);
-      Alert.alert(t('common.error'), 'Failed to start recording');
+      Alert.alert(t('common.error'), t('chat.errors.startRecording'));
       isRecordingIntentRef.current = false;
     }
   };
@@ -1749,12 +1749,12 @@ const ChatScreen = (props: any) => {
         );
         requestAnimationFrame(() => listRef.current?.scrollToOffset({ offset: 0, animated: true }));
       } else {
-        Alert.alert(t('common.error'), uploadResult.error || 'Failed to send voice message');
+        Alert.alert(t('common.error'), uploadResult.error || t('chat.errors.sendVoice'));
       }
 
     } catch (err) {
       console.error('Failed to send recording', err);
-      Alert.alert(t('common.error'), 'Failed to send voice message');
+      Alert.alert(t('common.error'), t('chat.errors.sendVoice'));
     } finally {
       setIsUploadingVoice(false);
     }
@@ -2058,7 +2058,7 @@ const ChatScreen = (props: any) => {
 
                             setProductInfoSent(true); // Hide product card after sending
                         } catch (e) {
-                            Alert.alert(t('common.error'), 'Failed to send product');
+                            Alert.alert(t('common.error'), t('chat.errors.sendProductFailed'));
                         }
                     }}
                     style={{ 
@@ -2317,7 +2317,7 @@ const ChatScreen = (props: any) => {
                 contentContainerStyle={{ gap: 8, paddingRight: 16 }}
                 keyboardShouldPersistTaps="always"
               >
-                 {["Hello! 👋", "Yes, it is available ✨", "Please place your order 🛒", "We can offer a discount 🎉", "Let me check the stock 📦"].map((reply, idx) => (
+                 {[t('chat.quickReplies.hello'), t('chat.quickReplies.available'), t('chat.quickReplies.placeOrder'), t('chat.quickReplies.discount'), t('chat.quickReplies.checkStock')].map((reply, idx) => (
                      <TouchableOpacity
                         key={idx}
                         onPress={() => setText(reply)}

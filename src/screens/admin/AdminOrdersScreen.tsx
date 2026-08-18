@@ -220,7 +220,7 @@ const AdminOrdersScreen: React.FC = () => {
       // `total - (-500)` then INFLATED the outstanding balance by 500 across the
       // Unpaid tab, the cash-owed tile and the invoice's Remaining Due.
       if (!Number.isFinite(inputVal) || inputVal < 0) {
-        Alert.alert(t('admin.common.error', { defaultValue: 'Error' }), 'Enter a valid, non-negative amount.');
+        Alert.alert(t('admin.common.error', { defaultValue: 'Error' }), t('admin.orders.invalidAmountPaid', { defaultValue: 'Enter a valid, non-negative amount.' }));
         return;
       }
       let newAmountUSD = inputVal;
@@ -241,7 +241,7 @@ const AdminOrdersScreen: React.FC = () => {
       // Block overpayment. The totalUSD is the source of truth.
       const totalUSD = selectedOrder.totalUSD || 0;
       if (newAmountUSD > totalUSD) {
-        Alert.alert(t('admin.common.error', { defaultValue: 'Error' }), 'Amount paid cannot exceed the total order amount.');
+        Alert.alert(t('admin.common.error', { defaultValue: 'Error' }), t('admin.orders.overpayment', { defaultValue: 'Amount paid cannot exceed the total order amount.' }));
         return;
       }
 
@@ -253,9 +253,9 @@ const AdminOrdersScreen: React.FC = () => {
         o.id === selectedOrder.id ? { ...o, amountPaidUSD: newAmountUSD } : o
       ));
       setSelectedOrder(prev => prev ? { ...prev, amountPaidUSD: newAmountUSD } : null);
-      Alert.alert(t('admin.common.success'), 'Payment updated successfully');
+      Alert.alert(t('admin.common.success'), t('admin.orders.paymentUpdated', { defaultValue: 'Payment updated successfully' }));
     } catch (error) {
-      Alert.alert(t('admin.common.error'), 'Failed to update payment');
+      Alert.alert(t('admin.common.error'), t('admin.orders.updatePaymentFailed', { defaultValue: 'Failed to update payment status' }));
     } finally {
       setUpdating(false);
       orderWriteRef.current = false;
@@ -311,9 +311,9 @@ const AdminOrdersScreen: React.FC = () => {
         o.id === selectedOrder.id ? { ...o, amountPaidUSD: newAmountUSD } : o
       ));
       setSelectedOrder(prev => prev ? { ...prev, amountPaidUSD: newAmountUSD } : null);
-      Alert.alert(t('admin.common.success', { defaultValue: 'Success' }), 'Order marked as paid in full');
+      Alert.alert(t('admin.common.success', { defaultValue: 'Success' }), t('admin.orders.markedPaidInFull', { defaultValue: 'Order marked as paid in full' }));
     } catch (error) {
-      Alert.alert(t('admin.common.error', { defaultValue: 'Error' }), 'Failed to update payment');
+      Alert.alert(t('admin.common.error', { defaultValue: 'Error' }), t('admin.orders.updatePaymentFailed', { defaultValue: 'Failed to update payment status' }));
     } finally {
       setUpdating(false);
     }
@@ -656,13 +656,13 @@ const AdminOrdersScreen: React.FC = () => {
           // If we are just changing status to shipped, we might want to check if tracking URL exists on order.
           const trackUrl = trackingUrl || order.trackingUrl || '';
 
-          let msgText = `📦 Order ${orderNum} has been SHIPPED!\n\n💰 Total Amount: ${totalStr}`;
+          let msgText = `${t('admin.orders.shippedMsgHeader', { order: orderNum, defaultValue: '📦 Order {{order}} has been shipped!' })}\n\n${t('admin.orders.shippedMsgTotal', { total: totalStr, defaultValue: '💰 Total Amount: {{total}}' })}`;
 
           if (trackUrl) {
-            msgText += `\n\n📍 Track your order: ${trackUrl}`;
+            msgText += `\n\n${t('admin.orders.shippedMsgTrack', { url: trackUrl, defaultValue: '📍 Track your order: {{url}}' })}`;
           }
 
-          msgText += `\n\nThank you for your business!`;
+          msgText += `\n\n${t('admin.orders.shippedMsgThanks', { defaultValue: 'Thank you for your business!' })}`;
 
           // 3. Send message
           // CORRECTED ARGUMENTS: conversationId, text, senderId, senderType, senderName, attachmentUrl
@@ -731,7 +731,7 @@ const AdminOrdersScreen: React.FC = () => {
             firstItem?.productSnapshot
           );
         } else {
-          Alert.alert(t('admin.common.error'), "Cannot verify admin identity.");
+          Alert.alert(t('admin.common.error'), t('admin.orders.cannotVerifyAdmin', { defaultValue: 'Cannot verify admin identity.' }));
           setMessagingCustomer(false);
           return;
         }
@@ -750,16 +750,16 @@ const AdminOrdersScreen: React.FC = () => {
           try {
             const totalStr = selectedOrder.totalUSD != null ? formatPrice(selectedOrder.totalUSD, selectedOrder.currency, selectedOrder.exchangeRate) : 'N/A';
             const orderNum = selectedOrder.orderNumber?.replace(/ORD/g, '')?.replace(/#/g, '')?.replace(/-/g, '') || 'N/A';
-            let msgText = `📦 Order ${orderNum} has been SHIPPED!\n\n💰 Total Amount: ${totalStr}`;
+            let msgText = `${t('admin.orders.shippedMsgHeader', { order: orderNum, defaultValue: '📦 Order {{order}} has been shipped!' })}\n\n${t('admin.orders.shippedMsgTotal', { total: totalStr, defaultValue: '💰 Total Amount: {{total}}' })}`;
 
             // If it's a Google Maps link, use a slightly different label
             if (trackUrl.includes('google.com/maps')) {
-              msgText += `\n\n📍 Delivery Location: ${trackUrl}`;
+              msgText += `\n\n${t('admin.orders.shippedMsgLocation', { url: trackUrl, defaultValue: '📍 Delivery Location: {{url}}' })}`;
             } else {
-              msgText += `\n\n📍 Track your order: ${trackUrl}`;
+              msgText += `\n\n${t('admin.orders.shippedMsgTrack', { url: trackUrl, defaultValue: '📍 Track your order: {{url}}' })}`;
             }
 
-            msgText += `\n\nThank you for your business!`;
+            msgText += `\n\n${t('admin.orders.shippedMsgThanks', { defaultValue: 'Thank you for your business!' })}`;
 
             await sendMessage(
               conversation.id,
@@ -780,7 +780,7 @@ const AdminOrdersScreen: React.FC = () => {
           conversationId: conversation.id,
           adminId: propsUser?.uid,
           productId: firstItem?.productId,
-          productName: firstItem?.productName || 'Order Chat',
+          productName: firstItem?.productName || t('admin.orders.orderChat', { defaultValue: 'Order Chat' }),
           productImage: firstItem?.imageUrl || firstItem?.productSnapshot?.imageUrl,
           targetName: selectedOrder.shippingAddress?.fullName || (selectedOrder as any).customerName || t('chat.customer', 'Customer'),
           targetPhone: selectedOrder.shippingAddress?.phone || (selectedOrder as any).customerPhone || '',
@@ -1272,7 +1272,7 @@ const AdminOrdersScreen: React.FC = () => {
         await Print.printAsync({ uri });
       }
     } catch (error) {
-      Alert.alert(t('admin.common.error'), 'Failed to generate invoice');
+      Alert.alert(t('admin.common.error'), t('admin.orders.invoiceFailed', { defaultValue: 'Failed to generate invoice' }));
     } finally {
       printingRef.current = false;
     }
@@ -2080,7 +2080,7 @@ const AdminOrdersScreen: React.FC = () => {
                       style={[styles.copyShippingButton, { backgroundColor: theme.colors.primary + '1A' }]}
                       onPress={() => {
                         const info = selectedOrder.shippingOfficeInfo;
-                        const text = `Shipping Information Office:\nRecipient: ${info?.recipientName}\nMobile: ${info?.mobileNumber}\nOffice: ${info?.officeName}\nPhone: ${info?.officePhone}`;
+                        const text = `${t('shippingInfo.title', { defaultValue: 'Shipping Information Office' })}:\n${t('shippingInfo.recipientName', { defaultValue: 'Recipient Name' })}: ${info?.recipientName}\n${t('shippingInfo.mobileNumber', { defaultValue: 'Mobile Number' })}: ${info?.mobileNumber}\n${t('shippingInfo.officeName', { defaultValue: 'Shipping Office Name' })}: ${info?.officeName}\n${t('shippingInfo.officePhone', { defaultValue: 'Shipping Office Phone' })}: ${info?.officePhone}`;
                         Alert.alert(
                           t('admin.orders.shippingOfficeCopied', { defaultValue: 'Shipping Office Info' }),
                           text,
@@ -2151,7 +2151,7 @@ const AdminOrdersScreen: React.FC = () => {
                       style={[styles.copyShippingButton, { backgroundColor: theme.colors.warning + '1A' }]}
                       onPress={() => {
                         const info = (selectedOrder as any).moneyExchangerInfo;
-                        const text = `Money Transfer Details:\nOffice: ${info?.officeName}\nOffice Phone: ${info?.officePhone}\nReceiver Name: ${info?.receiverName}\nReceiver Phone: ${info?.receiverPhone}\nTotal Amount: ${info?.totalAmount != null ? formatPrice(Number(info.totalAmount), selectedOrder?.currency, selectedOrder?.exchangeRate) : ''}`;
+                        const text = `${t('checkout.moneyExchangerDetails', { defaultValue: 'Money Transfer Details' })}:\n${t('checkout.exchangeOfficeName', { defaultValue: 'Office Name' })}: ${info?.officeName}\n${t('checkout.exchangeOfficePhone', { defaultValue: 'Office Phone' })}: ${info?.officePhone}\n${t('checkout.receiverName', { defaultValue: 'Receiver Name' })}: ${info?.receiverName}\n${t('checkout.receiverPhone', { defaultValue: 'Receiver Phone' })}: ${info?.receiverPhone}\n${t('checkout.totalAmount', { defaultValue: 'Total Amount' })}: ${info?.totalAmount != null ? formatPrice(Number(info.totalAmount), selectedOrder?.currency, selectedOrder?.exchangeRate) : ''}`;
                         Alert.alert(
                           t('checkout.moneyExchangerDetails', { defaultValue: 'Money Transfer Details' }),
                           text,
@@ -2274,7 +2274,7 @@ const AdminOrdersScreen: React.FC = () => {
                               );
 
                               const orderNum = selectedOrder.orderNumber?.replace(/ORD/g, '').replace(/#/g, '').replace(/-/g, '') || 'N/A';
-                              const msgText = `📦 Order ${orderNum} has been shipped!\n\n📍 Track your order: ${trackingUrl}\n\nThank you for your business!`;
+                              const msgText = `${t('admin.orders.shippedMsgHeader', { order: orderNum, defaultValue: '📦 Order {{order}} has been shipped!' })}\n\n${t('admin.orders.shippedMsgTrack', { url: trackingUrl, defaultValue: '📍 Track your order: {{url}}' })}\n\n${t('admin.orders.shippedMsgThanks', { defaultValue: 'Thank you for your business!' })}`;
 
                               await sendMessage(
                                 conversation.id,
@@ -2288,9 +2288,9 @@ const AdminOrdersScreen: React.FC = () => {
                             }
                           }
 
-                          Alert.alert(t('admin.common.success'), 'Tracking URL saved');
+                          Alert.alert(t('admin.common.success'), t('admin.orders.trackingUrlSaved', { defaultValue: 'Tracking URL saved' }));
                         } catch (error) {
-                          Alert.alert(t('admin.common.error'), 'Failed to save tracking URL');
+                          Alert.alert(t('admin.common.error'), t('admin.orders.trackingUrlSaveFailed', { defaultValue: 'Failed to save tracking URL' }));
                         } finally {
                           setUpdating(false);
                           orderWriteRef.current = false;
@@ -2743,7 +2743,7 @@ const AdminOrdersScreen: React.FC = () => {
             <>
               <TouchableOpacity
                 onPress={() => navigation.goBack()}
-                style={{ position: 'absolute', top: insets.top + 8, left: 12, zIndex: 20, width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: isDark ? theme.colors.surface : '#fff', elevation: 4 }}
+                style={{ position: 'absolute', top: insets.top + 8, ...(isRTL ? { right: 12 } : { left: 12 }), zIndex: 20, width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: isDark ? theme.colors.surface : '#fff', elevation: 4 }}
               >
                 <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={22} color={theme.colors.text} />
               </TouchableOpacity>

@@ -321,10 +321,10 @@ const AdminStoreProfileScreen: React.FC = () => {
         setProfile(prev => ({ ...prev, logoUrl: result.url }));
         Alert.alert(t('common.success'), t('admin.storeProfile.logoUploaded', { defaultValue: 'Logo uploaded successfully' }));
       } else {
-        Alert.alert(t('common.error'), result.error || 'Failed to upload logo');
+        Alert.alert(t('common.error'), result.error || t('alerts.failedUpload'));
       }
     } catch (error: any) {
-      Alert.alert(t('common.error'), error.message || 'Failed to upload logo');
+      Alert.alert(t('common.error'), error.message || t('alerts.failedUpload'));
     } finally {
       setSaving(false);
     }
@@ -358,10 +358,10 @@ const AdminStoreProfileScreen: React.FC = () => {
         });
         Alert.alert(t('common.success'), t('admin.storeProfile.coverUploaded', { defaultValue: 'Image uploaded successfully' }));
       } else {
-        Alert.alert(t('common.error'), result.error || 'Failed to upload image');
+        Alert.alert(t('common.error'), result.error || t('alerts.failedUpload'));
       }
     } catch (error: any) {
-      Alert.alert(t('common.error'), error.message || 'Failed to upload image');
+      Alert.alert(t('common.error'), error.message || t('alerts.failedUpload'));
     } finally {
       setSaving(false);
     }
@@ -423,7 +423,7 @@ const AdminStoreProfileScreen: React.FC = () => {
   
   const handleSave = async () => {
     if (!tenantId || !user?.uid) {
-      Alert.alert(t('common.error'), 'Tenant not found');
+      Alert.alert(t('common.error'), t('admin.storeProfile.tenantNotFound', { defaultValue: 'Your store is still loading. Please go back and try again.' }));
       return;
     }
     
@@ -494,7 +494,7 @@ const AdminStoreProfileScreen: React.FC = () => {
       navigation.goBack();
     } catch (error: any) {
       console.error('Error saving store profile:', error);
-      Alert.alert(t('common.error'), error.message || 'Failed to save store profile');
+      Alert.alert(t('common.error'), error.message || t('admin.storeProfile.saveFailed', { defaultValue: 'Failed to save store profile' }));
     } finally {
       setSaving(false);
     }
@@ -503,7 +503,7 @@ const AdminStoreProfileScreen: React.FC = () => {
   const getLocalizedLocationName = (location: StoreLocation): string => {
     if (i18n.language === 'ar' && location.nameAr) return location.nameAr;
     if (i18n.language === 'ku' && location.nameKu) return location.nameKu;
-    return location.name || location.address || 'Unnamed Location';
+    return location.name || location.address || t('admin.storeProfile.unnamedLocation', { defaultValue: 'Unnamed location' });
   };
   
   const selectedLocation = locations.find(l => l.id === selectedLocationId);
@@ -795,7 +795,7 @@ const AdminStoreProfileScreen: React.FC = () => {
               label={t('admin.storeProfile.wechatId', { defaultValue: 'WeChat ID / Link' })}
               value={profile.wechatId}
               onChangeText={(text) => handleChange('wechatId', text)}
-              placeholder="WeChat ID or profile link"
+              placeholder={t('admin.storeProfile.wechatIdPlaceholder', { defaultValue: 'WeChat ID or profile link' })}
               autoCapitalize="none"
               containerStyle={styles.input}
             />
@@ -818,10 +818,10 @@ const AdminStoreProfileScreen: React.FC = () => {
                       setProfile(prev => ({ ...prev, wechat: result.url }));
                       Alert.alert(t('common.success'), t('admin.storeProfile.wechatUploaded', { defaultValue: 'WeChat QR code uploaded successfully' }));
                     } else {
-                      Alert.alert(t('common.error'), result.error || 'Failed to upload QR code');
+                      Alert.alert(t('common.error'), result.error || t('alerts.failedUpload'));
                     }
                   } catch (error: any) {
-                    Alert.alert(t('common.error'), error.message || 'Failed to upload QR code');
+                    Alert.alert(t('common.error'), error.message || t('alerts.failedUpload'));
                   } finally {
                     setSaving(false);
                   }
@@ -1050,7 +1050,7 @@ const AdminStoreProfileScreen: React.FC = () => {
             {/* Custom Day Selector */}
             {getClosedDaysMode() === 'custom' && (
               <View style={[styles.daysContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => {
+                {['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((day, index) => {
                   const isSelected = (profile.closedDays || []).includes(index);
                   return (
                     <TouchableOpacity
@@ -1064,11 +1064,15 @@ const AdminStoreProfileScreen: React.FC = () => {
                       ]}
                       onPress={() => toggleClosedDay(index)}
                     >
-                      <AppText style={{ 
-                        color: isSelected ? 'white' : theme.colors.text,
-                        fontWeight: 'bold'
-                      }}>
-                        {day}
+                      <AppText 
+                        adjustsFontSizeToFit
+                        numberOfLines={1}
+                        minimumFontScale={0.7}
+                        style={{ 
+                          color: isSelected ? 'white' : theme.colors.text,
+                          fontWeight: 'bold'
+                        }}>
+                        {t(`admin.days.short.${day}`)}
                       </AppText>
                     </TouchableOpacity>
                   );

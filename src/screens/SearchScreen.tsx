@@ -711,7 +711,7 @@ const SearchScreen: React.FC = () => {
         </TouchableOpacity>
         
         <Text allowFontScaling={false} style={[styles.headerTitle, { color: theme.colors.text }]}>
-          {preSelectedCategory ? preSelectedCategory : t('search.title')}
+          {preSelectedCategory ? translateCategory(preSelectedCategory) : t('search.title')}
         </Text>
       </View>
 

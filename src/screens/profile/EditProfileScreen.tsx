@@ -125,7 +125,9 @@ type SheetMode = 'name' | null;
 
 // ---- Validation Schemas ----
 const nameSchema = z.object({
-  fullName: z.string().min(2, 'Name must be at least 2 characters').max(100)
+  // Messages are i18n keys — the sheet translates them at render time (schema is
+  // module-level, so t() is not available here).
+  fullName: z.string().min(2, 'profile.nameTooShort').max(100, 'profile.nameTooLong')
 });
 type NameFormData = z.infer<typeof nameSchema>;
 
@@ -231,7 +233,7 @@ const EditProfileScreen: React.FC = () => {
             await refreshUser();
           }
         } else {
-          Alert.alert(t('common.error'), upload.error || 'Upload failed');
+          Alert.alert(t('common.error'), upload.error || t('alerts.failedUpload'));
         }
         setUploadingImage(false);
       }
@@ -455,7 +457,7 @@ const EditProfileScreen: React.FC = () => {
           />
           {nameErrors.fullName && (
             <Text allowFontScaling={false} style={{ color: theme.colors.error, fontSize: 13, marginTop: 6, marginLeft: 4, textAlign: isRTL ? 'right' : 'left' }}>
-              {nameErrors.fullName.message}
+              {nameErrors.fullName.message ? t(nameErrors.fullName.message) : ''}
             </Text>
           )}
 

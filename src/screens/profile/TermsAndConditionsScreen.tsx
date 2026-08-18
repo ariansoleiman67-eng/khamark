@@ -346,7 +346,7 @@ Last Updated: January 2025`
                 marginBottom: SPACING.sm,
                 textAlign: 'center',
               }}>
-                Your Rights Protected
+                {t('profile.termsFooterTitle', { defaultValue: 'Your Rights Protected' })}
               </Text>
               <Text allowFontScaling={false} style={{
                 fontSize: 14,
@@ -355,7 +355,7 @@ Last Updated: January 2025`
                 lineHeight: 20,
                 marginBottom: SPACING.md,
               }}>
-                These terms are designed to protect both customers and our business while ensuring fair, transparent transactions.
+                {t('profile.termsFooterBody', { defaultValue: 'These terms are designed to protect both customers and our business while ensuring fair, transparent transactions.' })}
               </Text>
               <Text allowFontScaling={false} style={{
                 fontSize: 12,
@@ -363,8 +363,8 @@ Last Updated: January 2025`
                 textAlign: 'center',
               }}>
                 {brandContact(BRAND.contactEmail)
-                  ? `Questions? Contact us at ${brandContact(BRAND.contactEmail)}`
-                  : 'Questions? Reach us through Help & Support in the app.'}
+                  ? t('profile.termsFooterContact', { defaultValue: 'Questions? Contact us at {{email}}', email: brandContact(BRAND.contactEmail) })
+                  : t('profile.termsFooterContactFallback', { defaultValue: 'Questions? Reach us through Help & Support in the app.' })}
               </Text>
             </View>
           </View>

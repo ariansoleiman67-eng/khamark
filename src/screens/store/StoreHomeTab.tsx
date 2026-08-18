@@ -103,7 +103,7 @@ const StoreHomeTab: React.FC<StoreHomeTabProps & { onSwitchTab?: (tabName: strin
             style={styles.productImageOverlay}
           />
           {/* Price badge */}
-          <View style={styles.priceBadge}>
+          <View style={[styles.priceBadge, isRTL && { left: undefined, right: 8 }]}>
             <Text allowFontScaling={false} 
               style={styles.priceBadgeText}
               numberOfLines={1}
@@ -262,21 +262,11 @@ const StoreHomeTab: React.FC<StoreHomeTabProps & { onSwitchTab?: (tabName: strin
                 metadata; restore this only when real ratings exist to average.
                 statCard is flex:1, so the remaining cards simply widen. */}
 
-            {/* Years in business */}
-            <View style={[styles.statCard, { backgroundColor: isDark ? 'rgba(79,172,254,0.15)' : 'rgba(79,172,254,0.1)' }]}>
-              <LinearGradient
-                colors={TEAL_GRADIENT}
-                style={styles.statIconWrapper}
-              >
-                <Ionicons name="trophy" size={18} color="#fff" />
-              </LinearGradient>
-              <Text allowFontScaling={false} style={[styles.statValue, { color: theme.colors.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
-                10+
-              </Text>
-              <Text allowFontScaling={false} style={[styles.statLabel, { color: theme.colors.textSecondary }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
-                {t('store.years', 'Years')}
-              </Text>
-            </View>
+            {/* A "10+ Years" card used to sit here, hardcoded on every store page.
+                StoreProfile has no founded/established field, so the decade was
+                invented — a shop that signed up yesterday advertised ten years of
+                trading. Same fabricated-social-proof defect as the rating card
+                above; restore this only when the profile records a founding date. */}
           </View>
         </View>
 

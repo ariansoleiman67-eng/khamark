@@ -130,7 +130,7 @@ const ReauthModal = forwardRef<ReauthModalHandle>((_, ref) => {
   const handlePasswordSubmit = async () => {
     if (loading) return; // Prevent double-tap
     if (!password.trim()) {
-      setError('Please enter your password');
+      setError(t('confirmIdentity.enterPasswordError', { defaultValue: 'Please enter your password' }));
       return;
     }
     setLoading(true);
@@ -144,9 +144,9 @@ const ReauthModal = forwardRef<ReauthModalHandle>((_, ref) => {
       rejectRef.current = null;
     } catch (e: any) {
       if (e?.code === 'auth/wrong-password' || e?.code === 'auth/invalid-credential') {
-        setError('Incorrect password. Please try again.');
+        setError(t('auth.wrongPassword', { defaultValue: 'Incorrect password. Please try again.' }));
       } else {
-        setError(e?.message || 'Authentication failed');
+        setError(e?.message || t('confirmIdentity.authFailed', { defaultValue: 'Authentication failed' }));
       }
     } finally {
       // Use ref-based check instead of stale `visible` closure
@@ -180,7 +180,7 @@ const ReauthModal = forwardRef<ReauthModalHandle>((_, ref) => {
         handleCancel();
         return;
       }
-      setError(e?.message || 'Apple authentication failed');
+      setError(e?.message || t('profile.accountSecurity.reauth.appleFailed', { defaultValue: 'Apple authentication failed' }));
     } finally {
       // Use ref-based check instead of stale `visible` closure
       if (resolveRef.current && rejectRef.current) {
@@ -246,7 +246,7 @@ const ReauthModal = forwardRef<ReauthModalHandle>((_, ref) => {
                 <Ionicons name="lock-closed-outline" size={18} color={mutedColor} style={styles.inputIcon} />
                 <TextInput allowFontScaling={false}
                   style={[styles.input, { color: textColor }]}
-                  placeholder="Enter your password"
+                  placeholder={t('auth.enterPassword', { defaultValue: 'Enter your password' })}
                   placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : LUX.placeholder}
                   secureTextEntry={!showPassword}
                   value={password}
@@ -294,7 +294,7 @@ const ReauthModal = forwardRef<ReauthModalHandle>((_, ref) => {
               ) : (
                 <>
                   <Ionicons name="logo-apple" size={20} color="#FFF" />
-                  <Text allowFontScaling={false} style={styles.appleButtonText}>Continue with Apple</Text>
+                  <Text allowFontScaling={false} style={styles.appleButtonText}>{t('auth.continueWithApple', { defaultValue: 'Continue with Apple' })}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -305,7 +305,7 @@ const ReauthModal = forwardRef<ReauthModalHandle>((_, ref) => {
             <View style={[styles.fallbackBox, { backgroundColor: isDark ? 'rgba(255,118,34,0.1)' : '#FFF8F2' }]}>
               <Ionicons name="information-circle-outline" size={18} color={LUX.accent} />
               <Text allowFontScaling={false} style={[styles.fallbackText, { color: mutedColor }]}>
-                For security, please sign out and sign back in, then try again.
+                {t('profile.accountSecurity.reauth.signoutFallback', { defaultValue: 'For security, please sign out and sign back in, then try again.' })}
               </Text>
             </View>
           )}

@@ -1,6 +1,9 @@
 import React, { Component, ReactNode } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+// Class component, so no hooks: translate through the i18next instance directly.
+// i18next is initialised at import time (src/locales), not inside the provider tree.
+import i18n from '../locales';
 
 interface Props {
   children: ReactNode;
@@ -44,7 +47,10 @@ class ErrorBoundary extends Component<Props, State> {
   handleReportError = () => {
     if (!__DEV__) {
       // Never surface raw error message/stack to end users in production.
-      Alert.alert('Something went wrong', 'Please try again. If the problem persists, contact support.');
+      Alert.alert(
+        i18n.t('common.somethingWentWrong', { defaultValue: 'Something went wrong' }),
+        i18n.t('errors.persistContactSupport', { defaultValue: 'Please try again. If the problem persists, contact support.' })
+      );
       return;
     }
     const errorMessage = this.state.error?.message || 'Unknown error';
@@ -73,18 +79,20 @@ class ErrorBoundary extends Component<Props, State> {
             <Ionicons name="alert-circle-outline" size={80} color="#FF6B6B" />
           </View>
           
-          <Text allowFontScaling={false} style={styles.title}>Oops! Something went wrong</Text>
+          <Text allowFontScaling={false} style={styles.title}>
+            {i18n.t('common.somethingWentWrong', { defaultValue: 'Something went wrong' })}
+          </Text>
           <Text allowFontScaling={false} style={styles.subtitle}>
-            We encountered an unexpected error. This has been logged and we'll look into it.
+            {i18n.t('errors.unexpectedLogged', { defaultValue: "We encountered an unexpected error. This has been logged and we'll look into it." })}
           </Text>
           
           <View style={styles.buttonContainer}>
             <TouchableOpacity style={styles.primaryButton} onPress={this.handleReset}>
-              <Text allowFontScaling={false} style={styles.primaryButtonText}>Try Again</Text>
+              <Text allowFontScaling={false} style={styles.primaryButtonText}>{i18n.t('common.tryAgain', { defaultValue: 'Try Again' })}</Text>
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.secondaryButton} onPress={this.handleReportError}>
-              <Text allowFontScaling={false} style={styles.secondaryButtonText}>View Error Details</Text>
+              <Text allowFontScaling={false} style={styles.secondaryButtonText}>{i18n.t('errors.viewDetails', { defaultValue: 'View Error Details' })}</Text>
             </TouchableOpacity>
           </View>
           

@@ -286,7 +286,7 @@ const CartItemComponent: React.FC<CartItemComponentProps> = ({
         </View>
 
         {/* ===== BOTTOM ROW: Qty Controls + Price + Delete ===== */}
-        <View style={styles.cartItemBottom}>
+        <View style={[styles.cartItemBottom, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           {/* Quantity controls */}
           <View style={[styles.actionsColumn, {
             backgroundColor: theme.dark ? 'rgba(255,255,255,0.06)' : '#f2f2f2',
@@ -724,7 +724,7 @@ const CartScreen: React.FC = () => {
       
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         {/* FIGMA: Orange header */}
-        <View style={styles.headerContainer}>
+        <View style={[styles.headerContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           {/* Go back button with pill background */}
           <TouchableOpacity
             style={[styles.goBackPill, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}

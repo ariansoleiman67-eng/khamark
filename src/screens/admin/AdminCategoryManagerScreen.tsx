@@ -47,13 +47,18 @@ const AdminCategoryManagerScreen: React.FC = () => {
   const [form, setForm] = useState<Partial<StoredCategory>>(emptyForm());
   const [picking, setPicking] = useState(false);
   const [saving, setSaving] = useState(false);
+  // A failed fetch must not look like an empty store — the owner would think
+  // their categories were gone and re-create them.
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const load = useCallback(async () => {
     try {
+      setLoadFailed(false);
       setItems(await categoryStore.getAll(tenantId || undefined));
     } catch (e) {
       console.warn('[AdminCategoryManager] Failed to load categories', e);
       setItems([]);
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -183,6 +188,16 @@ const AdminCategoryManagerScreen: React.FC = () => {
 
       {loading ? (
         <View style={styles.center}><ActivityIndicator size="large" color={theme.colors.primary} /></View>
+      ) : loadFailed ? (
+        <View style={styles.center}>
+          <Ionicons name="cloud-offline-outline" size={40} color={theme.colors.textSecondary} />
+          <Text style={[styles.loadError, { color: theme.colors.textSecondary }]}>
+            {t('admin.categoryMgr.loadFailed', { defaultValue: 'Could not load categories. Check your connection and try again.' })}
+          </Text>
+          <TouchableOpacity onPress={() => { setLoading(true); load(); }} style={[styles.retryBtn, { backgroundColor: theme.colors.primary }]}>
+            <Text style={{ color: theme.colors.textOnPrimary, fontWeight: '700' }}>{t('common.retry', { defaultValue: 'Retry' })}</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <FlatList
           data={items}
@@ -227,7 +242,7 @@ const AdminCategoryManagerScreen: React.FC = () => {
             <TextInput
               value={form.name}
               onChangeText={name => setForm(f => ({ ...f, name }))}
-              placeholder="e.g. Chargers"
+              placeholder={t('admin.categoryMgr.namePlaceholder', { defaultValue: 'e.g. Chargers' })}
               placeholderTextColor={theme.colors.placeholder}
               style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.border, textAlign: isRTL ? 'right' : 'left' }]}
             />
@@ -259,6 +274,8 @@ const styles = StyleSheet.create({
   iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   title: { flex: 1, fontWeight: '800', fontSize: 20, textAlign: 'center' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80 },
+  loadError: { fontSize: 14, marginTop: 12, marginBottom: 16, textAlign: 'center', paddingHorizontal: 24 },
+  retryBtn: { borderRadius: 999, paddingVertical: 12, paddingHorizontal: 32, alignItems: 'center', justifyContent: 'center' },
   row: { alignItems: 'center', borderRadius: 16, padding: 12, marginBottom: 12 },
   logoBox: { width: 52, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   logoImg: { width: '80%', height: '80%' },

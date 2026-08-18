@@ -161,6 +161,7 @@ export const StoreLocationScreen: React.FC = () => {
 
   const [locations, setLocations] = useState<StoreLocation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<StoreLocation | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('map');
   // Typed, because BRAND.storeCoords is `as const`: inferred from the initial
@@ -187,6 +188,7 @@ export const StoreLocationScreen: React.FC = () => {
   const loadLocations = async () => {
     try {
       setLoading(true);
+      setLoadError(false);
       const storeLocations = await fetchActiveLocations(tenantId);
       setLocations(storeLocations);
       
@@ -203,10 +205,7 @@ export const StoreLocationScreen: React.FC = () => {
       }
     } catch (error) {
       console.error('Error loading locations:', error);
-      Alert.alert(
-        t('common.error', { defaultValue: 'Error' }),
-        t('storeLocations.loadError', { defaultValue: 'Failed to load store locations. Please try again.' })
-      );
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -278,7 +277,7 @@ export const StoreLocationScreen: React.FC = () => {
             </Text>
             <View style={[styles.statusRow, isRTL && { flexDirection: 'row-reverse' }]}>
               <Text allowFontScaling={false} style={[styles.storeType, { color: theme.colors.textSecondary }, isRTL ? { marginRight: 0, marginLeft: SPACING.sm } : null]}>
-                {(storeLocation.type || 'branch').toUpperCase()}
+                {t(`admin.storeLocations.${storeLocation.type || 'branch'}`).toUpperCase()}
               </Text>
               <Text allowFontScaling={false} style={[
                 styles.storeStatus,
@@ -455,7 +454,7 @@ export const StoreLocationScreen: React.FC = () => {
                 {getLocalizedName(selectedLocation, i18n.language)}
               </Text>
               <Text allowFontScaling={false} style={[styles.locationSubtitle, { color: theme.colors.textSecondary }]}>
-                {(selectedLocation.type || 'branch').toUpperCase()} • {isStoreOpen(selectedLocation)
+                {t(`admin.storeLocations.${selectedLocation.type || 'branch'}`).toUpperCase()} • {isStoreOpen(selectedLocation)
                   ? `🟢 ${t('storeLocations.open', { defaultValue: 'Open' })}`
                   : `🔴 ${t('storeLocations.closed', { defaultValue: 'Closed' })}`}
               </Text>
@@ -536,6 +535,26 @@ export const StoreLocationScreen: React.FC = () => {
           <Text allowFontScaling={false} style={[styles.loadingText, { color: theme.colors.text }]}>
             {t('storeLocations.loading', { defaultValue: 'Loading store locations...' })}
           </Text>
+        </View>
+      ) : loadError && locations.length === 0 ? (
+        <View style={[styles.emptyContainer, { backgroundColor: theme.colors.background }]}>
+          <Ionicons name="cloud-offline-outline" size={64} color={theme.colors.textSecondary} />
+          <Text allowFontScaling={false} style={[styles.emptyTitle, { color: theme.colors.text }]}>
+            {t('storeLocations.errorTitle', { defaultValue: "Couldn't Load Store Locations" })}
+          </Text>
+          <Text allowFontScaling={false} style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
+            {t('storeLocations.loadError', { defaultValue: 'Failed to load store locations. Please try again.' })}
+          </Text>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={loadLocations}
+            style={[styles.retryButton, { backgroundColor: theme.colors.primary }]}
+          >
+            <Ionicons name="refresh" size={18} color="#FFFFFF" />
+            <Text allowFontScaling={false} style={styles.retryButtonText}>
+              {t('common.retry', { defaultValue: 'Retry' })}
+            </Text>
+          </TouchableOpacity>
         </View>
       ) : locations.length === 0 ? (
         <View style={[styles.emptyContainer, { backgroundColor: theme.colors.background }]}>
@@ -726,6 +745,20 @@ const styles = StyleSheet.create({
   locationTitle: {
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  retryButton: {
+    alignItems: 'center',
+    borderRadius: 20,
+    flexDirection: 'row',
+    marginTop: SPACING.lg,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 6,
   },
   statusRow: {
     alignItems: 'center',

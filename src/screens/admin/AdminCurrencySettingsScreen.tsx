@@ -114,7 +114,7 @@ const AdminCurrencySettingsScreen = () => {
         <StatusBar style={isDark ? 'light' : 'dark'} />
         
         {/* Header */}
-        <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
+        <View style={[styles.header, { borderBottomColor: theme.colors.border, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <Ionicons 
             name={isRTL ? 'arrow-forward' : 'arrow-back'} 
             size={24} 

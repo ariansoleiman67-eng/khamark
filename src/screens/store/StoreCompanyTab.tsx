@@ -99,7 +99,7 @@ const StoreCompanyTab: React.FC<StoreCompanyTabProps> = ({ profile }) => {
         {title}
       </Text>
       {/* Decorative dots */}
-      <View style={[styles.headerDots, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+      <View style={[styles.headerDots, { flexDirection: isRTL ? 'row-reverse' : 'row', left: isRTL ? 16 : undefined, right: isRTL ? undefined : 16 }]}>
         <View style={styles.headerDot} />
         <View style={[styles.headerDot, { opacity: 0.5 }]} />
         <View style={[styles.headerDot, { opacity: 0.3 }]} />
@@ -422,7 +422,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 4,
     position: 'absolute',
-    right: 16,
   },
   headerDot: {
     backgroundColor: 'rgba(255,255,255,0.5)',

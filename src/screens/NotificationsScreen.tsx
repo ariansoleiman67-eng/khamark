@@ -489,6 +489,24 @@ export const NotificationsScreen: React.FC = () => {
       >
         {t('notifications.emptyStateDescription')}
       </Text>
+      {/* A load that failed inside NotificationService returns [] and lands here,
+          so the empty state must always offer a way to try again. */}
+      <TouchableOpacity
+        onPress={() => loadNotifications(true)}
+        style={{
+          marginTop: SPACING.lg,
+          paddingHorizontal: SPACING.lg,
+          paddingVertical: SPACING.sm,
+          borderRadius: 20,
+          borderWidth: 1,
+          borderColor: theme.colors.border,
+        }}
+        activeOpacity={0.7}
+      >
+        <Text allowFontScaling={false} style={{ fontSize: 14, fontWeight: '600', color: theme.colors.primary }}>
+          {t('common.refresh')}
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 
@@ -719,32 +737,30 @@ export const NotificationsScreen: React.FC = () => {
         </View>
 
         {/* Notifications List */}
-        {filteredNotifications.length === 0 ? (
-          renderEmptyState()
-        ) : (
-          <FlatList
-            data={filteredNotifications}
-            renderItem={renderNotificationItem}
-            keyExtractor={(item) => item.id}
-            keyboardShouldPersistTaps="handled"
-            removeClippedSubviews
-            initialNumToRender={10}
-            maxToRenderPerBatch={10}
-            windowSize={5}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={() => loadNotifications(true)}
-                colors={[theme.colors.primary]}
-                tintColor={theme.colors.primary}
-              />
-            }
-            contentContainerStyle={{
-              paddingVertical: SPACING.sm,
-            }}
-            showsVerticalScrollIndicator={false}
-          />
-        )}
+        <FlatList
+          data={filteredNotifications}
+          renderItem={renderNotificationItem}
+          keyExtractor={(item) => item.id}
+          keyboardShouldPersistTaps="handled"
+          removeClippedSubviews
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => loadNotifications(true)}
+              colors={[theme.colors.primary]}
+              tintColor={theme.colors.primary}
+            />
+          }
+          ListEmptyComponent={renderEmptyState}
+          contentContainerStyle={[
+            { paddingVertical: SPACING.sm },
+            filteredNotifications.length === 0 && { flexGrow: 1 },
+          ]}
+          showsVerticalScrollIndicator={false}
+        />
       </SafeAreaView>
     </View>
   );

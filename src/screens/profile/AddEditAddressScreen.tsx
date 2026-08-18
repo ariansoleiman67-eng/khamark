@@ -75,6 +75,12 @@ const AddEditAddressScreen: React.FC = () => {
   const { theme } = useTheme();
   const { t, i18n } = useTranslation();
   const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
+  // Country/city records carry nameAr/nameKu; every lookup helper accepts any of the three.
+  const localizedPlaceName = (place: { name: string; nameAr?: string; nameKu?: string }): string => {
+    if (i18n.language === 'ar' && place.nameAr) return place.nameAr;
+    if (i18n.language === 'ku' && place.nameKu) return place.nameKu;
+    return place.name;
+  };
   const navigation = useNavigation();
   const route = useRoute<AddEditAddressRouteProp>();
   const { user } = useAuth();
@@ -319,7 +325,10 @@ const AddEditAddressScreen: React.FC = () => {
         
         const phoneValidation = PhoneNumberService.validatePhone(value, countryCodeToUse);
         if (!phoneValidation.isValid) {
-          return phoneValidation.error;
+          const phoneMask = getCountryByCode(countryCodeToUse)?.phoneMask;
+          return phoneMask
+            ? t('addresses.invalidPhoneFormat', { format: phoneMask, defaultValue: 'Please enter a valid phone number. Format: {{format}}' })
+            : t('validation.phone');
         }
         return undefined;
       }
@@ -888,7 +897,7 @@ const AddEditAddressScreen: React.FC = () => {
                   if (directMatch) {
                     return (
                       <Text allowFontScaling={false} style={{ fontSize: 12, color: theme.colors.success, marginTop: 4 }}>
-                        ✓ {directMatch.name}
+                        ✓ {localizedPlaceName(directMatch)}
                       </Text>
                     );
                   }
@@ -911,7 +920,7 @@ const AddEditAddressScreen: React.FC = () => {
                         {matches.map((country) => (
                           <TouchableOpacity
                             key={country.code}
-                            onPress={() => handleInputChange('countryCode', country.name)}
+                            onPress={() => handleInputChange('countryCode', localizedPlaceName(country))}
                             style={{
                               paddingVertical: 6,
                               paddingHorizontal: 10,
@@ -923,7 +932,7 @@ const AddEditAddressScreen: React.FC = () => {
                             }}
                           >
                             <Text allowFontScaling={false} style={{ fontSize: 14, color: theme.colors.text }}>
-                              {country.name} ({country.code})
+                              {localizedPlaceName(country)} ({country.code})
                             </Text>
                           </TouchableOpacity>
                         ))}
@@ -997,7 +1006,7 @@ const AddEditAddressScreen: React.FC = () => {
                   if (directMatch) {
                     return (
                       <Text allowFontScaling={false} style={{ fontSize: 12, color: theme.colors.success, marginTop: 4 }}>
-                        ✓ {directMatch.name}
+                        ✓ {localizedPlaceName(directMatch)}
                       </Text>
                     );
                   }
@@ -1015,12 +1024,12 @@ const AddEditAddressScreen: React.FC = () => {
                     return (
                       <View style={{ marginTop: 4 }}>
                         <Text allowFontScaling={false} style={{ fontSize: 12, color: theme.colors.textSecondary, marginBottom: 4 }}>
-                          {t('addresses.citiesIn', { name: countryMatch.name, defaultValue: 'Cities in {{name}}:' })}
+                          {t('addresses.citiesIn', { name: localizedPlaceName(countryMatch), defaultValue: 'Cities in {{name}}:' })}
                         </Text>
                         {matches.map((city) => (
                           <TouchableOpacity
                             key={city.code}
-                            onPress={() => handleInputChange('cityCode', city.name)}
+                            onPress={() => handleInputChange('cityCode', localizedPlaceName(city))}
                             style={{
                               paddingVertical: 6,
                               paddingHorizontal: 10,
@@ -1032,7 +1041,7 @@ const AddEditAddressScreen: React.FC = () => {
                             }}
                           >
                             <Text allowFontScaling={false} style={{ fontSize: 14, color: theme.colors.text }}>
-                              {city.name} {city.isCapital ? '★' : ''}
+                              {localizedPlaceName(city)} {city.isCapital ? '★' : ''}
                             </Text>
                           </TouchableOpacity>
                         ))}

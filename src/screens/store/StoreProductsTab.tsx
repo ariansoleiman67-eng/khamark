@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
+import AppNumber from '../../components/AppNumber';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -194,10 +195,12 @@ const StoreProductsTab: React.FC<StoreProductsTabProps> = ({ products }) => {
 
       {/* Results count badge */}
       <View style={[styles.resultsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-        <View style={[styles.resultsBadge, { backgroundColor: isDark ? 'rgba(102,126,234,0.15)' : 'rgba(102,126,234,0.1)' }]}>
+        <View style={[styles.resultsBadge, { backgroundColor: isDark ? 'rgba(102,126,234,0.15)' : 'rgba(102,126,234,0.1)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <Ionicons name="cube" size={14} color="#667eea" />
-          <Text allowFontScaling={false} style={[styles.resultsText, { color: theme.colors.textSecondary }]}>
-            {displayProducts.length} {t('common.products', 'products')}
+          {/* Count stays LTR (AppNumber) so it can't reorder against the translated label. */}
+          <AppNumber value={displayProducts.length} style={[styles.resultsText, { color: theme.colors.textSecondary }]} />
+          <Text allowFontScaling={false} style={[styles.resultsText, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
+            {t('common.products', 'products')}
           </Text>
         </View>
       </View>

@@ -38,14 +38,24 @@ const AdminBrandManagerScreen: React.FC = () => {
 
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [form, setForm] = useState<Partial<Brand>>(emptyForm());
   const [picking, setPicking] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
-    setBrands(await brandService.getAllBrands(tenantId || undefined));
-    setLoading(false);
+    try {
+      setLoadError(false);
+      setBrands(await brandService.getAllBrands(tenantId || undefined));
+    } catch (e) {
+      // Without this the rejection escapes and setLoading(false) never runs,
+      // leaving the screen on a spinner with no way out.
+      console.error('Failed to load brands:', e);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
   }, [tenantId]);
   useEffect(() => { load(); }, [load]);
 
@@ -161,6 +171,16 @@ const AdminBrandManagerScreen: React.FC = () => {
 
       {loading ? (
         <View style={styles.center}><ActivityIndicator size="large" color={theme.colors.primary} /></View>
+      ) : loadError ? (
+        <View style={styles.center}>
+          <Ionicons name="cloud-offline-outline" size={48} color={theme.colors.textSecondary} />
+          <Text style={[styles.errorText, { color: theme.colors.textSecondary }]}>
+            {t('admin.brands.loadFailed', { defaultValue: 'Could not load brands. Check your connection and try again.' })}
+          </Text>
+          <TouchableOpacity onPress={() => { setLoading(true); load(); }} style={[styles.retryBtn, { backgroundColor: theme.colors.primary }]}>
+            <Text style={{ color: theme.colors.textOnPrimary, fontWeight: '700' }}>{t('common.retry', { defaultValue: 'Retry' })}</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <FlatList
           data={brands}
@@ -196,7 +216,7 @@ const AdminBrandManagerScreen: React.FC = () => {
             <TextInput
               value={form.name}
               onChangeText={name => setForm(f => ({ ...f, name }))}
-              placeholder="e.g. Samsung"
+              placeholder={t('admin.brands.namePlaceholder', { defaultValue: 'e.g. Samsung' })}
               placeholderTextColor={theme.colors.placeholder}
               style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.border, textAlign: isRTL ? 'right' : 'left' }]}
             />
@@ -227,6 +247,8 @@ const styles = StyleSheet.create({
   iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   title: { flex: 1, fontWeight: '800', fontSize: 20, textAlign: 'center' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80 },
+  errorText: { marginTop: 12, marginBottom: 16, paddingHorizontal: 24, textAlign: 'center' },
+  retryBtn: { borderRadius: 999, paddingVertical: 12, paddingHorizontal: 32, alignItems: 'center', justifyContent: 'center' },
   row: { alignItems: 'center', borderRadius: 16, padding: 12, marginBottom: 12 },
   logoBox: { width: 52, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   logoImg: { width: '80%', height: '80%' },

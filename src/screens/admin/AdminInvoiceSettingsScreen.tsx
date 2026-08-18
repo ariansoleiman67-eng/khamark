@@ -463,7 +463,7 @@ const AdminInvoiceSettingsScreen: React.FC = () => {
               t('admin.invoiceSettings.taxId', { defaultValue: 'Tax ID / Registration Number' }),
               taxId,
               setTaxId,
-              { placeholder: 'Optional' }
+              { placeholder: t('checkout.optional') }
             )}
           </View>
 

@@ -48,7 +48,7 @@ const AdminDiscountsScreen: React.FC = () => {
       const data = await service.getAllDiscounts();
       setDiscounts(data as Discount[]);
     } catch (error: any) {
-      Alert.alert(t('common.error'), error.message || 'Failed to load discounts');
+      Alert.alert(t('common.error'), error.message || t('admin.discounts.loadFailed'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -77,7 +77,7 @@ const AdminDiscountsScreen: React.FC = () => {
         prev.map(d => d.id === discount.id ? { ...d, isActive: newStatus } : d)
       );
     } catch (error: any) {
-      Alert.alert(t('common.error'), error.message);
+      Alert.alert(t('common.error'), error.message || t('errors.unknown'));
     }
   };
 
@@ -98,7 +98,7 @@ const AdminDiscountsScreen: React.FC = () => {
               setDiscounts(prev => prev.filter(d => d.id !== discount.id));
               Alert.alert(t('common.success'), t('admin.discounts.deleteSuccess'));
             } catch (error: any) {
-              Alert.alert(t('common.error'), error.message);
+              Alert.alert(t('common.error'), error.message || t('errors.unknown'));
             }
           },
         },

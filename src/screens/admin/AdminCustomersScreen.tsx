@@ -721,7 +721,7 @@ const AdminCustomersScreen: React.FC = () => {
                             closeDetailsModal();
                             navigation.navigate('AdminPartnerAssignment', {
                               userId: selectedCustomer.uid,
-                              userName: selectedCustomer.fullName || selectedCustomer.name || 'Admin',
+                              userName: selectedCustomer.fullName || selectedCustomer.name || t('admin.partners.adminBadge', { defaultValue: 'Admin' }),
                               userEmail: selectedCustomer.email
                             });
                           }}

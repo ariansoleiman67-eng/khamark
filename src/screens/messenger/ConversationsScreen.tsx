@@ -45,7 +45,7 @@ const COLORS = {
   checkbox: '#ccc',
 };
 
-function formatTimeAgo(ts: any, t: (key: string, fallback: string) => string) {
+function formatTimeAgo(ts: any, t: (key: string, fallback: string) => string, locale: string) {
   try {
     // Supabase returns ISO strings; older data may be a Firestore Timestamp.
     const d = ts?.toDate?.() ? ts.toDate() : (ts ? new Date(ts) : null);
@@ -58,10 +58,10 @@ function formatTimeAgo(ts: any, t: (key: string, fallback: string) => string) {
     const days = Math.floor(diff / 86400000);
     
     if (minutes < 1) return t('chat.justNow', 'Just now');
-    if (minutes < 60) return `${minutes}m`;
-    if (hours < 24) return `${hours}h`;
-    if (days < 7) return d.toLocaleDateString([], { weekday: 'short' });
-    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    if (minutes < 60) return `${minutes}${t('time.minutes', 'm')}`;
+    if (hours < 24) return `${hours}${t('time.hours', 'h')}`;
+    if (days < 7) return d.toLocaleDateString(locale, { weekday: 'short' });
+    return d.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
   } catch {
     return '';
   }
@@ -138,12 +138,12 @@ const ConversationItem = React.memo(({ item, index, isEditMode, isSelected, onTo
 
   // Determine Display Name
   const lang = i18n.language;
-  let storeName = 'Store';
+  let storeName = t('chat.store', 'Store');
   
   if (resolvedStore) {
     if (lang === 'ar' && resolvedStore.storeNameAr) storeName = resolvedStore.storeNameAr;
     else if (lang === 'ku' && resolvedStore.storeNameKu) storeName = resolvedStore.storeNameKu;
-    else storeName = resolvedStore.storeName || 'Store';
+    else storeName = resolvedStore.storeName || t('chat.store', 'Store');
   } else if (item.adminSnapshot?.name) {
     storeName = item.adminSnapshot.name;
   } else if ((item as any).storeName) {
@@ -283,9 +283,9 @@ const ConversationItem = React.memo(({ item, index, isEditMode, isSelected, onTo
               <Text allowFontScaling={false} 
                 numberOfLines={1}
                 adjustsFontSizeToFit
-                style={[styles.timeText, { color: theme.colors.textSecondary, fontSize: 11, minWidth: 60, textAlign: 'right' }]}
+                style={[styles.timeText, { color: theme.colors.textSecondary, fontSize: 11, minWidth: 60, textAlign: isRTL ? 'left' : 'right' }]}
               >
-                {formatTimeAgo(item.updatedAt, t)}
+                {formatTimeAgo(item.updatedAt, t, lang)}
               </Text>
             </View>
 
@@ -706,7 +706,7 @@ export default function ConversationsScreen() {
              {t('chat.unread', 'Unread')}
              {unreadTotal > 0 && (
                <Text allowFontScaling={false} style={{fontSize: 10, lineHeight: 10, fontWeight: '700', color: filter === 'unread' ? (isDark ? theme.colors.primary : ORANGE) : theme.colors.textSecondary }}>
-                 {' '}{unreadTotal > 99 ? '99+' : unreadTotal}
+                 {` \u200E${unreadTotal > 99 ? '99+' : unreadTotal}`}
                </Text>
              )}
           </Text>

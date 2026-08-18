@@ -11,6 +11,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from './ThemeProvider';
 import { ColorPickerConfig } from '../types/theme';
 
@@ -51,6 +52,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
 }) => {
   const { height: windowHeight } = useWindowDimensions();
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const [currentColor, setCurrentColor] = useState(config.defaultColor);
   const [hexInput, setHexInput] = useState(config.defaultColor);
 
@@ -85,7 +87,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
             </Text>
             <TouchableOpacity onPress={handleConfirm} style={styles.confirmButton}>
               <Text allowFontScaling={false} style={[styles.confirmText, { color: theme.colors.primary }]}>
-                Done
+                {t('common.done', { defaultValue: 'Done' })}
               </Text>
             </TouchableOpacity>
           </View>
@@ -96,7 +98,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
               <View style={[styles.colorSwatch, { backgroundColor: currentColor, borderColor: theme.colors.border }]} />
               <View style={styles.colorInfo}>
                 <Text allowFontScaling={false} style={[styles.colorName, { color: theme.colors.text }]}>
-                  Selected Color
+                  {t('colorPicker.selectedColor', { defaultValue: 'Selected Color' })}
                 </Text>
                 <TextInput allowFontScaling={false}
                   style={[
@@ -119,7 +121,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
             {/* Color Presets */}
             <View style={styles.presetsContainer}>
               <Text allowFontScaling={false} style={[styles.presetsTitle, { color: theme.colors.text }]}>
-                Choose a Color
+                {t('colorPicker.chooseColor', { defaultValue: 'Choose a Color' })}
               </Text>
               <View style={styles.presetGrid}>
                 {COLOR_PRESETS.map((color, index) => (
@@ -150,7 +152,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
             {config.presets && config.presets.length > 0 && (
               <View style={styles.presetsContainer}>
                 <Text allowFontScaling={false} style={[styles.presetsTitle, { color: theme.colors.text }]}>
-                  Suggested Colors
+                  {t('colorPicker.suggestedColors', { defaultValue: 'Suggested Colors' })}
                 </Text>
                 <View style={styles.presetGrid}>
                   {config.presets.map((color, index) => (

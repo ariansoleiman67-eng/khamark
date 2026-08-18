@@ -25,10 +25,10 @@ import { DiscountType } from '../../types';
 import { TenantAdminService, TenantProduct } from '../../services/tenantAdminService';
 import { useTenant } from '../../contexts/TenantContext';
 
-const DISCOUNT_TYPES: { type: DiscountType; label: string; icon: string }[] = [
-  { type: 'percentage', label: 'Percentage Off', icon: 'trending-down' },
-  { type: 'fixed', label: 'Fixed Amount', icon: 'cash-outline' },
-  { type: 'bundle', label: 'Bundle Deal', icon: 'gift-outline' },
+const DISCOUNT_TYPES: { type: DiscountType; labelKey: string; icon: string }[] = [
+  { type: 'percentage', labelKey: 'admin.discounts.typePercentage', icon: 'trending-down' },
+  { type: 'fixed', labelKey: 'admin.discounts.typeFixed', icon: 'cash-outline' },
+  { type: 'bundle', labelKey: 'admin.discounts.typeBundle', icon: 'gift-outline' },
 ];
 
 const AdminEditDiscountScreen: React.FC = () => {
@@ -77,6 +77,7 @@ const AdminEditDiscountScreen: React.FC = () => {
   const [showProductPicker, setShowProductPicker] = useState(false);
   const [productSearchQuery, setProductSearchQuery] = useState('');
   const [productsLoading, setProductsLoading] = useState(true);
+  const [productsError, setProductsError] = useState(false);
 
   useEffect(() => {
     loadProducts();
@@ -94,11 +95,16 @@ const AdminEditDiscountScreen: React.FC = () => {
     }
     try {
       setProductsLoading(true);
+      setProductsError(false);
       const tenantService = new TenantAdminService(tenantId);
       const products = await tenantService.getAllProducts();
       setAllProducts(products);
     } catch (error) {
       console.error('Failed to load products:', error);
+      // A failed fetch must not look like an empty catalogue: leaving allProducts at []
+      // would show "No products found" and tempt the admin into saving an empty
+      // product_ids, which means "apply to ALL products".
+      setProductsError(true);
     } finally {
       setProductsLoading(false);
     }
@@ -256,7 +262,7 @@ const AdminEditDiscountScreen: React.FC = () => {
       discountData.product_ids = selectedProductIds;
 
       if (!tenantId) {
-        Alert.alert(t('common.error'), 'No business selected');
+        Alert.alert(t('common.error'), t('admin.noBusinessSelected'));
         return;
       }
 
@@ -301,7 +307,7 @@ const AdminEditDiscountScreen: React.FC = () => {
             styles.typeLabel,
             { color: type === dt.type ? '#fff' : theme.colors.text }
           ]}>
-            {dt.label}
+            {t(dt.labelKey)}
           </Text>
         </TouchableOpacity>
       ))}
@@ -326,7 +332,7 @@ const AdminEditDiscountScreen: React.FC = () => {
           colors={[theme.colors.primary, theme.colors.primaryVariant || theme.colors.primary]}
           style={styles.headerGradient}
         >
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, isRTL ? { right: SPACING.md } : { left: SPACING.md }]}>
             <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color="#fff" />
           </TouchableOpacity>
           
@@ -495,7 +501,7 @@ const AdminEditDiscountScreen: React.FC = () => {
                     keyboardType="numeric"
                   />
                 </View>
-                <Text allowFontScaling={false} style={[styles.bundleFor, { color: theme.colors.text }]}>for</Text>
+                <Text allowFontScaling={false} style={[styles.bundleFor, { color: theme.colors.text }]}>{t('admin.discounts.for')}</Text>
                 <View style={styles.bundleField}>
                   <Text allowFontScaling={false} style={[styles.bundleLabel, { color: theme.colors.textSecondary }]}>
                     {t('admin.discounts.bundlePrice')}
@@ -532,10 +538,10 @@ const AdminEditDiscountScreen: React.FC = () => {
           </View>
 
           <Text allowFontScaling={false} style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>
-            Min Items Required (Optional)
+            {t('admin.discounts.minItemsOptional')}
           </Text>
           <Text allowFontScaling={false} style={[styles.helperText, { color: theme.colors.textSecondary }]}>
-            E.g. Buy 2+ items get $10 off, Buy 30+ items get $30 off
+            {t('admin.discounts.minItemsHint')}
           </Text>
           <View style={styles.inputWithSuffix}>
             <TextInput allowFontScaling={false}
@@ -546,7 +552,7 @@ const AdminEditDiscountScreen: React.FC = () => {
               onChangeText={setMinQuantity}
               keyboardType="numeric"
             />
-            <Text allowFontScaling={false} style={[styles.suffix, { color: theme.colors.text }]}>items</Text>
+            <Text allowFontScaling={false} style={[styles.suffix, { color: theme.colors.text }]}>{t('admin.discounts.itemsSuffix')}</Text>
           </View>
 
           {type !== 'bundle' && (
@@ -659,6 +665,18 @@ const AdminEditDiscountScreen: React.FC = () => {
                 <Text allowFontScaling={false} style={[styles.productsLoadingText, { color: theme.colors.textSecondary }]}>
                   {t('common.loading')}
                 </Text>
+              </View>
+            ) : productsError ? (
+              <View style={styles.noProductsContainer}>
+                <Ionicons name="cloud-offline-outline" size={32} color={theme.colors.error} />
+                <Text allowFontScaling={false} style={[styles.noProductsText, { color: theme.colors.textSecondary }]}>
+                  {t('common.loadError')}
+                </Text>
+                <TouchableOpacity onPress={loadProducts} style={styles.retryButton}>
+                  <Text allowFontScaling={false} style={[styles.retryText, { color: theme.colors.primary }]}>
+                    {t('common.retry')}
+                  </Text>
+                </TouchableOpacity>
               </View>
             ) : allProducts.length === 0 ? (
               <View style={styles.noProductsContainer}>
@@ -828,7 +846,6 @@ const AdminEditDiscountScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   backButton: {
-    left: SPACING.md,
     position: 'absolute',
     top: '50%',
     transform: [{ translateY: -12 }],
@@ -1091,6 +1108,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: SPACING.xs,
     textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+  },
+  retryText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

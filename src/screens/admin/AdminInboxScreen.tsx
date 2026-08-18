@@ -78,21 +78,21 @@ const toMillis = (ts: any): number => {
   }
 };
 
-const formatTimeAgo = (ts: any, t?: any): string => {
+const formatTimeAgo = (ts: any, t?: any, lang?: string): string => {
   const ms = toMillis(ts);
   if (!ms) return '';
   const now = Date.now();
   const diff = now - ms;
   const mins = Math.floor(diff / 60000);
   if (mins < 1) return t ? t('chat.justNow', 'Just now') : 'Just now';
-  if (mins < 60) return `${mins}m`;
+  if (mins < 60) return t ? t('chat.minutesShort', { value: mins, defaultValue: '{{value}}m' }) : `${mins}m`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h`;
+  if (hrs < 24) return t ? t('chat.hoursShort', { value: hrs, defaultValue: '{{value}}h' }) : `${hrs}h`;
   const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d`;
+  if (days < 7) return t ? t('chat.daysShort', { value: days, defaultValue: '{{value}}d' }) : `${days}d`;
   // Show date
   const d = new Date(ms);
-  const month = d.toLocaleString('default', { month: 'short' });
+  const month = d.toLocaleString(lang === 'ar' ? 'ar-IQ' : lang === 'ku' ? 'ckb-IQ' : 'en-US', { month: 'short' });
   return `${month} ${d.getDate()}`;
 };
 
@@ -151,7 +151,7 @@ const ConversationCard = React.memo(({
   
   const lastText = chatLastMessagePreview(item.lastMessage?.text, lastMsgType, t, productTitle);
 
-  const timeText = formatTimeAgo(item.lastMessage?.createdAt || item.updatedAt, t);
+  const timeText = formatTimeAgo(item.lastMessage?.createdAt || item.updatedAt, t, i18n?.language);
   const unread = item.unread?.admin || 0;
   const customerName = item.userSnapshot?.name || t('chat.customer', 'Customer');
   const customerPhone = item.userSnapshot?.phone || '';
@@ -178,7 +178,7 @@ const ConversationCard = React.memo(({
       >
         {/* Unread left accent bar */}
         {unread > 0 && (
-          <View style={styles.unreadAccent} />
+          <View style={[styles.unreadAccent, isRTL && { left: undefined, right: 0 }]} />
         )}
 
         <View style={[styles.rowInner, isRTL && { flexDirection: 'row-reverse' }]}>

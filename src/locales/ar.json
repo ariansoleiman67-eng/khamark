@@ -63,7 +63,8 @@
     "exchangerOfficePhoneRequired": "يرجى إدخال رقم هاتف المكتب.",
     "exchangerReceiverNameRequired": "يرجى إدخال اسم المستلم.",
     "exchangerReceiverPhoneRequired": "يرجى إدخال رقم هاتف المستلم.",
-    "securePayment": "دفع آمن"
+    "securePayment": "دفع آمن",
+    "whatsappMessage": "مرحبًا، لديّ سؤال عن طرق الدفع"
   },
   "time": {
     "hours": "س",
@@ -179,7 +180,8 @@
     "pullToRefresh": "اسحب للأسفل للتحديث",
     "somethingWentWrong": "حدث خطأ ما",
     "loadError": "تعذر تحميل المنتجات. تحقق من اتصالك.",
-    "all": "الكل"
+    "all": "الكل",
+    "tapToOpenInMaps": "اضغط للفتح في الخرائط"
   },
   "product": {
     "partNumber": "رمز المنتج",
@@ -261,7 +263,8 @@
     "colorCount_few": "{{count}} ألوان",
     "colorCount_many": "{{count}} لوناً",
     "colorCount_other": "{{count}} لون",
-    "imageNOfM": "صورة {{current}} من {{total}}"
+    "imageNOfM": "صورة {{current}} من {{total}}",
+    "shareText": "شاهد هذا المنتج على أسنكري!"
   },
   "tradeIn": {
     "title": "بيع أو استبدال هاتفك",
@@ -346,7 +349,8 @@
       "otpInfo": "سنرسل لك رمز التحقق (OTP) للتحقق من رقم هاتفك قبل أن تتمكن من إعادة تعيين كلمة المرور",
       "subtitle": "أدخل رقم هاتفك لإعادة تعيين كلمة المرور",
       "title": "نسيت كلمة المرور؟",
-      "emailSent": "تم إرسال بريد إعادة تعيين كلمة المرور! يرجى التحقق من صندوق الوارد."
+      "emailSent": "تم إرسال بريد إعادة تعيين كلمة المرور! يرجى التحقق من صندوق الوارد.",
+      "phoneNotRegistered": "رقم الهاتف هذا غير مسجل. يرجى التحقق من الرقم أو إنشاء حساب جديد."
     },
     "resetPassword": {
       "subtitle": "أنشئ كلمة مرور جديدة لحسابك",
@@ -417,7 +421,8 @@
     "verifyPhone": {
       "title": "التحقق من الهاتف",
       "subtitle": "أرسلنا رمزاً إلى {{phone}}",
-      "code": "الرمز"
+      "code": "الرمز",
+      "linkSuccess": "تم ربط رقم الهاتف بنجاح"
     },
     "setPassword": {
       "title": "تعيين كلمة المرور",
@@ -558,7 +563,9 @@
     "signInWithFacebook": "المتابعة باستخدام Facebook",
     "verifyFailed": "فشل التحقق. حاول مرة أخرى.",
     "accountCheckFailed": "تعذّر التحقق مما إذا كان هذا الحساب موجوداً بالفعل. يرجى المحاولة مرة أخرى.",
-    "invalidPhone": "يرجى إدخال رقم هاتف صالح"
+    "invalidPhone": "يرجى إدخال رقم هاتف صالح",
+    "googleSignInFailed": "فشل تسجيل الدخول عبر Google",
+    "appleSignInFailed": "فشل تسجيل الدخول عبر Apple"
   },
   "home": {
     "welcome": "مرحباً بك في Asankary",
@@ -786,7 +793,9 @@
     "promoNoLongerEligible": "رمز الخصم لم يعد ينطبق على سلتك",
     "promoSingleStore": "ينطبق هذا الرمز على منتجات متجر واحد فقط.",
     "pricesUpdatedTitle": "تحديث الأسعار",
-    "pricesUpdatedMessage": "تغيّرت بعض الأسعار في سلتك. راجع الإجمالي الجديد قبل تأكيد طلبك."
+    "pricesUpdatedMessage": "تغيّرت بعض الأسعار في سلتك. راجع الإجمالي الجديد قبل تأكيد طلبك.",
+    "savedCardEndingIn": "بطاقة QiCard المنتهية بـ {{last4}}",
+    "savedCard": "بطاقة محفوظة"
   },
   "qiCard": {
     "title": "دفع بطاقة كي",
@@ -1316,7 +1325,9 @@
         "title": "تحقق من هويتك",
         "passwordSubtitle": "أدخل كلمة المرور للمتابعة.",
         "appleSubtitle": "قم بتسجيل الدخول باستخدام Apple للمتابعة.",
-        "signoutSubtitle": "يرجى تسجيل الخروج وتسجيل الدخول مرة أخرى للمتابعة."
+        "signoutSubtitle": "يرجى تسجيل الخروج وتسجيل الدخول مرة أخرى للمتابعة.",
+        "appleFailed": "فشلت المصادقة عبر Apple",
+        "signoutFallback": "لدواعي الأمان، يرجى تسجيل الخروج ثم تسجيل الدخول مرة أخرى، ثم حاول مجدداً."
       },
       "failedToVerify": "تعذّر إرسال بريد التحقق.",
       "verify": "تحقّق",
@@ -1324,7 +1335,9 @@
       "verifyEmailSentTitle": "تم إرسال التحقق",
       "profile": "الملف الشخصي",
       "fullName": "الاسم الكامل",
-      "vehicle": "المركبة"
+      "vehicle": "المركبة",
+      "updatePhotoFailed": "تعذّر تحديث الصورة",
+      "saveNameFailed": "تعذّر حفظ الاسم"
     },
     "emailVerification": {
       "title": "تحقق من بريدك الإلكتروني",
@@ -1347,7 +1360,13 @@
     "currencyUsd": "الدولار الأمريكي ($)",
     "memberSince": "عضو منذ {{year}}",
     "updateName": "تحديث الاسم",
-    "yourName": "اسمك"
+    "yourName": "اسمك",
+    "nameTooShort": "يجب ألا يقل الاسم عن حرفين",
+    "nameTooLong": "يجب ألا يزيد الاسم عن 100 حرف",
+    "termsFooterTitle": "حقوقك محمية",
+    "termsFooterBody": "وُضعت هذه الشروط لحماية العملاء وأعمالنا معًا، مع ضمان معاملات عادلة وشفافة.",
+    "termsFooterContact": "هل لديك أسئلة؟ تواصل معنا على {{email}}",
+    "termsFooterContactFallback": "هل لديك أسئلة؟ تواصل معنا عبر «المساعدة والدعم» داخل التطبيق."
   },
   "notifications": {
     "title": "الإشعارات",
@@ -1567,7 +1586,10 @@
     "loadingData": "تعذّر تحميل البيانات",
     "overnightNotSupported": "يجب أن يكون وقت الإغلاق بعد وقت الفتح",
     "authenticationError": "خطأ في المصادقة",
-    "loginAgainToOrder": "يرجى تسجيل الخروج ثم تسجيل الدخول مرة أخرى لتقديم الطلبات."
+    "loginAgainToOrder": "يرجى تسجيل الخروج ثم تسجيل الدخول مرة أخرى لتقديم الطلبات.",
+    "persistContactSupport": "يرجى المحاولة مرة أخرى. إذا استمرت المشكلة، تواصل مع الدعم.",
+    "unexpectedLogged": "حدث خطأ غير متوقع. تم تسجيله وسنقوم بمراجعته.",
+    "viewDetails": "عرض تفاصيل الخطأ"
   },
   "addresses": {
     "myAddresses": "عناويني",
@@ -1664,7 +1686,8 @@
     "mapUnavailable": "الخريطة غير متاحة",
     "noLocationSet": "لم يتم تحديد موقع",
     "selectCountryFirst": "اختر الدولة أولاً",
-    "suggestionsTapToSelect": "اقتراحات (انقر للاختيار):"
+    "suggestionsTapToSelect": "اقتراحات (انقر للاختيار):",
+    "invalidPhoneFormat": "يرجى إدخال رقم هاتف صالح. الصيغة: {{format}}"
   },
   "store": {
     "home": "الرئيسية",
@@ -1871,6 +1894,40 @@
       "textDescription": "لون النص الأساسي",
       "accent": "لون التمييز",
       "accentDescription": "التمييزات الخاصة وعناصر الدعوة للعمل"
+    },
+    "presets": {
+      "amber-retail": {
+        "name": "كهرماني للمتاجر",
+        "description": "لمسة كهرمانية دافئة على أسطح محايدة فاتحة"
+      },
+      "amber-retail-dark": {
+        "name": "كهرماني للمتاجر داكن",
+        "description": "لمسة كهرمانية دافئة على أسطح محايدة داكنة"
+      },
+      "ocean-breeze": {
+        "name": "نسيم المحيط",
+        "description": "ألوان هادئة ومنعشة مستوحاة من المحيط"
+      },
+      "midnight-aurora": {
+        "name": "ذهبي فاخر",
+        "description": "تصميم متدرّج ذهبي فاخر"
+      },
+      "sunset-vibes": {
+        "name": "أجواء الغروب",
+        "description": "ألوان دافئة ونابضة بالحياة من الغروب"
+      },
+      "forest-green": {
+        "name": "أخضر الغابة",
+        "description": "درجات خضراء طبيعية مستوحاة من الغابة"
+      },
+      "royal-purple": {
+        "name": "بنفسجي ملكي",
+        "description": "ثيم بنفسجي فاخر بلمسات ذهبية"
+      },
+      "minimalist-gray": {
+        "name": "رمادي بسيط",
+        "description": "لوحة ألوان رمادية نظيفة وبسيطة"
+      }
     }
   },
   "chatbot": {
@@ -2019,7 +2076,32 @@
     "addCaption": "أضف تعليقاً...",
     "chat": "الدردشة",
     "sellerSupport": "دعم البائع • رد سريع",
-    "sendFailed": "تعذّر إرسال الرسالة. اضغط إرسال للمحاولة مجددًا."
+    "sendFailed": "تعذّر إرسال الرسالة. اضغط إرسال للمحاولة مجددًا.",
+    "whatsappGreeting": "مرحباً 👋",
+    "quickReplies": {
+      "hello": "مرحباً! 👋",
+      "available": "نعم، إنه متوفر ✨",
+      "placeOrder": "يرجى تقديم طلبك 🛒",
+      "discount": "يمكننا تقديم خصم 🎉",
+      "checkStock": "دعني أتحقق من المخزون 📦"
+    },
+    "errors": {
+      "pickImage": "فشل اختيار الصورة",
+      "capturePhoto": "فشل التقاط الصورة",
+      "uploadImage": "فشل رفع الصورة",
+      "sendImage": "فشل إرسال الصورة",
+      "uploadFile": "فشل رفع الملف",
+      "pickDocument": "فشل اختيار الملف",
+      "micPermission": "يجب السماح باستخدام الميكروفون لإرسال الرسائل الصوتية",
+      "startRecording": "فشل بدء التسجيل",
+      "sendVoice": "فشل إرسال الرسالة الصوتية",
+      "sendProductFailed": "فشل إرسال المنتج"
+    },
+    "minutesShort": "{{value}} د",
+    "hoursShort": "{{value}} س",
+    "daysShort": "{{value}} ي",
+    "minuteShort": "د",
+    "hourShort": "س"
   },
   "share": {
     "sendTo": "إرسال إلى...",
@@ -2051,7 +2133,8 @@
     "addDescription": "اختياري: للشحن إلى مكاتب خارجية",
     "addShippingOffice": "إضافة مكتب شحن",
     "useShippingOffice": "الشحن إلى مكتب الشحن الخاص بي",
-    "saveFailed": "فشل الحفظ"
+    "saveFailed": "فشل الحفظ",
+    "loadFailed": "تعذر تحميل بيانات الشحن المحفوظة. تحقق من اتصالك وحاول مرة أخرى."
   },
   "admin": {
     "categories": {
@@ -2355,7 +2438,21 @@
       "chat": "محادثة",
       "gpsTrackingPreview": "معاينة تتبع GPS",
       "saveTrackingUrl": "حفظ رابط التتبع",
-      "trackingUrlLabel": "رابط التتبع (GPSOPS)"
+      "trackingUrlLabel": "رابط التتبع (GPSOPS)",
+      "invalidAmountPaid": "أدخل مبلغاً صحيحاً وغير سالب.",
+      "overpayment": "لا يمكن أن يتجاوز المبلغ المدفوع إجمالي مبلغ الطلب.",
+      "paymentUpdated": "تم تحديث الدفعة بنجاح",
+      "markedPaidInFull": "تم تعليم الطلب كمدفوع بالكامل",
+      "invoiceFailed": "فشل إنشاء الفاتورة",
+      "cannotVerifyAdmin": "تعذر التحقق من هوية المشرف.",
+      "orderChat": "محادثة الطلب",
+      "trackingUrlSaved": "تم حفظ رابط التتبع",
+      "trackingUrlSaveFailed": "فشل حفظ رابط التتبع",
+      "shippedMsgHeader": "📦 تم شحن الطلب {{order}}!",
+      "shippedMsgTotal": "💰 المبلغ الإجمالي: {{total}}",
+      "shippedMsgTrack": "📍 تتبع طلبك: {{url}}",
+      "shippedMsgLocation": "📍 موقع التسليم: {{url}}",
+      "shippedMsgThanks": "شكراً لتعاملكم معنا!"
     },
     "order": {
       "color": "اللون",
@@ -2447,7 +2544,12 @@
       "storeSetupRequiredSubtitle": "اضغط لإكمال إعداد متجرك",
       "exportData": "تصدير كل البيانات",
       "exportDataSubtitle": "تصدير المنتجات والطلبات والعملاء إلى JSON",
-      "exportingData": "جاري تصدير البيانات..."
+      "exportingData": "جاري تصدير البيانات...",
+      "syncFailed": "فشل مزامنة المنتجات",
+      "sharingUnavailable": "المشاركة غير متاحة على هذا الجهاز",
+      "exportFailed": "فشل التصدير",
+      "exportFailedMessage": "حدث خطأ أثناء تصدير البيانات.",
+      "deleteFailed": "فشل حذف الحساب"
     },
     "stockReport": {
       "title": "تقرير المخزون",
@@ -2498,7 +2600,11 @@
       "ordersInTransit": "طلبات في الطريق",
       "itemsShipping": "منتجات قيد الشحن",
       "noOnTheWay": "لا توجد طلبات في الطريق حالياً",
-      "item": "منتج"
+      "item": "منتج",
+      "revenueReportFailed": "تعذر إنشاء تقرير الإيرادات",
+      "unpaidLoadFailed": "تعذر تحميل الطلبات غير المدفوعة",
+      "sharingUnavailable": "المشاركة غير متاحة على هذا الجهاز",
+      "pdfFailed": "تعذر إنشاء ملف PDF"
     },
     "banner": {
       "title": "إدارة البانرات",
@@ -2569,7 +2675,15 @@
       "confirmRemoveImage": "حذف هذه الصورة؟",
       "customTimezone": "(مخصص)",
       "deviceDefaultTimezone": "(افتراضي الجهاز)",
-      "mainImage": "الرئيسية"
+      "mainImage": "الرئيسية",
+      "coverUploadFailed": "فشل رفع صورة الغلاف",
+      "coverUpdateFailed": "فشل تحديث صورة الغلاف",
+      "logoUploadFailed": "فشل رفع الشعار",
+      "logoUpdateFailed": "فشل تحديث الشعار",
+      "tenantNotFound": "لم يتم تحميل متجرك بعد. يرجى العودة والمحاولة مرة أخرى.",
+      "saveFailed": "فشل حفظ ملف المتجر",
+      "unnamedLocation": "موقع بدون اسم",
+      "wechatIdPlaceholder": "معرّف وي تشات أو رابط الملف الشخصي"
     },
     "storeLocations": {
       "title": "مواقع المتجر",
@@ -2689,7 +2803,14 @@
       "minOrder": "أقل طلب",
       "minItems": "أقل عدد عناصر",
       "descriptionArabic": "الوصف (بالعربية)",
-      "descriptionKurdish": "الوصف (بالكردية)"
+      "descriptionKurdish": "الوصف (بالكردية)",
+      "typePercentage": "خصم بنسبة مئوية",
+      "typeFixed": "مبلغ ثابت",
+      "typeBundle": "عرض مجمّع",
+      "minItemsOptional": "أقل عدد من العناصر المطلوبة (اختياري)",
+      "minItemsHint": "مثلاً: اشترِ عنصرين أو أكثر واحصل على خصم 10$، اشترِ 30 عنصراً أو أكثر واحصل على خصم 30$",
+      "itemsSuffix": "عناصر",
+      "loadFailed": "فشل تحميل الخصومات"
     },
     "analytics": {
       "reports": "التقارير",
@@ -3122,7 +3243,16 @@
       "sunday": "الأحد",
       "thursday": "الخميس",
       "tuesday": "الثلاثاء",
-      "wednesday": "الأربعاء"
+      "wednesday": "الأربعاء",
+      "short": {
+        "sun": "أحد",
+        "mon": "اثن",
+        "tue": "ثلا",
+        "wed": "أرب",
+        "thu": "خمي",
+        "fri": "جمع",
+        "sat": "سبت"
+      }
     },
     "inStore": {
       "title": "مبيعات داخل المتجر",
@@ -3198,7 +3328,9 @@
       "nameRequired": "اسم العلامة التجارية مطلوب",
       "pickLogo": "إضافة شعار",
       "subtitle": "إدارة العلامات التجارية والشعارات",
-      "title": "العلامات التجارية"
+      "title": "العلامات التجارية",
+      "loadFailed": "تعذّر تحميل العلامات التجارية. تحقّق من اتصالك وحاول مرة أخرى.",
+      "namePlaceholder": "مثال: سامسونج"
     },
     "categoryMgr": {
       "add": "إضافة تصنيف",
@@ -3212,7 +3344,9 @@
       "nameRequired": "اسم التصنيف مطلوب",
       "pickLogo": "إضافة شعار",
       "saveError": "تعذر حفظ التصنيف. حاول مرة أخرى.",
-      "title": "التصنيفات"
+      "title": "التصنيفات",
+      "namePlaceholder": "مثال: شواحن",
+      "loadFailed": "تعذر تحميل التصنيفات. تحقق من اتصالك وحاول مرة أخرى."
     },
     "hidden": "مخفي",
     "promos": {
@@ -3232,8 +3366,14 @@
       "duplicateCode": "هذا الكود موجود بالفعل",
       "percentRange": "يجب أن تكون نسبة الخصم بين 1 و 100",
       "saveFailed": "تعذّر الحفظ. حاول مرة أخرى.",
-      "deleteFailed": "تعذّر الحذف. حاول مرة أخرى."
-    }
+      "deleteFailed": "تعذّر الحذف. حاول مرة أخرى.",
+      "offPercent": "خصم {{value}}٪",
+      "offAmount": "خصم ${{value}}",
+      "minShort": "الحد الأدنى ${{value}}",
+      "codePlaceholder": "مثال: WELCOME10",
+      "loadFailed": "تعذّر تحميل أكواد الخصم. تحقق من اتصالك وحاول مرة أخرى."
+    },
+    "noBusinessSelected": "لم يتم اختيار متجر"
   },
   "onboarding": {
     "welcomeTitle": "مرحبًا بكم في",
@@ -3367,14 +3507,45 @@
     "mapsError": "تعذّر فتح تطبيق الخرائط.",
     "phoneError": "تعذّر فتح تطبيق الهاتف.",
     "whatsappError": "واتساب غير مثبّت على هذا الجهاز.",
-    "whatsappMessage": "مرحباً، أودّ الاستفسار عن المنتجات في {{store}}."
+    "whatsappMessage": "مرحباً، أودّ الاستفسار عن المنتجات في {{store}}.",
+    "errorTitle": "تعذّر تحميل مواقع المتجر"
   },
   "loginGate": {
     "backToBrowsing": "العودة إلى التصفح",
     "whyCreate": "لماذا تنشئ حساباً؟",
     "benefitTrackOrders": "تتبّع طلباتك لحظة بلحظة",
     "benefitSaveAddresses": "احفظ العناوين لدفع أسرع",
-    "benefitExclusiveDeals": "احصل على عروض وصفقات حصرية"
+    "benefitExclusiveDeals": "احصل على عروض وصفقات حصرية",
+    "reason": {
+      "checkout": {
+        "title": "سجّل الدخول لإتمام الشراء",
+        "description": "أنشئ حساباً أو سجّل الدخول لإتمام عملية الشراء وتتبّع طلبك."
+      },
+      "orders": {
+        "title": "سجّل الدخول لعرض الطلبات",
+        "description": "سجّل الدخول لرؤية سجل طلباتك وتتبّع عمليات التوصيل الحالية."
+      },
+      "message": {
+        "title": "سجّل الدخول للمراسلة",
+        "description": "سجّل الدخول للتواصل مع البائعين والحصول على إجابات لأسئلتك."
+      },
+      "address": {
+        "title": "سجّل الدخول لحفظ العنوان",
+        "description": "سجّل الدخول لحفظ عناوين التوصيل الخاصة بك لدفع أسرع."
+      },
+      "payment": {
+        "title": "سجّل الدخول لحفظ وسيلة الدفع",
+        "description": "سجّل الدخول لحفظ وسائل الدفع الخاصة بك بأمان."
+      },
+      "profile": {
+        "title": "سجّل الدخول للوصول إلى الملف الشخصي",
+        "description": "سجّل الدخول لإدارة إعدادات حسابك وتفضيلاتك."
+      },
+      "default": {
+        "title": "تسجيل الدخول مطلوب",
+        "description": "يرجى تسجيل الدخول لمتابعة هذا الإجراء."
+      }
+    }
   },
   "confirmIdentity": {
     "enterPasswordError": "يرجى إدخال كلمة المرور",
@@ -3390,6 +3561,47 @@
   "privacyPolicy": {
     "title": "سياسة الخصوصية",
     "quickSummary": "ملخّص سريع للخصوصية",
-    "contactHeading": "أسئلة حول خصوصيتك؟"
+    "contactHeading": "أسئلة حول خصوصيتك؟",
+    "heroSubtitle": "خصوصيتك هي أولويتنا. توضح هذه السياسة كيف نجمع معلوماتك الشخصية ونستخدمها ونحميها.",
+    "effectiveDate": "تاريخ السريان: 1 يناير 2025 | الإصدار 2.1",
+    "summary": {
+      "minimalData": "نجمع فقط المعلومات الضرورية لتقديم خدماتنا",
+      "encrypted": "بياناتك مشفّرة ومخزّنة بأمان",
+      "neverSell": "لا نبيع معلوماتك الشخصية لأي طرف ثالث أبداً",
+      "fullControl": "لديك تحكم كامل ببياناتك ويمكنك حذفها في أي وقت"
+    }
+  },
+  "imageViewer": {
+    "shareTitle": "مشاركة الصورة",
+    "sharingUnavailable": "المشاركة غير متاحة على هذا الجهاز",
+    "shareFailed": "فشلت مشاركة الصورة",
+    "saved": "تم الحفظ",
+    "savedMessage": "تم حفظ الصورة بنجاح",
+    "saveFailed": "فشل حفظ الصورة"
+  },
+  "liveTracking": {
+    "headerLabel": "تتبّع مباشر",
+    "trackingDriver": "تتبّع موقع السائق",
+    "driver": "السائق",
+    "toYourLocation": "إلى موقعك",
+    "updatesEvery": "يتم التحديث كل ١٠ ثوانٍ",
+    "gpsActive": "GPS نشط",
+    "yourLocation": "موقعك",
+    "distanceToDelivery": "المسافة إلى التوصيل:",
+    "addGpsHint": "أضف موقع GPS إلى عنوانك لعرض المسافة",
+    "notActive": "التتبّع المباشر غير مفعّل",
+    "live": "مباشر",
+    "signalLost": "فُقدت الإشارة...",
+    "lastKnownLocation": "آخر موقع معروف"
+  },
+  "phoneInput": {
+    "searchCountryOrCode": "ابحث عن دولة أو رمز...",
+    "byRegion": "حسب المنطقة",
+    "countryCount": "{{n}} دولة"
+  },
+  "colorPicker": {
+    "selectedColor": "اللون المحدد",
+    "chooseColor": "اختر لوناً",
+    "suggestedColors": "ألوان مقترحة"
   }
 }

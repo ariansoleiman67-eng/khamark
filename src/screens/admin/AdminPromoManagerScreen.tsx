@@ -45,6 +45,8 @@ const AdminPromoManagerScreen: React.FC = () => {
 
   const [promos, setPromos] = useState<Promo[]>([]);
   const [loading, setLoading] = useState(true);
+  // Distinguishes "the fetch failed" from "there are genuinely no codes yet".
+  const [loadFailed, setLoadFailed] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [form, setForm] = useState<Partial<Promo>>(emptyForm());
   const [saving, setSaving] = useState(false);
@@ -56,13 +58,16 @@ const AdminPromoManagerScreen: React.FC = () => {
   const load = useCallback(async () => {
     try {
       setPromos(await promoService.getAll(tenantId || undefined));
+      setLoadFailed(false);
     } catch {
       // Keep whatever was loaded before; never leave the spinner stuck on failure.
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
   }, [tenantId]);
   useEffect(() => { load(); }, [load]);
+  const retryLoad = () => { setLoading(true); load(); };
 
   const openAdd = () => { setForm(emptyForm()); setValueText(''); setMinText(''); setModalVisible(true); };
   const openEdit = (p: Promo) => {
@@ -74,8 +79,12 @@ const AdminPromoManagerScreen: React.FC = () => {
 
   // Human-readable discount line: "10% off" / "$5 off" (+ " • min $30").
   const describe = (p: Promo): string => {
-    const off = p.type === 'percentage' ? `${p.value}% off` : `$${p.value} off`;
-    return p.minPurchase ? `${off} • min $${p.minPurchase}` : off;
+    const off = p.type === 'percentage'
+      ? t('admin.promos.offPercent', { value: p.value, defaultValue: '{{value}}% off' })
+      : t('admin.promos.offAmount', { value: p.value, defaultValue: '${{value}} off' });
+    return p.minPurchase
+      ? `${off} • ${t('admin.promos.minShort', { value: p.minPurchase, defaultValue: 'min ${{value}}' })}`
+      : off;
   };
 
   const save = async () => {
@@ -195,6 +204,15 @@ const AdminPromoManagerScreen: React.FC = () => {
 
       {loading ? (
         <View style={styles.center}><ActivityIndicator size="large" color={theme.colors.primary} /></View>
+      ) : loadFailed && promos.length === 0 ? (
+        <View style={styles.center}>
+          <Text style={[styles.errorText, { color: theme.colors.textSecondary }]}>
+            {t('admin.promos.loadFailed', { defaultValue: 'Could not load promo codes. Check your connection and try again.' })}
+          </Text>
+          <TouchableOpacity onPress={retryLoad} style={[styles.retryBtn, { backgroundColor: theme.colors.primary }]}>
+            <Text style={{ color: theme.colors.textOnPrimary, fontWeight: '700' }}>{t('common.retry', { defaultValue: 'Retry' })}</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <FlatList
           data={promos}
@@ -219,7 +237,7 @@ const AdminPromoManagerScreen: React.FC = () => {
               value={form.code}
               onChangeText={code => setForm(f => ({ ...f, code }))}
               autoCapitalize="characters"
-              placeholder="e.g. WELCOME10"
+              placeholder={t('admin.promos.codePlaceholder', { defaultValue: 'e.g. WELCOME10' })}
               placeholderTextColor={theme.colors.placeholder}
               style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.border, textAlign: isRTL ? 'right' : 'left' }]}
             />
@@ -306,6 +324,8 @@ const styles = StyleSheet.create({
   switchRow: { alignItems: 'center', justifyContent: 'space-between', marginTop: 16 },
   modalActions: { marginTop: 22, gap: 12 },
   btn: { flex: 1, borderRadius: 999, paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
+  errorText: { fontSize: 14, textAlign: 'center', paddingHorizontal: 32, marginBottom: 16 },
+  retryBtn: { borderRadius: 999, paddingVertical: 12, paddingHorizontal: 32, alignItems: 'center', justifyContent: 'center' },
 });
 
 export default AdminPromoManagerScreen;

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Platform, Linking, TouchableOpacity, Image } fr
 import { GOOGLE_MAPS_API_KEY } from '../constants/config';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from './ThemeProvider';
+import { useTranslation } from 'react-i18next';
 
 // =====================================================================
 // iOS CRASH FIX: react-native-maps v1.20.x is INCOMPATIBLE with
@@ -59,6 +60,7 @@ const SafeMapView: React.FC<SafeMapViewProps> = ({
   ...mapViewProps 
 }) => {
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const [hasError, setHasError] = useState(false);
 
   // Extract coordinates from region or initialRegion
@@ -107,7 +109,7 @@ const SafeMapView: React.FC<SafeMapViewProps> = ({
           <View style={styles.openInMapsOverlay}>
             <View style={styles.openInMapsBadge}>
               <Ionicons name="open-outline" size={14} color="#fff" />
-              <Text allowFontScaling={false} style={styles.openInMapsText}>Open in Maps</Text>
+              <Text allowFontScaling={false} style={styles.openInMapsText}>{t('common.openInMaps')}</Text>
             </View>
           </View>
         )}

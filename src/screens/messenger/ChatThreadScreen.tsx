@@ -258,6 +258,23 @@ export default function ChatThreadScreen() {
             maxToRenderPerBatch={10}
             initialNumToRender={14}
             updateCellsBatchingPeriod={40}
+            ListEmptyComponent={
+              // The list is inverted, so the placeholder has to be flipped back
+              // upright. Without it an empty thread is an entirely blank screen.
+              <View style={[styles.emptyWrap, { transform: [{ scaleY: -1 }] }]}>
+                <Ionicons name="chatbubble-ellipses-outline" size={44} color={theme.colors.textSecondary} />
+                <Text allowFontScaling={false}
+                  style={{ color: theme.colors.text, fontSize: 16, fontWeight: '700', marginTop: 10, textAlign: 'center' }}
+                >
+                  {t('chat.noMessages', { defaultValue: 'No messages yet' })}
+                </Text>
+                <Text allowFontScaling={false}
+                  style={{ color: theme.colors.textSecondary, fontSize: 13, marginTop: 4, textAlign: 'center' }}
+                >
+                  {t('chat.startConversation', { defaultValue: 'Start the conversation with the seller.' })}
+                </Text>
+              </View>
+            }
             contentContainerStyle={{
               paddingTop: composerH + insets.bottom + 14,
               paddingBottom: 10,
@@ -364,6 +381,11 @@ const styles = StyleSheet.create({
     right: 0,
   },
 
+  emptyWrap: {
+    alignItems: 'center',
+    paddingHorizontal: SPACING.lg,
+    paddingTop: 80,
+  },
   header: {
     alignItems: 'center',
     borderBottomWidth: 1,

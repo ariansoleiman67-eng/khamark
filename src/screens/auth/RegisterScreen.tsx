@@ -262,7 +262,7 @@ const RegisterScreen: React.FC = () => {
       // Auth state change routes into the app automatically.
     } catch (error: any) {
       if (error?.message !== 'Sign in was cancelled') {
-        Alert.alert(t('auth.error'), error?.message || 'Google sign-in failed');
+        Alert.alert(t('auth.error'), error?.message || t('auth.googleSignInFailed'));
       }
     } finally {
       setGoogleLoading(false);
@@ -278,7 +278,7 @@ const RegisterScreen: React.FC = () => {
       await signInWithApple();
     } catch (error: any) {
       if (error?.message !== 'Sign in was cancelled') {
-        Alert.alert(t('auth.error'), error?.message || 'Apple sign-in failed');
+        Alert.alert(t('auth.error'), error?.message || t('auth.appleSignInFailed'));
       }
     } finally {
       setAppleLoading(false);
@@ -321,7 +321,7 @@ const RegisterScreen: React.FC = () => {
           phone: formattedPhone,
         });
       } catch (error: any) {
-        setErrorMessage(error.message || 'Something went wrong');
+        setErrorMessage(error.message || t('common.somethingWentWrong'));
       } finally {
         submittingRef.current = false;
         setLoading(false);
@@ -353,7 +353,7 @@ const RegisterScreen: React.FC = () => {
           email: email.trim(),
         });
       } catch (error: any) {
-        setErrorMessage(error.message || 'Something went wrong');
+        setErrorMessage(error.message || t('common.somethingWentWrong'));
       } finally {
         submittingRef.current = false;
         setLoading(false);

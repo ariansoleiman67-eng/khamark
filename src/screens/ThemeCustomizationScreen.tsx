@@ -46,6 +46,8 @@ export const ThemeCustomizationScreen: React.FC = () => {
   // disabled in App.tsx, so I18nManager.isRTL alone is always false here — the
   // language check is what actually does the work.
   const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
+  // Every translated string on this screen has to follow the reading direction.
+  const rtlText = { textAlign: (isRTL ? 'right' : 'left') as 'right' | 'left' };
   const { theme, setCustomTheme, currentCustomTheme } = useTheme();
   
   const COLOR_CUSTOMIZATION_ITEMS: ColorCustomizationItem[] = [
@@ -247,11 +249,11 @@ export const ThemeCustomizationScreen: React.FC = () => {
           <View style={[styles.previewColor, { backgroundColor: preset.preview.background }]} />
           <View style={[styles.previewColor, { backgroundColor: preset.preview.surface }]} />
         </View>
-        <Text allowFontScaling={false} style={[styles.presetName, { color: theme.colors.text }]}>
-          {preset.name}
+        <Text allowFontScaling={false} style={[styles.presetName, { color: theme.colors.text }, rtlText]}>
+          {t(`theme.presets.${preset.id}.name`, { defaultValue: preset.name })}
         </Text>
-        <Text allowFontScaling={false} style={[styles.presetDescription, { color: theme.colors.textSecondary }]}>
-          {preset.description}
+        <Text allowFontScaling={false} style={[styles.presetDescription, { color: theme.colors.textSecondary }, rtlText]}>
+          {t(`theme.presets.${preset.id}.description`, { defaultValue: preset.description })}
         </Text>
         {isSelected && (
           <View style={[styles.selectedIndicator, { backgroundColor: theme.colors.primary }]}>
@@ -267,10 +269,10 @@ export const ThemeCustomizationScreen: React.FC = () => {
 
     return (
       <Animated.View entering={FadeInUp.delay(200)} style={styles.customizationSection}>
-        <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text }]}>
+        <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text }, rtlText]}>
           {t('theme.customizeColors')}
         </Text>
-        <Text allowFontScaling={false} style={[styles.sectionDescription, { color: theme.colors.textSecondary }]}>
+        <Text allowFontScaling={false} style={[styles.sectionDescription, { color: theme.colors.textSecondary }, rtlText]}>
           {t('theme.customizeColorsDescription')}
         </Text>
 
@@ -295,10 +297,10 @@ export const ThemeCustomizationScreen: React.FC = () => {
                     ]}
                   />
                 </View>
-                <Text allowFontScaling={false} style={[styles.colorItemTitle, { color: theme.colors.text }]}>
+                <Text allowFontScaling={false} style={[styles.colorItemTitle, { color: theme.colors.text }, rtlText]}>
                   {item.title}
                 </Text>
-                <Text allowFontScaling={false} style={[styles.colorItemDescription, { color: theme.colors.textSecondary }]}>
+                <Text allowFontScaling={false} style={[styles.colorItemDescription, { color: theme.colors.textSecondary }, rtlText]}>
                   {item.description}
                 </Text>
                 <Text allowFontScaling={false} style={[styles.colorValue, { color: theme.colors.textSecondary }]}>
@@ -311,7 +313,7 @@ export const ThemeCustomizationScreen: React.FC = () => {
 
         {isCreatingCustom && (
           <Animated.View entering={FadeInUp.delay(300)} style={styles.customThemeCreation}>
-            <Text allowFontScaling={false} style={[styles.customThemeTitle, { color: theme.colors.text }]}>
+            <Text allowFontScaling={false} style={[styles.customThemeTitle, { color: theme.colors.text }, rtlText]}>
               {t('theme.createCustomTheme')}
             </Text>
             <TextInput allowFontScaling={false}
@@ -322,6 +324,7 @@ export const ThemeCustomizationScreen: React.FC = () => {
                   borderColor: theme.colors.border,
                   color: theme.colors.text,
                 },
+                rtlText,
               ]}
               placeholder={t('theme.enterThemeName')}
               placeholderTextColor={theme.colors.placeholder}
@@ -343,7 +346,7 @@ export const ThemeCustomizationScreen: React.FC = () => {
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
+      <View style={[styles.header, { backgroundColor: theme.colors.surface }, isRTL && { flexDirection: 'row-reverse' as const }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backButton}
@@ -365,10 +368,10 @@ export const ThemeCustomizationScreen: React.FC = () => {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {/* Theme Presets */}
         <Animated.View entering={FadeInUp} style={styles.presetsSection}>
-          <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text }]}>
+          <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text }, rtlText]}>
             {t('theme.chooseTheme')}
           </Text>
-          <Text allowFontScaling={false} style={[styles.sectionDescription, { color: theme.colors.textSecondary }]}>
+          <Text allowFontScaling={false} style={[styles.sectionDescription, { color: theme.colors.textSecondary }, rtlText]}>
             {t('theme.chooseThemeDescription')}
           </Text>
           
@@ -386,7 +389,7 @@ export const ThemeCustomizationScreen: React.FC = () => {
 
         {/* Preview Section */}
         <Animated.View entering={FadeInUp.delay(400)} style={styles.previewSection}>
-          <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text }]}>
+          <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text }, rtlText]}>
             {t('theme.preview')}
           </Text>
           <View style={[styles.previewCard, { backgroundColor: theme.colors.surface }]}>
@@ -397,10 +400,10 @@ export const ThemeCustomizationScreen: React.FC = () => {
               <Text allowFontScaling={false} style={styles.previewHeaderText}>{t('theme.sampleHeader')}</Text>
             </LinearGradient>
             <View style={styles.previewContent}>
-              <Text allowFontScaling={false} style={[styles.previewTitle, { color: theme.colors.text }]}>
+              <Text allowFontScaling={false} style={[styles.previewTitle, { color: theme.colors.text }, rtlText]}>
                 {t('theme.sampleContent')}
               </Text>
-              <Text allowFontScaling={false} style={[styles.previewText, { color: theme.colors.textSecondary }]}>
+              <Text allowFontScaling={false} style={[styles.previewText, { color: theme.colors.textSecondary }, rtlText]}>
                 {t('theme.sampleText')}
               </Text>
               <TouchableOpacity

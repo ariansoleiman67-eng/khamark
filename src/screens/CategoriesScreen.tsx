@@ -565,11 +565,11 @@ const CategoriesScreen: React.FC = () => {
         {profile.isVerified ? (
           <View style={styles.storeVerifiedTag}>
             <Ionicons name="checkmark-circle" size={12} color="#FFFFFF" />
-            <Text allowFontScaling={false} style={styles.storeVerifiedText}>Verified</Text>
+            <Text allowFontScaling={false} style={styles.storeVerifiedText}>{t('profile.verified')}</Text>
           </View>
         ) : (
           <View style={styles.storeVisitTag}>
-            <Text allowFontScaling={false} style={[styles.storeVisitText, { color: '#FF6A00' }]}>Visit →</Text>
+            <Text allowFontScaling={false} style={[styles.storeVisitText, { color: '#FF6A00' }]}>{`${t('store.visit')} ${isRTL ? '←' : '→'}`}</Text>
           </View>
         )}
       </TouchableOpacity>

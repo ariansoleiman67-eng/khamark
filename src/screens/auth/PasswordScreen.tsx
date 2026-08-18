@@ -509,7 +509,7 @@ const PasswordScreen: React.FC = () => {
                 </Animated.View>
                 <Animated.View entering={FadeIn.duration(500).delay(400)}>
                   <Animated.Text allowFontScaling={false} style={styles.subtitle}>
-                  {t('auth.signInAs', { defaultValue: 'Sign in as' })} {masked}
+                  {t('auth.signInAs', { defaultValue: 'Sign in as' })} {`\u2066${masked}\u2069`}
                 </Animated.Text>
                 </Animated.View>
               </Animated.View>

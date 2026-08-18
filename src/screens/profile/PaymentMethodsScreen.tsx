@@ -193,7 +193,7 @@ const PaymentMethodsScreen: React.FC = () => {
       }
       // Payment methods are defined statically in availablePaymentMethods
     } catch (error) {
-      Alert.alert('Error', 'Failed to load payment methods');
+      Alert.alert(t('common.error'), t('errors.loadingData'));
     } finally {
       setLoading(false);
     }
@@ -303,7 +303,7 @@ const PaymentMethodsScreen: React.FC = () => {
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
         <View style={{
-          flexDirection: 'row',
+          flexDirection: isRTL ? 'row-reverse' : 'row',
           alignItems: 'center',
           padding: SPACING.md,
           borderBottomWidth: 1,
@@ -326,7 +326,9 @@ const PaymentMethodsScreen: React.FC = () => {
             fontSize: 18,
             fontWeight: '600',
             color: theme.colors.text,
-            marginLeft: SPACING.md,
+            marginLeft: isRTL ? 0 : SPACING.md,
+            marginRight: isRTL ? SPACING.md : 0,
+            textAlign: isRTL ? 'right' : 'left',
           }}>
             {t('payment.title', { defaultValue: 'Payment Methods' })}
           </Text>
@@ -837,7 +839,7 @@ const PaymentMethodsScreen: React.FC = () => {
 
                     <TouchableOpacity
                       onPress={() => {
-                        openWhatsApp(brandWhatsAppDigits(), 'Hi, I have a question about payment methods');
+                        openWhatsApp(brandWhatsAppDigits(), t('payment.whatsappMessage', { defaultValue: 'Hi, I have a question about payment methods' }));
                       }}
                       style={{
                         flexDirection: 'row',

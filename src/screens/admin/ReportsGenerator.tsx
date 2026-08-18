@@ -149,7 +149,7 @@ export const ReportsGenerator = () => {
       const html = generateRevenueReportHtml(rows, totals, invoiceSettings, lang, logoData);
       await generateAndSharePDF(html, 'Revenue_Report');
     } catch (error) {
-      Alert.alert(t('admin.common.error', { defaultValue: 'Error' }), 'Failed to generate revenue report');
+      Alert.alert(t('admin.common.error', { defaultValue: 'Error' }), t('admin.stockReport.revenueReportFailed'));
     } finally {
       setLoadingType(null);
     }
@@ -183,7 +183,7 @@ export const ReportsGenerator = () => {
       });
 
       if (unpaid.length === 0) {
-        Alert.alert(t('admin.common.success', { defaultValue: 'Success' }), 'No unpaid orders found.');
+        Alert.alert(t('admin.common.success', { defaultValue: 'Success' }), t('admin.stockReport.noUnpaidOrders'));
         return;
       }
 
@@ -222,7 +222,7 @@ export const ReportsGenerator = () => {
         );
       }
     } catch (error) {
-      Alert.alert(t('admin.common.error', { defaultValue: 'Error' }), 'Failed to load unpaid orders');
+      Alert.alert(t('admin.common.error', { defaultValue: 'Error' }), t('admin.stockReport.unpaidLoadFailed'));
     } finally {
       setLoadingType(null);
     }
@@ -238,10 +238,10 @@ export const ReportsGenerator = () => {
       if (isAvailable) {
         await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
       } else {
-        Alert.alert(t('admin.common.error', { defaultValue: 'Error' }), 'Sharing not available');
+        Alert.alert(t('admin.common.error', { defaultValue: 'Error' }), t('admin.stockReport.sharingUnavailable'));
       }
     } catch (error) {
-      Alert.alert(t('admin.common.error', { defaultValue: 'Error' }), 'Failed to create PDF');
+      Alert.alert(t('admin.common.error', { defaultValue: 'Error' }), t('admin.stockReport.pdfFailed'));
     }
   };
 
@@ -835,7 +835,7 @@ export const ReportsGenerator = () => {
         ]
       );
     } catch (e) {
-      Alert.alert(t('admin.common.error', { defaultValue: 'Error' }), 'Failed to generate invoice');
+      Alert.alert(t('admin.common.error', { defaultValue: 'Error' }), t('admin.partnerDashboard.invoiceFailed'));
     }
   };
 
@@ -903,7 +903,7 @@ export const ReportsGenerator = () => {
                 const map = new Map<string, { id: string, name: string, phone: string, recipientName: string, remaining: number, firstOrderId: string, profileImageUrl: string | null }>();
                 unpaidOrders.forEach(order => {
                   const remaining = (order.totalUSD || 0) - (order.amountPaidUSD || 0);
-                  const name = order.shippingAddress?.fullName || 'Unknown';
+                  const name = order.shippingAddress?.fullName || t('admin.orders.unknownCustomer');
                   const phone = order.shippingAddress?.phone || '';
                   const recipientName = order.shippingOfficeInfo?.recipientName || '';
                   const profileImageUrl = order.profileImageUrl || null;
@@ -918,7 +918,7 @@ export const ReportsGenerator = () => {
                   }
                 });
                 return Array.from(map.values());
-              }, [unpaidOrders])}
+              }, [unpaidOrders, t])}
               keyExtractor={item => item.id}
               contentContainerStyle={{ padding: 16 }}
               renderItem={({ item }) => {
@@ -926,7 +926,7 @@ export const ReportsGenerator = () => {
                   <TouchableOpacity 
                     style={[styles.unpaidCard, { backgroundColor: isDark ? theme.colors.surface : '#FFFFFF', alignItems: 'center', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                     onPress={() => {
-                      const userOrders = unpaidOrders.filter(o => (o.userId || o.shippingAddress?.fullName || 'Unknown') === item.id);
+                      const userOrders = unpaidOrders.filter(o => (o.userId || o.shippingAddress?.fullName || t('admin.orders.unknownCustomer')) === item.id);
                       setSelectedUnpaidUser({ ...item, orders: userOrders });
                     }}
                   >

@@ -236,7 +236,7 @@ const AccountSecurityScreen: React.FC = () => {
         }
       }
     } catch (e: any) {
-      Alert.alert(t('common.error'), e?.message || 'Failed to update photo');
+      Alert.alert(t('common.error'), e?.message || t('profile.accountSecurity.updatePhotoFailed'));
     } finally {
       setUploadingImage(false);
     }
@@ -250,7 +250,7 @@ const AccountSecurityScreen: React.FC = () => {
       await AuthService.updateUserProfile(user.uid, { name: nm, fullName: nm } as any);
       await refreshUser();
     } catch (e: any) {
-      Alert.alert(t('common.error'), e?.message || 'Failed to save name');
+      Alert.alert(t('common.error'), e?.message || t('profile.accountSecurity.saveNameFailed'));
     }
     setEditingName(false);
   };
@@ -272,7 +272,7 @@ const AccountSecurityScreen: React.FC = () => {
         t('profile.accountSecurity.verifyEmailSentMessage', { defaultValue: 'Check your inbox and tap the link to verify your email.' }),
       );
     } catch (e: any) {
-      Alert.alert(t('common.error'), e?.message || 'Failed to send verification email.');
+      Alert.alert(t('common.error'), e?.message || t('profile.accountSecurity.failedToVerify'));
     } finally {
       setVerifyLoading(false);
     }

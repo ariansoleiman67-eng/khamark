@@ -292,7 +292,7 @@ const VerifyPhoneScreen: React.FC = () => {
         if (currentUser) {
           await AuthService.updateUserProfile(currentUser.uid, { phone });
         }
-        Alert.alert(t('auth.success'), 'Phone number linked successfully');
+        Alert.alert(t('auth.success'), t('auth.verifyPhone.linkSuccess'));
         navigation.goBack();
       }
     } catch (error: any) {
@@ -435,8 +435,8 @@ const VerifyPhoneScreen: React.FC = () => {
               style={styles.subtitle}
             >
               {t('auth.verifyPhone.subtitle', {
-                phone,
-                defaultValue: `Enter the 6-digit code sent to ${phone}`,
+                phone: `\u200E${phone}\u200E`,
+                defaultValue: `Enter the 6-digit code sent to \u200E${phone}\u200E`,
               })}
             </Animated.Text>
             </Animated.View>

@@ -63,7 +63,8 @@
     "exchangerOfficePhoneRequired": "Please enter the office phone number.",
     "exchangerReceiverNameRequired": "Please enter the receiver name.",
     "exchangerReceiverPhoneRequired": "Please enter the receiver phone number.",
-    "securePayment": "Secure Payment"
+    "securePayment": "Secure Payment",
+    "whatsappMessage": "Hi, I have a question about payment methods"
   },
   "time": {
     "hours": "h",
@@ -179,7 +180,8 @@
     "pullToRefresh": "Pull down to refresh",
     "somethingWentWrong": "Something went wrong",
     "loadError": "Could not load products. Check your connection.",
-    "all": "All"
+    "all": "All",
+    "tapToOpenInMaps": "Tap to open in Maps"
   },
   "product": {
     "partNumber": "Item Code",
@@ -257,7 +259,8 @@
     "storage": "Storage",
     "colorCount_one": "{{count}} color",
     "colorCount_other": "{{count}} colors",
-    "imageNOfM": "Image {{current}} of {{total}}"
+    "imageNOfM": "Image {{current}} of {{total}}",
+    "shareText": "Check out this product on Asankary!"
   },
   "tradeIn": {
     "title": "Sell or trade your phone",
@@ -397,7 +400,8 @@
     "verifyPhone": {
       "title": "Verify Phone",
       "subtitle": "We sent a code to {{phone}}",
-      "code": "CODE"
+      "code": "CODE",
+      "linkSuccess": "Phone number linked successfully"
     },
     "setPassword": {
       "title": "Set Password",
@@ -485,7 +489,8 @@
       "title": "Forgot Password?",
       "subtitle": "Enter your phone number to reset your password",
       "otpInfo": "We will send an OTP to verify your phone number before you can reset your password",
-      "emailSent": "Password reset email sent! Please check your inbox."
+      "emailSent": "Password reset email sent! Please check your inbox.",
+      "phoneNotRegistered": "This phone number is not registered. Please check your number or register."
     },
     "legacyLogin": {
       "title": "Legacy Email Login",
@@ -554,7 +559,9 @@
     "signInWithFacebook": "Continue with Facebook",
     "verifyFailed": "Verification failed. Try again.",
     "accountCheckFailed": "We couldn't check whether this account already exists. Please try again.",
-    "invalidPhone": "Please enter a valid phone number"
+    "invalidPhone": "Please enter a valid phone number",
+    "googleSignInFailed": "Google sign-in failed",
+    "appleSignInFailed": "Apple sign-in failed"
   },
   "home": {
     "welcome": "Welcome to Asankary",
@@ -820,7 +827,9 @@
     "promoNoLongerEligible": "Promo code no longer applies to your cart",
     "promoSingleStore": "This code applies to one store's items only.",
     "pricesUpdatedTitle": "Prices updated",
-    "pricesUpdatedMessage": "Some prices in your cart changed. Please review the new total before placing your order."
+    "pricesUpdatedMessage": "Some prices in your cart changed. Please review the new total before placing your order.",
+    "savedCardEndingIn": "QiCard ending in {{last4}}",
+    "savedCard": "Saved Card"
   },
   "qiCard": {
     "title": "QI Card Payment",
@@ -1350,7 +1359,9 @@
         "title": "Verify Your Identity",
         "passwordSubtitle": "Enter your password to continue this action.",
         "appleSubtitle": "Sign in with Apple to continue.",
-        "signoutSubtitle": "Please sign out and sign in again to continue."
+        "signoutSubtitle": "Please sign out and sign in again to continue.",
+        "appleFailed": "Apple authentication failed",
+        "signoutFallback": "For security, please sign out and sign back in, then try again."
       },
       "failedToVerify": "Failed to send verification email.",
       "verify": "Verify",
@@ -1358,7 +1369,9 @@
       "verifyEmailSentTitle": "Verification Sent",
       "profile": "PROFILE",
       "fullName": "Full Name",
-      "vehicle": "Vehicle"
+      "vehicle": "Vehicle",
+      "updatePhotoFailed": "Failed to update photo",
+      "saveNameFailed": "Failed to save name"
     },
     "emailVerification": {
       "resend": "Resend",
@@ -1381,7 +1394,13 @@
     "currencyUsd": "US Dollar ($)",
     "memberSince": "Member since {{year}}",
     "updateName": "Update name",
-    "yourName": "Your Name"
+    "yourName": "Your Name",
+    "nameTooShort": "Name must be at least 2 characters",
+    "nameTooLong": "Name cannot exceed 100 characters",
+    "termsFooterTitle": "Your Rights Protected",
+    "termsFooterBody": "These terms are designed to protect both customers and our business while ensuring fair, transparent transactions.",
+    "termsFooterContact": "Questions? Contact us at {{email}}",
+    "termsFooterContactFallback": "Questions? Reach us through Help & Support in the app."
   },
   "notifications": {
     "title": "Notifications",
@@ -1601,7 +1620,10 @@
     "loadingData": "Failed to load data",
     "overnightNotSupported": "Closing time must be after opening time",
     "authenticationError": "Authentication Error",
-    "loginAgainToOrder": "Please log out and log back in to place orders."
+    "loginAgainToOrder": "Please log out and log back in to place orders.",
+    "persistContactSupport": "Please try again. If the problem persists, contact support.",
+    "unexpectedLogged": "We encountered an unexpected error. This has been logged and we'll look into it.",
+    "viewDetails": "View Error Details"
   },
   "addresses": {
     "myAddresses": "My Addresses",
@@ -1698,7 +1720,8 @@
     "mapUnavailable": "Map unavailable",
     "noLocationSet": "No location set",
     "selectCountryFirst": "Select a country first",
-    "suggestionsTapToSelect": "Suggestions (tap to select):"
+    "suggestionsTapToSelect": "Suggestions (tap to select):",
+    "invalidPhoneFormat": "Please enter a valid phone number. Format: {{format}}"
   },
   "location": {
     "permissionRequired": "Location Permission Required",
@@ -1900,6 +1923,40 @@
       "textDescription": "Primary text color",
       "accent": "Accent Color",
       "accentDescription": "Special highlights and call-to-action elements"
+    },
+    "presets": {
+      "amber-retail": {
+        "name": "Amber Retail",
+        "description": "Warm amber accent on airy neutral surfaces"
+      },
+      "amber-retail-dark": {
+        "name": "Amber Retail Dark",
+        "description": "Warm amber accent on deep neutral surfaces"
+      },
+      "ocean-breeze": {
+        "name": "Ocean Breeze",
+        "description": "Calm and refreshing ocean-inspired colors"
+      },
+      "midnight-aurora": {
+        "name": "Luxury Gold",
+        "description": "Abstract luxury gold gradient design"
+      },
+      "sunset-vibes": {
+        "name": "Sunset Vibes",
+        "description": "Warm and energetic sunset colors"
+      },
+      "forest-green": {
+        "name": "Forest Green",
+        "description": "Natural green tones inspired by forest"
+      },
+      "royal-purple": {
+        "name": "Royal Purple",
+        "description": "Luxurious purple theme with golden accents"
+      },
+      "minimalist-gray": {
+        "name": "Minimalist Gray",
+        "description": "Clean and minimal gray palette"
+      }
     }
   },
   "chatbot": {
@@ -2048,7 +2105,32 @@
     "addCaption": "Add a caption...",
     "chat": "Chat",
     "sellerSupport": "Seller Support • Fast reply",
-    "sendFailed": "Message failed to send. Tap send to retry."
+    "sendFailed": "Message failed to send. Tap send to retry.",
+    "whatsappGreeting": "Hello 👋",
+    "quickReplies": {
+      "hello": "Hello! 👋",
+      "available": "Yes, it is available ✨",
+      "placeOrder": "Please place your order 🛒",
+      "discount": "We can offer a discount 🎉",
+      "checkStock": "Let me check the stock 📦"
+    },
+    "errors": {
+      "pickImage": "Failed to pick image",
+      "capturePhoto": "Failed to capture photo",
+      "uploadImage": "Failed to upload image",
+      "sendImage": "Failed to send image",
+      "uploadFile": "Failed to upload file",
+      "pickDocument": "Failed to pick document",
+      "micPermission": "Microphone permission is required to send voice messages",
+      "startRecording": "Failed to start recording",
+      "sendVoice": "Failed to send voice message",
+      "sendProductFailed": "Failed to send product"
+    },
+    "minutesShort": "{{value}}m",
+    "hoursShort": "{{value}}h",
+    "daysShort": "{{value}}d",
+    "minuteShort": "m",
+    "hourShort": "h"
   },
   "adminSettings": {
     "businessSettings": "Business Settings",
@@ -2102,7 +2184,8 @@
     "addShippingOffice": "Add Shipping Office",
     "addDescription": "Optional: For shipping to external offices",
     "useShippingOffice": "Ship to my shipping office",
-    "saveFailed": "Failed to save"
+    "saveFailed": "Failed to save",
+    "loadFailed": "Could not load your saved shipping details. Check your connection and try again."
   },
   "admin": {
     "categories": {
@@ -2322,7 +2405,12 @@
       "failedUpdateRole": "Failed to update role",
       "exportData": "Export All Data",
       "exportDataSubtitle": "Export products, orders, and customers to JSON",
-      "exportingData": "Exporting data..."
+      "exportingData": "Exporting data...",
+      "syncFailed": "Failed to sync products",
+      "sharingUnavailable": "Sharing is not available on this device",
+      "exportFailed": "Export Failed",
+      "exportFailedMessage": "An error occurred while exporting data.",
+      "deleteFailed": "Failed to delete account"
     },
     "stockReport": {
       "title": "Stock Report",
@@ -2373,7 +2461,11 @@
       "ordersInTransit": "orders in transit",
       "itemsShipping": "items shipping",
       "noOnTheWay": "No orders currently in transit",
-      "item": "item"
+      "item": "item",
+      "revenueReportFailed": "Failed to generate revenue report",
+      "unpaidLoadFailed": "Failed to load unpaid orders",
+      "sharingUnavailable": "Sharing is not available on this device",
+      "pdfFailed": "Failed to create PDF"
     },
     "banner": {
       "title": "Banner Management",
@@ -2463,7 +2555,14 @@
       "minOrder": "Min Order",
       "minItems": "Min Items",
       "descriptionArabic": "Description (Arabic)",
-      "descriptionKurdish": "Description (Kurdish)"
+      "descriptionKurdish": "Description (Kurdish)",
+      "typePercentage": "Percentage Off",
+      "typeFixed": "Fixed Amount",
+      "typeBundle": "Bundle Deal",
+      "minItemsOptional": "Min Items Required (Optional)",
+      "minItemsHint": "E.g. Buy 2+ items get $10 off, Buy 30+ items get $30 off",
+      "itemsSuffix": "items",
+      "loadFailed": "Failed to load discounts"
     },
     "storeProfile": {
       "title": "Store Profile",
@@ -2511,7 +2610,15 @@
       "wechatUploaded": "WeChat QR code uploaded successfully",
       "customTimezone": "(Custom)",
       "deviceDefaultTimezone": "(Device Default)",
-      "mainImage": "MAIN"
+      "mainImage": "MAIN",
+      "coverUploadFailed": "Failed to upload cover",
+      "coverUpdateFailed": "Failed to update cover",
+      "logoUploadFailed": "Failed to upload logo",
+      "logoUpdateFailed": "Failed to update logo",
+      "tenantNotFound": "Your store is still loading. Please go back and try again.",
+      "saveFailed": "Failed to save store profile",
+      "unnamedLocation": "Unnamed location",
+      "wechatIdPlaceholder": "WeChat ID or profile link"
     },
     "storeLocations": {
       "title": "Store Locations",
@@ -2634,7 +2741,16 @@
       "wednesday": "Wednesday",
       "thursday": "Thursday",
       "friday": "Friday",
-      "saturday": "Saturday"
+      "saturday": "Saturday",
+      "short": {
+        "sun": "Sun",
+        "mon": "Mon",
+        "tue": "Tue",
+        "wed": "Wed",
+        "thu": "Thu",
+        "fri": "Fri",
+        "sat": "Sat"
+      }
     },
     "businessInfo": {
       "title": "Business Info",
@@ -2846,7 +2962,21 @@
       "chat": "Chat",
       "gpsTrackingPreview": "GPS Tracking Preview",
       "saveTrackingUrl": "Save Tracking URL",
-      "trackingUrlLabel": "Tracking URL (GPSOPS)"
+      "trackingUrlLabel": "Tracking URL (GPSOPS)",
+      "invalidAmountPaid": "Enter a valid, non-negative amount.",
+      "overpayment": "Amount paid cannot exceed the total order amount.",
+      "paymentUpdated": "Payment updated successfully",
+      "markedPaidInFull": "Order marked as paid in full",
+      "invoiceFailed": "Failed to generate invoice",
+      "cannotVerifyAdmin": "Cannot verify admin identity.",
+      "orderChat": "Order Chat",
+      "trackingUrlSaved": "Tracking URL saved",
+      "trackingUrlSaveFailed": "Failed to save tracking URL",
+      "shippedMsgHeader": "📦 Order {{order}} has been shipped!",
+      "shippedMsgTotal": "💰 Total Amount: {{total}}",
+      "shippedMsgTrack": "📍 Track your order: {{url}}",
+      "shippedMsgLocation": "📍 Delivery Location: {{url}}",
+      "shippedMsgThanks": "Thank you for your business!"
     },
     "order": {
       "color": "Color",
@@ -3249,7 +3379,9 @@
       "nameRequired": "Brand name is required",
       "pickLogo": "Add logo",
       "subtitle": "Manage brands & logos",
-      "title": "Brands"
+      "title": "Brands",
+      "loadFailed": "Could not load brands. Check your connection and try again.",
+      "namePlaceholder": "e.g. Samsung"
     },
     "categoryMgr": {
       "add": "Add Category",
@@ -3263,7 +3395,9 @@
       "nameRequired": "Category name is required",
       "pickLogo": "Add logo",
       "saveError": "Could not save the category. Please try again.",
-      "title": "Categories"
+      "title": "Categories",
+      "namePlaceholder": "e.g. Chargers",
+      "loadFailed": "Could not load categories. Check your connection and try again."
     },
     "hidden": "Hidden",
     "promos": {
@@ -3283,8 +3417,14 @@
       "duplicateCode": "That code already exists",
       "percentRange": "Percent off must be between 1 and 100",
       "saveFailed": "Could not save. Try again.",
-      "deleteFailed": "Could not delete. Try again."
-    }
+      "deleteFailed": "Could not delete. Try again.",
+      "offPercent": "{{value}}% off",
+      "offAmount": "${{value}} off",
+      "minShort": "min ${{value}}",
+      "codePlaceholder": "e.g. WELCOME10",
+      "loadFailed": "Could not load promo codes. Check your connection and try again."
+    },
+    "noBusinessSelected": "No business selected"
   },
   "onboarding": {
     "welcomeTitle": "Welcome to",
@@ -3363,14 +3503,45 @@
     "mapsError": "Could not open the maps application.",
     "phoneError": "Could not open the phone application.",
     "whatsappError": "WhatsApp is not installed on this device.",
-    "whatsappMessage": "Hello, I would like to inquire about products at {{store}}."
+    "whatsappMessage": "Hello, I would like to inquire about products at {{store}}.",
+    "errorTitle": "Couldn't Load Store Locations"
   },
   "loginGate": {
     "backToBrowsing": "Back to Browsing",
     "whyCreate": "Why create an account?",
     "benefitTrackOrders": "Track your orders in real-time",
     "benefitSaveAddresses": "Save addresses for faster checkout",
-    "benefitExclusiveDeals": "Access exclusive deals and offers"
+    "benefitExclusiveDeals": "Access exclusive deals and offers",
+    "reason": {
+      "checkout": {
+        "title": "Sign in to Checkout",
+        "description": "Create an account or sign in to complete your purchase and track your order."
+      },
+      "orders": {
+        "title": "Sign in to View Orders",
+        "description": "Sign in to see your order history and track current deliveries."
+      },
+      "message": {
+        "title": "Sign in to Message",
+        "description": "Sign in to contact sellers and get answers to your questions."
+      },
+      "address": {
+        "title": "Sign in to Save Address",
+        "description": "Sign in to save your delivery addresses for faster checkout."
+      },
+      "payment": {
+        "title": "Sign in to Save Payment",
+        "description": "Sign in to securely save your payment methods."
+      },
+      "profile": {
+        "title": "Sign in to Access Profile",
+        "description": "Sign in to manage your account settings and preferences."
+      },
+      "default": {
+        "title": "Sign in Required",
+        "description": "Please sign in to continue with this action."
+      }
+    }
   },
   "confirmIdentity": {
     "enterPasswordError": "Please enter your password",
@@ -3386,6 +3557,47 @@
   "privacyPolicy": {
     "title": "Privacy Policy",
     "quickSummary": "Privacy Quick Summary",
-    "contactHeading": "Questions About Your Privacy?"
+    "contactHeading": "Questions About Your Privacy?",
+    "heroSubtitle": "Your privacy is our priority. This policy explains how we collect, use, and protect your personal information.",
+    "effectiveDate": "Effective Date: January 1, 2025 | Version 2.1",
+    "summary": {
+      "minimalData": "We only collect information necessary for providing our services",
+      "encrypted": "Your data is encrypted and securely stored",
+      "neverSell": "We never sell your personal information to third parties",
+      "fullControl": "You have full control over your data and can delete it anytime"
+    }
+  },
+  "imageViewer": {
+    "shareTitle": "Share Image",
+    "sharingUnavailable": "Sharing is not available on this device",
+    "shareFailed": "Failed to share image",
+    "saved": "Saved",
+    "savedMessage": "Image saved successfully",
+    "saveFailed": "Failed to save image"
+  },
+  "liveTracking": {
+    "headerLabel": "LIVE TRACKING",
+    "trackingDriver": "Tracking driver location",
+    "driver": "Driver",
+    "toYourLocation": "to your location",
+    "updatesEvery": "Updates every 10s",
+    "gpsActive": "GPS Active",
+    "yourLocation": "Your Location",
+    "distanceToDelivery": "Distance to delivery:",
+    "addGpsHint": "Add GPS location to your address to see distance",
+    "notActive": "Live tracking is not active",
+    "live": "LIVE",
+    "signalLost": "Signal lost...",
+    "lastKnownLocation": "Last known location"
+  },
+  "phoneInput": {
+    "searchCountryOrCode": "Search country or code...",
+    "byRegion": "By Region",
+    "countryCount": "{{n}} countries"
+  },
+  "colorPicker": {
+    "selectedColor": "Selected Color",
+    "chooseColor": "Choose a Color",
+    "suggestedColors": "Suggested Colors"
   }
 }

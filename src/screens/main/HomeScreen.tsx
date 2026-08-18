@@ -130,6 +130,9 @@ const HomeScreen: React.FC = () => {
   const [showScrollHint, setShowScrollHint] = useState(false); // For scroll-to-top button
   const [cartSheetProduct, setCartSheetProduct] = useState<Product | null>(null);
   const [cartSheetVisible, setCartSheetVisible] = useState(false);
+  // True when the product fetch itself failed, so the empty list can show a retry
+  // instead of the "no products" state (a dead network must not look like empty stock).
+  const [loadError, setLoadError] = useState(false);
 
   // Data states
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -228,6 +231,7 @@ const HomeScreen: React.FC = () => {
         };
       }
       setNewArrivals(products || []);
+      setLoadError(false);
 
       // Prefetch first 6 images for instant display
       if (products && products.length > 0) {
@@ -243,6 +247,7 @@ const HomeScreen: React.FC = () => {
     } catch (error) {
       if (seq !== undefined && seq !== loadSeq.current) return;
       setNewArrivals([]);
+      setLoadError(true);
     }
   };
 
@@ -555,7 +560,7 @@ const HomeScreen: React.FC = () => {
     </View>
   ), [handleProductPress, handleAddToCartPress, isFavorites, toggleFavorite]);
 
-  // Empty list component
+  // Empty list component — doubles as the error state (with retry) when the fetch failed.
   const renderEmptyProducts = () => (
     <View style={[
       styles.emptyState,
@@ -571,14 +576,28 @@ const HomeScreen: React.FC = () => {
         backgroundColor: theme.colors.primary + '12',
         justifyContent: 'center', alignItems: 'center', marginBottom: 16,
       }}>
-        <Ionicons name="cube-outline" size={28} color={theme.colors.primary} />
+        <Ionicons name={loadError ? 'cloud-offline-outline' : 'cube-outline'} size={28} color={theme.colors.primary} />
       </View>
       <Text allowFontScaling={false} style={{ fontSize: 17, fontWeight: '600', color: theme.colors.text, textAlign: 'center' }}>
-        {t('home.noProducts', { defaultValue: 'No products available' })}
+        {loadError ? t('common.somethingWentWrong') : t('home.noProducts', { defaultValue: 'No products available' })}
       </Text>
       <Text allowFontScaling={false} style={{ fontSize: 14, color: theme.colors.textSecondary, textAlign: 'center', marginTop: 6 }}>
-        {t('common.pullToRefresh', { defaultValue: 'Pull down to refresh' })}
+        {loadError ? t('common.loadError') : t('common.pullToRefresh', { defaultValue: 'Pull down to refresh' })}
       </Text>
+      {loadError && (
+        <TouchableOpacity
+          onPress={() => loadDataRef.current()}
+          accessibilityRole="button"
+          style={{
+            marginTop: 16, paddingHorizontal: 22, paddingVertical: 10,
+            borderRadius: 12, backgroundColor: theme.colors.primary,
+          }}
+        >
+          <Text allowFontScaling={false} style={{ fontSize: 14, fontWeight: '600', color: '#FFFFFF', textAlign: 'center' }}>
+            {t('common.retry')}
+          </Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 
@@ -594,17 +613,17 @@ const HomeScreen: React.FC = () => {
         <StatusBar style={isDark ? 'light' : 'dark'} translucent backgroundColor="transparent" />
 
         {/* Skeleton Header */}
-        <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
-          <View style={styles.headerLeft}>
+        <View style={[styles.header, { backgroundColor: theme.colors.surface, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+          <View style={[styles.headerLeft, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: skBg }} />
             <View style={{ marginHorizontal: 10 }}>
               <View style={{ width: 60, height: 10, borderRadius: 5, backgroundColor: skBg }} />
               <View style={{ width: 100, height: 14, borderRadius: 7, backgroundColor: skBg, marginTop: 6 }} />
             </View>
           </View>
-          <View style={styles.headerRight}>
+          <View style={[styles.headerRight, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             {[1, 2, 3, 4].map((i) => (
-              <View key={i} style={{ width: 30, height: 30, borderRadius: 12, backgroundColor: skBg, marginLeft: 12 }} />
+              <View key={i} style={{ width: 30, height: 30, borderRadius: 12, backgroundColor: skBg }} />
             ))}
           </View>
         </View>

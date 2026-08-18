@@ -1348,7 +1348,7 @@ const AdminStockReportScreen: React.FC = () => {
               }
               renderItem={({ item }) => (
                 <TouchableOpacity
-                  style={[styles.unpaidCustomerCard, { backgroundColor: isDark ? theme.colors.surface : '#FFFFFF' }]}
+                  style={[styles.unpaidCustomerCard, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDark ? theme.colors.surface : '#FFFFFF' }]}
                   activeOpacity={0.7}
                   onPress={() => {
                     setUnpaidModalVisible(false);
@@ -1359,33 +1359,33 @@ const AdminStockReportScreen: React.FC = () => {
                     });
                   }}
                 >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 12 }}>
+                  <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', flex: 1, marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }}>
                     {/* Customer Avatar */}
                     <View style={[styles.unpaidAvatar, { backgroundColor: '#EAB308' }]}>
                       <Text allowFontScaling={false} style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '700' }}>
                         {item.name.charAt(0).toUpperCase()}
                       </Text>
                     </View>
-                    <View style={{ flex: 1, marginLeft: 12 }}>
-                      <Text allowFontScaling={false} style={[styles.unpaidCustomerName, { color: theme.colors.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+                    <View style={{ flex: 1, marginLeft: isRTL ? 0 : 12, marginRight: isRTL ? 12 : 0 }}>
+                      <Text allowFontScaling={false} style={[styles.unpaidCustomerName, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
                         {item.name}
                       </Text>
                       {item.phone ? (
-                        <Text allowFontScaling={false} style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+                        <Text allowFontScaling={false} style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 2, textAlign: isRTL ? 'right' : 'left' }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
                           {item.phone}
                         </Text>
                       ) : null}
-                      <Text allowFontScaling={false} style={{ fontSize: 11, color: theme.colors.textSecondary, marginTop: 2 }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+                      <Text allowFontScaling={false} style={{ fontSize: 11, color: theme.colors.textSecondary, marginTop: 2, textAlign: isRTL ? 'right' : 'left' }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
                         {item.orders.length} {item.orders.length === 1 ? t('admin.stockReport.order', { defaultValue: 'order' }) : t('admin.stockReport.orders', { defaultValue: 'orders' })}
                       </Text>
                     </View>
                   </View>
-                  <View style={{ alignItems: 'flex-end', flexShrink: 0 }}>
+                  <View style={{ alignItems: isRTL ? 'flex-start' : 'flex-end', flexShrink: 0 }}>
                     <Text allowFontScaling={false} style={styles.unpaidAmount} adjustsFontSizeToFit numberOfLines={1}>
                       {formatPrice(item.totalRemaining, item.currency as any, item.exchangeRate)}
                     </Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                      <Text allowFontScaling={false} style={{ fontSize: 11, color: theme.colors.textSecondary, marginRight: 4 }} adjustsFontSizeToFit numberOfLines={1}>
+                    <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', marginTop: 4 }}>
+                      <Text allowFontScaling={false} style={{ fontSize: 11, color: theme.colors.textSecondary, marginRight: isRTL ? 0 : 4, marginLeft: isRTL ? 4 : 0 }} adjustsFontSizeToFit numberOfLines={1}>
                         {t('admin.stockReport.viewOrders', { defaultValue: 'View' })}
                       </Text>
                       <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={14} color={theme.colors.textSecondary} />

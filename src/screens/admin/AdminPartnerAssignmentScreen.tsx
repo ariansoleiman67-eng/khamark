@@ -119,7 +119,7 @@ export default function AdminPartnerAssignmentScreen() {
       Alert.alert(
         t('admin.common.success', { defaultValue: 'Success' }),
         t('admin.partners.assignSaved', { count: updatesCount, defaultValue: `Updated assignments for ${updatesCount} products.` }),
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
+        [{ text: t('admin.common.ok', { defaultValue: 'OK' }), onPress: () => navigation.goBack() }]
       );
     } catch (error) {
       Alert.alert(t('admin.common.error', { defaultValue: 'Error' }), t('admin.partners.assignFailed', { defaultValue: 'Failed to save assignments' }));

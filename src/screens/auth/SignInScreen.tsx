@@ -430,7 +430,7 @@ const SignInScreen: React.FC = () => {
           setShowCreateAccountModal(true);
         }
       } catch (error: any) {
-        setErrorMessage(error.message || 'Something went wrong');
+        setErrorMessage(error.message || t('errors.unknown'));
       } finally {
         setLoading(false);
       }
@@ -454,7 +454,7 @@ const SignInScreen: React.FC = () => {
           rememberMe: rememberMe,
         });
       } catch (error: any) {
-        setErrorMessage(error.message || 'Something went wrong');
+        setErrorMessage(error.message || t('errors.unknown'));
       } finally {
         setLoading(false);
       }
@@ -485,8 +485,10 @@ const handleGoogleSignIn = async () => {
       handleSuccessfulLogin();
     } catch (error: any) {
       if (error.message !== 'Sign in was cancelled') {
-        const errorDetails = JSON.stringify(error, Object.getOwnPropertyNames(error), 2);
-        Alert.alert(t('auth.error'), error.message ? error.message : `Raw Error: ${errorDetails}`);
+        // A provider rejection without a .message (native GoogleSignIn status codes)
+        // used to dump raw JSON into the alert — keep that detail in the log only.
+        console.error('Google sign-in error:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+        Alert.alert(t('auth.error'), error.message ? error.message : t('errors.unknown'));
       }
     } finally {
       setGoogleLoading(false);

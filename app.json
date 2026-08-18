@@ -3,7 +3,7 @@
     "name": "Asankary",
     "slug": "Asankary",
     "scheme": "asankary",
-    "version": "1.9.43",
+    "version": "1.9.44",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -33,7 +33,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.asankary.app",
-      "buildNumber": "73",
+      "buildNumber": "74",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "This app needs location access to provide accurate delivery addresses and find nearby parts.",
         "NSCameraUsageDescription": "This app needs camera access to take photos for profile and support tickets.",
@@ -49,7 +49,7 @@
     },
     "android": {
       "package": "com.asankary.app",
-      "versionCode": 134,
+      "versionCode": 135,
       "versionName": "1.9.43",
       "googleServicesFile": "./google-services.json",
       "softwareKeyboardLayoutMode": "resize",

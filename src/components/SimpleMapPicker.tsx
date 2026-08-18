@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform, Image as RNImage, Linking } from 'react-native';
 import { GOOGLE_MAPS_API_KEY } from '../constants/config';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from './ThemeProvider';
 
 // iOS CRASH FIX: react-native-maps crashes on iOS with newArchEnabled (Fabric).
@@ -36,6 +37,7 @@ const SimpleMapPicker: React.FC<SimpleMapPickerProps> = ({
   height = 250,
 }) => {
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const [region, setRegion] = useState({
     latitude,
     longitude,
@@ -77,7 +79,7 @@ const SimpleMapPicker: React.FC<SimpleMapPickerProps> = ({
           />
           <View style={{ position: 'absolute', bottom: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             <Ionicons name="open-outline" size={14} color="#fff" />
-            <Text allowFontScaling={false} style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>Open in Maps</Text>
+            <Text allowFontScaling={false} style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>{t('common.openInMaps')}</Text>
           </View>
         </TouchableOpacity>
 
@@ -90,7 +92,7 @@ const SimpleMapPicker: React.FC<SimpleMapPickerProps> = ({
         </View>
 
         <Text allowFontScaling={false} style={[styles.helpText, { color: theme.colors.textSecondary }]}>
-          📍 Tap to open in Apple Maps
+          {`📍 ${t('common.tapToOpenInMaps', { defaultValue: 'Tap to open in Maps' })}`}
         </Text>
       </View>
     );
@@ -110,8 +112,8 @@ const SimpleMapPicker: React.FC<SimpleMapPickerProps> = ({
             coordinate={{ latitude, longitude }}
             draggable
             onDragEnd={handleMarkerDragEnd}
-            title="Delivery Location"
-            description="Drag to adjust"
+            title={t('addresses.deliveryLocation')}
+            description={t('addresses.dragPinToAdjust')}
           />
         </MapView>
 

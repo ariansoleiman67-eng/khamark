@@ -343,14 +343,14 @@ Policy Version: 2.1`
               marginBottom: SPACING.sm,
               textAlign: isRTL ? 'right' : 'left',
             }}>
-              Your privacy is our priority. This policy explains how we collect, use, and protect your personal information.
+              {t('privacyPolicy.heroSubtitle')}
             </Text>
             <Text allowFontScaling={false} style={{
               fontSize: 14,
               color: 'rgba(255,255,255,0.8)',
               textAlign: isRTL ? 'right' : 'left',
             }}>
-              Effective Date: January 1, 2025 | Version 2.1
+              {t('privacyPolicy.effectiveDate')}
             </Text>
           </View>
 
@@ -381,7 +381,7 @@ Policy Version: 2.1`
                 flex: 1,
                 textAlign: isRTL ? 'right' : 'left',
               }}>
-                We only collect information necessary for providing our services
+                {t('privacyPolicy.summary.minimalData')}
               </Text>
             </View>
 
@@ -395,7 +395,7 @@ Policy Version: 2.1`
                 flex: 1,
                 textAlign: isRTL ? 'right' : 'left',
               }}>
-                Your data is encrypted and securely stored
+                {t('privacyPolicy.summary.encrypted')}
               </Text>
             </View>
 
@@ -409,7 +409,7 @@ Policy Version: 2.1`
                 flex: 1,
                 textAlign: isRTL ? 'right' : 'left',
               }}>
-                We never sell your personal information to third parties
+                {t('privacyPolicy.summary.neverSell')}
               </Text>
             </View>
 
@@ -423,7 +423,7 @@ Policy Version: 2.1`
                 flex: 1,
                 textAlign: isRTL ? 'right' : 'left',
               }}>
-                You have full control over your data and can delete it anytime
+                {t('privacyPolicy.summary.fullControl')}
               </Text>
             </View>
           </View>

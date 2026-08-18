@@ -141,10 +141,10 @@ const AdminDashboardScreen: React.FC = () => {
         setStoreProfile(prev => ({ ...prev, logoUrl: result.url }));
         Alert.alert(t('common.success'), t('admin.dashboard.logoUploaded', { defaultValue: 'Logo updated successfully!' }));
       } else {
-        Alert.alert(t('common.error'), result.error || 'Failed to upload logo');
+        Alert.alert(t('common.error'), result.error || t('alerts.failedUpload'));
       }
     } catch (error: any) {
-      Alert.alert(t('common.error'), error.message || 'Failed to upload logo');
+      Alert.alert(t('common.error'), error.message || t('alerts.failedUpload'));
     } finally {
       setUploading(false);
     }
@@ -167,10 +167,10 @@ const AdminDashboardScreen: React.FC = () => {
         setStoreProfile(prev => ({ ...prev, coverUrl: result.url, coverUrls: newCoverUrls }));
         Alert.alert(t('common.success'), t('admin.dashboard.bannerUploaded', { defaultValue: 'Banner updated successfully!' }));
       } else {
-        Alert.alert(t('common.error'), result.error || 'Failed to upload banner');
+        Alert.alert(t('common.error'), result.error || t('alerts.failedUpload'));
       }
     } catch (error: any) {
-      Alert.alert(t('common.error'), error.message || 'Failed to upload banner');
+      Alert.alert(t('common.error'), error.message || t('alerts.failedUpload'));
     } finally {
       setUploading(false);
     }
@@ -233,7 +233,7 @@ const AdminDashboardScreen: React.FC = () => {
       const mappedOrders = ordersData.map((order: any) => ({
         id: order.id!,
         orderNumber: order.orderNumber,
-        customerName: order.shippingAddress?.fullName || 'Guest',
+        customerName: order.shippingAddress?.fullName || '',
         total: order.totalUSD ?? 0,
         status: order.status || 'pending',
         createdAt: order.createdAt?.toDate?.() || new Date(),
@@ -346,7 +346,7 @@ const AdminDashboardScreen: React.FC = () => {
           adjustsFontSizeToFit
           numberOfLines={1}
         >
-          {order.customerName}
+          {order.customerName || t('home.guest')}
         </Text>
       </View>
       
@@ -427,7 +427,7 @@ const AdminDashboardScreen: React.FC = () => {
               adjustsFontSizeToFit
               numberOfLines={1}
             >
-              {businessName || getLocalizedStoreName(storeProfile, i18n.language) || (user as any)?.displayName || 'Admin'}
+              {businessName || getLocalizedStoreName(storeProfile, i18n.language) || (user as any)?.displayName || t('admin.dashboard.administrator')}
             </Text>
             {user?.email && !isSyntheticEmail(user.email) && (
               <Text allowFontScaling={false} 
