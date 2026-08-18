@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { selectAdminParts } from './partsRead';
 import { Order, Product } from '../types';
 import { safeCall } from '../utils/safeFirebaseCall';
 import { mapProduct, toPartRow, ProductService } from './productService';
@@ -36,10 +37,10 @@ const mapTenantProduct = (doc: any): TenantProduct => ({
 // (not the light LIST_COLUMNS) so purchasePrice + coAdminIds come through.
 export const getAssignedProducts = async (partnerUid: string): Promise<TenantProduct[]> => {
   if (!partnerUid) return [];
-  const { data, error } = await supabase
-    .from('parts')
-    .select('*')
-    .contains('extra_data', { coAdminIds: [partnerUid] });
+  // Through the view: `*` on `parts` stops working for `authenticated` once
+  // purchase_price is revoked, and this read exists precisely to carry it.
+  const { data, error } = await selectAdminParts('*', (q) =>
+    q.contains('extra_data', { coAdminIds: [partnerUid] }));
   if (error) throw error;
   return (data || []).map(mapTenantProduct);
 };
@@ -197,10 +198,8 @@ export class TenantAdminService {
 
   async getProducts(): Promise<TenantProduct[]> {
     try {
-      const { data, error } = await supabase
-        .from('parts')
-        .select('*')
-        .eq('tenant_id', this.tenantId);
+      const { data, error } = await selectAdminParts('*', (q) =>
+        q.eq('tenant_id', this.tenantId));
 
       if (error) throw error;
 
@@ -229,19 +228,17 @@ export class TenantAdminService {
 
   async getProduct(productId: string): Promise<TenantProduct | null> {
     try {
-      const { data, error } = await supabase
-        .from('parts')
-        .select('*')
-        .eq('id', productId)
-        .single();
+      const { data, error } = await selectAdminParts('*', (q) =>
+        q.eq('id', productId).limit(1));
+      const row = Array.isArray(data) ? data[0] : data;
 
-      if (error || !data) return null;
-      if (data.tenant_id !== this.tenantId) {
+      if (error || !row) return null;
+      if (row.tenant_id !== this.tenantId) {
         console.warn(`Access denied: Product ${productId} does not belong to tenant ${this.tenantId}`);
         return null;
       }
 
-      return mapTenantProduct(data);
+      return mapTenantProduct(row);
     } catch (error) {
       console.error('Error fetching product:', error);
       throw error;

@@ -4,6 +4,7 @@
  */
 
 import { supabase } from './supabase';
+import { selectAdminParts } from './partsRead';
 import { Order, Product, User } from '../types';
 import { revenueToIQD } from '../utils/currency';
 
@@ -219,7 +220,9 @@ export const getOrderById = async (orderId: string): Promise<Order | null> => {
 
 export const fetchAllProducts = async (): Promise<Product[]> => {
   try {
-    const { data, error } = await supabase.from('parts').select('*');
+    // Through the view — see partsRead.ts. `*` on `parts` cannot include cost for
+    // `authenticated` any more, and this is a back-office read that wants it.
+    const { data, error } = await selectAdminParts('*');
     if (error) throw error;
     return (data || []).map(mapProduct);
   } catch (error) {
@@ -259,7 +262,10 @@ export const addProduct = async (productData: Omit<Product, 'id' | 'createdAt' |
       tenant_id: productData.tenantId,
     };
 
-    const { data, error } = await supabase.from('parts').insert([payload]).select().single();
+    // `.select()` with no argument is `*`, which requires SELECT on EVERY column —
+    // including purchase_price, which `authenticated` no longer has. Only the id is
+    // used two lines down, so only the id is asked for.
+    const { data, error } = await supabase.from('parts').insert([payload]).select('id').single();
     if (error) throw error;
     return data.id;
   } catch (error) {
@@ -482,9 +488,10 @@ export const getAnalyticsData = async (startDate: Date, endDate: Date, tenantId?
     // order line (it.purchasePrice was wrong — showed old/low costs, overstating profit).
     const purchaseById = new Map<string, number>();
     try {
-      let pq = supabase.from('parts').select('id, extra_data, price_tiers, price_usd, price_iqd, purchase_price');
-      if (tenantId) pq = pq.eq('tenant_id', tenantId);
-      const { data: parts } = await pq;
+      const { data: parts } = await selectAdminParts(
+        'id, extra_data, price_tiers, price_usd, price_iqd, purchase_price',
+        (q) => (tenantId ? q.eq('tenant_id', tenantId) : q),
+      );
       for (const p of (parts || [])) {
         partIds.add((p as any).id);
         const ca = (p as any).extra_data?.coAdminIds;
