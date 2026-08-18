@@ -35,11 +35,10 @@
       "bundleIdentifier": "com.asankary.app",
       "buildNumber": "74",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "This app needs location access to provide accurate delivery addresses and find nearby parts.",
-        "NSCameraUsageDescription": "This app needs camera access to take photos for profile and support tickets.",
-        "NSPhotoLibraryUsageDescription": "This app needs photo library access to select images for profile and support.",
-        "NSMicrophoneUsageDescription": "This app needs microphone access for sending voice messages in chat.",
-        "NSUserTrackingUsageDescription": "This identifier is used to measure the performance of our ads so we can show you more relevant offers.",
+        "NSLocationWhenInUseUsageDescription": "Asankary uses your location to fill in your delivery address and to show you the nearest shop branch — for example, dropping a pin on your street so a delivery rider can find you.",
+        "NSCameraUsageDescription": "Asankary uses the camera so you can photograph a phone you want to trade in, or take a profile picture — for example, snapping the back of your old handset so the shop can price it.",
+        "NSPhotoLibraryUsageDescription": "Asankary uses your photo library so you can attach existing photos to a trade-in request, a message to the shop, or your profile — for example, choosing a photo of your old phone you already took.",
+        "NSMicrophoneUsageDescription": "Asankary uses the microphone so you can send the shop a voice message in chat instead of typing — for example, asking about a product in Kurdish rather than writing it.",
         "ITSAppUsesNonExemptEncryption": false
       },
       "config": {
