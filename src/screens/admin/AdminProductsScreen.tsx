@@ -269,7 +269,7 @@ const AdminProductsScreen: React.FC = () => {
     setIsActive(true);
     setFormData({
       name: '', nameAr: '', nameKu: '', partNumber: '', category: '', categoryAr: '', categoryKu: '',
-      priceUSD: '', compareAtPriceUSD: '', vipPriceUSD: '', purchasePrice: '', stockQty: '', historicalStockQty: '', initialStock: '', shippingCost: '', description: '', descriptionAr: '', descriptionKu: '', brand: '', status: 'available',
+      priceUSD: '', priceIQD: '', compareAtPriceUSD: '', vipPriceUSD: '', purchasePrice: '', stockQty: '', historicalStockQty: '', initialStock: '', shippingCost: '', description: '', descriptionAr: '', descriptionKu: '', brand: '', status: 'available',
       warranty: '', sku: '', barcode: '', weight: '', dimLength: '', dimWidth: '', dimHeight: '',
     });
     // Also reset view state so a tenant switch doesn't carry over filters/reorder mode.
@@ -385,7 +385,7 @@ const AdminProductsScreen: React.FC = () => {
     setIsActive(true);
     setFormData({
       name: '', nameAr: '', nameKu: '', partNumber: '', category: '', categoryAr: '', categoryKu: '',
-      priceUSD: '', compareAtPriceUSD: '', vipPriceUSD: '', purchasePrice: '', stockQty: '', historicalStockQty: '', initialStock: '', shippingCost: '', description: '', descriptionAr: '', descriptionKu: '', brand: '', status: 'available',
+      priceUSD: '', priceIQD: '', compareAtPriceUSD: '', vipPriceUSD: '', purchasePrice: '', stockQty: '', historicalStockQty: '', initialStock: '', shippingCost: '', description: '', descriptionAr: '', descriptionKu: '', brand: '', status: 'available',
       warranty: '', sku: '', barcode: '', weight: '', dimLength: '', dimWidth: '', dimHeight: '',
     });
     setApplyShippingToAll(false);
@@ -1886,7 +1886,7 @@ const AdminProductsScreen: React.FC = () => {
   // Price is only required for `available` products (see handleSave) — the button used to
   // demand one for every status, so a "Coming soon" product could never be saved.
   const canSubmitForm = !!formData.name.trim() && !!formData.partNumber.trim()
-    && (formData.status !== 'available' || !!formData.priceUSD.trim() || !!formData.priceIQD.trim());
+    && (formData.status !== 'available' || !!formData.priceUSD.trim() || !!(formData.priceIQD || '').trim());
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: pageBg }]} edges={['left', 'right']}>
@@ -2711,7 +2711,7 @@ const AdminProductsScreen: React.FC = () => {
                     numberOfLines={3}
                   >
                     {(() => {
-                      const iqd = parseInt(formData.priceIQD.replace(/[^0-9]/g, ''), 10) || 0;
+                      const iqd = parseInt((formData.priceIQD || '').replace(/[^0-9]/g, ''), 10) || 0;
                       if (iqd <= 0) {
                         return t('admin.products.form.priceIQDHint', {
                           defaultValue: 'Leave blank to price this product in dollars as usual. Fill it in for stock you bought in dinar — customers then see this exact amount and the exchange rate is not applied to it.',
