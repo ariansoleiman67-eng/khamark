@@ -2013,14 +2013,22 @@ const AdminOrdersScreen: React.FC = () => {
                   </View>
                 </View>
 
-                {/* Special Instructions / Notes */}
-                {selectedOrder?.notes && (
+                {/* Special Instructions / Notes.
+                    TWO COLUMNS, because the two surfaces write different ones:
+                    this app writes the customer's note to `orders.notes`
+                    (OrderService.ts:186) while the website writes it to
+                    `orders.special_instructions`. Reading only `notes` meant a
+                    web customer's delivery instruction — "call before you come",
+                    "second floor" — never reached the shop at all. Neither
+                    column is duplicated on write; the readers just have to know
+                    about both. */}
+                {(selectedOrder?.notes || (selectedOrder as any)?.special_instructions) && (
                   <View style={[styles.modalSection, { backgroundColor: theme.colors.background }]}>
                     <Text allowFontScaling={false} style={[styles.modalLabel, { color: theme.colors.textSecondary }]}>
                       {t('admin.orders.specialInstructions', { defaultValue: 'Special Instructions' })}
                     </Text>
                     <Text allowFontScaling={false} style={[styles.modalValue, { color: theme.colors.text }]}>
-                      {selectedOrder.notes}
+                      {selectedOrder?.notes || (selectedOrder as any)?.special_instructions}
                     </Text>
                   </View>
                 )}
