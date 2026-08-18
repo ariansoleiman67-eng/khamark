@@ -111,13 +111,33 @@ Deno.serve(async (req: Request) => {
       // answer honest about stock and price.
       const { data: products } = await supabase
         .from('parts')
-        .select('name, brand, category, price_usd, stock_qty, status, description')
+        .select('name, brand, category, price_usd, price_iqd, stock_qty, status, description')
         .limit(200);
+
+      // Most customers here ask in dinar, so give the model both figures rather
+      // than a dollar price it would have to convert itself — and it is told
+      // below never to do arithmetic on a price.
+      //
+      // A product priced in dinar (price_iqd set) carries that exact figure; the
+      // dollar column is derived from it. One priced in dollars gets its dinar
+      // figure the way the app renders it: x rate, rounded to the nearest 250.
+      // Read the live rate the app itself uses, rather than an env var that would
+      // silently go stale the first time the shop edits it in Currency Settings.
+      const { data: settingsRow } = await supabase
+        .from('global_settings')
+        .select('data')
+        .eq('id', 'business_info')
+        .maybeSingle();
+      const exchangeRate = Number((settingsRow?.data as Record<string, unknown> | null)?.exchangeRateIQD) || 1500;
+      const toIQD = (usd: number) => Math.round((usd * exchangeRate) / 250) * 250;
 
       const catalogue = (products ?? [])
         .map((p) => {
           const inStock = (p.status === null || p.status === 'available') && Number(p.stock_qty) > 0;
-          return `- ${p.name}${p.brand ? ` (${p.brand})` : ''} — $${p.price_usd} — ${inStock ? 'in stock' : 'out of stock'}${p.category ? ` — ${p.category}` : ''}`;
+          const usd = Number(p.price_usd) || 0;
+          const iqd = p.price_iqd != null ? Number(p.price_iqd) : toIQD(usd);
+          const price = `$${usd.toFixed(2)} / ${iqd.toLocaleString('en-US')} IQD`;
+          return `- ${p.name}${p.brand ? ` (${p.brand})` : ''} — ${price} — ${inStock ? 'in stock' : 'out of stock'}${p.category ? ` — ${p.category}` : ''}`;
         })
         .join('\n');
 
@@ -129,6 +149,7 @@ Deno.serve(async (req: Request) => {
         '- Reply in the SAME language the customer used. Arabic gets Arabic, Kurdish Sorani gets Kurdish Sorani, English gets English.',
         '- Keep it short — one or two sentences, the way a shop replies on WhatsApp.',
         '- Only state prices and stock from the list below. Never invent a product, a price, or a delivery date.',
+        '- Each product lists both a dollar and a dinar price. Quote whichever the customer asked in, copied EXACTLY as written. Never convert between them yourself and never round — the dinar figure is the price the shop set, not a conversion.',
         "- If you don't know, say the shop will confirm shortly. Do not guess.",
         '- Never promise a discount, a refund, or a delivery time.',
         '- You are an assistant, not the owner. If asked to agree a deal, say the owner will confirm.',
