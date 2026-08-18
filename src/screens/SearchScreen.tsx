@@ -790,7 +790,6 @@ const SearchScreen: React.FC = () => {
         keyExtractor={(item: Product) => item.id}
         numColumns={numColumns}
         masonry
-        estimatedItemSize={250}
         contentContainerStyle={[styles.listContainer, { backgroundColor: isDark ? theme.colors.background : '#FFF3E0' }]}
         showsVerticalScrollIndicator={false}
         // Kill the rubber-band overscroll so dragging with a finger doesn't make the results

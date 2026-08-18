@@ -1,7 +1,6 @@
-// @ts-nocheck
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
-import { FlashList } from '@shopify/flash-list';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import {
   View,
   Text,
@@ -120,7 +119,7 @@ const AdminProductsScreen: React.FC = () => {
   const { user } = useAuth();
   const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
-  const listRef = useRef<FlashList<Product>>(null);
+  const listRef = useRef<FlashListRef<Product>>(null);
   // Task 9 trade-in hand-off: AdminTradeInDetailScreen navigates here with a
   // `prefill` param. Neither hook was used in this file before — AdminProducts is
   // rendered as a tab (AdminTabNavigator's WrappedProductsScreen renders
@@ -222,6 +221,16 @@ const AdminProductsScreen: React.FC = () => {
     vipPriceUSD: '',
     purchasePrice: '',
     stockQty: '',
+    // BOTH OF THESE WERE WRITTEN BY THE FORM AND MISSING FROM ITS INITIAL SHAPE.
+    // `historicalStockQty` is set by the two reset literals and read at :798;
+    // `condition` is set by the trade-in prefill (:437) and by openEditModal
+    // (:656) and read at :861. Neither existed here, so the state's inferred type
+    // did not contain them and `formData.condition` was a type error TypeScript
+    // was told not to look at. This is the same shape as the crash the shop hit
+    // when `priceIQD` was absent from a reset literal: a field the form writes
+    // but the initial object does not declare is undefined on first mount.
+    historicalStockQty: '',
+    condition: '',
     shippingCost: '',
     description: '',
     descriptionAr: '',
@@ -269,7 +278,7 @@ const AdminProductsScreen: React.FC = () => {
     setIsActive(true);
     setFormData({
       name: '', nameAr: '', nameKu: '', partNumber: '', category: '', categoryAr: '', categoryKu: '',
-      priceUSD: '', priceIQD: '', compareAtPriceUSD: '', vipPriceUSD: '', purchasePrice: '', stockQty: '', historicalStockQty: '', initialStock: '', shippingCost: '', description: '', descriptionAr: '', descriptionKu: '', brand: '', status: 'available',
+      priceUSD: '', priceIQD: '', compareAtPriceUSD: '', vipPriceUSD: '', purchasePrice: '', stockQty: '', historicalStockQty: '', condition: '', initialStock: '', shippingCost: '', description: '', descriptionAr: '', descriptionKu: '', brand: '', status: 'available',
       warranty: '', sku: '', barcode: '', weight: '', dimLength: '', dimWidth: '', dimHeight: '',
     });
     // Also reset view state so a tenant switch doesn't carry over filters/reorder mode.
@@ -385,7 +394,7 @@ const AdminProductsScreen: React.FC = () => {
     setIsActive(true);
     setFormData({
       name: '', nameAr: '', nameKu: '', partNumber: '', category: '', categoryAr: '', categoryKu: '',
-      priceUSD: '', priceIQD: '', compareAtPriceUSD: '', vipPriceUSD: '', purchasePrice: '', stockQty: '', historicalStockQty: '', initialStock: '', shippingCost: '', description: '', descriptionAr: '', descriptionKu: '', brand: '', status: 'available',
+      priceUSD: '', priceIQD: '', compareAtPriceUSD: '', vipPriceUSD: '', purchasePrice: '', stockQty: '', historicalStockQty: '', condition: '', initialStock: '', shippingCost: '', description: '', descriptionAr: '', descriptionKu: '', brand: '', status: 'available',
       warranty: '', sku: '', barcode: '', weight: '', dimLength: '', dimWidth: '', dimHeight: '',
     });
     setApplyShippingToAll(false);
@@ -1266,6 +1275,17 @@ const AdminProductsScreen: React.FC = () => {
   }, [t, openEditModal, handleDuplicate, handleDelete]);
 
   // Bulk: set the same status on every selected product (e.g. a shipment arrived → all Available).
+  // DECLARED ABOVE THE BULK CALLBACKS, not 100 lines below them. Both
+  // useCallback dependency arrays below name `selectedIds`, and a dependency
+  // array is built DURING RENDER at that line — so this state was read about a
+  // hundred lines before its own `const` ran, on every render of the screen. It
+  // survives today only because of how the bundle transpiles block scoping; under
+  // a toolchain that keeps the temporal dead zone it is a hard crash on the
+  // admin's product list. One of the errors `@ts-nocheck` was hiding.
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+
   const bulkSetStatus = useCallback((status: ProductStatus) => {
     const ids = Array.from(selectedIds);
     if (!tenantId || !ids.length) return;
@@ -1369,9 +1389,6 @@ const AdminProductsScreen: React.FC = () => {
   type SortMode = 'default' | 'stock_low' | 'price_high' | 'price_low' | 'name' | 'newest';
   const [sortMode, setSortMode] = useState<SortMode>('default');
   const [sortSheetOpen, setSortSheetOpen] = useState(false);
-  const [selectionMode, setSelectionMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [bulkBusy, setBulkBusy] = useState(false);
 
   // Debounce search so filtering all ~258 products doesn't run on every keystroke (smooth typing).
   useEffect(() => {
@@ -2006,7 +2023,6 @@ const AdminProductsScreen: React.FC = () => {
         data={reorderMode ? reorderedProducts : sortedProducts}
         keyExtractor={(item) => `${tenantId}-${item.id}`}
         renderItem={renderProductItem}
-        estimatedItemSize={120}
         extraData={reorderMode ? reorderedProducts : undefined}
         contentContainerStyle={{ paddingBottom: ADMIN_TAB_HEIGHT + insets.bottom + SPACING.xl }}
         ListHeaderComponent={reorderMode ? null : ListHeader}
@@ -2037,7 +2053,6 @@ const AdminProductsScreen: React.FC = () => {
           const y = e.nativeEvent.contentOffset.y;
           setShowScrollHint(y > 200);
         }}
-        estimatedItemSize={120}
       />
 
       {showScrollHint && !modalVisible && (

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useState, useEffect, useRef } from 'react';
 import {
   ActivityIndicator,
@@ -690,7 +689,7 @@ export const ProductDetailsScreen: React.FC = () => {
       setLoading(false); // <--- UNBLOCK UI HERE (Main Content Ready)
 
       // Load Store Info using product's tenantId
-      const tid = product.tenantId;
+      const tid = product.tenantId ?? null;
       setTenantId(tid);
       setStoreExpanded(true); // Start expanded
 
@@ -1128,16 +1127,6 @@ export const ProductDetailsScreen: React.FC = () => {
   const storeAddressLine = [storeInfo?.city, storeAddress].filter(Boolean).join(' · ');
   const hasStoreCard = !!(storeDisplayName || storeAddressLine || storeInfo?.phone || storeInfo?.whatsapp);
 
-  // Gallery images from product. When a colour with its own image is selected,
-  // that image leads the gallery so the hero swaps to the chosen colour.
-  const selectedColorImg = effectiveColor
-    ? product.colorVariations?.find((c) => c.colorValue === effectiveColor)?.imageUrl
-    : undefined;
-  const baseGallery = product.imageUrls || [];
-  const galleryImages = selectedColorImg
-    ? [selectedColorImg, ...baseGallery.filter((u) => u !== selectedColorImg)]
-    : baseGallery;
-
   // Stock from product - SUM all potential stock sources
   // This addresses user report: "out of stock just out of stock happen when there is no any stock of color , size , main"
   const sizeStock = product.variations?.reduce((sum, v) => sum + (v.stockQuantity || 0), 0) || 0;
@@ -1212,6 +1201,22 @@ export const ProductDetailsScreen: React.FC = () => {
     selectedColor ??
     (product.colorVariations?.find((c) => (c.stockQuantity ?? 0) > 0)?.colorValue ?? null);
   const storageDelta = storageOptions.find((s) => s.id === effectiveStorageId)?.priceDelta ?? 0;
+
+  // Gallery images from product. When a colour with its own image is selected,
+  // that image leads the gallery so the hero swaps to the chosen colour.
+  //
+  // MOVED DOWN, deliberately: this block used to sit ~80 lines ABOVE
+  // `effectiveColor` and read it there, in the component body, before its `const`
+  // ran — a temporal-dead-zone access that only fails to throw because of how the
+  // bundle transpiles today. It is a crash waiting for a toolchain change, and it
+  // is one of the errors `@ts-nocheck` was hiding at the top of this file.
+  const selectedColorImg = effectiveColor
+    ? product.colorVariations?.find((c) => c.colorValue === effectiveColor)?.imageUrl
+    : undefined;
+  const baseGallery = product.imageUrls || [];
+  const galleryImages = selectedColorImg
+    ? [selectedColorImg, ...baseGallery.filter((u) => u !== selectedColorImg)]
+    : baseGallery;
 
   // Calculate total price:
   // - For simple products: tieredUnitPrice × quantity
@@ -1963,7 +1968,7 @@ export const ProductDetailsScreen: React.FC = () => {
                       <AppNumber
                         value={formatItemPrice(product, currentCurrency as any, exchangeRateIQD)}
                         style={[
-                          styles.stockStatusPrice, 
+                          styles.tierPrice,
                           { 
                             color: activeQtyForPricing < (product.priceTiers[0]?.minQty || 1) && !isVip 
                               ? theme.colors.primary 
@@ -2326,7 +2331,7 @@ export const ProductDetailsScreen: React.FC = () => {
                         );
                       })()}
                       <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', flexWrap: 'wrap', gap: 12, marginTop: 10, marginBottom: 6 }}>
-                        {product.colorVariations.map((cv) => {
+                        {(product.colorVariations ?? []).map((cv) => {
                           const sel = effectiveColor === cv.colorValue;
                           const soldOut = (cv.stockQuantity ?? 0) <= 0;
                           // A white or near-white swatch vanishes against the card, so
@@ -2470,7 +2475,7 @@ export const ProductDetailsScreen: React.FC = () => {
                   </View>
 
                   {/* Rows */}
-                  {product.colorVariations.map((colorVar, index) => {
+                  {(product.colorVariations ?? []).map((colorVar, index) => {
                     const isOutOfStock = colorVar.stockQuantity <= 0;
                     const currentQty = colorVariationQuantities[colorVar.variationId] || 0;
                     // colorValue comes from admin-entered DB JSON and may be null/empty.
@@ -3819,6 +3824,16 @@ const styles = StyleSheet.create({
   tierText: {
     flex: 1,
     fontSize: 14,
+  },
+  /* The MIDDLE COLUMN of the wholesale-tier table. Both of its call sites named a
+     style that was never defined — `styles.stockStatusPrice` and `styles.tierPrice`
+     — so the price cell resolved to `undefined` and rendered with no `flex: 1` at
+     all, while the quantity column on its left and the saving on its right both
+     had it. The three columns of that table have never lined up. */
+  tierPrice: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
   },
   hintContainer: {
     alignItems: 'center',

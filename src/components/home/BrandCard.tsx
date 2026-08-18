@@ -70,7 +70,13 @@ const BrandCard: React.FC<BrandCardProps> = ({ label, imageUrl, width, onPress, 
         )}
       </View>
 
-      {!compact && (
+      {/* Only under a LOGO. The caption exists to name the mark above it — but
+          when the brand has no logo, the thing above it IS the name, drawn as a
+          wordmark, so the tile printed it twice: "BELKIN" over "Belkin". Most of
+          this shop's brands have no logo uploaded, so most of the rail read like
+          that. This is the same reasoning the `compact` variant already carries a
+          few lines up; it was only ever applied to the small tile. */}
+      {!compact && showImage && (
         <AppText
           fontSize={13}
           numberOfLines={1}

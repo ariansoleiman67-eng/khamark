@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -164,7 +163,16 @@ export const StoreLocationScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedLocation, setSelectedLocation] = useState<StoreLocation | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('map');
-  const [mapRegion, setMapRegion] = useState({
+  // Typed, because BRAND.storeCoords is `as const`: inferred from the initial
+  // value alone, this state's type is the LITERAL 36.1911 / 44.0094, and every
+  // later setMapRegion — centring on a real store, focusing a marker — is a type
+  // error. Which is what @ts-nocheck was hiding.
+  const [mapRegion, setMapRegion] = useState<{
+    latitude: number
+    longitude: number
+    latitudeDelta: number
+    longitudeDelta: number
+  }>({
     latitude: BRAND.storeCoords.latitude, // Default store region
     longitude: BRAND.storeCoords.longitude,
     latitudeDelta: 0.5,

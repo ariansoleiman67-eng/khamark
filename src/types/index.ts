@@ -181,6 +181,19 @@ export interface Product {
   // Video support: optional product video URL (BunnyCDN/Cloud)
   videoUrl?: string;
   tenantId?: string;
+  /**
+   * Which admin owns this product, and therefore which inbox a customer's
+   * question about it lands in (chatService.ts:130 routes on it).
+   *
+   * Not a column — `parts` has no owner_admin_id. It lives inside the `extra_data`
+   * jsonb, listed in productService's PART_EXTRA_KEYS, and tenantAdminService
+   * (:26) lifts it back out onto the object. So the VALUE has always been here;
+   * only the declaration was missing, which made every read of it a type error
+   * inside a file carrying @ts-nocheck. `adminId` is the older name for the same
+   * thing, still written alongside it for rows created before the rename.
+   */
+  ownerAdminId?: string | null;
+  adminId?: string | null;
   coAdminIds?: string[]; // IDs of other admins allowed to view this product
   sortOrder?: number; // Admin-controlled display order (lower = first)
   createdAt: Timestamp;

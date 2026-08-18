@@ -721,7 +721,8 @@
     "youSave": "You save",
     "updateError": "Failed to update quantity",
     "moreToUnlock": "more to unlock {{name}}",
-    "moreItemsToUnlock": "more items to unlock {{name}}"
+    "moreItemsToUnlock": "more items to unlock {{name}}",
+    "restartFailed": "Your cart was cleared but the item could not be added. Please try again."
   },
   "checkout": {
     "title": "Checkout",
@@ -817,7 +818,9 @@
     "promoPlaceholder": "Promo code",
     "promoApply": "Apply",
     "promoNoLongerEligible": "Promo code no longer applies to your cart",
-    "promoSingleStore": "This code applies to one store's items only."
+    "promoSingleStore": "This code applies to one store's items only.",
+    "pricesUpdatedTitle": "Prices updated",
+    "pricesUpdatedMessage": "Some prices in your cart changed. Please review the new total before placing your order."
   },
   "qiCard": {
     "title": "QI Card Payment",
@@ -1462,7 +1465,8 @@
     "showInStockOnly": "Show only in-stock items",
     "applyFilters": "Apply Filters ({{count}} results)",
     "clearFilters": "Clear Filters",
-    "scanBarcode": "Scan Barcode"
+    "scanBarcode": "Scan Barcode",
+    "loadErrorSubtitle": "Please check your connection and try again."
   },
   "scanner": {
     "title": "Barcode Scanner",
@@ -1850,7 +1854,8 @@
       "description": "Our support team is available Saturday to Thursday, 8:00 AM - 6:00 PM",
       "chatButton": "Chat with Support"
     },
-    "whatsappMessage": "Hi, I need help with my question that's not covered in the FAQ"
+    "whatsappMessage": "Hi, I need help with my question that's not covered in the FAQ",
+    "contactUnavailable": "Support contact is not available yet. Please try again later."
   },
   "navigation": {
     "home": "Home",
@@ -2042,7 +2047,8 @@
     "trackOrder": "Track Order",
     "addCaption": "Add a caption...",
     "chat": "Chat",
-    "sellerSupport": "Seller Support • Fast reply"
+    "sellerSupport": "Seller Support • Fast reply",
+    "sendFailed": "Message failed to send. Tap send to retry."
   },
   "adminSettings": {
     "businessSettings": "Business Settings",
@@ -2184,7 +2190,9 @@
       "tookOut": "Took out value",
       "deleteUnshareNote": "This only removes the record. It does NOT give the item back to the partner.",
       "takeOutUnits": "Take out by units · {{price}}/unit",
-      "tookOutUnits": "Took out {{count}} units"
+      "tookOutUnits": "Took out {{count}} units",
+      "enterAmountTitle": "Enter an amount",
+      "enterAmount": "Please enter a valid amount greater than 0."
     },
     "partners": {
       "title": "Partner Management",
@@ -2224,7 +2232,9 @@
       "noSearchResults": "No products match your search.",
       "viewProducts": "View",
       "subtitleOne": "1 partner",
-      "productsCountOne": "1 product"
+      "productsCountOne": "1 product",
+      "errorTitle": "Couldn't Load Partners",
+      "errorSubtitle": "Check your connection and try again."
     },
     "settings": {
       "title": "Admin Settings",
@@ -3114,7 +3124,9 @@
       "uploadLogo": "Tap to upload logo",
       "uploadLogoError": "Failed to upload logo",
       "pickImageError": "Failed to pick image",
-      "saveError": "Failed to save settings"
+      "saveError": "Failed to save settings",
+      "loadFailedCannotSave": "Could not load your current settings. Please reload before saving to avoid overwriting your data.",
+      "loadError": "Could not load invoice settings. Check your connection and try again."
     },
     "tabs": {
       "dashboard": "Dashboard",
@@ -3160,7 +3172,8 @@
       "rateHint": "Current conversion rate used for IQD displays. E.g., 1550 means 1 USD = 1,550 IQD.",
       "successMessage": "Currency settings updated successfully",
       "saveError": "Failed to save currency settings",
-      "loadError": "Failed to load currency settings"
+      "loadError": "Failed to load currency settings",
+      "invalidRate": "Please enter a valid exchange rate."
     },
     "inStore": {
       "title": "In-Store Sales",
@@ -3215,7 +3228,8 @@
       "options": "options",
       "createFailed": "Failed to create sale",
       "stockNotDeductedTitle": "Stock not updated",
-      "stockNotDeductedMsg": "The sale was saved, but stock could not be deducted for one or more items. Please adjust the stock manually."
+      "stockNotDeductedMsg": "The sale was saved, but stock could not be deducted for one or more items. Please adjust the stock manually.",
+      "loadFailed": "Couldn't load products"
     },
     "tradeIn": {
       "title": "Trade-In Requests",
