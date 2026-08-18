@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   Alert,
   Modal,
+  Platform,
   View,
   Text,
   TouchableOpacity,
@@ -12,6 +13,7 @@ import {
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from './ThemeProvider';
+import { createAlertCloseSequencer } from './alertSequencer';
 
 type AlertButton = {
   text?: string;
@@ -37,6 +39,13 @@ export default function AppAlertHost() {
   const { t } = useTranslation();
   const [current, setCurrent] = useState<AlertData | null>(null);
   const queueRef = useRef<AlertData[]>([]);
+  // Holds the pressed button's handler until this dialog's own <Modal> has gone.
+  // See alertSequencer.ts for why that ordering is the whole bug.
+  const sequencerRef = useRef(createAlertCloseSequencer());
+  // While true, a newly-raised alert only QUEUES. Showing it immediately would
+  // keep the Modal visible, so iOS would never fire onDismiss and the pending
+  // handler would be stranded.
+  const dismissingRef = useRef(false);
   const opacity = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.92)).current;
 
@@ -51,6 +60,7 @@ export default function AppAlertHost() {
       options?: { cancelable?: boolean },
     ) => {
       queueRef.current.push({ title, message, buttons, cancelable: options?.cancelable });
+      if (dismissingRef.current) return; // the dismissal handler below will pick it up
       setCurrent((prev) => (prev ? prev : queueRef.current.shift() || null));
     };
     return () => {
@@ -68,26 +78,61 @@ export default function AppAlertHost() {
     ]).start();
   }, [current, opacity, scale]);
 
+  // Runs the pressed button's handler and then shows whatever queued up behind
+  // it. Called from the Modal's onDismiss on iOS — the platform telling us the
+  // view controller has finished going away — and directly on Android, which has
+  // no onDismiss and no conflict to avoid.
+  const afterDialogGone = useCallback(() => {
+    dismissingRef.current = false;
+    sequencerRef.current.dialogDismissed();
+    const next = queueRef.current.shift();
+    if (next) setCurrent(next);
+  }, []);
+
   const close = useCallback(
     (btn?: AlertButton) => {
-      try {
-        btn?.onPress?.();
-      } catch {
-        /* swallow handler errors so the dialog still closes */
-      }
+      // ARMED, NOT RUN. This handler used to be invoked right here, before the
+      // fade even started, so it opened its modal while this dialog's <Modal> was
+      // still mounted. On iOS that is two view controllers at once and the app
+      // freezes; on Android it is two Dialogs and nothing happens. That is the
+      // whole platform split in the bug report.
+      sequencerRef.current.arm(btn?.onPress ? () => btn.onPress!() : null);
+      dismissingRef.current = true;
       Animated.timing(opacity, { toValue: 0, duration: 120, useNativeDriver: true }).start(() => {
         setCurrent(null);
-        // Show the next queued alert (if any) on the next tick.
-        setTimeout(() => {
-          const next = queueRef.current.shift();
-          if (next) setCurrent(next);
-        }, 50);
+        // A HANDLER MUST NEVER BE LOST. On iOS the intended trigger is the
+        // Modal's onDismiss, which RN emits from UIKit's dismissal completion
+        // block (RCTModalHostViewComponentView.mm:183) — but that block only
+        // runs if the modal was actually presented in the first place. If it
+        // never was, onDismiss never fires and the pressed button would silently
+        // do nothing, which for a "Delete" button is far worse than the bug this
+        // is fixing. So a timer backs it up. The sequencer runs a handler at most
+        // once, so whichever arrives first wins and the other is a no-op.
+        // Android has no onDismiss at all and no presentation conflict to avoid,
+        // so there the timer IS the mechanism.
+        setTimeout(afterDialogGone, Platform.OS === 'ios' ? 350 : 50);
       });
     },
-    [opacity],
+    [opacity, afterDialogGone],
   );
 
-  if (!current) return null;
+  // THE MODAL STAYS MOUNTED WHEN THERE IS NO ALERT, rendered with visible={false}
+  // rather than returning null. Both branches of this component return a <Modal>
+  // at the same position, so React reconciles them to ONE instance whose `visible`
+  // prop flips — which is what lets iOS fire `onDismiss` on the way down. Return
+  // null here and the element unmounts instead of dismissing, no onDismiss ever
+  // arrives, and the pressed button's handler would sit in the sequencer forever.
+  if (!current) {
+    return (
+      <Modal
+        transparent
+        visible={false}
+        animationType="none"
+        statusBarTranslucent
+        onDismiss={afterDialogGone}
+      />
+    );
+  }
 
   const buttons: AlertButton[] =
     current.buttons && current.buttons.length > 0
@@ -162,7 +207,17 @@ export default function AppAlertHost() {
   };
 
   return (
-    <Modal transparent visible animationType="none" onRequestClose={onBackdrop} statusBarTranslucent>
+    <Modal
+      transparent
+      visible
+      animationType="none"
+      onRequestClose={onBackdrop}
+      statusBarTranslucent
+      // iOS only, and the point of the whole change: it fires once this dialog's
+      // view controller has finished dismissing, which is when the pressed
+      // button's handler may safely open a modal of its own.
+      onDismiss={afterDialogGone}
+    >
       <Pressable style={styles.backdrop} onPress={onBackdrop}>
         <Animated.View style={{ opacity }} pointerEvents="box-none">
           <Pressable onPress={() => {}} style={styles.center} pointerEvents="box-none">
