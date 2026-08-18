@@ -210,3 +210,43 @@ describe('order totals', () => {
     expect(formatOrderLineTotal(usdLine, 'IQD', RATE)).toBe('IQD 150,000');
   });
 });
+
+// --- admin revenue reporting --------------------------------------------------
+import { revenueToIQD } from '../../src/utils/currency';
+
+describe('revenueToIQD', () => {
+  it('is the plain conversion when nothing was priced in dinar', () => {
+    // The exact arithmetic the analytics screen used before, so existing
+    // revenue/profit figures do not shift for shops with no dinar products.
+    expect(revenueToIQD(1000, 0, 0, RATE)).toBe(1500000);
+    expect(revenueToIQD(1000, 0, 0, 1520)).toBe(1520000);
+  });
+
+  it('counts the dinar portion in dinar and converts only the rest', () => {
+    // 1 unit at 1,237,123 IQD (stored as $824.75) plus $100 of dollar-priced sales.
+    expect(revenueToIQD(924.75, 1237123, 824.75, RATE)).toBe(1237123 + 150000);
+  });
+
+  it('is exact where the old arithmetic drifted', () => {
+    const typed = 1237123;
+    const storedUSD = 824.75;                       // price_usd, only to the cent
+    const oldWay = storedUSD * RATE;                // what analytics reported before
+    const newWay = revenueToIQD(storedUSD, typed, storedUSD, RATE);
+    expect(newWay).toBe(typed);
+    expect(oldWay).not.toBe(typed);
+    expect(Math.round(oldWay - typed)).toBe(2);     // the few dinar it was out by
+  });
+
+  it('scales that drift with quantity, which the fix removes', () => {
+    const qty = 500;
+    const oldWay = 824.75 * qty * RATE;
+    const newWay = revenueToIQD(824.75 * qty, 1237123 * qty, 824.75 * qty, RATE);
+    expect(newWay).toBe(1237123 * qty);
+    expect(Math.round(oldWay - newWay)).toBe(1000);  // a full 1,000 IQD over 500 units
+  });
+
+  it('handles a missing or zero rate without producing NaN', () => {
+    expect(revenueToIQD(100, 0, 0, 0)).toBe(0);
+    expect(revenueToIQD(100, 0, 0, NaN)).toBe(0);
+  });
+});

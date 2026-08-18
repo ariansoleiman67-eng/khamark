@@ -5,6 +5,7 @@
 
 import { supabase } from './supabase';
 import { Order, Product, User } from '../types';
+import { revenueToIQD } from '../utils/currency';
 
 // Helper to convert snake_case DB fields to camelCase for the frontend
 const mapProduct = (data: any): Product => ({
@@ -473,11 +474,15 @@ export const getAnalyticsData = async (startDate: Date, endDate: Date, tenantId?
     // Wholesale unit price per product (lowest valid tier price, else base) — the owner's revenue
     // and profit are valued at WHOLESALE, not the per-piece price actually charged on each line.
     const wholesaleById = new Map<string, number>();
+    // The same wholesale value in dinar, but ONLY for products whose wholesale
+    // price is their dinar price — i.e. priced in dinar and carrying no tier.
+    // A tier price is a dollar figure, so a tiered product converts as before.
+    const wholesaleIQDById = new Map<string, number>();
     // Buy price per product from the PRODUCT (purchase_price), NOT the stale price recorded on each
     // order line (it.purchasePrice was wrong — showed old/low costs, overstating profit).
     const purchaseById = new Map<string, number>();
     try {
-      let pq = supabase.from('parts').select('id, extra_data, price_tiers, price_usd, purchase_price');
+      let pq = supabase.from('parts').select('id, extra_data, price_tiers, price_usd, price_iqd, purchase_price');
       if (tenantId) pq = pq.eq('tenant_id', tenantId);
       const { data: parts } = await pq;
       for (const p of (parts || [])) {
@@ -487,6 +492,10 @@ export const getAnalyticsData = async (startDate: Date, endDate: Date, tenantId?
         const tiers = Array.isArray((p as any).price_tiers) ? (p as any).price_tiers : [];
         const valid = tiers.filter((t: any) => t && t.minQty > 0 && t.priceUSD > 0).map((t: any) => Number(t.priceUSD));
         wholesaleById.set((p as any).id, valid.length ? Math.min(...valid) : (Number((p as any).price_usd) || 0));
+        const pIqd = Number((p as any).price_iqd);
+        if (!valid.length && (p as any).price_iqd != null && pIqd > 0) {
+          wholesaleIQDById.set((p as any).id, pIqd);
+        }
         purchaseById.set((p as any).id, Number((p as any).purchase_price) || 0);
       }
     } catch { /* best-effort: if parts can't be read, no exclusion */ }
@@ -526,6 +535,10 @@ export const getAnalyticsData = async (startDate: Date, endDate: Date, tenantId?
       const isPartnerLine = (it: any) => assignedSet.has(it.productId) || (isPartnerOrder && !partIds.has(it.productId));
       const items = Array.isArray(o.items) ? o.items : [];
       let owRev = 0, owProfit = 0;
+      // Running totals for the dinar-exact part: the dinar value of those lines,
+      // and the dollar value of the SAME lines, so the remainder can be converted
+      // without double-counting them.
+      let exactIQD = 0, exactUSD = 0, owCostUSD = 0;
       for (const it of items) {
         if (isPartnerLine(it)) continue;
         // No wholesale price for this line's product (a custom/POS line, or a deleted product)
@@ -534,8 +547,12 @@ export const getAnalyticsData = async (startDate: Date, endDate: Date, tenantId?
         if (!wholesaleById.has(it.productId)) continue;
         const q = num(it.quantity) || 1;
         const ws = wholesaleById.get(it.productId) as number;
+        const cost = purchaseById.get(it.productId) || 0;
         owRev += ws * q;
-        owProfit += (ws - (purchaseById.get(it.productId) || 0)) * q;
+        owProfit += (ws - cost) * q;
+        owCostUSD += cost * q;
+        const wsIQD = wholesaleIQDById.get(it.productId);
+        if (wsIQD) { exactIQD += wsIQD * q; exactUSD += ws * q; }
       }
       if (owRev <= 0) continue; // nothing for the owner (all shared / partner / no-price lines)
 
@@ -547,10 +564,17 @@ export const getAnalyticsData = async (startDate: Date, endDate: Date, tenantId?
       const collected = owRev * payFrac;
       const outstanding = owRev - collected;
 
-      revUSD += owRev;            revIQD += owRev * rate;
-      collectedUSD += collected;  collectedIQD += collected * rate;
-      unpaidUSD += outstanding;   unpaidIQD += outstanding * rate;
-      profUSD += owProfit;        profIQD += owProfit * rate;
+      // Dinar revenue for this order: the dinar-priced lines counted in dinar, plus
+      // everything else converted once. With no dinar-priced line exactIQD is 0 and
+      // this collapses to owRev * rate — the original arithmetic, unchanged.
+      const owRevIQD = revenueToIQD(owRev, exactIQD, exactUSD, rate);
+      const collectedIQDPart = owRevIQD * payFrac;
+
+      revUSD += owRev;            revIQD += owRevIQD;
+      collectedUSD += collected;  collectedIQD += collectedIQDPart;
+      unpaidUSD += outstanding;   unpaidIQD += owRevIQD - collectedIQDPart;
+      // Cost is a dollar figure either way, so only the revenue half can be exact.
+      profUSD += owProfit;        profIQD += owRevIQD - owCostUSD * rate;
     }
 
     return {

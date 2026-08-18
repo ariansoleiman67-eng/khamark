@@ -558,3 +558,31 @@ export const formatOrderLineTotal = (
   }
   return formatPrice((Number(line?.priceUSD) || 0) * qty, currency, exchangeRateIQD, options);
 };
+
+/**
+ * Convert a revenue figure to dinar without re-converting the part of it that
+ * was already authored in dinar.
+ *
+ * Admin analytics values the shop's sales in USD and multiplies the lot by the
+ * rate. For a product priced in dinar that multiplication reconstructs an
+ * approximation of a number the shop typed, off by a few dinar per unit because
+ * price_usd is only stored to the cent.
+ *
+ * @param revenueUSD  the whole revenue figure, in dollars
+ * @param exactIQD    the dinar value of the dinar-priced portion
+ * @param exactUSD    the dollar value of that SAME portion, so it is not counted twice
+ *
+ * With no dinar-priced portion (exactIQD 0) this is exactly revenueUSD * rate —
+ * the original arithmetic, so existing figures do not shift.
+ */
+export const revenueToIQD = (
+  revenueUSD: number,
+  exactIQD: number,
+  exactUSD: number,
+  exchangeRate: number = 1500
+): number => {
+  const usd = Number(revenueUSD) || 0;
+  const rate = Number(exchangeRate) || 0;
+  if (!(Number(exactIQD) > 0)) return usd * rate;
+  return Number(exactIQD) + (usd - (Number(exactUSD) || 0)) * rate;
+};
