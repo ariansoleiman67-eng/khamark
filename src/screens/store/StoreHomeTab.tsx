@@ -26,6 +26,7 @@ import Animated, {
   useAnimatedStyle, 
   withSpring 
 } from 'react-native-reanimated';
+import { iosTapFix } from '../../ui/iosTapFix';
 
 interface StoreHomeTabProps {
   profile: StoreProfile;
@@ -175,7 +176,7 @@ const StoreHomeTab: React.FC<StoreHomeTabProps & { onSwitchTab?: (tabName: strin
 
   return (
     <View style={[styles.container, { backgroundColor: isDark ? theme.colors.background : '#F8FAFC' }]}>
-      <ScrollView 
+      <ScrollView {...iosTapFix} 
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -190,7 +191,7 @@ const StoreHomeTab: React.FC<StoreHomeTabProps & { onSwitchTab?: (tabName: strin
               gradient={ACCENT_GRADIENT}
               onViewAll={() => onSwitchTab?.('ProductsTab')}
             />
-            <ScrollView 
+            <ScrollView {...iosTapFix} 
               horizontal 
               showsHorizontalScrollIndicator={false} 
               contentContainerStyle={[

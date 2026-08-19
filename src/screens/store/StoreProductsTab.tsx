@@ -28,6 +28,7 @@ import MasonryProductCard from '../../components/MasonryProductCard';
 import { useTheme } from '../../components/ThemeProvider';
 import { SPACING, FONT_SIZE } from '../../constants/theme';
 import { useFavorites } from '../../contexts/FavoritesContext';
+import { iosTapFix } from '../../ui/iosTapFix';
 
 interface StoreProductsTabProps {
   tenantId: string;
@@ -176,7 +177,7 @@ const StoreProductsTab: React.FC<StoreProductsTabProps> = ({ products }) => {
   const renderHeader = useCallback(() => (
     <View style={[styles.filterHeaderContainer, { backgroundColor: isDark ? theme.colors.background : '#F8FAFC' }]}>
       {/* Modern Filter Chips with animations */}
-      <FlatList
+      <FlatList {...iosTapFix}
         data={FILTER_CHIPS}
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -270,7 +271,7 @@ const StoreProductsTab: React.FC<StoreProductsTabProps> = ({ products }) => {
         </View>
       </View>
 
-      <FlatList
+      <FlatList {...iosTapFix}
         ref={flatListRef}
         data={displayProducts}
         renderItem={renderItem}

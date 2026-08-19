@@ -37,6 +37,7 @@ import { ProductService } from '../services/productService';
 import { useTenant } from '../contexts/TenantContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getTimeFromTimestamp } from '../utils/timestampUtils';
+import { iosTapFix } from '../ui/iosTapFix';
 
 // Visual search analysis type from the AI backend
 interface VisualAnalysis {
@@ -503,7 +504,7 @@ const SearchScreen: React.FC = () => {
 
           {/* Confidence Badges */}
           {badges.length > 0 && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={vsStyles.aiBadgesRow}>
+            <ScrollView {...iosTapFix} horizontal showsHorizontalScrollIndicator={false} style={vsStyles.aiBadgesRow}>
               {badges.map((badge, idx) => (
                 <View key={idx} style={vsStyles.aiConfidenceBadge}>
                   <Ionicons name={badge.icon as any} size={12} color="rgba(255,255,255,0.9)" />
@@ -564,7 +565,7 @@ const SearchScreen: React.FC = () => {
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-        <ScrollView style={styles.filtersContent} keyboardShouldPersistTaps="handled">
+        <ScrollView {...iosTapFix} style={styles.filtersContent} keyboardShouldPersistTaps="handled">
           {/* Category Filter */}
           <View style={styles.filterSection}>
             <Text allowFontScaling={false} style={[styles.filterSectionTitle, { color: theme.colors.text }]}>{t('search.category')}</Text>
@@ -784,7 +785,7 @@ const SearchScreen: React.FC = () => {
       {renderAIBanner()}
 
       {/* Products List - Masonry Grid */}
-      <FlashList
+      <FlashList {...iosTapFix}
         data={filteredProducts}
         renderItem={renderProduct}
         keyExtractor={(item: Product) => item.id}

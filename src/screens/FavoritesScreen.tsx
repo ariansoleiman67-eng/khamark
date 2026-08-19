@@ -23,6 +23,7 @@ import { SHADOW_STYLES as shadows } from '../constants/theme';
 import MasonryProductCard from '../components/MasonryProductCard';
 import ProductService from '../services/productService';
 import { Product, RootStackParamList, Theme } from '../types';
+import { iosTapFix } from '../ui/iosTapFix';
 
 type FavoritesScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Favorites'>;
 
@@ -270,7 +271,7 @@ const FavoritesScreen: React.FC = () => {
           </View>
 
           {/* Products Grid */}
-          <FlatList
+          <FlatList {...iosTapFix}
             data={products}
             renderItem={renderProductItem}
             keyExtractor={(item) => item.id}

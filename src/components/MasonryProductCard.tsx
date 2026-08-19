@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import {
   View,
+  Alert,
   Pressable,
   StyleSheet,
   Dimensions,
@@ -62,7 +63,21 @@ const SALE_RED = "#E53935";
 // against white (computed, not assumed) and reads as informational rather than a warning.
 const USED_SLATE = "#4B5563";
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+// A PLAIN Pressable, not Animated.createAnimatedComponent(Pressable).
+//
+// The press-scale now lives on an inner Animated.View, so this element carries no
+// animated style at all — the Reanimated wrapper was left sitting directly in the
+// touch path for nothing. That matters: under the New Architecture the wrapper
+// forwards props to a host view it also drives, and a press that starts is not
+// reliably released through it. The symptom on a physical iPhone was exact —
+// onPressIn fired every single time, onPress never did.
+//
+// It also explains the heart button, which is a plain Pressable and was failing
+// too: it is nested INSIDE this element, so a parent that mishandles the responder
+// takes its children down with it.
+//
+// If a card-level animated style is ever needed again, add an inner Animated.View
+// rather than animating the touch target.
 
 interface MasonryProductCardProps {
   product: Product;
@@ -269,7 +284,7 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
   const displayUri = thumbFailed ? imageUri : getThumbnailUrl(imageUri, 400);
 
   return (
-    <AnimatedPressable
+    <Pressable
       onPress={handlePress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
@@ -288,23 +303,39 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
       ]
         .filter(Boolean)
         .join(", ")}
+      // NO TRANSFORM HERE, DELIBERATELY. The press-scale used to be applied to this
+      // very element, and it was cancelling the taps it was meant to decorate.
+      // Measured on a physical iPhone: 84 touches registered, 2 presses completed.
+      // Pressing shrinks the card to 0.97 under the finger, iOS re-runs hit-testing
+      // against the new frame, decides the finger has left the view, and cancels
+      // the press. Android does not re-hit-test mid-gesture, which is exactly why
+      // the shop never saw this on Android.
+      // The animation now lives on the inner view below, so the touch target keeps
+      // a fixed frame for the whole gesture.
       style={[
         styles.cardWrapper,
         style,
-        scaleAnimatedStyle,
-        styles.card,
         {
-          backgroundColor: theme.colors.card,
           width: CARD_WIDTH,
           height: CARD_HEIGHT,
-          shadowColor: isDark ? "transparent" : "#000",
-          shadowOpacity: isDark ? 0 : 0.08,
-          shadowOffset: { width: 0, height: 8 },
-          shadowRadius: 16,
-          elevation: isDark ? 0 : 4,
         },
       ]}
     >
+      <Animated.View
+        style={[
+          scaleAnimatedStyle,
+          styles.card,
+          {
+            flex: 1,
+            backgroundColor: theme.colors.card,
+            shadowColor: isDark ? "transparent" : "#000",
+            shadowOpacity: isDark ? 0 : 0.08,
+            shadowOffset: { width: 0, height: 8 },
+            shadowRadius: 16,
+            elevation: isDark ? 0 : 4,
+          },
+        ]}
+      >
       {/* Image */}
       <View style={[styles.imageContainer, { backgroundColor: "#FFFFFF" }]}>
         {imageError ? (
@@ -553,7 +584,8 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
           </Pressable>
         </View>
       </View>
-    </AnimatedPressable>
+      </Animated.View>
+    </Pressable>
   );
 };
 

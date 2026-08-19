@@ -24,7 +24,7 @@ import { useTenant } from '../../contexts/TenantContext';
 import MasonryProductCard from '../../components/MasonryProductCard';
 import SectionHeader from '../../components/home/SectionHeader';
 import BrandCard from '../../components/home/BrandCard';
-import AutoScrollRail from '../../components/home/AutoScrollRail';
+import AutoScrollRail, { type AutoScrollRailHandle } from '../../components/home/AutoScrollRail';
 import { brandService, Brand } from '../../services/brandService';
 import AppNumber from '../../components/AppNumber';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -42,6 +42,7 @@ import { useBadgeCount } from '../../contexts/NotificationContext';
 import LanguagePicker from '../../components/LanguagePicker';
 import BannerCarousel from '../../components/BannerCarousel';
 import StartOrderBottomSheet from '../../components/StartOrderBottomSheet';
+import { iosTapFix } from '../../ui/iosTapFix';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -110,6 +111,11 @@ const HomeScreen: React.FC = () => {
 
   const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const textAlign: 'left' | 'right' = isRTL ? 'right' : 'left';
+
+  // The brands rail must stand still while a finger is down ANYWHERE on this
+  // screen — see the note on AutoScrollRailHandle. A ref rather than state, so
+  // holding and releasing it costs no render.
+  const brandRailRef = useRef<AutoScrollRailHandle>(null);
 
   // Ref for scroll-to-top functionality
   const flatListRef = useRef<FlatList>(null);
@@ -474,7 +480,7 @@ const HomeScreen: React.FC = () => {
         {featured.length > 0 && (
           <View>
             <SectionHeader title={t('home.featuredProducts')} />
-            <FlatList
+            <FlatList {...iosTapFix}
               data={featured}
               renderItem={renderSpotlightCard}
               keyExtractor={(item) => `featured-${item.id}`}
@@ -495,6 +501,7 @@ const HomeScreen: React.FC = () => {
                 either direction without hitting an end. Pauses while touched and
                 resumes a couple of seconds after release. */}
             <AutoScrollRail
+              ref={brandRailRef}
               data={brandCols}
               keyExtractor={(_, i) => `brand-col-${i}`}
               itemWidth={BRAND_TILE_WIDTH}
@@ -528,7 +535,7 @@ const HomeScreen: React.FC = () => {
               title={group.brand}
               onSeeAll={() => (navigation as any).navigate('CategoryProducts', { brand: group.brand, title: group.brand })}
             />
-            <FlatList
+            <FlatList {...iosTapFix}
               data={group.products}
               renderItem={renderSpotlightCard}
               keyExtractor={(item) => `${group.brand}-${item.id}`}
@@ -727,7 +734,22 @@ const HomeScreen: React.FC = () => {
       >
         {/* GOLDEN TEMPLATE: SINGLE FlatList as vertical scroll owner */}
         {/* ALIBABA: Performance guardrails for low-end devices */}
-        <FlatList
+        {/* THE BRANDS RAIL HOLDS STILL WHILE A FINGER IS DOWN.
+            Touch events bubble in React Native, so this View sees every touch on
+            anything inside the list — a product card, a "See All", a swatch — and
+            not only touches on the rail itself, which the rail already handled.
+            It has to: the rail's drift calls scrollToOffset every frame, and on
+            iOS that cancels presses in progress elsewhere in the same list. The
+            tap registered (onPressIn) and then died (no onPress), which is why
+            products opened "with luck" and the heart did nothing.
+            Refs and imperative calls, so a touch costs no re-render. */}
+        <View
+          style={{ flex: 1 }}
+          onTouchStart={() => brandRailRef.current?.hold()}
+          onTouchEnd={() => brandRailRef.current?.release()}
+          onTouchCancel={() => brandRailRef.current?.release()}
+        >
+        <FlatList {...iosTapFix}
           ref={flatListRef}
           data={newArrivals}
           renderItem={renderProduct}
@@ -761,6 +783,7 @@ const HomeScreen: React.FC = () => {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
           }
         />
+        </View>
       </KeyboardAvoidingView>
 
       {/* Scroll-to-top FAB */}

@@ -25,6 +25,7 @@ import { useTenant } from '../contexts/TenantContext';
 import { Product } from '../types';
 import BrandCard from '../components/home/BrandCard';
 import { brandService } from '../services/brandService';
+import { iosTapFix } from '../ui/iosTapFix';
 
 // 'recommended' = the order the service already returned (parts.sort_order ascending,
 // previous ordering as tiebreaker) — i.e. the order the admin set by dragging.
@@ -194,7 +195,7 @@ const CategoryProductsScreen: React.FC = () => {
           Horizontal only: the FlatList below stays the single vertical scroll owner
           (GOLDEN_RULES §1). */}
       {brandFacets.length > 0 && (
-        <ScrollView
+        <ScrollView {...iosTapFix}
           horizontal
           showsHorizontalScrollIndicator={false}
           // A horizontal ScrollView in a column otherwise grows to fill the leftover
@@ -264,7 +265,7 @@ const CategoryProductsScreen: React.FC = () => {
           <ActivityIndicator size="large" color={theme.colors.primary} />
         </View>
       ) : (
-        <FlatList
+        <FlatList {...iosTapFix}
           data={sorted}
           renderItem={renderItem}
           keyExtractor={item => item.id}

@@ -40,6 +40,7 @@ import type { TenantCategory } from '../services/tenantAdminService';
 import { storeProfileService, StoreProfile } from '../services/storeProfileService';
 import BannerCarousel from '../components/BannerCarousel';
 import CategoryTile from '../components/home/CategoryTile';
+import { iosTapFix } from '../ui/iosTapFix';
 
 
 
@@ -645,7 +646,7 @@ const CategoriesScreen: React.FC = () => {
             </Text>
           </View>
         ) : (
-          <FlatList
+          <FlatList {...iosTapFix}
             data={stores}
             renderItem={renderStoreCard}
             keyExtractor={(item) => item.tenantId}
@@ -1020,7 +1021,7 @@ const CategoriesScreen: React.FC = () => {
       >
         {/* GOLDEN TEMPLATE: SINGLE FlatList as vertical scroll owner */}
         {/* ALIBABA: Performance guardrails */}
-        <FlatList
+        <FlatList {...iosTapFix}
           ref={productListRef}
           data={filteredProducts}
           renderItem={renderProductCard}

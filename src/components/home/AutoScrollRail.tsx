@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   FlatList,
@@ -7,6 +7,28 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+
+/**
+ * A parent can hold the drift still while the shopper is touching something else.
+ *
+ * WHY THIS EXISTS. The drift calls scrollToOffset on every frame, and on iOS a
+ * scroll view moving under programmatic control CANCELS presses in progress
+ * elsewhere in the same list — the touch starts, onPressIn fires, and onPress
+ * never arrives. Measured on the simulator: with the drift running, tapping a
+ * product card produced onPressIn + onPressOut and no onPress, every time; with
+ * it stopped, the same tap fired onPress immediately. It took out the product
+ * cards and the "See All" links alike, while the header buttons OUTSIDE the list
+ * kept working. Android never showed it — its touch dispatch does not cancel a
+ * child's press when a sibling scroller moves.
+ *
+ * So the rail must stand still while a finger is down anywhere above it.
+ */
+export interface AutoScrollRailHandle {
+  /** Stop drifting now. Safe to call repeatedly. */
+  hold(): void;
+  /** Resume after the usual idle delay. */
+  release(): void;
+}
 
 interface AutoScrollRailProps<T> {
   data: T[];
@@ -70,7 +92,7 @@ const MOMENTUM_GRACE_MS = 3000;
  * permanently moving element is a real problem for people with vestibular
  * disorders. Looping still works under Reduce Motion; only the drift stops.
  */
-function AutoScrollRail<T>({
+function AutoScrollRailInner<T>({
   data,
   renderItem,
   keyExtractor,
@@ -80,7 +102,7 @@ function AutoScrollRail<T>({
   speed = 18,
   resumeDelayMs = 2500,
   contentContainerStyle,
-}: AutoScrollRailProps<T>) {
+}: AutoScrollRailProps<T>, ref: React.Ref<AutoScrollRailHandle>) {
   const listRef = useRef<FlatList>(null);
   const offset = useRef(0);
   const centered = useRef(false);
@@ -184,6 +206,11 @@ function AutoScrollRail<T>({
       if (focused.current) startLoop();
     }, delay);
   }, [startLoop]);
+
+  useImperativeHandle(ref, () => ({
+    hold: () => pause(),
+    release: () => scheduleResume(resumeDelayMs),
+  }), [pause, scheduleResume, resumeDelayMs]);
 
   useEffect(() => {
     if (canDrift) startLoop(); else stopLoop();
@@ -316,5 +343,11 @@ function AutoScrollRail<T>({
     </View>
   );
 }
+
+// forwardRef loses the generic parameter, so the cast restores it — the component
+// is generic over its item type and callers rely on that inference.
+const AutoScrollRail = React.forwardRef(AutoScrollRailInner) as <T>(
+  props: AutoScrollRailProps<T> & { ref?: React.Ref<AutoScrollRailHandle> },
+) => React.ReactElement;
 
 export default AutoScrollRail;
