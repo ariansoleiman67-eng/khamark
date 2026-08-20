@@ -260,6 +260,21 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
     });
   };
 
+  // TAPPING THE ROW SELECTS IT. Until now only the small +/- circles responded, so
+  // a shopper who tapped "Black" or "256GB" — the obvious target — got nothing, and
+  // then found Confirm Order did nothing either because the quantity was still 0.
+  // One tap picks one; tapping a selected row clears it. The steppers still handle
+  // more than one.
+  const toggleVarRow = (variationId: string, qty: number, outOfStock: boolean) => {
+    if (outOfStock) return;
+    updateSizeQty(variationId, qty > 0 ? -qty : 1);
+  };
+
+  const toggleColorRow = (variationId: string, qty: number, outOfStock: boolean) => {
+    if (outOfStock) return;
+    updateColorQty(variationId, qty > 0 ? -qty : 1);
+  };
+
   const updateColorQty = (variationId: string, delta: number) => {
     const variation = product?.colorVariations?.find(v => v.variationId === variationId);
     if (!variation) return;
@@ -784,11 +799,20 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                       const qty = localVarQtys[v.variationId] || 0;
                       const outOfStock = v.stockQuantity === 0;
                       return (
-                        <View
+                        <TouchableOpacity
                           key={v.variationId}
+                          activeOpacity={outOfStock ? 1 : 0.7}
+                          onPress={() => toggleVarRow(v.variationId, qty, outOfStock)}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: qty > 0, disabled: outOfStock }}
                           style={[
                             styles.varRow,
                             { flexDirection: isRTL ? 'row-reverse' : 'row', opacity: outOfStock ? 0.4 : 1 },
+                            qty > 0 && {
+                              backgroundColor: theme.colors.primary + '12',
+                              borderColor: theme.colors.primary,
+                              borderWidth: 1,
+                            },
                           ]}
                         >
                           <View style={[styles.varInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
@@ -830,7 +854,7 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                               <Ionicons name="add" size={18} color={theme.colors.primary} />
                             </TouchableOpacity>
                           </View>
-                        </View>
+                        </TouchableOpacity>
                       );
                     })}
                   </View>
@@ -846,11 +870,20 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                       const qty = localColorQtys[v.variationId] || 0;
                       const outOfStock = v.stockQuantity === 0;
                       return (
-                        <View
+                        <TouchableOpacity
                           key={v.variationId}
+                          activeOpacity={outOfStock ? 1 : 0.7}
+                          onPress={() => toggleColorRow(v.variationId, qty, outOfStock)}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: qty > 0, disabled: outOfStock }}
                           style={[
                             styles.varRow,
                             { flexDirection: isRTL ? 'row-reverse' : 'row', opacity: outOfStock ? 0.4 : 1 },
+                            qty > 0 && {
+                              backgroundColor: theme.colors.primary + '12',
+                              borderColor: theme.colors.primary,
+                              borderWidth: 1,
+                            },
                           ]}
                         >
                           <View style={[styles.varInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start', flexDirection: isRTL ? 'row-reverse' : 'row', gap: 8 }]}>
@@ -902,7 +935,7 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                               <Ionicons name="add" size={18} color={theme.colors.primary} />
                             </TouchableOpacity>
                           </View>
-                        </View>
+                        </TouchableOpacity>
                       );
                     })}
                   </View>
