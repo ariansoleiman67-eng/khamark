@@ -226,7 +226,15 @@ export default function App() {
       <SafeAreaProvider initialMetrics={initialWindowMetrics}>
       <ErrorBoundary>
         <ThemeProvider>
-          <AppAlertHost />
+          {/* AppAlertHost is NOT mounted — see src/components/AppAlertHost.tsx.
+              It replaced every Alert.alert with a react-native <Modal>, and on iOS a
+              Modal cannot present over another Modal. Every alert raised from inside
+              a bottom sheet, a picker or the admin editor was silently dropped —
+              and because RN latches the failed presentation, the FIRST dropped alert
+              killed every alert for the rest of the session. That is why "tap Buy"
+              and "tap Add address" both did nothing.
+              HAryad, the working production app this was forked from, has no such
+              override and uses the system alert. So do we again. */}
           <AuthProvider>
             <TenantProvider>
               <CurrencyProvider>

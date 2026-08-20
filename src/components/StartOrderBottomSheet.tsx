@@ -1123,9 +1123,18 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.confirmButton, { opacity: isProcessing || localTotalQty === 0 || maxStock === 0 ? 0.7 : 1 }]}
+                  style={[styles.confirmButton, { opacity: isProcessing || maxStock === 0 ? 0.7 : 1 }]}
                   onPress={handleConfirm}
-                  disabled={isProcessing || localTotalQty === 0 || maxStock === 0}
+                  // NOT disabled for an empty quantity, deliberately. It used to be,
+                  // and the only cue was opacity 0.7 — so a shopper who had not picked
+                  // a size tapped Buy and NOTHING happened, with nothing to read. The
+                  // handler already has the right words for this ("Please select
+                  // quantity before ordering", :425) and they were unreachable, because
+                  // a disabled button never calls its handler. Now the tap lands and the
+                  // app says why. Still disabled while a request is in flight and when
+                  // the product genuinely has no stock — in both cases pressing again
+                  // must not do anything.
+                  disabled={isProcessing || maxStock === 0}
                   activeOpacity={0.85}
                 >
                   <LinearGradient

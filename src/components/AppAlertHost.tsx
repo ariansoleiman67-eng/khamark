@@ -34,6 +34,26 @@ type AlertData = {
  * Mount once, high in the tree (inside ThemeProvider). Alerts are queued so
  * overlapping calls show one after another.
  */
+/**
+ * ⚠️ NOT MOUNTED. App.tsx no longer renders this, deliberately.
+ *
+ * It overrode Alert.alert globally and drew the dialog as a react-native <Modal>.
+ * On iOS a Modal cannot be presented while another Modal is already presented, so
+ * every alert raised from inside a bottom sheet, a picker, or the admin product
+ * editor was silently dropped — the shopper tapped and nothing happened.
+ *
+ * Worse, React Native latches the attempt: RCTModalHostViewComponentView.mm sets
+ * _isPresented = YES BEFORE calling presentViewController: and guards re-presenting
+ * with !_isPresented. So the FIRST alert iOS refused to show killed EVERY alert for
+ * the rest of the session — including "your order failed" and "address saved".
+ *
+ * Two bugs the shop reported traced back to exactly this: "I tap Buy and nothing
+ * happens" and "I add an address and nothing happens" (it saved, silently, twice).
+ *
+ * HAryad — the working production app this was forked from — has no such override.
+ * Before reviving this, it must not be a Modal: render the dialog inline in a host
+ * that lives above the navigator, or accept the system alert.
+ */
 export default function AppAlertHost() {
   const { theme, isDark } = useTheme();
   const { t } = useTranslation();
