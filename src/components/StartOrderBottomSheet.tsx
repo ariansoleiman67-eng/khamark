@@ -809,9 +809,8 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                             styles.varRow,
                             { flexDirection: isRTL ? 'row-reverse' : 'row', opacity: outOfStock ? 0.4 : 1 },
                             qty > 0 && {
-                              backgroundColor: theme.colors.primary + '12',
-                              borderColor: theme.colors.primary,
-                              borderWidth: 1,
+                              backgroundColor: theme.colors.primary + '0E',
+                              borderColor: theme.colors.primary + '44',
                             },
                           ]}
                         >
@@ -880,9 +879,8 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                             styles.varRow,
                             { flexDirection: isRTL ? 'row-reverse' : 'row', opacity: outOfStock ? 0.4 : 1 },
                             qty > 0 && {
-                              backgroundColor: theme.colors.primary + '12',
-                              borderColor: theme.colors.primary,
-                              borderWidth: 1,
+                              backgroundColor: theme.colors.primary + '0E',
+                              borderColor: theme.colors.primary + '44',
                             },
                           ]}
                         >
@@ -1600,7 +1598,14 @@ const createStyles = (theme: any, isDark: boolean, insets: any, isRTL: boolean) 
       alignItems: 'center',
       borderBottomColor: theme.colors.border + '12',
       borderBottomWidth: StyleSheet.hairlineWidth,
+      // The border and the padding are ALWAYS here, transparent when the row is not
+      // selected. Adding a border only on selection made the row jump by a pixel and
+      // the text shuffle sideways the moment you tapped it.
+      borderColor: 'transparent',
+      borderRadius: 10,
+      borderWidth: 1,
       gap: 10,
+      paddingHorizontal: 8,
       paddingVertical: 12,
     },
     varInfo: {
