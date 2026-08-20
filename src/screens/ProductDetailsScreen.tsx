@@ -1377,6 +1377,9 @@ export const ProductDetailsScreen: React.FC = () => {
       quantity: number;
       price: number;
       stock: number;
+      // A size selection can carry the chosen colour, so one phone is one cart line.
+      color?: string;
+      colorVariationId?: string;
     }>;
     colorSelections?: Array<{
       variationId: string;
@@ -1401,6 +1404,8 @@ export const ProductDetailsScreen: React.FC = () => {
           sizeUnit: '',
           quantity: v.quantity,
           priceUSD: v.price,
+          colorValue: v.color,
+          colorVariationId: v.colorVariationId,
         }));
 
         const colorSelectionsData = (orderData.colorSelections || []).map(v => ({
@@ -1468,6 +1473,9 @@ export const ProductDetailsScreen: React.FC = () => {
       quantity: number;
       price: number;
       stock: number;
+      // A size selection can carry the chosen colour, so one phone is one cart line.
+      color?: string;
+      colorVariationId?: string;
     }>;
     colorSelections?: Array<{
       variationId: string;
@@ -1493,6 +1501,8 @@ export const ProductDetailsScreen: React.FC = () => {
           sizeUnit: '',
           quantity: v.quantity,
           priceUSD: v.price,
+          colorValue: v.color,
+          colorVariationId: v.colorVariationId,
         }));
 
         const colorSelectionsData = (orderData.colorSelections || []).map(v => ({

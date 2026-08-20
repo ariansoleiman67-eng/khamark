@@ -216,7 +216,7 @@ export class LocalCartService {
   static async addVariationsToCart(
     userId: string,
     product: Product,
-    selections: Array<{ variationId: string; quantity: number; priceUSD?: number; sizeValue?: number | string; sizeUnit?: string; colorValue?: string }>
+    selections: Array<{ variationId: string; quantity: number; priceUSD?: number; sizeValue?: number | string; sizeUnit?: string; colorValue?: string; colorVariationId?: string }>
   ): Promise<Cart> {
     return this.enqueue(userId, () =>
       this.addVariationsToCartImpl(userId, product, selections)
@@ -226,7 +226,7 @@ export class LocalCartService {
   private static async addVariationsToCartImpl(
     userId: string,
     product: Product,
-    selections: Array<{ variationId: string; quantity: number; priceUSD?: number; sizeValue?: number | string; sizeUnit?: string; colorValue?: string }>
+    selections: Array<{ variationId: string; quantity: number; priceUSD?: number; sizeValue?: number | string; sizeUnit?: string; colorValue?: string; colorVariationId?: string }>
   ): Promise<Cart> {
     try {
       // Filter out selections with quantity 0
@@ -272,17 +272,33 @@ export class LocalCartService {
         if (!variation) {
           throw new Error(`Variation ${selection.variationId} not found`);
         }
-        
-        // Check existing quantity in cart
-        const existingItem = cart.items.find(
-          item => item.productId === product.id && item.variationId === selection.variationId
-        );
-        const existingQty = existingItem?.quantity || 0;
+
+        // A size can now appear on more than one line (256GB/Black and 256GB/White are
+        // separate lines), and every one of them draws on the same size stock. Sum them
+        // all — reading only the first match let the same size be oversold colour by colour.
+        const existingQty = cart.items
+          .filter(item => item.productId === product.id && item.variationId === selection.variationId)
+          .reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
         const totalQty = existingQty + selection.quantity;
-        
+
         if (totalQty > variation.stockQuantity) {
           const varName = selection.colorValue || `${selection.sizeValue} ${selection.sizeUnit || ''}`.trim();
           throw new Error(`Only ${variation.stockQuantity - existingQty} more "${varName}" available`);
+        }
+
+        // The colour riding along on a size line has its own stock to answer to.
+        if (selection.colorVariationId) {
+          const colorVariation = product.colorVariations?.find(v => v.variationId === selection.colorVariationId);
+          if (colorVariation) {
+            const existingColorQty = cart.items
+              .filter(item => item.productId === product.id && item.colorVariationId === selection.colorVariationId)
+              .reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+            if (existingColorQty + selection.quantity > colorVariation.stockQuantity) {
+              throw new Error(
+                `Only ${colorVariation.stockQuantity - existingColorQty} more "${selection.colorValue || colorVariation.colorValue}" available`
+              );
+            }
+          }
         }
       }
 
@@ -296,9 +312,15 @@ export class LocalCartService {
 
         const variationPrice = selection.priceUSD ?? variation?.priceUSD ?? product.priceUSD;
         
-        // Find existing item by productId + variationId
+        // Find existing item by productId + variationId + colour. Matching on the
+        // variationId alone merged 256GB/Black with 256GB/White into one line labelled
+        // with whichever colour was added first.
+        const selectionColor = (selection.colorValue || '').trim().toLowerCase();
         const existingItemIndex = cart.items.findIndex(
-          item => item.productId === product.id && item.variationId === selection.variationId
+          item =>
+            item.productId === product.id &&
+            item.variationId === selection.variationId &&
+            (item.selectedOptions?.color || '').trim().toLowerCase() === selectionColor
         );
 
         if (existingItemIndex >= 0) {
@@ -325,6 +347,7 @@ export class LocalCartService {
             addedAt: new Date() as any,
             selectedOptions,
             variationId: selection.variationId,
+            colorVariationId: selection.colorVariationId,
           };
           cart.items.push(newItem);
         }

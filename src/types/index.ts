@@ -214,6 +214,9 @@ export interface CartItem {
   };
   // ALIBABA VARIATION: Track variationId for per-size stock items
   variationId?: string;
+  // A size line can also carry a colour (one phone, one line). Kept so the colour's
+  // own stock can be checked on later adds.
+  colorVariationId?: string;
 }
 
 export interface Cart {

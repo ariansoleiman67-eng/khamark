@@ -177,8 +177,9 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
   // ===== LOCAL QUANTITY STATE (editable in sheet) =====
   const [localQty, setLocalQty] = useState(totalQuantity || 1);
   const [localQtyText, setLocalQtyText] = useState(String(totalQuantity || 1));
-  const [localVarQtys, setLocalVarQtys] = useState<Record<string, number>>({});
-  const [localColorQtys, setLocalColorQtys] = useState<Record<string, number>>({});
+  // ONE choice per group, not a quantity per variation. The sheet is a chooser.
+  const [selectedSizeId, setSelectedSizeId] = useState<string | null>(null);
+  const [selectedColorId, setSelectedColorId] = useState<string | null>(null);
 
   const hasSizeVars = !!(product?.variations && product.variations.length > 0);
   const hasColorVars = !!(product?.colorVariations && product.colorVariations.length > 0);
@@ -187,36 +188,59 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
   // Initialize local state from props when the sheet opens
   useEffect(() => {
     if (visible && product) {
-      if (hasSizeVars) {
-        const initSizes: Record<string, number> = {};
-        variationSelections.forEach(v => { initSizes[v.variationId] = v.quantity; });
-        product.variations?.forEach(v => {
-          if (!(v.variationId in initSizes)) initSizes[v.variationId] = 0;
-        });
-        setLocalVarQtys(initSizes);
-      }
-      if (hasColorVars) {
-        const initColors: Record<string, number> = {};
-        colorSelections.forEach(v => { initColors[v.variationId] = v.quantity; });
-        product.colorVariations?.forEach(v => {
-          if (!(v.variationId in initColors)) initColors[v.variationId] = 0;
-        });
-        setLocalColorQtys(initColors);
-      }
-      if (!hasAnyVars) {
-        setLocalQty(totalQuantity || 1);
-        setLocalQtyText(String(totalQuantity || 1));
-      }
+      // Re-open on whatever was already chosen, if anything.
+      const preSize = variationSelections.find(v => v.quantity > 0);
+      const preColor = colorSelections.find(v => v.quantity > 0);
+      setSelectedSizeId(preSize?.variationId ?? null);
+      setSelectedColorId(preColor?.variationId ?? null);
+      const preQty = preSize?.quantity ?? preColor?.quantity ?? totalQuantity ?? 1;
+      setLocalQty(Math.max(1, preQty));
+      setLocalQtyText(String(Math.max(1, preQty)));
     }
   }, [visible, product, totalQuantity]);
+
+  const selectedSize = useMemo(
+    () => product?.variations?.find(v => v.variationId === selectedSizeId) ?? null,
+    [product, selectedSizeId],
+  );
+  const selectedColor = useMemo(
+    () => product?.colorVariations?.find(v => v.variationId === selectedColorId) ?? null,
+    [product, selectedColorId],
+  );
+
+  // Every group the product offers must be answered before there is anything to buy.
+  const selectionComplete = (!hasSizeVars || !!selectedSize) && (!hasColorVars || !!selectedColor);
+  const qtyEnabled = !hasAnyVars || selectionComplete;
+
+  const selectionHint = useMemo(() => {
+    if (!hasAnyVars || selectionComplete) return '';
+    if (hasSizeVars && !selectedSize) return t('startOrder.chooseSize', { defaultValue: 'Choose a size to continue' });
+    return t('startOrder.chooseColor', { defaultValue: 'Choose a colour to continue' });
+  }, [hasAnyVars, selectionComplete, hasSizeVars, selectedSize, t]);
+
+  // The chosen size and the chosen colour are the same physical phone, so the order
+  // can never exceed the smaller of the two stocks.
+  const maxSelectable = useMemo(() => {
+    if (!hasAnyVars) return product?.stockQty || 999;
+    const caps: number[] = [];
+    if (selectedSize) caps.push(selectedSize.stockQuantity);
+    if (selectedColor) caps.push(selectedColor.stockQuantity);
+    return caps.length > 0 ? Math.max(1, Math.min(...caps)) : 1;
+  }, [hasAnyVars, product?.stockQty, selectedSize, selectedColor]);
+
+  // Changing the choice can lower the ceiling under a quantity already typed in.
+  useEffect(() => {
+    if (localQty > maxSelectable) {
+      setLocalQty(maxSelectable);
+      setLocalQtyText(String(maxSelectable));
+    }
+  }, [maxSelectable, localQty]);
 
   // Computed local totals
   const localTotalQty = useMemo(() => {
     if (!hasAnyVars) return localQty;
-    const sizeTotal = Object.values(localVarQtys).reduce((s, q) => s + q, 0);
-    const colorTotal = Object.values(localColorQtys).reduce((s, q) => s + q, 0);
-    return sizeTotal + colorTotal;
-  }, [hasAnyVars, localQty, localVarQtys, localColorQtys]);
+    return selectionComplete ? localQty : 0;
+  }, [hasAnyVars, localQty, selectionComplete]);
 
   const localUnitPrice = useMemo(() => {
     if (!product) return 0;
@@ -227,63 +251,14 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
   const localTotalPrice = useMemo(() => {
     if (!product) return 0;
     if (!hasAnyVars) return localUnitPrice * localQty;
-    // For variation products: sum each variation * its price (or tiered unit price)
-    let total = 0;
-    if (hasSizeVars && product.variations) {
-      product.variations.forEach(v => {
-        const qty = localVarQtys[v.variationId] || 0;
-        const price = v.priceUSD ?? product.priceUSD;
-        // Apply tiered discount ratio
-        const ratio = localUnitPrice / product.priceUSD;
-        total += qty * price * (ratio < 1 ? ratio : 1);
-      });
-    }
-    if (hasColorVars && product.colorVariations) {
-      product.colorVariations.forEach(v => {
-        const qty = localColorQtys[v.variationId] || 0;
-        const price = v.priceUSD ?? product.priceUSD;
-        const ratio = localUnitPrice / product.priceUSD;
-        total += qty * price * (ratio < 1 ? ratio : 1);
-      });
-    }
-    return total;
-  }, [product, hasAnyVars, hasSizeVars, hasColorVars, localVarQtys, localColorQtys, localUnitPrice, localQty]);
+    if (!selectionComplete) return 0;
+    // One line, one price: the size carries the price when there is one, otherwise
+    // the colour, otherwise the product. Summing both is what charged for two phones.
+    const price = selectedSize?.priceUSD ?? selectedColor?.priceUSD ?? product.priceUSD;
+    const ratio = product.priceUSD > 0 ? localUnitPrice / product.priceUSD : 1;
+    return price * localQty * (ratio < 1 ? ratio : 1);
+  }, [product, hasAnyVars, selectionComplete, selectedSize, selectedColor, localUnitPrice, localQty]);
 
-  // Helpers for +/- 
-  const updateSizeQty = (variationId: string, delta: number) => {
-    const variation = product?.variations?.find(v => v.variationId === variationId);
-    if (!variation) return;
-    setLocalVarQtys(prev => {
-      const cur = prev[variationId] || 0;
-      const next = Math.max(0, Math.min(cur + delta, variation.stockQuantity));
-      return { ...prev, [variationId]: next };
-    });
-  };
-
-  // TAPPING THE ROW SELECTS IT. Until now only the small +/- circles responded, so
-  // a shopper who tapped "Black" or "256GB" — the obvious target — got nothing, and
-  // then found Confirm Order did nothing either because the quantity was still 0.
-  // One tap picks one; tapping a selected row clears it. The steppers still handle
-  // more than one.
-  const toggleVarRow = (variationId: string, qty: number, outOfStock: boolean) => {
-    if (outOfStock) return;
-    updateSizeQty(variationId, qty > 0 ? -qty : 1);
-  };
-
-  const toggleColorRow = (variationId: string, qty: number, outOfStock: boolean) => {
-    if (outOfStock) return;
-    updateColorQty(variationId, qty > 0 ? -qty : 1);
-  };
-
-  const updateColorQty = (variationId: string, delta: number) => {
-    const variation = product?.colorVariations?.find(v => v.variationId === variationId);
-    if (!variation) return;
-    setLocalColorQtys(prev => {
-      const cur = prev[variationId] || 0;
-      const next = Math.max(0, Math.min(cur + delta, variation.stockQuantity));
-      return { ...prev, [variationId]: next };
-    });
-  };
 
   // Payment methods
   const PAYMENT_METHODS: PaymentMethod[] = useMemo(() => [
@@ -440,7 +415,7 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
     if (localTotalQty === 0) {
       Alert.alert(
         t('startOrder.noSelection', { defaultValue: 'No Selection' }),
-        t('startOrder.selectItemsFirst', { defaultValue: 'Please select quantity before ordering.' })
+        selectionHint || t('startOrder.selectItemsFirst', { defaultValue: 'Please select quantity before ordering.' })
       );
       return;
     }
@@ -463,26 +438,33 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
       return;
     }
 
-    // Build selections from local state
-    const localSizeSelections = (product?.variations || [])
-      .filter(v => (localVarQtys[v.variationId] || 0) > 0)
-      .map(v => ({
-        variationId: v.variationId,
-        name: v.sizeValue,
-        quantity: localVarQtys[v.variationId] || 0,
-        price: v.priceUSD ?? product!.priceUSD,
-        stock: v.stockQuantity,
-      }));
+    // Build selections from local state.
+    //
+    // ONE cart line, even when both a size and a colour were chosen. Sending them as
+    // two selections is what made "256GB" + "Black" arrive as two separate lines and
+    // charge for two phones. The size carries the line (it holds the price) and the
+    // colour rides along on it; only a colour-only product sends a colour selection.
+    const localSizeSelections = selectedSize
+      ? [{
+          variationId: selectedSize.variationId,
+          name: String(selectedSize.sizeValue ?? ''),
+          quantity: localQty,
+          price: selectedSize.priceUSD ?? product!.priceUSD,
+          stock: selectedSize.stockQuantity,
+          color: selectedColor?.colorValue,
+          colorVariationId: selectedColor?.variationId,
+        }]
+      : [];
 
-    const localColorSelections = (product?.colorVariations || [])
-      .filter(v => (localColorQtys[v.variationId] || 0) > 0)
-      .map(v => ({
-        variationId: v.variationId,
-        name: v.colorValue,
-        quantity: localColorQtys[v.variationId] || 0,
-        price: v.priceUSD ?? product!.priceUSD,
-        stock: v.stockQuantity,
-      }));
+    const localColorSelections = !selectedSize && selectedColor
+      ? [{
+          variationId: selectedColor.variationId,
+          name: String(selectedColor.colorValue ?? ''),
+          quantity: localQty,
+          price: selectedColor.priceUSD ?? product!.priceUSD,
+          stock: selectedColor.stockQuantity,
+        }]
+      : [];
 
     // Set synchronously before the first await. `isProcessing` is state, so it only
     // takes effect on the next render and two taps in the same frame would both
@@ -708,9 +690,146 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                   </Text>
                 </View>
 
-                {/* ---- Simple product: single quantity selector ---- */}
-                {!hasAnyVars && (
-                  <View style={[styles.quantityRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                {/* ---- Size: pick one ---- */}
+                {hasSizeVars && product?.variations && (
+                  <View>
+                    <AppText style={[styles.varSectionLabel, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
+                      {t('product.size', { defaultValue: 'Size' })}
+                    </AppText>
+                    <View style={[styles.chipWrap, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                      {product.variations.map((v) => {
+                        const soldOut = v.stockQuantity === 0;
+                        const sel = selectedSizeId === v.variationId;
+                        return (
+                          <TouchableOpacity
+                            key={v.variationId}
+                            disabled={soldOut}
+                            activeOpacity={0.8}
+                            onPress={() => setSelectedSizeId(sel ? null : v.variationId)}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: sel, disabled: soldOut }}
+                            style={[
+                              styles.optionChip,
+                              {
+                                backgroundColor: sel ? theme.colors.primary + '12' : 'transparent',
+                                borderColor: sel ? theme.colors.primary : theme.colors.border,
+                                borderWidth: sel ? 2 : 1.5,
+                                opacity: soldOut ? 0.45 : 1,
+                              },
+                            ]}
+                          >
+                            <AppText
+                              style={[
+                                styles.optionChipText,
+                                {
+                                  color: sel ? theme.colors.primary : theme.colors.text,
+                                  textDecorationLine: soldOut ? 'line-through' : 'none',
+                                },
+                              ]}
+                            >
+                              {String(v.sizeValue ?? '')}
+                            </AppText>
+                            {typeof v.priceUSD === 'number' && v.priceUSD !== product.priceUSD && (
+                              <AppNumber
+                                value={formatPrice(v.priceUSD, currency, exchangeRateIQD)}
+                                style={[styles.optionChipPrice, { color: sel ? theme.colors.primary : theme.colors.textSecondary }]}
+                              />
+                            )}
+                            {soldOut && (
+                              <AppText style={[styles.optionChipSoldOut, { color: '#F44336' }]}>
+                                {t('product.outOfStock', { defaultValue: 'Out of Stock' })}
+                              </AppText>
+                            )}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
+
+                {/* ---- Colour: pick one ---- */}
+                {hasColorVars && product?.colorVariations && (
+                  <View>
+                    <AppText style={[styles.varSectionLabel, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
+                      {t('product.color', { defaultValue: 'Color' })}
+                    </AppText>
+                    <View style={[styles.chipWrap, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                      {product.colorVariations.map((v) => {
+                        const soldOut = v.stockQuantity === 0;
+                        const sel = selectedColorId === v.variationId;
+                        return (
+                          <TouchableOpacity
+                            key={v.variationId}
+                            disabled={soldOut}
+                            activeOpacity={0.8}
+                            onPress={() => setSelectedColorId(sel ? null : v.variationId)}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: sel, disabled: soldOut }}
+                            style={[
+                              styles.optionChip,
+                              {
+                                backgroundColor: sel ? theme.colors.primary + '12' : 'transparent',
+                                borderColor: sel ? theme.colors.primary : theme.colors.border,
+                                borderWidth: sel ? 2 : 1.5,
+                                opacity: soldOut ? 0.45 : 1,
+                              },
+                            ]}
+                          >
+                            <View style={[styles.optionChipLine, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                              {!!v.colorHex && (
+                                <View
+                                  style={[
+                                    styles.colorDot,
+                                    { backgroundColor: v.colorHex, borderColor: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.15)' },
+                                  ]}
+                                />
+                              )}
+                              <AppText
+                                style={[
+                                  styles.optionChipText,
+                                  {
+                                    color: sel ? theme.colors.primary : theme.colors.text,
+                                    textDecorationLine: soldOut ? 'line-through' : 'none',
+                                  },
+                                ]}
+                              >
+                                {String(v.colorValue ?? '')}
+                              </AppText>
+                            </View>
+                            {typeof v.priceUSD === 'number' && v.priceUSD !== product.priceUSD && (
+                              <AppNumber
+                                value={formatPrice(v.priceUSD, currency, exchangeRateIQD)}
+                                style={[styles.optionChipPrice, { color: sel ? theme.colors.primary : theme.colors.textSecondary }]}
+                              />
+                            )}
+                            {soldOut && (
+                              <AppText style={[styles.optionChipSoldOut, { color: '#F44336' }]}>
+                                {t('product.outOfStock', { defaultValue: 'Out of Stock' })}
+                              </AppText>
+                            )}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
+
+                {/* ---- Quantity: one stepper for the whole order ----
+                     There used to be a +/- stepper on every variation row, so the sheet
+                     asked "how many of each?" when the shopper only wanted to pick one.
+                     Worse, a size AND a colour each became their own cart line, and a
+                     shopper who picked "256GB" and "Black" was charged for two phones.
+                     One choice per group, one quantity. */}
+                <View style={{ marginTop: hasAnyVars ? SPACING.md : 0 }}>
+                  {hasAnyVars && (
+                    <AppText style={[styles.varSectionLabel, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
+                      {t('startOrder.quantity', { defaultValue: 'Quantity' })}
+                    </AppText>
+                  )}
+                  <View
+                    style={[styles.quantityRow, { flexDirection: isRTL ? 'row-reverse' : 'row', opacity: qtyEnabled ? 1 : 0.4 }]}
+                    pointerEvents={qtyEnabled ? 'auto' : 'none'}
+                  >
                     <View style={[styles.quantitySelector, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                       <TouchableOpacity
                         style={styles.qtyButton}
@@ -730,10 +849,9 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                             setLocalQtyText(cleaned);
                             if (cleaned.length > 0) {
                               const num = parseInt(cleaned, 10);
-                              const maxS = product?.stockQty || 999;
-                              if (num > maxS) {
-                                setLocalQty(maxS);
-                                setLocalQtyText(String(maxS));
+                              if (num > maxSelectable) {
+                                setLocalQty(maxSelectable);
+                                setLocalQtyText(String(maxSelectable));
                               } else if (num >= 1) {
                                 setLocalQty(num);
                               }
@@ -741,13 +859,12 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                           }}
                           onBlur={() => {
                             const num = parseInt(localQtyText, 10);
-                            const maxS = product?.stockQty || 999;
                             if (isNaN(num) || num < 1) {
                               setLocalQty(1);
                               setLocalQtyText('1');
-                            } else if (num > maxS) {
-                              setLocalQty(maxS);
-                              setLocalQtyText(String(maxS));
+                            } else if (num > maxSelectable) {
+                              setLocalQty(maxSelectable);
+                              setLocalQtyText(String(maxSelectable));
                             } else {
                               setLocalQty(num);
                               setLocalQtyText(String(num));
@@ -767,8 +884,7 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                       <TouchableOpacity
                         style={styles.qtyButton}
                         onPress={() => {
-                          const maxS = product?.stockQty || 999;
-                          const newQ = Math.min(localQty + 1, maxS);
+                          const newQ = Math.min(localQty + 1, maxSelectable);
                           setLocalQty(newQ);
                           setLocalQtyText(String(newQ));
                         }}
@@ -787,173 +903,12 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                       />
                     </View>
                   </View>
-                )}
-
-                {/* ---- Size Variations ---- */}
-                {hasSizeVars && product?.variations && (
-                  <View style={{ marginTop: hasColorVars ? 0 : 0 }}>
-                    <AppText style={[styles.varSectionLabel, { color: theme.colors.textSecondary }]} numberOfLines={1} adjustsFontSizeToFit>
-                      {t('product.size', { defaultValue: 'Size' })}
+                  {!!selectionHint && (
+                    <AppText style={[styles.selectionHint, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
+                      {selectionHint}
                     </AppText>
-                    {product.variations.map((v) => {
-                      const qty = localVarQtys[v.variationId] || 0;
-                      const outOfStock = v.stockQuantity === 0;
-                      return (
-                        <TouchableOpacity
-                          key={v.variationId}
-                          activeOpacity={outOfStock ? 1 : 0.7}
-                          onPress={() => toggleVarRow(v.variationId, qty, outOfStock)}
-                          accessibilityRole="button"
-                          accessibilityState={{ selected: qty > 0, disabled: outOfStock }}
-                          style={[
-                            styles.varRow,
-                            { flexDirection: isRTL ? 'row-reverse' : 'row', opacity: outOfStock ? 0.4 : 1 },
-                            qty > 0 && {
-                              backgroundColor: theme.colors.primary + '0E',
-                              borderColor: theme.colors.primary + '44',
-                            },
-                          ]}
-                        >
-                          <View style={[styles.varInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
-                            <AppText style={[styles.varName, { color: theme.colors.text }]} numberOfLines={1} adjustsFontSizeToFit>
-                              {v.sizeValue}
-                            </AppText>
-                            <AppText style={[styles.varStock, { color: outOfStock ? '#F44336' : theme.colors.textSecondary }]} numberOfLines={1} adjustsFontSizeToFit>
-                              {outOfStock
-                                ? t('product.outOfStock', { defaultValue: 'Out of Stock' })
-                                : ''
-                              }
-                            </AppText>
-                            {!outOfStock && product.priceTiers && product.priceTiers.length > 0 && (
-                              <AppText style={[styles.varStock, { color: '#FF6B00', fontSize: 10, marginTop: 2 }]} numberOfLines={1} adjustsFontSizeToFit>
-                                {`${t('product.wholesalePricing', { defaultValue: 'Wholesale' })}: ${formatPrice(Math.min(...product.priceTiers.map(tier => tier.priceUSD)), currency, exchangeRateIQD)}`}
-                              </AppText>
-                            )}
-                          </View>
-                          {v.priceUSD && v.priceUSD !== product.priceUSD && (
-                            <AppNumber
-                              value={formatPrice(v.priceUSD, currency, exchangeRateIQD)}
-                              style={[styles.varPrice, { color: theme.colors.primary }]}
-                            />
-                          )}
-                          <View style={[styles.varQtyControls, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                            <TouchableOpacity
-                              style={styles.varQtyBtn}
-                              onPress={() => updateSizeQty(v.variationId, -1)}
-                              disabled={outOfStock || qty === 0}
-                            >
-                              <Ionicons name="remove" size={18} color={theme.colors.primary} />
-                            </TouchableOpacity>
-                            <AppNumber value={qty} style={[styles.varQtyText, { color: theme.colors.text }]} />
-                            <TouchableOpacity
-                              style={styles.varQtyBtn}
-                              onPress={() => updateSizeQty(v.variationId, 1)}
-                              disabled={outOfStock || qty >= v.stockQuantity}
-                            >
-                              <Ionicons name="add" size={18} color={theme.colors.primary} />
-                            </TouchableOpacity>
-                          </View>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                )}
-
-                {/* ---- Color Variations ---- */}
-                {hasColorVars && product?.colorVariations && (
-                  <View style={{ marginTop: hasSizeVars ? SPACING.md : 0 }}>
-                    <AppText style={[styles.varSectionLabel, { color: theme.colors.textSecondary }]} numberOfLines={1} adjustsFontSizeToFit>
-                      {t('product.color', { defaultValue: 'Color' })}
-                    </AppText>
-                    {product.colorVariations.map((v) => {
-                      const qty = localColorQtys[v.variationId] || 0;
-                      const outOfStock = v.stockQuantity === 0;
-                      return (
-                        <TouchableOpacity
-                          key={v.variationId}
-                          activeOpacity={outOfStock ? 1 : 0.7}
-                          onPress={() => toggleColorRow(v.variationId, qty, outOfStock)}
-                          accessibilityRole="button"
-                          accessibilityState={{ selected: qty > 0, disabled: outOfStock }}
-                          style={[
-                            styles.varRow,
-                            { flexDirection: isRTL ? 'row-reverse' : 'row', opacity: outOfStock ? 0.4 : 1 },
-                            qty > 0 && {
-                              backgroundColor: theme.colors.primary + '0E',
-                              borderColor: theme.colors.primary + '44',
-                            },
-                          ]}
-                        >
-                          <View style={[styles.varInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start', flexDirection: isRTL ? 'row-reverse' : 'row', gap: 8 }]}>
-                            {v.colorHex && (
-                              <View
-                                style={[
-                                  styles.colorDot,
-                                  { backgroundColor: v.colorHex, borderColor: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.15)' },
-                                ]}
-                              />
-                            )}
-                            <View style={{ alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
-                              <AppText style={[styles.varName, { color: theme.colors.text }]} numberOfLines={1} adjustsFontSizeToFit>
-                                {v.colorValue}
-                              </AppText>
-                              <AppText style={[styles.varStock, { color: outOfStock ? '#F44336' : theme.colors.textSecondary }]} numberOfLines={1} adjustsFontSizeToFit>
-                                {outOfStock
-                                  ? t('product.outOfStock', { defaultValue: 'Out of Stock' })
-                                  : ''
-                                }
-                              </AppText>
-                              {!outOfStock && product.priceTiers && product.priceTiers.length > 0 && (
-                                <AppText style={[styles.varStock, { color: '#FF6B00', fontSize: 10, marginTop: 2 }]} numberOfLines={1} adjustsFontSizeToFit>
-                                  {`${t('product.wholesalePricing', { defaultValue: 'Wholesale' })}: ${formatPrice(Math.min(...product.priceTiers.map(tier => tier.priceUSD)), currency, exchangeRateIQD)}`}
-                                </AppText>
-                              )}
-                            </View>
-                          </View>
-                          {v.priceUSD && v.priceUSD !== product.priceUSD && (
-                            <AppNumber
-                              value={formatPrice(v.priceUSD, currency, exchangeRateIQD)}
-                              style={[styles.varPrice, { color: theme.colors.primary }]}
-                            />
-                          )}
-                          <View style={[styles.varQtyControls, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                            <TouchableOpacity
-                              style={styles.varQtyBtn}
-                              onPress={() => updateColorQty(v.variationId, -1)}
-                              disabled={outOfStock || qty === 0}
-                            >
-                              <Ionicons name="remove" size={18} color={theme.colors.primary} />
-                            </TouchableOpacity>
-                            <AppNumber value={qty} style={[styles.varQtyText, { color: theme.colors.text }]} />
-                            <TouchableOpacity
-                              style={styles.varQtyBtn}
-                              onPress={() => updateColorQty(v.variationId, 1)}
-                              disabled={outOfStock || qty >= v.stockQuantity}
-                            >
-                              <Ionicons name="add" size={18} color={theme.colors.primary} />
-                            </TouchableOpacity>
-                          </View>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                )}
-
-                {/* ---- Totals summary (for variant products) ---- */}
-                {hasAnyVars && (
-                  <View style={[styles.varTotalRow, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: theme.colors.primary + '10', marginTop: SPACING.sm }]}>
-                    <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
-                      <AppText style={{ color: theme.colors.textSecondary, fontSize: 13 }} numberOfLines={1} adjustsFontSizeToFit>
-                        {t('startOrder.totalItems', { defaultValue: 'Total Items:' })}
-                      </AppText>
-                      <AppNumber value={localTotalQty} style={{ fontSize: 16, fontWeight: '700', color: theme.colors.text }} />
-                    </View>
-                    <AppNumber
-                      value={formatPrice(localTotalPrice, currency, exchangeRateIQD)}
-                      style={[styles.totalPrice, { color: theme.colors.primary }]}
-                    />
-                  </View>
-                )}
+                  )}
+                </View>
               </View>
 
               {/* ==================== DELIVERY ADDRESS (order mode only) ==================== */}
@@ -1594,72 +1549,42 @@ const createStyles = (theme: any, isDark: boolean, insets: any, isRTL: boolean) 
       opacity: 0.5,
       textTransform: 'uppercase',
     },
-    varRow: {
-      alignItems: 'center',
-      borderBottomColor: theme.colors.border + '12',
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      // The border and the padding are ALWAYS here, transparent when the row is not
-      // selected. Adding a border only on selection made the row jump by a pixel and
-      // the text shuffle sideways the moment you tapped it.
-      borderColor: 'transparent',
-      borderRadius: 10,
-      borderWidth: 1,
+    chipWrap: {
+      flexWrap: 'wrap',
       gap: 10,
-      paddingHorizontal: 8,
-      paddingVertical: 12,
+      marginBottom: 4,
     },
-    varInfo: {
-      flex: 1,
-      gap: 3,
-    },
-    varName: {
-      fontSize: 15,
-      fontWeight: '600',
-      letterSpacing: 0.1,
-    },
-    varStock: {
-      fontSize: 12,
-      opacity: 0.7,
-    },
-    varPrice: {
-      fontSize: 14,
-      fontWeight: '700',
-      marginHorizontal: 6,
-    },
-    varQtyControls: {
-      alignItems: 'center',
-      backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#f2f2f2',
-      borderRadius: 18,
-      paddingHorizontal: 3,
-      paddingVertical: 3,
-      borderWidth: 1,
-      borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.03)',
-    },
-    varQtyBtn: {
-      alignItems: 'center',
-      borderRadius: 15,
-      height: 30,
-      justifyContent: 'center',
-      width: 30,
-      backgroundColor: theme.colors.background,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.1,
-      shadowRadius: 2,
-      elevation: 2,
-    },
-    varQtyText: {
-      fontSize: 18,
-      fontWeight: '700',
-      minWidth: 36,
-      textAlign: 'center',
-    },
-    varTotalRow: {
+    optionChip: {
       alignItems: 'center',
       borderRadius: 14,
-      justifyContent: 'space-between',
-      paddingHorizontal: 14,
+      gap: 3,
+      justifyContent: 'center',
+      minHeight: 52,
+      minWidth: 76,
+      paddingHorizontal: 16,
       paddingVertical: 10,
+    },
+    optionChipLine: {
+      alignItems: 'center',
+      gap: 8,
+    },
+    optionChipText: {
+      fontSize: 15,
+      fontWeight: '700',
+      letterSpacing: 0.1,
+    },
+    optionChipPrice: {
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    optionChipSoldOut: {
+      fontSize: 10,
+      fontWeight: '600',
+    },
+    selectionHint: {
+      fontSize: 12,
+      marginTop: 8,
+      opacity: 0.8,
     },
     colorDot: {
       borderRadius: 12,

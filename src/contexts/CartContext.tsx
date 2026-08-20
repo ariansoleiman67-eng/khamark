@@ -14,7 +14,7 @@ interface CartContextValue {
   refreshCart: () => Promise<void>;
   addToCart: (productId: string, quantity?: number, product?: Product, selectedOptions?: { color?: string; size?: string; storage?: string }) => Promise<void>;
   // ALIBABA VARIATION: Batch add multiple variations in one operation
-  addVariationsToCart: (product: Product, selections: Array<{ variationId: string; quantity: number; priceUSD?: number; sizeValue?: number | string; sizeUnit?: string; colorValue?: string }>) => Promise<void>;
+  addVariationsToCart: (product: Product, selections: Array<{ variationId: string; quantity: number; priceUSD?: number; sizeValue?: number | string; sizeUnit?: string; colorValue?: string; colorVariationId?: string }>) => Promise<void>;
   updateQuantity: (productId: string, quantity: number, selectedOptions?: { color?: string; size?: string; storage?: string }) => Promise<void>;
   removeFromCart: (productId: string, selectedOptions?: { color?: string; size?: string; storage?: string }) => Promise<void>;
   clearCart: () => Promise<void>;
@@ -367,7 +367,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   // ALIBABA VARIATION: Batch add multiple size variations in one operation
   const addVariationsToCart = useCallback(async (
     product: Product,
-    selections: Array<{ variationId: string; quantity: number; priceUSD?: number; sizeValue?: number | string; sizeUnit?: string; colorValue?: string }>
+    selections: Array<{ variationId: string; quantity: number; priceUSD?: number; sizeValue?: number | string; sizeUnit?: string; colorValue?: string; colorVariationId?: string }>
   ) => {
     // Prevent rapid consecutive additions
     if (isAddingRef.current) {

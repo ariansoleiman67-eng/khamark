@@ -925,7 +925,9 @@
     "addAddressFirst": "Please add a delivery address first.",
     "noSelection": "No Selection",
     "orderFailed": "Failed to place order",
-    "selectItemsFirst": "Please select quantity before ordering."
+    "selectItemsFirst": "Please select quantity before ordering.",
+    "chooseSize": "Choose a size to continue",
+    "chooseColor": "Choose a colour to continue"
   },
   "orders": {
     "title": "My Orders",

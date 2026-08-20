@@ -891,7 +891,9 @@
     "loginToOrder": "تسجيل الدخول للطلب",
     "noSelection": "لا يوجد تحديد",
     "orderFailed": "تعذّر تقديم الطلب",
-    "selectItemsFirst": "يرجى تحديد الكمية قبل الطلب."
+    "selectItemsFirst": "يرجى تحديد الكمية قبل الطلب.",
+    "chooseSize": "اختر الحجم للمتابعة",
+    "chooseColor": "اختر اللون للمتابعة"
   },
   "orders": {
     "title": "طلباتي",
