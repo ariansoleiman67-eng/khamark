@@ -161,7 +161,7 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
       onPress={() => handleCountrySelect(item)}
       activeOpacity={0.7}
     >
-      <Text allowFontScaling={false} style={styles.countryFlag}>{item.flag}</Text>
+      <Text allowFontScaling={false} style={styles.countryIso}>{item.code}</Text>
       <View style={styles.countryInfo}>
         <Text allowFontScaling={false} style={styles.countryName} numberOfLines={1} adjustsFontSizeToFit>
           {item.name}
@@ -188,7 +188,7 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
             onPress={() => handleCountrySelect(country)}
             activeOpacity={0.7}
           >
-            <Text allowFontScaling={false} style={styles.countryFlag}>{country.flag}</Text>
+            <Text allowFontScaling={false} style={styles.countryIso}>{country.code}</Text>
             <View style={styles.countryInfo}>
               <Text allowFontScaling={false} style={styles.countryName} numberOfLines={1} adjustsFontSizeToFit>
                 {country.name}
@@ -243,7 +243,12 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
             onPress={openPicker}
             activeOpacity={0.8}
           >
-            <Text allowFontScaling={false} style={styles.flagEmoji}>{selectedCountry.flag}</Text>
+            {/* NO EMOJI FLAG. `flag` is a regional-indicator pair (Iraq is
+                U+1F1EE U+1F1F6 — two code points, one glyph), and on the shop's
+                iPhone iOS failed to find an emoji glyph for either half, so the
+                sign-in screen showed two ?-in-a-box characters where the flag
+                should be. The dial code beside it already identifies the country,
+                and text cannot fall back to .notdef. */}
             <Text allowFontScaling={false} style={[styles.dialCode, { color: theme.colors.text }]} adjustsFontSizeToFit numberOfLines={1}>
               {selectedCountry.dialCode}
             </Text>
@@ -449,9 +454,15 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     paddingHorizontal: 20,
   },
-  countryFlag: {
-    fontSize: 28,
+  /* Was `countryFlag` at fontSize 28 holding an emoji flag — see the note in the
+     collapsed input above. A two-letter ISO code renders in any font. */
+  countryIso: {
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.5,
     marginRight: 12,
+    minWidth: 30,
+    opacity: 0.65,
   },
   countryInfo: {
     flex: 1,
@@ -500,9 +511,6 @@ const styles = StyleSheet.create({
     color: COLORS.error,
     fontSize: 12,
     marginTop: 6,
-  },
-  flagEmoji: {
-    fontSize: 22,
   },
   headerRow: {
     alignItems: 'center',
