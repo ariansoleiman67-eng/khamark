@@ -33,7 +33,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.asankary.app",
-      "buildNumber": "74",
+      "buildNumber": "75",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Asankary uses your location to fill in your delivery address and to show you the nearest shop branch — for example, dropping a pin on your street so a delivery rider can find you.",
         "NSCameraUsageDescription": "Asankary uses the camera so you can photograph a phone you want to trade in, or take a profile picture — for example, snapping the back of your old handset so the shop can price it.",
