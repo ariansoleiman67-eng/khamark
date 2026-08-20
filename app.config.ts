@@ -18,9 +18,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   slug: "asankary",
   scheme: "asankary",
   // Must match CFBundleShortVersionString in ios/Asankary/Info.plist and the
-  // version record in App Store Connect ("1.0"), or the processed build may not
-  // attach to that version.
-  version: "1.0",
+  // version record in App Store Connect, or the processed build may not attach to
+  // that version. This file WINS over app.json — bumping app.json alone does
+  // nothing, because the object below spreads app.json and then overrides it.
+  version: "1.9.44",
   newArchEnabled: true,
   orientation: "portrait",
   icon: "./assets/icon.png",
@@ -83,7 +84,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     //   1.0 (2) — rejected 2.1(a), crashed on launch (react-native-get-random-values 2.0.0)
     //   1.0 (4) — launched fine; rejected 2.3.10, non-iOS device imagery
     //   1.0 (5) — HaryadAutoparts fork residue removed from the binary
-    buildNumber: "5",
+    //   1.9.44 (75) — reply to 2.1 Information Needed; the recorded review build
+    buildNumber: "75",
     // associatedDomains removed: it carried "applinks:ASANKARY_DOMAIN_TBD", a
     // placeholder host. That ships a real com.apple.developer.associated-domains
     // entitlement pointing at a domain that cannot serve an
@@ -139,7 +141,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backgroundColor: colors.iconBackground,
     },
     package: "com.asankary.app",
-    versionCode: 2,
+    versionCode: 135,
     googleServicesFile: "./google-services.json",
     intentFilters: [
       // The https/autoVerify filter for host "ASANKARY_DOMAIN_TBD" was removed — a

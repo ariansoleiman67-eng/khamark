@@ -36,7 +36,8 @@ shop's own staff. The interface is fully translated into English, Arabic and
 Kurdish (Sorani), with right-to-left layout for Arabic and Kurdish.
 
 There are no in-app purchases and no subscriptions. Everything sold is a physical
-product paid for on delivery, by card, or through a money exchanger.
+product, and no payment is taken inside the app: an order is settled on delivery
+in cash, or through a money exchanger. The app never handles card details.
 
 ---
 
@@ -61,7 +62,7 @@ Main flows:
 2. **Language and currency** — the globe icon in the header switches between
    English, Arabic and Kurdish. Prices switch between USD and IQD.
 3. **Cart and checkout** — add to cart, then choose delivery to an Iraqi city or
-   collection, and a payment method (cash on delivery, QiCard, or money exchanger).
+   collection, and a payment method (cash on delivery or money exchanger).
    Sign-in is required only at this point.
 4. **Orders** — the Orders tab tracks each order's status.
 5. **Messages** — a customer can message the shop about a specific product. This
@@ -86,7 +87,6 @@ Main flows:
 | Google Maps | Picking and displaying a delivery address |
 | Anthropic (Claude) | The in-app shopping assistant that answers product questions, and image-based product search |
 | Bunny CDN | Hosts product videos |
-| QiCard | Card payment processing (Iraq) |
 
 No advertising networks, no analytics SDKs, and no third-party trackers.
 
@@ -111,8 +111,9 @@ regulated industry.
 
 Product names, images and specifications are manufacturer material for the
 handsets and accessories the shop stocks and resells, used to describe goods it
-actually sells. Card payments are handled by QiCard, a licensed Iraqi payment
-provider; the app never processes or stores card details itself.
+actually sells. No payment is taken in the app and no card details are collected
+or stored — every order is settled offline, on delivery or through a money
+exchanger.
 
 ---
 
