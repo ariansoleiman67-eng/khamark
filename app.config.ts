@@ -141,6 +141,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backgroundColor: colors.iconBackground,
     },
     package: "com.asankary.app",
+    // Android ships its own version name, INDEPENDENT of the root `version`. The
+    // root value is 1.9.44 because that is what App Store Connect expects for the
+    // iOS submission in flight; Play starts its own numbering at 1.0. Changing the
+    // root field to 1.0 would drag iOS back with it.
+    version: "1.0",
     versionCode: 135,
     googleServicesFile: "./google-services.json",
     intentFilters: [
