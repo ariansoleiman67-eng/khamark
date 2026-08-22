@@ -146,7 +146,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // iOS submission in flight; Play starts its own numbering at 1.0. Changing the
     // root field to 1.0 would drag iOS back with it.
     version: "1.0",
-    versionCode: 135,
+    versionCode: 136,
     googleServicesFile: "./google-services.json",
     intentFilters: [
       // The https/autoVerify filter for host "ASANKARY_DOMAIN_TBD" was removed — a
