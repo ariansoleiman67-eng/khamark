@@ -3204,7 +3204,9 @@
         "discardTitle": "Discard this product?",
         "discardBody": "What you have filled in will be lost. It has not been saved.",
         "keepEditing": "Keep editing",
-        "discard": "Discard"
+        "discard": "Discard",
+        "brandNone": "No brand",
+        "stillNeeded": "Still needed:"
       },
       "invalidSizeValue": "Please enter a size",
       "duplicateSizeValue": "This size already exists",

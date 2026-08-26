@@ -3248,7 +3248,9 @@
         "discardTitle": "تجاهل هذا المنتج؟",
         "discardBody": "سيضيع ما ملأته. لم يتم حفظه.",
         "keepEditing": "تابع التعديل",
-        "discard": "تجاهل"
+        "discard": "تجاهل",
+        "brandNone": "بدون ماركة",
+        "stillNeeded": "ما زال مطلوباً:"
       },
       "noSearchResults": "لم يتم العثور على منتجات مطابقة",
       "loadingTenant": "جارٍ تحميل بيانات المتجر...",

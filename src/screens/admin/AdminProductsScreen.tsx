@@ -13,7 +13,6 @@ import {
   Alert,
   Modal,
   Platform,
-  I18nManager,
   LayoutAnimation,
   UIManager,
 } from 'react-native';
@@ -798,7 +797,16 @@ const AdminProductsScreen: React.FC = () => {
   useEffect(() => { formDataRef.current = formData; }, [formData]);
   useEffect(() => { specEntriesRef.current = specEntries; }, [specEntries]);
 
-  const applyAiDraft = useCallback((draft: AiProductDraft, overwrite: boolean) => {
+  const applyAiDraft = useCallback((draft: AiProductDraft, overwrite: boolean, session: number) => {
+    // The live refs fixed one bug and opened another: "the form, now" is the wrong
+    // form if the admin closed this product and opened a different one while the
+    // request was in flight, or while the Keep-mine/Replace choice sat on screen.
+    // Product A's name, descriptions and specs would be written into product B and
+    // saved by someone who believed they were looking at B.
+    //
+    // Every other async writer in this file already captures editSessionRef before
+    // its await; this one was the exception.
+    if (!isSameEditSession(session)) return 0;
     const liveForm = formDataRef.current;
     const liveSpecs = specEntriesRef.current;
     const currentSpecs = liveSpecs.reduce<Record<string, string>>((acc, e) => {
@@ -806,6 +814,14 @@ const AdminProductsScreen: React.FC = () => {
       return acc;
     }, {});
     const { merged, specs, filled } = mergeDraft(liveForm, draft, currentSpecs, overwrite);
+    // A new category has to drop the old translations with it. The category field
+    // already does this on every manual edit; leaving them behind files the
+    // product under the PREVIOUS category for Arabic and Kurdish shoppers, which
+    // nothing on screen would show.
+    if (merged.category !== liveForm.category) {
+      merged.categoryAr = '';
+      merged.categoryKu = '';
+    }
     setFormData(merged);
     // Preserve the admin's ordering; append anything new after it. Compared
     // case-insensitively, or a model answering "cable" after the admin typed
@@ -831,6 +847,9 @@ const AdminProductsScreen: React.FC = () => {
       return;
     }
 
+    // Captured before the await, checked after it.
+    const session = editSessionRef.current;
+
     setAiFilling(true);
     try {
       const draft = await fetchProductDraft({
@@ -839,6 +858,11 @@ const AdminProductsScreen: React.FC = () => {
         category: formData.category,
         categories: managedCategories.map(c => c.name).filter(Boolean),
       });
+
+      // Bail before the dry run and before any alert: a late answer for a product
+      // the admin has already left must not even raise "Replace them too?" over
+      // the form they are looking at now.
+      if (!isSameEditSession(session)) return;
 
       // Dry run first, purely to count what would be overwritten. Reads the live
       // form for the same reason applyAiDraft does — the admin may have typed
@@ -860,19 +884,19 @@ const AdminProductsScreen: React.FC = () => {
             {
               text: t('admin.products.form.aiKeepMine', { defaultValue: 'Keep mine' }),
               style: 'cancel',
-              onPress: () => { applyAiDraft(draft, false); },
+              onPress: () => { applyAiDraft(draft, false, session); },
             },
             {
               text: t('admin.products.form.aiReplaceMine', { defaultValue: 'Replace' }),
               style: 'destructive',
-              onPress: () => { applyAiDraft(draft, true); },
+              onPress: () => { applyAiDraft(draft, true, session); },
             },
           ],
         );
         return;
       }
 
-      const filledCount = applyAiDraft(draft, false);
+      const filledCount = applyAiDraft(draft, false, session);
       if (filledCount === 0) {
         Alert.alert(
           t('admin.products.form.aiNothingTitle', { defaultValue: 'Nothing to add' }),
@@ -880,6 +904,9 @@ const AdminProductsScreen: React.FC = () => {
         );
       }
     } catch (err: any) {
+      // Silent for a product the admin has already left — an error about a form
+      // they closed is noise at best and misleading at worst.
+      if (!isSameEditSession(session)) return;
       // Every failure here is recoverable by typing the fields, so it says so
       // rather than reading like something broke.
       const code = err?.message || '';
@@ -2293,6 +2320,26 @@ const AdminProductsScreen: React.FC = () => {
   const canSubmitForm = !!formData.name.trim() && !!formData.partNumber.trim()
     && (formData.status !== 'available' || !!formData.priceUSD.trim() || !!(formData.priceIQD || '').trim());
 
+  // The Save button greys itself out and says nothing. On a ten-section form the
+  // missing field is usually off screen, so the admin is left tapping a dead
+  // button with no idea which one it wants. Name them, and let each one be
+  // tapped to jump to the section it lives in.
+  const missingRequired = useMemo(() => {
+    const missing: Array<{ label: string; section: string }> = [];
+    if (!formData.name.trim()) {
+      missing.push({ label: t('admin.products.form.name'), section: 'basic' });
+    }
+    if (!formData.partNumber.trim()) {
+      missing.push({ label: t('admin.products.form.partNumber'), section: 'basic' });
+    }
+    // Price is required only for an `available` product — a "Coming soon" listing
+    // saves without one, and demanding it was a bug this form already had once.
+    if (formData.status === 'available' && !formData.priceUSD.trim() && !(formData.priceIQD || '').trim()) {
+      missing.push({ label: t('admin.products.form.price'), section: 'pricing' });
+    }
+    return missing;
+  }, [formData.name, formData.partNumber, formData.status, formData.priceUSD, formData.priceIQD, t]);
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: pageBg }]} edges={['left', 'right']}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
@@ -2950,7 +2997,7 @@ const AdminProductsScreen: React.FC = () => {
                 >
                   {t('admin.products.form.nameAr')}
                 </Text>
-                <TextInput allowFontScaling={false}                  style={[styles.input, { backgroundColor: theme.colors.background, color: theme.colors.text }]}
+                <TextInput allowFontScaling={false}                  style={[styles.input, { backgroundColor: theme.colors.background, color: theme.colors.text, textAlign: 'right' }]}
                   value={formData.nameAr}
                   onChangeText={(text) => setFormData(prev => ({ ...prev, nameAr: text }))}
                   placeholder={t('admin.products.form.nameArPlaceholder')}
@@ -2969,7 +3016,7 @@ const AdminProductsScreen: React.FC = () => {
                 >
                   {t('admin.products.form.nameKu')}
                 </Text>
-                <TextInput allowFontScaling={false}                  style={[styles.input, { backgroundColor: theme.colors.background, color: theme.colors.text }]}
+                <TextInput allowFontScaling={false}                  style={[styles.input, { backgroundColor: theme.colors.background, color: theme.colors.text, textAlign: 'right' }]}
                   value={formData.nameKu}
                   onChangeText={(text) => setFormData(prev => ({ ...prev, nameKu: text }))}
                   placeholder={t('admin.products.form.nameKuPlaceholder')}
@@ -3019,7 +3066,7 @@ const AdminProductsScreen: React.FC = () => {
                           activeOpacity={0.7}
                         >
                           <Text allowFontScaling={false}
-                            style={{ fontSize: 15, color: theme.colors.text, textAlign: I18nManager.isRTL ? 'right' : 'left' }}
+                            style={{ fontSize: 15, color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }}
                             numberOfLines={1}
                           >
                             {categoryLabel}
@@ -3093,7 +3140,7 @@ const AdminProductsScreen: React.FC = () => {
                             textAlign: isRTL ? 'right' : 'left',
                           }}
                         >
-                          {formData.brand || t('admin.products.form.selectOrType')}
+                          {formData.brand || t('admin.products.form.selectBrand', { defaultValue: 'Select Brand' })}
                         </Text>
                       </TouchableOpacity>
                       <TouchableOpacity
@@ -4181,7 +4228,7 @@ const AdminProductsScreen: React.FC = () => {
                     {specEntries.map((spec) => (
                       <View key={spec.key} style={[styles.priceTierRow, { backgroundColor: theme.colors.background }]}>
                         <View style={{ width: 100, justifyContent: 'center' }}>
-                          <Text allowFontScaling={false} style={{ color: theme.colors.text, fontWeight: '600', fontSize: 13, textAlign: I18nManager.isRTL ? 'right' : 'left' }} numberOfLines={1}>{spec.key}</Text>
+                          <Text allowFontScaling={false} style={{ color: theme.colors.text, fontWeight: '600', fontSize: 13, textAlign: isRTL ? 'right' : 'left' }} numberOfLines={1}>{spec.key}</Text>
                         </View>
                         <TextInput allowFontScaling={false} style={[styles.input, { flex: 1, backgroundColor: theme.colors.surface, color: theme.colors.text, minHeight: 44, paddingVertical: 8, marginHorizontal: 8 }]}
                           value={spec.value}
@@ -4341,6 +4388,40 @@ const AdminProductsScreen: React.FC = () => {
               shadowRadius: 8,
               elevation: 8,
             }}>
+              {missingRequired.length > 0 && (
+                <View style={{
+                  flexDirection: isRTL ? 'row-reverse' : 'row',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  gap: 6,
+                  marginBottom: 10,
+                }}>
+                  <Text allowFontScaling={false} style={{ fontSize: 12, color: theme.colors.textSecondary }}>
+                    {t('admin.products.form.stillNeeded', { defaultValue: 'Still needed:' })}
+                  </Text>
+                  {missingRequired.map((m) => (
+                    <TouchableOpacity
+                      key={m.label}
+                      onPress={() => jumpToSection(m.section)}
+                      activeOpacity={0.7}
+                      accessibilityRole="button"
+                      style={{
+                        paddingHorizontal: 10,
+                        minHeight: 28,
+                        justifyContent: 'center',
+                        borderRadius: 14,
+                        borderWidth: 1,
+                        borderColor: '#F44336' + '55',
+                        backgroundColor: '#F44336' + '12',
+                      }}
+                    >
+                      <Text allowFontScaling={false} numberOfLines={1} style={{ fontSize: 12, fontWeight: '600', color: '#F44336' }}>
+                        {m.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
               <TouchableOpacity
                 style={{
                   alignItems: 'center', borderRadius: 16, flexDirection: 'row',
@@ -4437,6 +4518,50 @@ const AdminProductsScreen: React.FC = () => {
               </View>
 
               <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                {/* Brand is optional, and the text box this replaced could be
+                    select-all-deleted. The picker could only ever SET one, so a
+                    generic cable mis-tagged "Samsung" — or a listing born from a
+                    trade-in prefill — could not shed it without being deleted and
+                    recreated. Hidden while searching, where it would compete with
+                    the one-off hatch below. */}
+                {brandSearch.trim().length === 0 && (
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: !formData.brand.trim() }}
+                    onPress={() => {
+                      setFormData(prev => ({ ...prev, brand: '' }));
+                      setBrandPickerVisible(false);
+                    }}
+                    style={{
+                      flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 12,
+                      paddingHorizontal: 20, paddingVertical: 12,
+                      borderBottomWidth: 0.5,
+                      borderBottomColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)',
+                      backgroundColor: !formData.brand.trim() ? theme.colors.primary + '10' : 'transparent',
+                    }}
+                  >
+                    <View style={{
+                      width: 36, height: 36, borderRadius: 9,
+                      alignItems: 'center', justifyContent: 'center',
+                      backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                    }}>
+                      <Ionicons name="remove-outline" size={18} color={theme.colors.textSecondary} />
+                    </View>
+                    <Text
+                      allowFontScaling={false}
+                      numberOfLines={1}
+                      style={{
+                        flex: 1, fontSize: 15,
+                        fontWeight: !formData.brand.trim() ? '700' : '500',
+                        color: !formData.brand.trim() ? theme.colors.primary : theme.colors.text,
+                        textAlign: isRTL ? 'right' : 'left',
+                      }}
+                    >
+                      {t('admin.products.form.brandNone', { defaultValue: 'No brand' })}
+                    </Text>
+                    {!formData.brand.trim() && <Ionicons name="checkmark" size={18} color={theme.colors.primary} />}
+                  </TouchableOpacity>
+                )}
                 {filteredBrands.length === 0 ? (
                   <Text allowFontScaling={false} style={{ padding: 24, textAlign: 'center', color: theme.colors.textSecondary, fontSize: 14, lineHeight: 20 }}>
                     {brandOptions.length === 0

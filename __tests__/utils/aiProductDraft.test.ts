@@ -113,3 +113,47 @@ describe('mergeDraft — specification key casing', () => {
     expect(skipped).toContain('Cable');
   });
 });
+
+describe('parseProductDraft — braces inside string values', () => {
+  it('does not break on a brace inside a description', () => {
+    const d = parseProductDraft('{"description":"Great value { for the price","brand":"Honor"}');
+    expect(d).toEqual({ description: 'Great value { for the price', brand: 'Honor' });
+  });
+
+  it('does not return an earlier EXAMPLE when the real answer contains a brace', () => {
+    // The scanner counted braces without knowing about strings, so the stray "{"
+    // left depth non-zero, the real object was never captured, and the narrated
+    // example — the last balanced object — was returned instead. Silently wrong.
+    const raw = 'Example: {"brand":"WRONG"}\n\nAnswer:\n{"description":"Ships with a { free case","brand":"Honor"}';
+    expect(parseProductDraft(raw)?.brand).toBe('Honor');
+  });
+
+  it('survives an unmatched closing brace inside a string', () => {
+    const raw = 'Example: {"brand":"WRONG"}\n\n{"description":"Great value } for the price","brand":"Honor"}';
+    expect(parseProductDraft(raw)?.brand).toBe('Honor');
+  });
+
+  it('handles an escaped quote before a brace', () => {
+    const d = parseProductDraft('{"specifications":{"Screen":"6.7\\" {AMOLED}"},"brand":"Honor"}');
+    expect(d?.brand).toBe('Honor');
+    expect(d?.specifications?.Screen).toBe('6.7" {AMOLED}');
+  });
+});
+
+describe('mergeDraft — agreement is not a conflict', () => {
+  it('does not count a field the model agrees with as skipped', () => {
+    const { skipped, filled } = mergeDraft({ brand: 'Honor' } as any, { brand: 'Honor' }, {}, false);
+    expect(skipped).toEqual([]);
+    expect(filled).toEqual([]);
+  });
+
+  it('does not count an identical spec as skipped', () => {
+    const { skipped } = mergeDraft({} as any, { specifications: { Cable: 'USB-C' } }, { Cable: 'USB-C' }, false);
+    expect(skipped).toEqual([]);
+  });
+
+  it('still reports a genuine conflict', () => {
+    const { skipped } = mergeDraft({ brand: 'Samsung' } as any, { brand: 'Honor' }, {}, false);
+    expect(skipped).toEqual(['brand']);
+  });
+});

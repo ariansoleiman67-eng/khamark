@@ -53,22 +53,43 @@ export const parseProductDraft = (raw: string | null | undefined): AiProductDraf
 
   // Every balanced {...} run in the text, LAST first: a model that shows an
   // example and then gives its real answer puts the answer last.
-  for (const source of [raw]) {
+  //
+  // The scan MUST know about strings. A description like "Ships with a { free
+  // case" is ordinary model output, and counting that brace left the depth
+  // unbalanced: the real object was never captured and the narrated example
+  // before it — the last run that did balance — was returned instead. Not a
+  // parse failure the caller could see, but the wrong product silently filled in.
+  {
     const found: string[] = [];
     let depth = 0;
     let start = -1;
-    for (let i = 0; i < source.length; i++) {
-      const ch = source[i];
+    let inString = false;
+    let escaped = false;
+    for (let i = 0; i < raw.length; i++) {
+      const ch = raw[i];
+
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (ch === '\\') escaped = true;
+        else if (ch === '"') inString = false;
+        continue;
+      }
+
+      if (ch === '"') {
+        inString = true;
+        continue;
+      }
       if (ch === '{') {
         if (depth === 0) start = i;
         depth++;
       } else if (ch === '}') {
         depth--;
         if (depth === 0 && start >= 0) {
-          found.push(source.slice(start, i + 1));
+          found.push(raw.slice(start, i + 1));
           start = -1;
         } else if (depth < 0) {
           depth = 0;
+          start = -1;
         }
       }
     }
@@ -139,11 +160,14 @@ export const mergeDraft = <T extends Record<string, any>>(
     const value = draft[field];
     if (!value) continue;
     const existing = String(merged[field] ?? '').trim();
+    // Equality FIRST. A field the model agrees with is not a conflict, and
+    // counting it as one told the admin their work would be replaced when the
+    // two values were identical — a question with no meaningful answer.
+    if (existing === value) continue;
     if (existing && !overwrite) {
       skipped.push(field);
       continue;
     }
-    if (existing === value) continue;
     merged[field] = value;
     filled.push(field);
   }
@@ -156,11 +180,11 @@ export const mergeDraft = <T extends Record<string, any>>(
   for (const [key, value] of Object.entries(draft.specifications || {})) {
     const target = keyByLower.get(key.trim().toLowerCase()) ?? key;
     const existing = String(specs[target] ?? '').trim();
+    if (existing === value) continue;
     if (existing && !overwrite) {
       skipped.push(target);
       continue;
     }
-    if (existing === value) continue;
     specs[target] = value;
     keyByLower.set(target.trim().toLowerCase(), target);
     filled.push(target);
