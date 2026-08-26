@@ -685,6 +685,26 @@ const AdminProductsScreen: React.FC = () => {
   // It fills a DRAFT and never saves. Fields the admin already typed are left
   // alone unless they say otherwise — and they are told exactly how many would be
   // replaced before they decide.
+  // The Save button greys itself out and says nothing. On a ten-section form the
+  // missing field is usually off screen, so the admin is left tapping a dead
+  // button with no idea which one it wants. Name them, and let each one be
+  // tapped to jump to the section it lives in.
+  const missingRequired = useMemo(() => {
+    const missing: Array<{ label: string; section: string }> = [];
+    if (!formData.name.trim()) {
+      missing.push({ label: t('admin.products.form.name'), section: 'basic' });
+    }
+    if (!formData.partNumber.trim()) {
+      missing.push({ label: t('admin.products.form.partNumber'), section: 'basic' });
+    }
+    // Price is required only for an `available` product — a "Coming soon" listing
+    // saves without one, and demanding it was a bug this form already had once.
+    if (formData.status === 'available' && !formData.priceUSD.trim() && !(formData.priceIQD || '').trim()) {
+      missing.push({ label: t('admin.products.form.price'), section: 'pricing' });
+    }
+    return missing;
+  }, [formData.name, formData.partNumber, formData.status, formData.priceUSD, formData.priceIQD, t]);
+
   // ---- Section jump bar -----------------------------------------------------
   // The form runs to ten sections and roughly a dozen phone-heights. Editing one
   // price on an existing product meant scrolling past images, variations and
@@ -2320,25 +2340,7 @@ const AdminProductsScreen: React.FC = () => {
   const canSubmitForm = !!formData.name.trim() && !!formData.partNumber.trim()
     && (formData.status !== 'available' || !!formData.priceUSD.trim() || !!(formData.priceIQD || '').trim());
 
-  // The Save button greys itself out and says nothing. On a ten-section form the
-  // missing field is usually off screen, so the admin is left tapping a dead
-  // button with no idea which one it wants. Name them, and let each one be
-  // tapped to jump to the section it lives in.
-  const missingRequired = useMemo(() => {
-    const missing: Array<{ label: string; section: string }> = [];
-    if (!formData.name.trim()) {
-      missing.push({ label: t('admin.products.form.name'), section: 'basic' });
-    }
-    if (!formData.partNumber.trim()) {
-      missing.push({ label: t('admin.products.form.partNumber'), section: 'basic' });
-    }
-    // Price is required only for an `available` product — a "Coming soon" listing
-    // saves without one, and demanding it was a bug this form already had once.
-    if (formData.status === 'available' && !formData.priceUSD.trim() && !(formData.priceIQD || '').trim()) {
-      missing.push({ label: t('admin.products.form.price'), section: 'pricing' });
-    }
-    return missing;
-  }, [formData.name, formData.partNumber, formData.status, formData.priceUSD, formData.priceIQD, t]);
+
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: pageBg }]} edges={['left', 'right']}>
