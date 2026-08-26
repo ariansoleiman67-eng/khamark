@@ -21,7 +21,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   // version record in App Store Connect, or the processed build may not attach to
   // that version. This file WINS over app.json — bumping app.json alone does
   // nothing, because the object below spreads app.json and then overrides it.
-  version: "1.9.44",
+  //
+  // 1.9.44 -> 1.9.45 because 1.9.44 was APPROVED. Once Apple approves a version
+  // its train closes, and a further upload is rejected twice over:
+  //   90186 "the train version '1.9.44' is closed for new build submissions"
+  //   90062 CFBundleShortVersionString must be HIGHER than the approved version
+  // A build-number bump alone is not enough once that has happened.
+  version: "1.9.45",
   newArchEnabled: true,
   orientation: "portrait",
   icon: "./assets/icon.png",
