@@ -85,7 +85,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     //   1.0 (4) — launched fine; rejected 2.3.10, non-iOS device imagery
     //   1.0 (5) — HaryadAutoparts fork residue removed from the binary
     //   1.9.44 (75) — reply to 2.1 Information Needed; the recorded review build
-    buildNumber: "75",
+    //   1.9.44 (76) — variant + VIP dinar pricing, brand picker, AI product fill
+    buildNumber: "76",
     // associatedDomains removed: it carried "applinks:ASANKARY_DOMAIN_TBD", a
     // placeholder host. That ships a real com.apple.developer.associated-domains
     // entitlement pointing at a domain that cannot serve an
@@ -146,7 +147,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // iOS submission in flight; Play starts its own numbering at 1.0. Changing the
     // root field to 1.0 would drag iOS back with it.
     version: "1.0",
-    versionCode: 136,
+    versionCode: 137,
     googleServicesFile: "./google-services.json",
     intentFilters: [
       // The https/autoVerify filter for host "ASANKARY_DOMAIN_TBD" was removed — a
