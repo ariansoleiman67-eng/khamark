@@ -33,6 +33,7 @@ Keys, all optional — omit any you are not confident about:
 Rules:
 - NEVER invent a price, a stock quantity, a warranty period or an availability claim. Those are the shop's, not yours.
 - If you do not know a specification for this exact model, leave it out. A wrong spec is worse than a missing one, because the shop will be held to it.
+- "Cable" is the exception worth stating: the charging connector follows from the model generation rather than needing datasheet knowledge, and it is the question this shop is asked most. Any current Android is "USB-C"; an iPhone 15 or later is "USB-C"; an iPhone 14 or earlier is "Lightning"; a budget handset several generations old may be "Micro-USB". Give it whenever the model tells you which of those it is, and leave it out only when it genuinely does not.
 - Keep Arabic and Kurdish natural, not transliterated English.
 - Specification values are short: "8GB", not "The device has 8GB of RAM".`;
 
