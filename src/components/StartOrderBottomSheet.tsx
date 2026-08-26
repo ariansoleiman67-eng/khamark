@@ -40,7 +40,7 @@ import { useTheme } from './ThemeProvider';
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { useCurrency } from '../contexts/CurrencyContext';
-import { formatPrice } from '../utils/currency';
+import { formatPrice, formatVariantPrice, getPriceUSD, variantPriceUSD } from '../utils/currency';
 import { Product, Address, RootStackParamList } from '../types';
 import { SPACING } from '../constants/theme';
 import { getDirection } from '../locales';
@@ -199,6 +199,15 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
     }
   }, [visible, product, totalQuantity]);
 
+  // A chip shows a price only when the variant carries one of its own — in either
+  // currency. Comparing priceUSD to product.priceUSD missed a dinar-only variant
+  // entirely, so the one variant whose price actually differs showed nothing.
+  const hasOwnPrice = (v: { priceUSD?: number; priceIQD?: number } | null | undefined) => {
+    if (!v || !product) return false;
+    if (typeof v.priceIQD === 'number' && v.priceIQD > 0) return true;
+    return typeof v.priceUSD === 'number' && v.priceUSD > 0 && v.priceUSD !== product.priceUSD;
+  };
+
   const selectedSize = useMemo(
     () => product?.variations?.find(v => v.variationId === selectedSizeId) ?? null,
     [product, selectedSizeId],
@@ -254,8 +263,12 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
     if (!selectionComplete) return 0;
     // One line, one price: the size carries the price when there is one, otherwise
     // the colour, otherwise the product. Summing both is what charged for two phones.
-    const price = selectedSize?.priceUSD ?? selectedColor?.priceUSD ?? product.priceUSD;
-    const ratio = product.priceUSD > 0 ? localUnitPrice / product.priceUSD : 1;
+    // variantPriceUSD, not `?? product.priceUSD`, so a variant priced in dinar is
+    // charged at its dinar figure instead of silently falling through to dollars.
+    const priced = selectedSize ?? selectedColor;
+    const price = variantPriceUSD(priced, product, exchangeRateIQD);
+    const base = getPriceUSD(product, exchangeRateIQD);
+    const ratio = base > 0 ? localUnitPrice / base : 1;
     return price * localQty * (ratio < 1 ? ratio : 1);
   }, [product, hasAnyVars, selectionComplete, selectedSize, selectedColor, localUnitPrice, localQty]);
 
@@ -449,7 +462,7 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
           variationId: selectedSize.variationId,
           name: String(selectedSize.sizeValue ?? ''),
           quantity: localQty,
-          price: selectedSize.priceUSD ?? product!.priceUSD,
+          price: variantPriceUSD(selectedSize, product, exchangeRateIQD),
           stock: selectedSize.stockQuantity,
           color: selectedColor?.colorValue,
           colorVariationId: selectedColor?.variationId,
@@ -461,7 +474,7 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
           variationId: selectedColor.variationId,
           name: String(selectedColor.colorValue ?? ''),
           quantity: localQty,
-          price: selectedColor.priceUSD ?? product!.priceUSD,
+          price: variantPriceUSD(selectedColor, product, exchangeRateIQD),
           stock: selectedColor.stockQuantity,
         }]
       : [];
@@ -729,9 +742,9 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                             >
                               {String(v.sizeValue ?? '')}
                             </AppText>
-                            {typeof v.priceUSD === 'number' && v.priceUSD !== product.priceUSD && (
+                            {hasOwnPrice(v) && (
                               <AppNumber
-                                value={formatPrice(v.priceUSD, currency, exchangeRateIQD)}
+                                value={formatVariantPrice(v, product, currency, exchangeRateIQD)}
                                 style={[styles.optionChipPrice, { color: sel ? theme.colors.primary : theme.colors.textSecondary }]}
                               />
                             )}
@@ -796,9 +809,9 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                                 {String(v.colorValue ?? '')}
                               </AppText>
                             </View>
-                            {typeof v.priceUSD === 'number' && v.priceUSD !== product.priceUSD && (
+                            {hasOwnPrice(v) && (
                               <AppNumber
-                                value={formatPrice(v.priceUSD, currency, exchangeRateIQD)}
+                                value={formatVariantPrice(v, product, currency, exchangeRateIQD)}
                                 style={[styles.optionChipPrice, { color: sel ? theme.colors.primary : theme.colors.textSecondary }]}
                               />
                             )}

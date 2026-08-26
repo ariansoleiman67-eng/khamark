@@ -90,6 +90,13 @@ export interface ProductVariation {
   sizeValue: string;             // Size value as text (e.g., '4cm', '10 inches', 'Large', 'XL')
   sizeUnit: string;              // Optional unit (can be empty if unit is in sizeValue)
   priceUSD?: number;             // Optional price override (defaults to product.priceUSD)
+  /**
+   * Optional price authored directly in dinar, exactly like Product.priceIQD.
+   * When set it WINS over priceUSD and is charged verbatim — no exchange-rate
+   * conversion, no 250 snap. Read it through variantPriceUSD/formatVariantPrice
+   * so a variant priced in dinar cannot be mistaken for a dollar figure.
+   */
+  priceIQD?: number;
   stockQuantity: number;         // Per-variation stock (admin-controlled, enforced at runtime)
 }
 
@@ -99,6 +106,7 @@ export interface ColorVariation {
   colorValue: string;            // Color name (e.g., 'Blue', 'Red', 'Black')
   colorHex?: string;             // Optional hex code for display (e.g., '#0000FF')
   priceUSD?: number;             // Optional price override
+  priceIQD?: number;             // Optional dinar price; wins over priceUSD, charged verbatim
   imageUrl?: string;             // Optional per-color image (swaps the hero when selected)
   stockQuantity: number;         // Per-color stock
 }
@@ -109,6 +117,13 @@ export interface StorageOption {
   id: string;                    // Unique id (e.g. 'stor_256')
   label: string;                 // Display label (e.g. '256GB', '1TB')
   priceDelta: number;            // USD added to the base price (0 for the default)
+  /**
+   * Optional ABSOLUTE dinar price for this capacity. When set it replaces the
+   * base-plus-delta arithmetic entirely: the shopper is charged this exact
+   * figure. A delta cannot express a dinar price, because the base it adds to
+   * may itself be in dollars.
+   */
+  priceIQD?: number;
 }
 
 export interface Product {

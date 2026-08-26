@@ -45,7 +45,7 @@ import { Chip, Surface, Divider, Badge } from 'react-native-paper';
 import AppNumber from '../components/AppNumber';
 import AppText from '../components/AppText';
 
-import { formatItemPrice, formatPrice } from '../utils/currency';
+import { formatItemPrice, formatPrice, formatVariantPrice, variantPriceUSD } from '../utils/currency';
 import { getProductImageUrls } from '../utils/imageUtils';
 import { ProductService } from '../services/productService';
 import { brandService } from '../services/brandService';
@@ -514,6 +514,7 @@ export const ProductDetailsScreen: React.FC = () => {
         sizeUnit: v.sizeUnit,
         quantity: variationQuantities[v.variationId] || 0,
         priceUSD: v.priceUSD,
+        priceIQD: v.priceIQD,
       }));
 
     // Collect color selections
@@ -523,7 +524,10 @@ export const ProductDetailsScreen: React.FC = () => {
         variationId: v.variationId,
         colorValue: v.colorValue,
         quantity: colorVariationQuantities[v.variationId] || 0,
-        priceUSD: undefined, // Colors usually don't override price, but could
+        // A colour CAN carry its own price — a matte finish costing more is the
+        // shop's own example. Discarding it here charged the base price for it.
+        priceUSD: v.priceUSD,
+        priceIQD: v.priceIQD,
       }));
 
     const allSelections = [...sizeSelections, ...colorSelections];
@@ -1271,7 +1275,7 @@ export const ProductDetailsScreen: React.FC = () => {
     if (hasSizeVariations && product.variations) {
       product.variations.forEach(variation => {
         const qty = variationQuantities[variation.variationId] || 0;
-        const price = variation.priceUSD ?? product.priceUSD;
+        const price = variantPriceUSD(variation, product, exchangeRateIQD);
         variationSubtotal += qty * price;
       });
     }
@@ -1280,7 +1284,7 @@ export const ProductDetailsScreen: React.FC = () => {
     if (hasColorVariations && product.colorVariations) {
       product.colorVariations.forEach(variation => {
         const qty = colorVariationQuantities[variation.variationId] || 0;
-        const price = variation.priceUSD ?? product.priceUSD;
+        const price = variantPriceUSD(variation, product, exchangeRateIQD);
         variationSubtotal += qty * price;
       });
     }
@@ -1412,7 +1416,7 @@ export const ProductDetailsScreen: React.FC = () => {
           variationId: v.variationId,
           colorValue: v.name,
           quantity: v.quantity,
-          priceUSD: undefined,
+          priceUSD: v.price,
         }));
 
         const allSelections = [...sizeSelections, ...colorSelectionsData];
@@ -1509,7 +1513,7 @@ export const ProductDetailsScreen: React.FC = () => {
           variationId: v.variationId,
           colorValue: v.name,
           quantity: v.quantity,
-          priceUSD: undefined,
+          priceUSD: v.price,
         }));
 
         const allSelections = [...sizeSelections, ...colorSelectionsData];
@@ -2126,7 +2130,7 @@ export const ProductDetailsScreen: React.FC = () => {
                       const isOutOfStock = variation.stockQuantity <= 0;
                       const selected = (variationQuantities[variation.variationId] || 0) > 0;
                       const sizeDisplay = `${variation.sizeValue} ${variation.sizeUnit}`.trim();
-                      const unitPrice = variation.priceUSD != null ? variation.priceUSD : product.priceUSD;
+                      const unitPrice = variantPriceUSD(variation, product, exchangeRateIQD);
                       return (
                         <TouchableOpacity
                           key={variation.variationId}
@@ -3385,7 +3389,7 @@ export const ProductDetailsScreen: React.FC = () => {
             variationId: v.variationId,
             name: v.sizeValue,
             quantity: variationQuantities[v.variationId] || 0,
-            price: v.priceUSD ?? product.priceUSD,
+            price: variantPriceUSD(v, product, exchangeRateIQD),
             stock: v.stockQuantity,
           })) || []
         }
@@ -3394,7 +3398,7 @@ export const ProductDetailsScreen: React.FC = () => {
             variationId: v.variationId,
             name: v.colorValue,
             quantity: colorVariationQuantities[v.variationId] || 0,
-            price: v.priceUSD ?? product.priceUSD,
+            price: variantPriceUSD(v, product, exchangeRateIQD),
             stock: v.stockQuantity,
           })) || []
         }
@@ -3426,7 +3430,7 @@ export const ProductDetailsScreen: React.FC = () => {
             variationId: v.variationId,
             name: v.sizeValue,
             quantity: variationQuantities[v.variationId] || 0,
-            price: v.priceUSD ?? product.priceUSD,
+            price: variantPriceUSD(v, product, exchangeRateIQD),
             stock: v.stockQuantity,
           })) || []
         }
@@ -3435,7 +3439,7 @@ export const ProductDetailsScreen: React.FC = () => {
             variationId: v.variationId,
             name: v.colorValue,
             quantity: colorVariationQuantities[v.variationId] || 0,
-            price: v.priceUSD ?? product.priceUSD,
+            price: variantPriceUSD(v, product, exchangeRateIQD),
             stock: v.stockQuantity,
           })) || []
         }

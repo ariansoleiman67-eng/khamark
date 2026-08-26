@@ -227,6 +227,62 @@ export const formatItemPrice = (
   return formatPrice(Number.isFinite(usd) ? usd : 0, currency, exchangeRateIQD, options);
 };
 
+/**
+ * The USD figure to charge for one unit of a chosen variant.
+ *
+ * Precedence, highest first:
+ *   1. the variant's own dinar price   (charged verbatim, converted only for arithmetic)
+ *   2. the variant's USD override
+ *   3. the product's price             (itself possibly authored in dinar)
+ *
+ * A variant satisfies PricedItem, so this is getPriceUSD with a fallback — the
+ * point is that every call site stops writing `variant.priceUSD ?? product.priceUSD`,
+ * which silently ignores a dinar price and undercharges by the whole exchange rate.
+ */
+export const variantPriceUSD = (
+  variant: PricedItem | null | undefined,
+  product: PricedItem | null | undefined,
+  exchangeRate: number = 1500,
+): number => {
+  if (isIQDPriced(variant)) return convertIQDToUSD(Number(variant!.priceIQD), exchangeRate);
+  const usd = Number(variant?.priceUSD);
+  if (Number.isFinite(usd) && usd > 0) return usd;
+  return getPriceUSD(product, exchangeRate);
+};
+
+/** The dinar figure for one unit of a chosen variant. Mirrors variantPriceUSD. */
+export const variantPriceIQD = (
+  variant: PricedItem | null | undefined,
+  product: PricedItem | null | undefined,
+  exchangeRate: number = 1500,
+): number => {
+  if (isIQDPriced(variant)) return Number(variant!.priceIQD);
+  const usd = Number(variant?.priceUSD);
+  if (Number.isFinite(usd) && usd > 0) return convertUSDToIQD(usd, exchangeRate);
+  return getPriceIQD(product, exchangeRate);
+};
+
+/** Format a variant's price in the shopper's currency, honouring a dinar price. */
+export const formatVariantPrice = (
+  variant: PricedItem | null | undefined,
+  product: PricedItem | null | undefined,
+  currency: 'USD' | 'IQD' = 'USD',
+  exchangeRateIQD: number = 1500,
+  options: any = {},
+): string => {
+  if (isIQDPriced(variant)) {
+    return currency === 'IQD'
+      ? formatCurrencyIQD(Number(variant!.priceIQD), options)
+      : formatCurrencyUSD(convertIQDToUSD(Number(variant!.priceIQD), exchangeRateIQD), options);
+  }
+  const usd = Number(variant?.priceUSD);
+  if (Number.isFinite(usd) && usd > 0) {
+    return formatPrice(usd, currency, exchangeRateIQD, options);
+  }
+  return formatItemPrice(product, currency, exchangeRateIQD, options);
+};
+
+
 // Date formatting utilities
 export const formatDate = (date: Date | string | any, locale: string = 'en-US'): string => {
   if (!date) return '';

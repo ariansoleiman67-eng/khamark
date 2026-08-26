@@ -110,6 +110,104 @@ type EditablePriceTier = PriceTier & { _key?: string };
 
 const newTierKey = () => `tier_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
+/**
+ * The dollar + dinar price pair for one variation.
+ *
+ * Kept as its own component because sizes and colours need exactly the same
+ * control and the same explanation, and because the shop needs to see, at the
+ * moment of typing, which of the two figures the customer will actually be
+ * charged — a dinar price silently outranks the dollar one beside it.
+ */
+const VariantPriceFields: React.FC<{
+  priceUSD?: number;
+  priceIQD?: number;
+  basePriceUSD: number;
+  basePriceIQD?: number;
+  exchangeRateIQD: number;
+  onChangeUSD: (text: string) => void;
+  onChangeIQD: (text: string) => void;
+  theme: any;
+  isRTL: boolean;
+  t: (key: string, opts?: any) => string;
+}> = ({ priceUSD, priceIQD, basePriceUSD, basePriceIQD, exchangeRateIQD, onChangeUSD, onChangeIQD, theme, isRTL, t }) => {
+  const iqd = Number(priceIQD) || 0;
+  const usd = Number(priceUSD) || 0;
+
+  const hint = (() => {
+    if (iqd > 0) {
+      return t('admin.products.form.variantPriceIQDActive', {
+        iqd: formatCurrencyIQD(iqd),
+        usd: formatCurrencyUSD(convertIQDToUSD(iqd, exchangeRateIQD)),
+        defaultValue: 'Customers pay {{iqd}} exactly ({{usd}} for shoppers browsing in dollars). The dollar box beside it is ignored.',
+      });
+    }
+    if (usd > 0) {
+      return t('admin.products.form.variantPriceUSDActive', {
+        usd: formatCurrencyUSD(usd),
+        defaultValue: 'Customers pay {{usd}} for this option.',
+      });
+    }
+    const base = Number(basePriceIQD) > 0
+      ? formatCurrencyIQD(Number(basePriceIQD))
+      : formatCurrencyUSD(basePriceUSD || 0);
+    return t('admin.products.form.variantPriceInherits', {
+      base,
+      defaultValue: 'Leave both blank and this option costs the product price, {{base}}.',
+    });
+  })();
+
+  const inputStyle = {
+    backgroundColor: theme.colors.surface,
+    color: theme.colors.text,
+    borderColor: theme.colors.border,
+    borderWidth: 1,
+    borderRadius: 10,
+    minHeight: 44,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    textAlign: 'center' as const,
+    flex: 1,
+  };
+
+  return (
+    <View style={{ marginTop: 8 }}>
+      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 8 }}>
+        <TextInput
+          allowFontScaling={false}
+          style={inputStyle}
+          value={priceUSD != null ? String(priceUSD) : ''}
+          onChangeText={onChangeUSD}
+          keyboardType="decimal-pad"
+          placeholder={t('admin.products.form.variantPriceUSDPlaceholder', { defaultValue: 'Price $' })}
+          placeholderTextColor={theme.colors.textSecondary}
+          multiline={false}
+          scrollEnabled={false}
+          disableFullscreenUI
+        />
+        <TextInput
+          allowFontScaling={false}
+          style={[inputStyle, iqd > 0 && { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary + '0C' }]}
+          value={priceIQD != null ? String(priceIQD) : ''}
+          onChangeText={onChangeIQD}
+          keyboardType="number-pad"
+          placeholder={t('admin.products.form.variantPriceIQDPlaceholder', { defaultValue: 'Price IQD' })}
+          placeholderTextColor={theme.colors.textSecondary}
+          multiline={false}
+          scrollEnabled={false}
+          disableFullscreenUI
+        />
+      </View>
+      <Text
+        allowFontScaling={false}
+        style={{ fontSize: 11, color: theme.colors.textSecondary, marginTop: 5, textAlign: isRTL ? 'right' : 'left' }}
+        numberOfLines={3}
+      >
+        {hint}
+      </Text>
+    </View>
+  );
+};
+
 const AdminProductsScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
   const { tenantId, isLoading: tenantLoading } = useTenant();
@@ -514,6 +612,50 @@ const AdminProductsScreen: React.FC = () => {
         return rest as ProductVariation;
       }
       return { ...v, priceUSD: num };
+    }));
+  };
+
+  // Per-variation dinar price. Blank clears it, so the variation falls back to its
+  // dollar override and then to the product price — the same ladder the customer
+  // app walks in variantPriceUSD.
+  const updateVariationPriceIQD = (variationId: string, newPrice: string) => {
+    const digits = newPrice.replace(/[^0-9]/g, '');
+    const num = parseInt(digits, 10);
+    setVariations(variations.map(v => {
+      if (v.variationId !== variationId) return v;
+      if (digits === '' || isNaN(num) || num <= 0) {
+        const { priceIQD, ...rest } = v;
+        return rest as ProductVariation;
+      }
+      return { ...v, priceIQD: num };
+    }));
+  };
+
+  // Colours could always carry their own price in the data model and the customer
+  // app has always read it — there was simply no field here to set it, so a colour
+  // that costs more could not be entered at all.
+  const updateColorVariationPrice = (variationId: string, newPrice: string) => {
+    const num = parseFloat(newPrice);
+    setColorVariations(colorVariations.map(v => {
+      if (v.variationId !== variationId) return v;
+      if (newPrice.trim() === '' || isNaN(num) || num <= 0) {
+        const { priceUSD, ...rest } = v;
+        return rest as ColorVariation;
+      }
+      return { ...v, priceUSD: num };
+    }));
+  };
+
+  const updateColorVariationPriceIQD = (variationId: string, newPrice: string) => {
+    const digits = newPrice.replace(/[^0-9]/g, '');
+    const num = parseInt(digits, 10);
+    setColorVariations(colorVariations.map(v => {
+      if (v.variationId !== variationId) return v;
+      if (digits === '' || isNaN(num) || num <= 0) {
+        const { priceIQD, ...rest } = v;
+        return rest as ColorVariation;
+      }
+      return { ...v, priceIQD: num };
     }));
   };
 
@@ -3353,7 +3495,8 @@ const AdminProductsScreen: React.FC = () => {
                   ) : (
                     <View style={styles.priceTiersList}>
                       {variations.map((variation) => (
-                        <View key={variation.variationId} style={[styles.priceTierRow, { backgroundColor: theme.colors.background }]}>
+                        <View key={variation.variationId} style={[styles.variantCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                        <View style={[styles.priceTierRow, { padding: 0 }]}>
                           <View style={styles.tierInputGroup}>
                             <Text allowFontScaling={false} style={[styles.tierLabel, { color: theme.colors.textSecondary, textAlign: 'center', lineHeight: 18, paddingVertical: 2, includeFontPadding: true }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{t('product.size', 'Size')}</Text>
                             <TextInput allowFontScaling={false}                              style={[styles.input, { backgroundColor: theme.colors.surface, color: theme.colors.text, paddingHorizontal: 0, minHeight: 48, paddingVertical: 10, minWidth: 60, textAlign: 'center', lineHeight: 22, includeFontPadding: true, fontWeight: Platform.OS === 'android' ? 'normal' : undefined }]}
@@ -3379,19 +3522,6 @@ const AdminProductsScreen: React.FC = () => {
                   disableFullscreenUI
                             />
                           </View>
-                          <View style={styles.tierInputGroup}>
-                            <Text allowFontScaling={false} style={[styles.tierLabel, { color: theme.colors.textSecondary, textAlign: 'center', lineHeight: 18, paddingVertical: 2, includeFontPadding: true }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{t('product.priceLabel', 'Price')}</Text>
-                            <TextInput allowFontScaling={false} style={[styles.input, { backgroundColor: theme.colors.surface, color: theme.colors.text, paddingHorizontal: 0, minHeight: 48, paddingVertical: 10, minWidth: 60, textAlign: 'center', lineHeight: 22, includeFontPadding: true, fontWeight: Platform.OS === 'android' ? 'normal' : undefined }]}
-                              value={variation.priceUSD != null ? variation.priceUSD.toString() : ''}
-                              onChangeText={(text) => updateVariationPrice(variation.variationId, text)}
-                              keyboardType="decimal-pad"
-                              placeholder="$"
-                              placeholderTextColor={theme.colors.textSecondary}
-                              multiline={false}
-                              scrollEnabled={false}
-                  disableFullscreenUI
-                            />
-                          </View>
                           <TouchableOpacity
                             style={[styles.removeTierButton, { backgroundColor: '#F44336' + '20' }]}
                             onPress={() => removeVariation(variation.variationId)}
@@ -3399,6 +3529,19 @@ const AdminProductsScreen: React.FC = () => {
                           >
                             <Ionicons name="trash-outline" size={16} color="#F44336" />
                           </TouchableOpacity>
+                        </View>
+                        <VariantPriceFields
+                          priceUSD={variation.priceUSD}
+                          priceIQD={variation.priceIQD}
+                          basePriceUSD={parseFloat(formData.priceUSD) || 0}
+                          basePriceIQD={parseInt(formData.priceIQD || '0', 10) || undefined}
+                          exchangeRateIQD={exchangeRateIQD}
+                          onChangeUSD={(text) => updateVariationPrice(variation.variationId, text)}
+                          onChangeIQD={(text) => updateVariationPriceIQD(variation.variationId, text)}
+                          theme={theme}
+                          isRTL={isRTL}
+                          t={t}
+                        />
                         </View>
                       ))}
                     </View>
@@ -3506,7 +3649,8 @@ const AdminProductsScreen: React.FC = () => {
                   ) : (
                     <View style={styles.priceTiersList}>
                       {colorVariations.map((variation) => (
-                        <View key={variation.variationId} style={[styles.priceTierRow, { backgroundColor: theme.colors.background }]}>
+                        <View key={variation.variationId} style={[styles.variantCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                        <View style={[styles.priceTierRow, { padding: 0 }]}>
                           <View style={styles.tierInputGroup}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', minWidth: 80 }}>
                               <View
@@ -3560,6 +3704,19 @@ const AdminProductsScreen: React.FC = () => {
                           >
                             <Ionicons name="trash-outline" size={16} color="#F44336" />
                           </TouchableOpacity>
+                        </View>
+                        <VariantPriceFields
+                          priceUSD={variation.priceUSD}
+                          priceIQD={variation.priceIQD}
+                          basePriceUSD={parseFloat(formData.priceUSD) || 0}
+                          basePriceIQD={parseInt(formData.priceIQD || '0', 10) || undefined}
+                          exchangeRateIQD={exchangeRateIQD}
+                          onChangeUSD={(text) => updateColorVariationPrice(variation.variationId, text)}
+                          onChangeIQD={(text) => updateColorVariationPriceIQD(variation.variationId, text)}
+                          theme={theme}
+                          isRTL={isRTL}
+                          t={t}
+                        />
                         </View>
                       ))}
                     </View>
@@ -3946,6 +4103,7 @@ const styles = StyleSheet.create({
 
   // Price Tiers & Variations
   priceTierRow: { alignItems: 'flex-end', borderRadius: 10, flexDirection: 'row', gap: 8, padding: SPACING.sm },
+  variantCard: { borderRadius: 12, borderWidth: 1, padding: SPACING.sm },
   priceTiersHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACING.sm },
   priceTiersList: { gap: SPACING.sm },
   priceTiersSection: { borderColor: 'rgba(0,0,0,0.06)', borderRadius: 14, borderStyle: 'dashed', borderWidth: 1, marginTop: SPACING.lg, padding: SPACING.md },

@@ -216,7 +216,7 @@ export class LocalCartService {
   static async addVariationsToCart(
     userId: string,
     product: Product,
-    selections: Array<{ variationId: string; quantity: number; priceUSD?: number; sizeValue?: number | string; sizeUnit?: string; colorValue?: string; colorVariationId?: string }>
+    selections: Array<{ variationId: string; quantity: number; priceUSD?: number; priceIQD?: number; sizeValue?: number | string; sizeUnit?: string; colorValue?: string; colorVariationId?: string }>
   ): Promise<Cart> {
     return this.enqueue(userId, () =>
       this.addVariationsToCartImpl(userId, product, selections)
@@ -226,7 +226,7 @@ export class LocalCartService {
   private static async addVariationsToCartImpl(
     userId: string,
     product: Product,
-    selections: Array<{ variationId: string; quantity: number; priceUSD?: number; sizeValue?: number | string; sizeUnit?: string; colorValue?: string; colorVariationId?: string }>
+    selections: Array<{ variationId: string; quantity: number; priceUSD?: number; priceIQD?: number; sizeValue?: number | string; sizeUnit?: string; colorValue?: string; colorVariationId?: string }>
   ): Promise<Cart> {
     try {
       // Filter out selections with quantity 0
@@ -311,6 +311,22 @@ export class LocalCartService {
         }
 
         const variationPrice = selection.priceUSD ?? variation?.priceUSD ?? product.priceUSD;
+
+        // A cart line inherits product.priceIQD from the spread below, so a variant
+        // that overrides the price in DOLLARS on a dinar-priced product would have
+        // been displayed and charged at the product's dinar figure — the override
+        // silently discarded. Decide the line's dinar price explicitly:
+        //   the variant's own dinar price if it has one;
+        //   otherwise null when the variant overrides in dollars;
+        //   otherwise the product's, because the variant sets no price at all.
+        const selectionIQD = Number(selection.priceIQD ?? (variation as any)?.priceIQD);
+        const hasVariantIQD = Number.isFinite(selectionIQD) && selectionIQD > 0;
+        const hasVariantUSD = selection.priceUSD != null || variation?.priceUSD != null;
+        const linePriceIQD = hasVariantIQD
+          ? selectionIQD
+          : hasVariantUSD
+            ? null
+            : (product.priceIQD ?? null);
         
         // Find existing item by productId + variationId + colour. Matching on the
         // variationId alone merged 256GB/Black with 256GB/White into one line labelled
@@ -342,6 +358,7 @@ export class LocalCartService {
             product: {
               ...product,
               priceUSD: variationPrice, // Use variation price for calculations
+              priceIQD: linePriceIQD ?? undefined,
             },
             quantity: selection.quantity,
             addedAt: new Date() as any,
