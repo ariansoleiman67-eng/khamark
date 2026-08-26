@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import i18n from '../locales';
 import { View, Text, Platform, ActivityIndicator, Alert, Linking, StatusBar as RNStatusBar } from 'react-native';
-import { NavigationContainer, DefaultTheme, createNavigationContainerRef } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
@@ -297,12 +297,44 @@ const TabNavigator = () => {
  * opened the privacy policy. The customer had no way to set a password and the
  * email looked broken.
  */
-const navigationRef = createNavigationContainerRef<RootStackParamList>();
+// A plain ref, not createNavigationContainerRef. That helper is re-exported from
+// @react-navigation/core through a wildcard, and the wildcard did not survive the
+// bundler here — it resolved to undefined and threw "Property
+// 'createNavigationContainerRef' doesn't exist" on the first deep link. The
+// container accepts an ordinary ref and exposes navigate/isReady on it, so there
+// is nothing to gain from the helper and one less thing to break.
+const navigationRef = React.createRef<any>();
+
+/**
+ * Navigate to the set-password screen, now or as soon as the navigator exists.
+ *
+ * Held in a module-level slot rather than component state because the target is
+ * decided by a deep link that can land before this tree has mounted.
+ */
+let pendingRecoveryNav = false;
+
+const goToSetNewPassword = () => {
+  if (navigationRef.current?.isReady?.()) {
+    pendingRecoveryNav = false;
+    navigationRef.current.navigate('SetNewPassword', {
+      mode: 'reset',
+      method: 'email',
+      phone: '',
+    });
+    return;
+  }
+  pendingRecoveryNav = true;
+};
+
+/** Called from NavigationContainer.onReady — flushes a link that beat the mount. */
+const flushPendingRecoveryNav = () => {
+  if (!pendingRecoveryNav) return;
+  goToSetNewPassword();
+};
 
 const PasswordRecoveryLinkHandler: React.FC = () => {
   React.useEffect(() => {
     let cancelled = false;
-
     const handle = async (url: string | null) => {
       if (!url || cancelled) return;
       // `type=recovery` is what distinguishes this from the Google callback,
@@ -310,12 +342,19 @@ const PasswordRecoveryLinkHandler: React.FC = () => {
       if (!url.includes('reset-password') && !url.includes('type=recovery')) return;
       try {
         const ok = await AuthService.handleRecoveryUrl(url);
-        if (!ok || cancelled || !navigationRef.isReady()) return;
-        (navigationRef.navigate as any)('SetNewPassword', {
-          mode: 'reset',
-          method: 'email',
-          phone: '',
-        });
+        if (!ok) return;
+        // Deliberately NOT gated on `cancelled`. Establishing the session fires
+        // onAuthStateChange, which re-renders this tree and tears down this very
+        // effect — so by the time the await returns, `cancelled` is true on the
+        // exact path that has to work. It cost an hour to find: the session was
+        // set, the customer was signed in, and they landed on the home screen
+        // with no way to set a password. Navigation goes through a module-level
+        // ref, so it is safe after this component has gone.
+        //
+        // A link that COLD-STARTS the app also arrives before the navigator is
+        // ready — the common case, since the customer taps it from their mail app
+        // with Asankary closed. goToSetNewPassword parks it until onReady.
+        goToSetNewPassword();
       } catch (err: any) {
         // An expired or already-used link is the common case, and it is the
         // customer's problem to solve, so say so rather than failing silently.
@@ -440,7 +479,7 @@ const AppNavigator: React.FC = () => {
   // Auth is handled via intent-based triggers (useAuthGate hook)
   return (
     <ErrorBoundary>
-      <NavigationContainer ref={navigationRef} theme={navigationTheme} linking={linking}>
+      <NavigationContainer ref={navigationRef} onReady={flushPendingRecoveryNav} theme={navigationTheme} linking={linking}>
         <PushInitializer />
         <PasswordRecoveryLinkHandler />
 
