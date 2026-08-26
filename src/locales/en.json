@@ -3182,7 +3182,12 @@
         "vipPriceIQD": "VIP Price (IQD) — optional",
         "vipPriceIQDHint": "Fill this in for VIP stock you priced in dinar. VIPs then see this exact amount and the exchange rate is not applied to it.",
         "vipPriceIQDActive": "VIP customers pay {{iqd}} exactly ({{usd}} browsing in dollars). This wins over the VIP dollar price beside it.",
-        "vipPriceIQDNotCheaper": "{{vip}} is not below this product’s normal price, so VIPs will keep paying the normal price. Lower it, or clear it."
+        "vipPriceIQDNotCheaper": "{{vip}} is not below this product’s normal price, so VIPs will keep paying the normal price. Lower it, or clear it.",
+        "selectBrand": "Select Brand",
+        "searchBrand": "Search brands",
+        "brandPickerEmpty": "No brands yet. Add them in Settings → Brands.",
+        "brandNoMatch": "No brand matches that.",
+        "brandUseTyped": "Use “{{name}}” as a one-off brand"
       },
       "invalidSizeValue": "Please enter a size",
       "duplicateSizeValue": "This size already exists",

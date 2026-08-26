@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import {
@@ -37,7 +37,7 @@ import { convertIQDToUSD, formatCurrencyIQD, formatCurrencyUSD } from '../../uti
 import { createTenantAdminService, TenantCategory } from '../../services/tenantAdminService';
 import { categoryStore } from '../../services/categoryStore';
 import { ImageService } from '../../services/imageService';
-import { brandService } from '../../services/brandService';
+import { Brand, brandService } from '../../services/brandService';
 import { VideoService, VIDEO_CONFIG, VideoPickResult } from '../../services/videoService';
 import { useTranslation } from 'react-i18next';
 import { Product, PriceTier, ProductStatus, ProductVariation, ColorVariation } from '../../types';
@@ -288,14 +288,23 @@ const AdminProductsScreen: React.FC = () => {
   const [applyShippingToAll, setApplyShippingToAll] = useState(false);
   const [isFeatured, setIsFeatured] = useState(false); // pin product to the featured row
   const [isActive, setIsActive] = useState(true); // false = hide from the storefront without deleting
-  // The shop's managed brands, offered as tap-to-fill chips so admins pick a
-  // canonical name instead of retyping (which caused "Sumsung"-style drift).
-  const [brandOptions, setBrandOptions] = useState<string[]>([]);
+  // The shop's managed brands. Held as whole Brand objects, not names, so the
+  // picker can show each logo — a shop recognises its brands by the mark far
+  // faster than by reading a row of near-identical words.
+  const [brandOptions, setBrandOptions] = useState<Brand[]>([]);
+  const [brandPickerVisible, setBrandPickerVisible] = useState(false);
+  const [brandSearch, setBrandSearch] = useState('');
   useEffect(() => {
     brandService.getActiveBrands(tenantId || undefined)
-      .then(bs => setBrandOptions(bs.map(b => b.name)))
+      .then(setBrandOptions)
       .catch(() => {});
   }, [tenantId]);
+
+  const filteredBrands = useMemo<Brand[]>(() => {
+    const q = brandSearch.trim().toLowerCase();
+    if (!q) return brandOptions;
+    return brandOptions.filter((b: Brand) => b.name.toLowerCase().includes(q));
+  }, [brandOptions, brandSearch]);
   
   // City-based shipping rates
   const [shippingRates, setShippingRates] = useState<Array<{ city: string; price: number }>>([]);
@@ -350,7 +359,16 @@ const AdminProductsScreen: React.FC = () => {
   const [specEntries, setSpecEntries] = useState<Array<{ key: string; value: string }>>([]);
   const [newSpecKey, setNewSpecKey] = useState('');
   const [newSpecValue, setNewSpecValue] = useState('');
-  const SPEC_PRESETS = ['RAM', 'Storage', 'Screen', 'Battery', 'Chipset', 'Camera', 'OS'];
+  // 'Cable' earns its place next to RAM: it is the question a phone shop is asked
+  // most and the one a listing almost never answers — which lead the handset takes.
+  const SPEC_PRESETS = ['RAM', 'Storage', 'Screen', 'Battery', 'Chipset', 'Camera', 'OS', 'Cable'];
+
+  // Tapping a preset fills the KEY; for the ones with a small fixed answer set,
+  // offer the values too rather than making the shop type 'USB-C' forty times.
+  const SPEC_VALUE_SUGGESTIONS: Record<string, string[]> = {
+    cable: ['USB-C', 'Lightning', 'Micro-USB', 'USB-C to USB-C', 'USB-C to Lightning'],
+    os: ['Android', 'iOS', 'HarmonyOS'],
+  };
 
   useEffect(() => {
     // Keep the ref in lockstep with the active tenant so an in-flight loadProducts()
@@ -2757,44 +2775,58 @@ const AdminProductsScreen: React.FC = () => {
                     >
                       {t('admin.products.form.brand')}
                     </Text>
-                    <TextInput allowFontScaling={false}                      style={[styles.input, { backgroundColor: theme.colors.background, color: theme.colors.text }]}
-                      value={formData.brand}
-                      onChangeText={(text) => setFormData(prev => ({ ...prev, brand: text }))}
-                      placeholder={t('admin.products.form.brandPlaceholder')}
-                      placeholderTextColor={theme.colors.textSecondary}
-                      multiline={false}
-                      scrollEnabled={false}
-                      disableFullscreenUI
-                      autoComplete="off"
-                    />
-                    {brandOptions.length > 0 && (
-                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 6 }}>
-                        {brandOptions.map((b) => {
-                          const selected = formData.brand.trim().toLowerCase() === b.toLowerCase();
-                          return (
-                            <TouchableOpacity
-                              key={b}
-                              onPress={() => setFormData(prev => ({ ...prev, brand: b }))}
-                              activeOpacity={0.7}
-                              style={{
-                                paddingVertical: 5,
-                                paddingHorizontal: 12,
-                                borderRadius: 16,
-                                borderWidth: 1,
-                                borderColor: selected ? theme.colors.primary : theme.colors.border,
-                                backgroundColor: selected ? theme.colors.primary + '15' : 'transparent',
-                                marginRight: 6,
-                                marginBottom: 6,
-                              }}
-                            >
-                              <Text allowFontScaling={false} style={{ fontSize: 12, color: selected ? theme.colors.primary : theme.colors.textSecondary, fontWeight: selected ? '600' : '400' }}>
-                                {b}
-                              </Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                    )}
+                    {/* Brand is a PICKER, like Category beside it. It used to be a
+                        bare text box with a row of chips underneath: the shop had to
+                        know its own brand list by heart, and any typo silently created
+                        a new brand ("Sumsung"), splitting a real brand's products in
+                        two on the storefront. */}
+                    <View style={[styles.input, {
+                      backgroundColor: theme.colors.background,
+                      flexDirection: isRTL ? 'row-reverse' : 'row',
+                      alignItems: 'center',
+                      paddingHorizontal: 0,
+                      paddingVertical: 0,
+                      overflow: 'hidden',
+                    }]}>
+                      <TouchableOpacity
+                        onPress={() => { setBrandSearch(''); setBrandPickerVisible(true); }}
+                        activeOpacity={0.7}
+                        accessibilityRole="button"
+                        style={{ flex: 1, flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 12 }}
+                      >
+                        {(() => {
+                          const picked = brandOptions.find(b => b.name.trim().toLowerCase() === formData.brand.trim().toLowerCase());
+                          if (picked?.logoUrl) {
+                            return (
+                              <ExpoImage
+                                source={{ uri: picked.logoUrl }}
+                                style={{ width: 22, height: 22, borderRadius: 5 }}
+                                contentFit="contain"
+                              />
+                            );
+                          }
+                          return null;
+                        })()}
+                        <Text
+                          allowFontScaling={false}
+                          numberOfLines={1}
+                          style={{
+                            flex: 1,
+                            color: formData.brand ? theme.colors.text : theme.colors.textSecondary,
+                            textAlign: isRTL ? 'right' : 'left',
+                          }}
+                        >
+                          {formData.brand || t('admin.products.form.selectOrType')}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => { setBrandSearch(''); setBrandPickerVisible(true); }}
+                        style={{ padding: 12 }}
+                        accessibilityRole="button"
+                      >
+                        <Ionicons name="chevron-down" size={18} color={theme.colors.textSecondary} />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
               </View>
@@ -3815,6 +3847,35 @@ const AdminProductsScreen: React.FC = () => {
                     );
                   })}
                 </View>
+
+                {/* Value suggestions for the spec being typed. Only appears for keys
+                    with a small fixed answer set, so 'Cable' becomes two taps
+                    instead of a typed string that varies shop-wide. */}
+                {(SPEC_VALUE_SUGGESTIONS[newSpecKey.trim().toLowerCase()] || []).length > 0 && (
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
+                    {SPEC_VALUE_SUGGESTIONS[newSpecKey.trim().toLowerCase()].map((val) => {
+                      const chosen = newSpecValue.trim().toLowerCase() === val.toLowerCase();
+                      return (
+                        <TouchableOpacity
+                          key={val}
+                          onPress={() => setNewSpecValue(val)}
+                          activeOpacity={0.7}
+                          style={{
+                            paddingVertical: 5, paddingHorizontal: 12, borderRadius: 16,
+                            borderWidth: 1,
+                            borderColor: chosen ? theme.colors.primary : theme.colors.border,
+                            backgroundColor: chosen ? theme.colors.primary + '15' : 'transparent',
+                            marginRight: 6, marginBottom: 6,
+                          }}
+                        >
+                          <Text allowFontScaling={false} style={{ fontSize: 12, color: chosen ? theme.colors.primary : theme.colors.textSecondary, fontWeight: chosen ? '700' : '500' }}>
+                            {val}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
                   <TextInput allowFontScaling={false} style={[styles.input, { backgroundColor: theme.colors.background, color: theme.colors.text, flex: 1, marginRight: 6 }]}
                     value={newSpecKey}
@@ -4030,6 +4091,160 @@ const AdminProductsScreen: React.FC = () => {
             </View>
         {/* Category Picker Modal - MUST be inside parent Modal for iOS */}
         {/* Luxury Category Picker */}
+        <Modal
+          visible={brandPickerVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setBrandPickerVisible(false)}
+        >
+          <TouchableOpacity
+            style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }}
+            activeOpacity={1}
+            onPress={() => setBrandPickerVisible(false)}
+          >
+            <TouchableOpacity activeOpacity={1} style={{
+              width: '88%', maxHeight: '75%', overflow: 'hidden',
+              backgroundColor: isDark ? theme.colors.surface : '#FFFFFF',
+              borderRadius: 20,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.15,
+              shadowRadius: 20,
+              elevation: 10,
+            }}>
+              <View style={{
+                flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between',
+                paddingHorizontal: 20, paddingVertical: 16,
+                borderBottomWidth: 0.5,
+                borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
+              }}>
+                <Text allowFontScaling={false} style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text, letterSpacing: -0.3 }}
+                  adjustsFontSizeToFit numberOfLines={1}
+                >
+                  {t('admin.products.form.selectBrand', { defaultValue: 'Select Brand' })}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setBrandPickerVisible(false)}
+                  style={{
+                    width: 32, height: 32, borderRadius: 10,
+                    backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+                    justifyContent: 'center', alignItems: 'center',
+                  }}
+                >
+                  <Ionicons name="close" size={18} color={isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)'} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Search. A shop with forty brands should not scroll to find one. */}
+              <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 }}>
+                <View style={{
+                  flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8,
+                  backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                  borderRadius: 12, paddingHorizontal: 12, minHeight: 44,
+                }}>
+                  <Ionicons name="search" size={16} color={theme.colors.textSecondary} />
+                  <TextInput
+                    allowFontScaling={false}
+                    value={brandSearch}
+                    onChangeText={setBrandSearch}
+                    placeholder={t('admin.products.form.searchBrand', { defaultValue: 'Search brands' })}
+                    placeholderTextColor={theme.colors.textSecondary}
+                    style={{ flex: 1, color: theme.colors.text, paddingVertical: 10, textAlign: isRTL ? 'right' : 'left' }}
+                    autoCorrect={false}
+                    autoCapitalize="none"
+                    multiline={false}
+                    scrollEnabled={false}
+                    disableFullscreenUI
+                  />
+                </View>
+              </View>
+
+              <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                {filteredBrands.length === 0 ? (
+                  <Text allowFontScaling={false} style={{ padding: 24, textAlign: 'center', color: theme.colors.textSecondary, fontSize: 14, lineHeight: 20 }}>
+                    {brandOptions.length === 0
+                      ? t('admin.products.form.brandPickerEmpty', { defaultValue: 'No brands yet. Add them in Settings \u2192 Brands.' })
+                      : t('admin.products.form.brandNoMatch', { defaultValue: 'No brand matches that.' })}
+                  </Text>
+                ) : filteredBrands.map((b) => {
+                  const isSelected = formData.brand.trim().toLowerCase() === b.name.trim().toLowerCase();
+                  return (
+                    <TouchableOpacity
+                      key={b.id || b.name}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: isSelected }}
+                      style={{
+                        flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 12,
+                        paddingHorizontal: 20, paddingVertical: 12,
+                        borderBottomWidth: 0.5,
+                        borderBottomColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)',
+                        backgroundColor: isSelected ? theme.colors.primary + '10' : 'transparent',
+                      }}
+                      onPress={() => {
+                        setFormData(prev => ({ ...prev, brand: b.name }));
+                        setBrandPickerVisible(false);
+                      }}
+                    >
+                      <View style={{
+                        width: 36, height: 36, borderRadius: 9, overflow: 'hidden',
+                        alignItems: 'center', justifyContent: 'center',
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                      }}>
+                        {b.logoUrl ? (
+                          <ExpoImage source={{ uri: b.logoUrl }} style={{ width: '100%', height: '100%' }} contentFit="contain" />
+                        ) : (
+                          <Text allowFontScaling={false} style={{ fontWeight: '800', fontSize: 14, color: theme.colors.textSecondary }}>
+                            {b.name.trim().charAt(0).toUpperCase()}
+                          </Text>
+                        )}
+                      </View>
+                      <Text
+                        allowFontScaling={false}
+                        numberOfLines={1}
+                        style={{
+                          flex: 1, fontSize: 15,
+                          fontWeight: isSelected ? '700' : '500',
+                          color: isSelected ? theme.colors.primary : theme.colors.text,
+                          textAlign: isRTL ? 'right' : 'left',
+                        }}
+                      >
+                        {b.name}
+                      </Text>
+                      {isSelected && <Ionicons name="checkmark" size={18} color={theme.colors.primary} />}
+                    </TouchableOpacity>
+                  );
+                })}
+
+                {/* An escape hatch, not the default. Typing a brand is how the
+                    catalogue drifted, so it costs a deliberate tap and says what
+                    it will do. */}
+                {brandSearch.trim().length > 0 &&
+                  !brandOptions.some(b => b.name.trim().toLowerCase() === brandSearch.trim().toLowerCase()) && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      setFormData(prev => ({ ...prev, brand: brandSearch.trim() }));
+                      setBrandPickerVisible(false);
+                    }}
+                    activeOpacity={0.7}
+                    style={{
+                      flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 10,
+                      paddingHorizontal: 20, paddingVertical: 14,
+                    }}
+                  >
+                    <Ionicons name="add-circle-outline" size={18} color={theme.colors.primary} />
+                    <Text allowFontScaling={false} numberOfLines={2} style={{ flex: 1, color: theme.colors.primary, fontSize: 14, textAlign: isRTL ? 'right' : 'left' }}>
+                      {t('admin.products.form.brandUseTyped', {
+                        name: brandSearch.trim(),
+                        defaultValue: 'Use \u201C{{name}}\u201D as a one-off brand',
+                      })}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </ScrollView>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
+
         <Modal
           visible={categoryPickerVisible}
           transparent
