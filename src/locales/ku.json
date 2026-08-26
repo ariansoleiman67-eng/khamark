@@ -414,7 +414,9 @@
     "accountCheckFailed": "نەتوانرا بزانرێت ئایا ئەم هەژمارە پێشتر هەیە یان نا. تکایە دووبارە هەوڵ بدەوە.",
     "invalidPhone": "تکایە ژمارەی تەلەفۆنێکی دروست بنووسە",
     "googleSignInFailed": "چوونەژوورەوە بە Google سەرکەوتوو نەبوو",
-    "appleSignInFailed": "چوونەژوورەوە بە Apple سەرکەوتوو نەبوو"
+    "appleSignInFailed": "چوونەژوورەوە بە Apple سەرکەوتوو نەبوو",
+    "resetLinkFailedTitle": "ئەم بەستەری ڕێکخستنەوە کاری نەکرد",
+    "resetLinkFailed": "لەوانەیە بەسەرچووبێت یان پێشتر بەکارهێنرابێت. داوای یەکێکی نوێ بکە."
   },
   "home": {
     "welcome": "بەخێربێیت بۆ Asankary",

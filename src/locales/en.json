@@ -562,7 +562,9 @@
     "accountCheckFailed": "We couldn't check whether this account already exists. Please try again.",
     "invalidPhone": "Please enter a valid phone number",
     "googleSignInFailed": "Google sign-in failed",
-    "appleSignInFailed": "Apple sign-in failed"
+    "appleSignInFailed": "Apple sign-in failed",
+    "resetLinkFailedTitle": "This reset link did not work",
+    "resetLinkFailed": "It may have expired or already been used. Ask for a new one."
   },
   "home": {
     "welcome": "Welcome to Asankary",

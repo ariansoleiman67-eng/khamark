@@ -566,7 +566,9 @@
     "accountCheckFailed": "تعذّر التحقق مما إذا كان هذا الحساب موجوداً بالفعل. يرجى المحاولة مرة أخرى.",
     "invalidPhone": "يرجى إدخال رقم هاتف صالح",
     "googleSignInFailed": "فشل تسجيل الدخول عبر Google",
-    "appleSignInFailed": "فشل تسجيل الدخول عبر Apple"
+    "appleSignInFailed": "فشل تسجيل الدخول عبر Apple",
+    "resetLinkFailedTitle": "لم يعمل رابط إعادة التعيين",
+    "resetLinkFailed": "ربما انتهت صلاحيته أو استُخدم من قبل. اطلب رابطاً جديداً."
   },
   "home": {
     "welcome": "مرحباً بك في Asankary",

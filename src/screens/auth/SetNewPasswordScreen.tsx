@@ -28,6 +28,7 @@ import Animated, {
   SlideInLeft,
 } from 'react-native-reanimated';
 import { registerWithPhone, registerWithEmail, resetPasswordAfterOTP } from '../../services/auth';
+import { AuthService } from '../../services/authService';
 import { RootStackParamList } from '../../types';
 import { useTenant } from '../../contexts/TenantContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -178,7 +179,15 @@ const SetNewPasswordScreen: React.FC = () => {
         await refreshUser();
         navigation.navigate('RegisterSuccess' as any, { method: 'phone' });
       } else if (mode === 'reset') {
-        await resetPasswordAfterOTP(phone, password);
+        // Two reset routes reach this screen. The phone one arrives with a
+        // verified OTP; the EMAIL one arrives from a recovery link that has
+        // already established a session, so the password is set on that session
+        // rather than re-proved with a code that does not exist.
+        if (method === 'email') {
+          await AuthService.setPasswordForRecoverySession(password);
+        } else {
+          await resetPasswordAfterOTP(phone, password);
+        }
         // Alert.alert is a native global modal that outlives this screen, so if the
         // user backed out during the reset it fires over whatever they landed on.
         if (!aliveRef.current) return;

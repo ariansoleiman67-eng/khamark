@@ -1,13 +1,15 @@
 import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View, Text, Platform, ActivityIndicator, StatusBar as RNStatusBar } from 'react-native';
-import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
+import i18n from '../locales';
+import { View, Text, Platform, ActivityIndicator, Alert, Linking, StatusBar as RNStatusBar } from 'react-native';
+import { NavigationContainer, DefaultTheme, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
 
 import { useTheme } from '../components/ThemeProvider';
 import { useAuth } from '../contexts/AuthContext';
+import { AuthService } from '../services/authService';
 import { perfStart, perfEnd } from '../utils/perfTrace';
 import AnimatedTabBar from '../components/AnimatedTabBar';
 import ScreenWrapper from '../components/ScreenWrapper';
@@ -283,6 +285,57 @@ const TabNavigator = () => {
   );
 };
 
+/**
+ * Catches the password-recovery link from the reset EMAIL.
+ *
+ * Supabase mails a link back to whatever redirect the app asked for. Ours is
+ * `asankary://reset-password#access_token=...`, which reopens the app here: the
+ * token becomes a session and the customer lands on the set-password screen.
+ *
+ * Before this existed, resetPassword() sent no redirect at all, so Supabase used
+ * the project's Site URL — the shop's legal/privacy site — and every reset email
+ * opened the privacy policy. The customer had no way to set a password and the
+ * email looked broken.
+ */
+const navigationRef = createNavigationContainerRef<RootStackParamList>();
+
+const PasswordRecoveryLinkHandler: React.FC = () => {
+  React.useEffect(() => {
+    let cancelled = false;
+
+    const handle = async (url: string | null) => {
+      if (!url || cancelled) return;
+      // `type=recovery` is what distinguishes this from the Google callback,
+      // which has its own listener and must not be stolen from it.
+      if (!url.includes('reset-password') && !url.includes('type=recovery')) return;
+      try {
+        const ok = await AuthService.handleRecoveryUrl(url);
+        if (!ok || cancelled || !navigationRef.isReady()) return;
+        (navigationRef.navigate as any)('SetNewPassword', {
+          mode: 'reset',
+          method: 'email',
+          phone: '',
+        });
+      } catch (err: any) {
+        // An expired or already-used link is the common case, and it is the
+        // customer's problem to solve, so say so rather than failing silently.
+        Alert.alert(
+          i18n.t('auth.resetLinkFailedTitle', { defaultValue: 'This reset link did not work' }),
+          i18n.t('auth.resetLinkFailed', {
+            defaultValue: 'It may have expired or already been used. Ask for a new one.',
+          }),
+        );
+      }
+    };
+
+    Linking.getInitialURL().then(handle).catch(() => {});
+    const sub = Linking.addEventListener('url', ({ url }) => { handle(url); });
+    return () => { cancelled = true; sub.remove(); };
+  }, []);
+
+  return null;
+};
+
 const AppNavigator: React.FC = () => {
   const { theme } = useTheme();
   const { user, isLoading, isAdmin, isPartner } = useAuth();
@@ -387,8 +440,9 @@ const AppNavigator: React.FC = () => {
   // Auth is handled via intent-based triggers (useAuthGate hook)
   return (
     <ErrorBoundary>
-      <NavigationContainer theme={navigationTheme} linking={linking}>
+      <NavigationContainer ref={navigationRef} theme={navigationTheme} linking={linking}>
         <PushInitializer />
+        <PasswordRecoveryLinkHandler />
 
         <Stack.Navigator 
           screenOptions={{ headerShown: false }}

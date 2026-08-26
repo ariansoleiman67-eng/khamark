@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { makeRedirectUri } from 'expo-auth-session';
 import { supabase } from './supabase';
 import { safeCallFunction } from './safeCallFunction';
 import { User } from '../types';
@@ -283,13 +284,69 @@ export class AuthService {
     }
   }
 
+  /**
+   * Send the "reset your password" email.
+   *
+   * The redirectTo is not optional. Without it Supabase puts the project's SITE
+   * URL in the email, and the shop's Site URL points at the public website — so
+   * the reset link opened the privacy policy and the customer never got a chance
+   * to set a password. It looked like the email was broken; it was the link.
+   *
+   * `asankary://reset-password` reopens the app on the set-password screen, where
+   * the recovery token in the URL becomes a session (see handleRecoveryUrl).
+   *
+   * THIS URL MUST BE ALLOW-LISTED in Supabase: Authentication -> URL
+   * Configuration -> Redirect URLs. An unlisted redirect is silently ignored and
+   * Supabase falls back to the Site URL, which is exactly the bug this fixes.
+   */
   static async resetPassword(email: string): Promise<void> {
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      const redirectTo = makeRedirectUri({ scheme: 'asankary', path: 'reset-password' });
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
       if (error) throw error;
     } catch (error: any) {
       throw new Error(error.message);
     }
+  }
+
+  /**
+   * Turn a password-recovery deep link into a live session.
+   *
+   * Supabase sends either `?code=` (PKCE) or `#access_token=&refresh_token=`
+   * depending on the project's flow, so both are handled — the same shapes the
+   * Google callback deals with. Returns true when a session was established and
+   * the caller should show the set-password screen.
+   */
+  static async handleRecoveryUrl(url: string): Promise<boolean> {
+    const parsed = new URL(url);
+    const qp = new URLSearchParams(parsed.search);
+    const hp = new URLSearchParams((parsed.hash || '').replace(/^#/, ''));
+    const get = (k: string) => qp.get(k) || hp.get(k) || undefined;
+
+    const err = get('error_description') || get('error_code') || get('error');
+    if (err) throw new Error(err);
+
+    const code = get('code');
+    if (code) {
+      const { error } = await supabase.auth.exchangeCodeForSession(code);
+      if (error) throw error;
+      return true;
+    }
+
+    const access_token = get('access_token');
+    const refresh_token = get('refresh_token');
+    if (access_token && refresh_token) {
+      const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+      if (error) throw error;
+      return true;
+    }
+    return false;
+  }
+
+  /** Set a new password for the session a recovery link just established. */
+  static async setPasswordForRecoverySession(newPassword: string): Promise<void> {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw new Error(error.message);
   }
 
   static async updateUserProfile(
