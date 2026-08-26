@@ -1244,7 +1244,14 @@ export const ProductDetailsScreen: React.FC = () => {
    * A capacity may also carry an ABSOLUTE dinar price of its own, which replaces
    * the base-plus-delta arithmetic outright.
    */
-  const priceProductForStorage = React.useCallback((base: typeof product) => {
+  //
+  // A PLAIN FUNCTION, deliberately, not a useCallback. It has to live below the
+  // `if (loading)` and `if (!product)` early returns because it reads
+  // storageOptions, which is only defined past them — and a hook below an early
+  // return changes the hook count between renders, which crashes the screen with
+  // "Rendered more hooks than during the previous render". It did exactly that.
+  // Nothing lists this in a dependency array, so there is nothing to memoise for.
+  const priceProductForStorage = (base: typeof product) => {
     if (!base) return base;
     const option = storageOptions.find((so) => so.id === effectiveStorageId);
     const delta = option?.priceDelta ?? 0;
@@ -1275,7 +1282,7 @@ export const ProductDetailsScreen: React.FC = () => {
       vipPriceUSD: typeof base.vipPriceUSD === 'number' ? base.vipPriceUSD + delta : undefined,
       vipPriceIQD: vipIQD > 0 ? vipIQD + deltaIQD : undefined,
     };
-  }, [storageOptions, effectiveStorageId, exchangeRateIQD]);
+  };
 
 
   // Gallery images from product. When a colour with its own image is selected,

@@ -490,7 +490,8 @@
       "subtitle": "Enter your phone number to reset your password",
       "otpInfo": "We will send an OTP to verify your phone number before you can reset your password",
       "emailSent": "Password reset email sent! Please check your inbox.",
-      "phoneNotRegistered": "This phone number is not registered. Please check your number or register."
+      "phoneNotRegistered": "This phone number is not registered. Please check your number or register.",
+      "subtitleEmail": "Enter your email address to reset your password"
     },
     "legacyLogin": {
       "title": "Legacy Email Login",

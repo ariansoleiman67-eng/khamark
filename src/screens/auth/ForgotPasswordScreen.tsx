@@ -453,7 +453,14 @@ const ForgotPasswordScreen: React.FC = () => {
               allowFontScaling={false}
               style={styles.subtitle}
             >
-              {t('auth.forgotPassword.subtitle', { defaultValue: 'Please sign in to your existing account' })}
+              {/* The subtitle has to follow the tab. It said "enter your phone
+                  number" while the Email tab was selected and an email box was on
+                  screen — and the default it fell back to was "Please sign in to
+                  your existing account", copied from the sign-in screen, which is
+                  not what this screen does at all. */}
+              {resetMethod === 'email'
+                ? t('auth.forgotPassword.subtitleEmail', { defaultValue: 'Enter your email address to reset your password' })
+                : t('auth.forgotPassword.subtitle', { defaultValue: 'Enter your phone number to reset your password' })}
             </Animated.Text>
             </Animated.View>
           </LinearGradient>
