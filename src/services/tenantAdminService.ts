@@ -386,6 +386,10 @@ export class TenantAdminService {
         subtotalUSD: doc.subtotal_usd,
         shippingUSD: doc.shipping_usd,
         totalUSD: doc.total_usd,
+        // The dinar total the order was actually placed at. Without it the admin side
+        // re-derived a total from total_usd x rate — the exact approximation total_iqd
+        // was added to avoid — so an invoice could disagree with the customer's copy.
+        totalIQD: doc.total_iqd,
         paymentStatus: doc.payment_status,
         paymentMethod: doc.payment_method?.type ?? doc.payment_method,
         exchangeRate: doc.exchange_rate,
@@ -470,6 +474,10 @@ export class TenantAdminService {
         subtotalUSD: doc.subtotal_usd,
         shippingUSD: doc.shipping_usd,
         totalUSD: doc.total_usd,
+        // The dinar total the order was actually placed at. Without it the admin side
+        // re-derived a total from total_usd x rate — the exact approximation total_iqd
+        // was added to avoid — so an invoice could disagree with the customer's copy.
+        totalIQD: doc.total_iqd,
         paymentStatus: doc.payment_status,
         paymentMethod: doc.payment_method?.type ?? doc.payment_method,
         exchangeRate: doc.exchange_rate,
@@ -513,6 +521,10 @@ export class TenantAdminService {
         subtotalUSD: data.subtotal_usd,
         shippingUSD: data.shipping_usd,
         totalUSD: data.total_usd,
+        // The dinar total the order was actually placed at. Without it the admin side
+        // re-derived a total from total_usd x rate — the exact approximation total_iqd
+        // was added to avoid — so an invoice could disagree with the customer's copy.
+        totalIQD: data.total_iqd,
         paymentStatus: data.payment_status,
         paymentMethod: data.payment_method?.type ?? data.payment_method,
         exchangeRate: data.exchange_rate,
@@ -1326,6 +1338,10 @@ export class TenantAdminService {
         subtotalUSD: doc.subtotal_usd,
         shippingUSD: doc.shipping_usd,
         totalUSD: doc.total_usd,
+        // The dinar total the order was actually placed at. Without it the admin side
+        // re-derived a total from total_usd x rate — the exact approximation total_iqd
+        // was added to avoid — so an invoice could disagree with the customer's copy.
+        totalIQD: doc.total_iqd,
         paymentStatus: doc.payment_status,
         paymentMethod: doc.payment_method?.type ?? doc.payment_method,
         exchangeRate: doc.exchange_rate,

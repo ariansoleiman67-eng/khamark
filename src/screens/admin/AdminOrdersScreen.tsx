@@ -35,7 +35,7 @@ import { Order, OrderStatus, normalizeOrderStatus } from '../../types';
 import { InvoiceSettings } from '../../services/tenantAdminService';
 import { BRAND, brandContact } from '../../constants/config';
 import OrderStatusBadge, { getStatusConfig } from '../../components/OrderStatusBadge';
-import { formatPrice, convertUSDToIQD } from '../../utils/currency';
+import { formatPrice, formatItemPrice, formatOrderLineTotal, formatOrderTotal, convertUSDToIQD } from '../../utils/currency';
 import { getThumbnailUrl } from '../../utils/imageUtils';
 import { formatFirestoreDate } from '../../utils/dateUtils';
 import * as Print from 'expo-print';
@@ -648,7 +648,7 @@ const AdminOrdersScreen: React.FC = () => {
           );
 
           // 2. Build message
-          const totalStr = order.totalUSD != null ? formatPrice(order.totalUSD, order.currency, order.exchangeRate) : 'N/A';
+          const totalStr = order.totalUSD != null ? formatOrderTotal(order as any, order.currency as any, order.exchangeRate as any) : 'N/A';
           const orderNum = order.orderNumber?.replace(/ORD/g, '').replace(/#/g, '').replace(/-/g, '') || 'N/A';
           // Use current state trackingUrl if it matches this order, otherwise use order's existing one
           // But here we might not have set the tracking URL yet in the UI for this specific order flow if just clicking "Shipped" from dropdown.
@@ -748,7 +748,7 @@ const AdminOrdersScreen: React.FC = () => {
         // User requesting strict manual entry for tracking URLs.
         if (trackUrl && propsUser?.uid) {
           try {
-            const totalStr = selectedOrder.totalUSD != null ? formatPrice(selectedOrder.totalUSD, selectedOrder.currency, selectedOrder.exchangeRate) : 'N/A';
+            const totalStr = selectedOrder.totalUSD != null ? formatOrderTotal(selectedOrder as any, selectedOrder.currency as any, selectedOrder.exchangeRate as any) : 'N/A';
             const orderNum = selectedOrder.orderNumber?.replace(/ORD/g, '')?.replace(/#/g, '')?.replace(/-/g, '') || 'N/A';
             let msgText = `${t('admin.orders.shippedMsgHeader', { order: orderNum, defaultValue: '📦 Order {{order}} has been shipped!' })}\n\n${t('admin.orders.shippedMsgTotal', { total: totalStr, defaultValue: '💰 Total Amount: {{total}}' })}`;
 
@@ -1019,8 +1019,8 @@ const AdminOrdersScreen: React.FC = () => {
             </div>
           </td>
           <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: center; vertical-align: middle;">${item.quantity}</td>
-          <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: center; vertical-align: middle;">${formatPrice(item.priceUSD, order.currency, order.exchangeRate)}</td>
-          <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: ${textAlignOpposite}; font-weight: bold; vertical-align: middle; color: #FF7816;">${formatPrice(item.priceUSD * item.quantity, order.currency, order.exchangeRate)}</td>
+          <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: center; vertical-align: middle;">${formatItemPrice(item as any, order.currency as any, order.exchangeRate as any)}</td>
+          <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: ${textAlignOpposite}; font-weight: bold; vertical-align: middle; color: #FF7816;">${formatOrderLineTotal(item as any, order.currency as any, order.exchangeRate as any)}</td>
         </tr>
       `;
     }).join('');
@@ -1207,7 +1207,7 @@ const AdminOrdersScreen: React.FC = () => {
           })()}
           <div class="total-row grand">
             <span class="total-label">${L.grandTotal}</span>
-            <span class="total-value">${order.totalUSD != null ? formatPrice(order.totalUSD, order.currency, order.exchangeRate) : formatPrice(0, order.currency, order.exchangeRate)}</span>
+            <span class="total-value">${order.totalUSD != null ? formatOrderTotal(order as any, order.currency as any, order.exchangeRate as any) : formatPrice(0, order.currency, order.exchangeRate)}</span>
           </div>
           ${(() => {
             const paidUSD = order.amountPaidUSD || 0;
@@ -1673,7 +1673,7 @@ const AdminOrdersScreen: React.FC = () => {
                   <View style={[styles.orderMetaDivider, { backgroundColor: theme.colors.border }]} />
                   <View style={[styles.orderMetaItem, { flexShrink: 0 }]}>
                     <Text allowFontScaling={false} style={[styles.orderTotalValue, { color: theme.colors.primary }]}>
-                      {selectedOrder?.totalUSD != null ? formatPrice(selectedOrder.totalUSD, selectedOrder.currency, selectedOrder.exchangeRate) : formatPrice(0, selectedOrder?.currency, selectedOrder?.exchangeRate)}
+                      {selectedOrder?.totalUSD != null ? formatOrderTotal(selectedOrder as any, selectedOrder.currency as any, selectedOrder.exchangeRate as any) : formatPrice(0, selectedOrder?.currency, selectedOrder?.exchangeRate)}
                     </Text>
                   </View>
                 </View>
@@ -1901,7 +1901,7 @@ const AdminOrdersScreen: React.FC = () => {
                         {/* Price */}
                         <View style={styles.itemPriceContainer}>
                           <Text allowFontScaling={false} style={[styles.itemPriceLabel, { color: theme.colors.primary }]}>
-                            {formatPrice(item.priceUSD * item.quantity, selectedOrder?.currency, selectedOrder?.exchangeRate)}
+                            {formatOrderLineTotal(item as any, selectedOrder?.currency as any, selectedOrder?.exchangeRate as any)}
                           </Text>
                           {/* 💰 Per-item Profit (admin-only) — hidden on partner-tagged orders (partner's profit, not owner's) */}
                           {!(selectedOrder as any)?.partnerId && item.purchasePrice != null && item.purchasePrice > 0 && (
@@ -1978,7 +1978,7 @@ const AdminOrdersScreen: React.FC = () => {
                         {t('admin.orders.total')}
                       </Text>
                       <Text allowFontScaling={false} style={[styles.totalValue, { color: theme.colors.primary }]}>
-                        {selectedOrder?.totalUSD != null ? formatPrice(selectedOrder.totalUSD, selectedOrder.currency, selectedOrder.exchangeRate) : formatPrice(0, selectedOrder?.currency, selectedOrder?.exchangeRate)}
+                        {selectedOrder?.totalUSD != null ? formatOrderTotal(selectedOrder as any, selectedOrder.currency as any, selectedOrder.exchangeRate as any) : formatPrice(0, selectedOrder?.currency, selectedOrder?.exchangeRate)}
                       </Text>
                     </View>
                     {/* 💰 TOTAL ORDER PROFIT (admin-only) */}
@@ -2369,7 +2369,7 @@ const AdminOrdersScreen: React.FC = () => {
                         {t('admin.orders.total', 'Total Amount')}:
                       </Text>
                       <Text allowFontScaling={false} style={[styles.shippingOfficeValue, { color: theme.colors.text, fontWeight: 'bold', fontSize: 16 }]}>
-                        {selectedOrder?.totalUSD != null ? formatPrice(selectedOrder.totalUSD, selectedOrder.currency, selectedOrder.exchangeRate) : '$0'}
+                        {selectedOrder?.totalUSD != null ? formatOrderTotal(selectedOrder as any, selectedOrder.currency as any, selectedOrder.exchangeRate as any) : '$0'}
                       </Text>
                     </View>
 

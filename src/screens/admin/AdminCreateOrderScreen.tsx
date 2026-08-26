@@ -16,17 +16,17 @@ import { SPACING, SHADOW_STYLES } from '../../constants/theme';
 import { COUNTRIES } from '../../constants/countries';
 import { useTenant } from '../../contexts/TenantContext';
 import { useCurrency } from '../../contexts/CurrencyContext';
-import { computeOrderTotalIQD, isIQDPriced } from '../../utils/currency';
+import { computeOrderTotalIQD, convertIQDToUSD, isIQDPriced, variantPriceUSD } from '../../utils/currency';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createTenantAdminService, TenantProduct } from '../../services/tenantAdminService';
-import { calculateTieredPrice } from '../../utils/pricingUtils';
+import { calculateTieredPrice, getEffectiveUnitPrice, vipDinarUnit } from '../../utils/pricingUtils';
 import PhoneInput from '../../components/PhoneInput';
 import { CountryInfo, getAllCountries } from '../../utils/phoneUtils';
 import { City } from 'country-state-city';
 
 // `manual` = admin typed a custom price; we then stop auto-recomputing it on
 // VIP/qty changes. Otherwise price follows the tiered/VIP pricing for the qty.
-interface VariationSel { variationId: string; label: string; priceUSD: number; stockQuantity: number; kind: 'size' | 'color'; }
+interface VariationSel { variationId: string; label: string; priceUSD: number; priceIQD?: number; stockQuantity: number; kind: 'size' | 'color'; }
 interface CartLine { product: TenantProduct; quantity: number; price: number; manual?: boolean; variation?: VariationSel; }
 
 // A product whose stock/price live in per-size or per-color variations (each its own SKU).
@@ -409,21 +409,54 @@ const AdminCreateOrderScreen: React.FC = () => {
 
   // Effective unit price: a manual override wins; otherwise the tiered price for
   // this quantity, with VIP unlocking wholesale pricing below the tier minimums.
+  //
+  // The two branches are deliberately different. A VARIATION is its own SKU with
+  // its own price, so the tier ladder is applied to that; getEffectiveUnitPrice
+  // would read the PRODUCT's price and quote the wrong SKU. A whole product goes
+  // through getEffectiveUnitPrice so a flat VIP price is honoured — this screen
+  // called calculateTieredPrice directly, which only knows about tiers, so the
+  // counter quoted a VIP one price and the app quoted them another.
   const priceOf = useCallback((l: CartLine) => {
     if (l.manual) return l.price;
-    const base = l.variation ? l.variation.priceUSD : (l.product.priceUSD || 0);
-    return calculateTieredPrice(l.quantity, base, (l.product as any).priceTiers, isVip);
-  }, [isVip]);
+    if (l.variation) {
+      const base = variantPriceUSD(l.variation, l.product as any, exchangeRateIQD);
+      return calculateTieredPrice(l.quantity, base, (l.product as any).priceTiers, isVip);
+    }
+    return getEffectiveUnitPrice(l.product as any, l.quantity, isVip, exchangeRateIQD);
+  }, [isVip, exchangeRateIQD]);
 
   // The per-unit dinar price to charge for a line, or null when the line is
   // charged in dollars. Defined once so the counter total, the stored order and
   // the line items cannot drift apart.
   const dinarUnit = useCallback((l: CartLine): number | null => {
-    if (l.manual || l.variation) return null;
+    if (l.manual) return null;
+    const unit = priceOf(l);
+
+    // A variation can carry its own dinar price. Refusing to look was why a
+    // 300,000 IQD storage tier rang up at the rate-converted, 250-snapped
+    // approximation of itself instead of the figure the shop typed.
+    if (l.variation) {
+      const vIQD = Number(l.variation.priceIQD);
+      if (Number.isFinite(vIQD) && vIQD > 0) {
+        return unit === convertIQDToUSD(vIQD, exchangeRateIQD) ? vIQD : null;
+      }
+      // No price of its own in either currency: it inherits the product's.
+      const vUSD = Number(l.variation.priceUSD);
+      const inherits = !(Number.isFinite(vUSD) && vUSD > 0);
+      const prod = l.product as any;
+      if (inherits && isIQDPriced(prod) && unit === convertIQDToUSD(Number(prod.priceIQD), exchangeRateIQD)) {
+        return Number(prod.priceIQD);
+      }
+      return null;
+    }
+
     const p = l.product as any;
+    // A VIP price can itself be in dinar, and when it wins it is the figure to charge.
+    const vipIQD = vipDinarUnit(p, isVip, unit, exchangeRateIQD, 0);
+    if (vipIQD != null) return vipIQD;
     if (!isIQDPriced(p)) return null;
-    return priceOf(l) === (l.product.priceUSD || 0) ? Number(p.priceIQD) : null;
-  }, [priceOf]);
+    return unit === (l.product.priceUSD || 0) ? Number(p.priceIQD) : null;
+  }, [priceOf, isVip, exchangeRateIQD]);
 
   // Persist the in-progress sale so an app crash/kill mid-sale doesn't lose the cart.
   const hydratedRef = useRef(false);
@@ -456,9 +489,16 @@ const AdminCreateOrderScreen: React.FC = () => {
                 const label = sizeV ? `${vv.sizeValue || ''}${vv.sizeUnit ? ' ' + vv.sizeUnit : ''}`.trim() : (vv.colorValue || '');
                 // Same JSONB coercion as addVariation — a string price here would
                 // restore the draft at the wrong (base) price.
+                // Restored from the variation's CURRENT data, dinar price included.
+                // Without it a crash mid-sale brought the line back at the base
+                // price — the one place a dinar variant silently lost its price.
+                const vvIQDNum = Number(vv.priceIQD);
+                const priceIQD = Number.isFinite(vvIQDNum) && vvIQDNum > 0 ? vvIQDNum : undefined;
                 const vvPriceNum = Number(vv.priceUSD);
-                const priceUSD = Number.isFinite(vvPriceNum) && vvPriceNum > 0 ? vvPriceNum : (Number(p.priceUSD) || 0);
-                restored[it.key || `${p.id}__${it.variationId}`] = { product: p, price: it.price ?? priceUSD, manual: it.manual, quantity: it.quantity || 1, variation: { variationId: it.variationId, label, priceUSD, stockQuantity: vv.stockQuantity ?? 0, kind } };
+                const priceUSD = priceIQD != null
+                  ? convertIQDToUSD(priceIQD, exchangeRateIQD)
+                  : (Number.isFinite(vvPriceNum) && vvPriceNum > 0 ? vvPriceNum : (Number(p.priceUSD) || 0));
+                restored[it.key || `${p.id}__${it.variationId}`] = { product: p, price: it.price ?? priceUSD, manual: it.manual, quantity: it.quantity || 1, variation: { variationId: it.variationId, label, priceUSD, priceIQD, stockQuantity: vv.stockQuantity ?? 0, kind } };
               } else {
                 restored[it.key || it.id] = { product: p, price: it.price ?? (p.priceUSD || 0), manual: it.manual, quantity: it.quantity || 1 };
               }
@@ -517,15 +557,20 @@ const AdminCreateOrderScreen: React.FC = () => {
   }, []);
 
   // Add a specific size/color (its own SKU). Keyed per variation so two sizes are two lines.
-  const addVariation = useCallback((p: TenantProduct, variationId: string, label: string, vPrice: number | undefined, stockQuantity: number, kind: 'size' | 'color') => {
+  const addVariation = useCallback((p: TenantProduct, variationId: string, label: string, vPrice: number | undefined, stockQuantity: number, kind: 'size' | 'color', vPriceIQD?: number) => {
     if (!p.id) return;
     const key = `${p.id}__${variationId}`;
     // Coerce, don't type-test. variations/color_variations are JSONB, so a
     // website-written priceUSD can be the string "25" — which fails
     // `typeof === 'number'` and silently fell back to the BASE product price, so
-    // the picker showed $10 for a $25 variant and the sale rang at $10.
+    // the picker showed $10 for a $25 variant and the sale rang at $10. The same
+    // coercion applies to the dinar price for the same reason.
     const vPriceNum = Number(vPrice);
-    const priceUSD = Number.isFinite(vPriceNum) && vPriceNum > 0 ? vPriceNum : (Number(p.priceUSD) || 0);
+    const vIQDNum = Number(vPriceIQD);
+    const priceIQD = Number.isFinite(vIQDNum) && vIQDNum > 0 ? vIQDNum : undefined;
+    const priceUSD = priceIQD != null
+      ? convertIQDToUSD(priceIQD, exchangeRateIQD)
+      : (Number.isFinite(vPriceNum) && vPriceNum > 0 ? vPriceNum : (Number(p.priceUSD) || 0));
     setCart((prev) => {
       const line = prev[key];
       return { ...prev, [key]: {
@@ -533,10 +578,10 @@ const AdminCreateOrderScreen: React.FC = () => {
         price: line?.price ?? priceUSD,
         manual: line?.manual,
         quantity: (line?.quantity || 0) + 1,
-        variation: { variationId, label, priceUSD, stockQuantity, kind },
+        variation: { variationId, label, priceUSD, priceIQD, stockQuantity, kind },
       } };
     });
-  }, []);
+  }, [exchangeRateIQD]);
 
   // Tapping a product: variation products open the picker, simple ones add straight to cart.
   const handleTapProduct = useCallback((p: TenantProduct) => {
@@ -1318,13 +1363,15 @@ const AdminCreateOrderScreen: React.FC = () => {
               ].map(({ v, kind, label }) => {
                 const key = `${variationPicker!.id}__${v.variationId}`;
                 const c = cart[key]?.quantity || 0;
-                const price = (typeof v.priceUSD === 'number' && v.priceUSD > 0) ? v.priceUSD : (variationPicker!.priceUSD || 0);
+                // Through the same ladder the sale uses, so the picker cannot quote
+                // one figure and the till ring up another.
+                const price = variantPriceUSD(v, variationPicker as any, exchangeRateIQD);
                 const soldOut = (v.stockQuantity ?? 0) <= 0;
                 return (
                   <TouchableOpacity
                     key={v.variationId}
                     disabled={soldOut}
-                    onPress={() => addVariation(variationPicker!, v.variationId, label, v.priceUSD, v.stockQuantity ?? 0, kind)}
+                    onPress={() => addVariation(variationPicker!, v.variationId, label, v.priceUSD, v.stockQuantity ?? 0, kind, v.priceIQD)}
                     style={[styles.varRow, { borderColor: c > 0 ? C.primary : C.border, opacity: soldOut ? 0.45 : 1 }]}
                     activeOpacity={0.8}
                   >
