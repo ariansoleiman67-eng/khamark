@@ -25,7 +25,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { useTheme } from '../components/ThemeProvider';
 import { convertUSDToIQD, formatCurrencyIQD, formatPrice, isIQDPriced } from '../utils/currency';
-import { formatLineTotal } from '../utils/pricingUtils';
+import { formatLineTotal, vipDinarUnit } from '../utils/pricingUtils';
 import { getProductImageUrl, getThumbnailUrl, logImageDebug } from '../utils/imageUtils';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
@@ -635,9 +635,21 @@ const CartScreen: React.FC = () => {
     let dinarIQD = 0;
     let dinarUSD = 0;
     for (const it of cart.items) {
-      if (!isIQDPriced(it.product)) continue;
       const unitUSD = LocalCartService.getTieredPrice(it.product, it.quantity, isVip);
-      // A tier or VIP price is a dollar figure, so that line converts normally.
+
+      // A VIP price can be authored in dinar too. When it is the figure winning,
+      // it is the exact dinar amount this line contributes — excluding it sent the
+      // line through the rate and the 250 snap, so the total printed under a set
+      // of exact dinar prices did not add up to them.
+      const vipIQD = vipDinarUnit(it.product, isVip, unitUSD, exchangeRateIQD, 0);
+      if (vipIQD != null) {
+        dinarIQD += vipIQD * it.quantity;
+        dinarUSD += unitUSD * it.quantity;
+        continue;
+      }
+
+      if (!isIQDPriced(it.product)) continue;
+      // A wholesale tier is a dollar figure, so that line converts normally.
       if (unitUSD !== it.product.priceUSD) continue;
       dinarIQD += Number(it.product.priceIQD) * it.quantity;
       dinarUSD += unitUSD * it.quantity;

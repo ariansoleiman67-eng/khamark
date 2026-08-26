@@ -3178,7 +3178,11 @@
         "variantPriceUSDActive": "Customers pay {{usd}} for this option.",
         "variantPriceInherits": "Leave both blank and this option costs the product price, {{base}}.",
         "variantPriceUSDPlaceholder": "Price $",
-        "variantPriceIQDPlaceholder": "Price IQD"
+        "variantPriceIQDPlaceholder": "Price IQD",
+        "vipPriceIQD": "VIP Price (IQD) — optional",
+        "vipPriceIQDHint": "Fill this in for VIP stock you priced in dinar. VIPs then see this exact amount and the exchange rate is not applied to it.",
+        "vipPriceIQDActive": "VIP customers pay {{iqd}} exactly ({{usd}} browsing in dollars). This wins over the VIP dollar price beside it.",
+        "vipPriceIQDNotCheaper": "{{vip}} is not below this product’s normal price, so VIPs will keep paying the normal price. Lower it, or clear it."
       },
       "invalidSizeValue": "Please enter a size",
       "duplicateSizeValue": "This size already exists",

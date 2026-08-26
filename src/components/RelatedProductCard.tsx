@@ -34,7 +34,9 @@ import {
   getDiscountPercent,
   getEffectiveStock,
   hasCompareAtDiscount,
-  LOW_STOCK_THRESHOLD, formatUnitPrice } from "../utils/pricingUtils";
+  LOW_STOCK_THRESHOLD, formatUnitPrice,
+  isVipPriceActive,
+} from "../utils/pricingUtils";
 import { getDirection } from "../locales";
 import { getThumbnailUrl } from "../utils/imageUtils";
 import { SPACING } from "../constants/theme";
@@ -113,8 +115,7 @@ const RelatedProductCard: React.FC<RelatedProductCardProps> = ({
     }
     return formatUnitPrice(product, isVip, currency, exchangeRateIQD);
   };
-  const vipActive =
-    isVip && typeof product.vipPriceUSD === "number" && product.vipPriceUSD > 0;
+  const vipActive = isVipPriceActive(product, isVip);
   const hasDiscount = hasCompareAtDiscount(product, isVip);
   const savePct = getDiscountPercent(product, isVip);
 

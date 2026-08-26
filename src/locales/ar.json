@@ -3222,7 +3222,11 @@
         "variantPriceUSDActive": "يدفع الزبائن {{usd}} لهذا الخيار.",
         "variantPriceInherits": "اترك الخانتين فارغتين ليأخذ هذا الخيار سعر المنتج، {{base}}.",
         "variantPriceUSDPlaceholder": "السعر $",
-        "variantPriceIQDPlaceholder": "السعر د.ع"
+        "variantPriceIQDPlaceholder": "السعر د.ع",
+        "vipPriceIQD": "سعر VIP (د.ع) — اختياري",
+        "vipPriceIQDHint": "املأ هذه الخانة للبضاعة التي سعّرتها بالدينار لزبائن VIP. عندها يرى زبائن VIP هذا المبلغ بالضبط دون تطبيق سعر الصرف عليه.",
+        "vipPriceIQDActive": "يدفع زبائن VIP {{iqd}} بالضبط ({{usd}} لمن يتصفح بالدولار). هذا يتقدّم على سعر VIP بالدولار المجاور.",
+        "vipPriceIQDNotCheaper": "{{vip}} ليس أقل من السعر العادي لهذا المنتج، لذا سيستمر زبائن VIP بدفع السعر العادي. خفّضه أو امسحه."
       },
       "noSearchResults": "لم يتم العثور على منتجات مطابقة",
       "loadingTenant": "جارٍ تحميل بيانات المتجر...",

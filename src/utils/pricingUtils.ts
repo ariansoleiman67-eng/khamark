@@ -1,4 +1,5 @@
 import { PriceTier, Product } from '../types';
+import { getCurrentExchangeRate } from './exchangeRate';
 import { convertIQDToUSD, formatCurrencyIQD, formatCurrencyUSD, formatPrice, isIQDPriced } from './currency';
 
 /**
@@ -80,30 +81,114 @@ export const calculateTieredPrice = (
   return basePrice;
 };
 
+/** What a VIP product type looks like once a VIP price can be authored in dinar. */
+type VipPriced = Pick<Product, 'priceUSD' | 'vipPriceUSD' | 'priceTiers'> & {
+  priceIQD?: number;
+  vipPriceIQD?: number;
+};
+
+/**
+ * The VIP price for this product, in USD, or null if it has none.
+ *
+ * A dinar VIP price outranks a dollar one, matching how priceIQD outranks
+ * priceUSD on the product itself.
+ */
+const vipCandidateUSD = (product: VipPriced, exchangeRate: number): number | null => {
+  const iqd = Number(product.vipPriceIQD);
+  if (Number.isFinite(iqd) && iqd > 0) return convertIQDToUSD(iqd, exchangeRate);
+  const usd = Number(product.vipPriceUSD);
+  return Number.isFinite(usd) && usd > 0 ? usd : null;
+};
+
+/**
+ * Is the VIP price actually cheaper than what this shopper would otherwise pay?
+ *
+ * When BOTH figures are authored in dinar the comparison is made in dinar. That
+ * is not a micro-optimisation: it is exact and rate-independent, whereas
+ * converting both to dollars first can flip the answer on a rate edit. And the
+ * naive form of this guard — `vipPriceIQD < product.priceUSD` — compares a
+ * six-figure dinar number against a two-figure dollar one and concludes the VIP
+ * price is never a discount, silently charging VIPs full price.
+ */
+const vipIsCheaper = (product: VipPriced, candidateUSD: number, exchangeRate: number): boolean => {
+  const vipIQD = Number(product.vipPriceIQD);
+  const baseIQD = Number(product.priceIQD);
+  if (Number.isFinite(vipIQD) && vipIQD > 0 && Number.isFinite(baseIQD) && baseIQD > 0) {
+    return vipIQD < baseIQD;
+  }
+  return candidateUSD < Number(product.priceUSD);
+};
+
 // A product's per-unit price to CHARGE for a given user + quantity.
-// VIP precedence: a flat `vipPriceUSD` (if set) wins; otherwise the tiered
-// (wholesale) VIP price applies. Non-VIP always gets the normal tiered price.
+// VIP precedence: a flat VIP price (if set, dinar before dollars) wins;
+// otherwise the tiered (wholesale) VIP price applies. Non-VIP always gets the
+// normal tiered price.
 export const getEffectiveUnitPrice = (
-  product: Pick<Product, 'priceUSD' | 'vipPriceUSD' | 'priceTiers'>,
+  product: VipPriced,
   quantity: number = 1,
-  isVip: boolean = false
+  isVip: boolean = false,
+  exchangeRate: number = getCurrentExchangeRate()
 ): number => {
-  if (
-    isVip &&
-    typeof product.vipPriceUSD === 'number' &&
-    product.vipPriceUSD > 0 &&
-    product.vipPriceUSD < product.priceUSD
-  ) {
-    return product.vipPriceUSD;
+  if (isVip) {
+    const candidate = vipCandidateUSD(product, exchangeRate);
+    if (candidate != null && candidate > 0 && vipIsCheaper(product, candidate, exchangeRate)) {
+      return candidate;
+    }
   }
   return calculateTieredPrice(quantity, product.priceUSD, product.priceTiers, isVip);
 };
 
+/**
+ * Is this shopper actually being charged a VIP price right now?
+ *
+ * The four surfaces that paint a price purple and stamp a VIP badge each tested
+ * `typeof product.vipPriceUSD === 'number' && > 0` — which misses a VIP price
+ * authored in dinar entirely (no badge on the very products the shop discounts
+ * for VIPs), and lights up for a VIP price that is NOT cheaper than the normal
+ * one, which getEffectiveUnitPrice refuses to charge. The badge said VIP while
+ * the till said full price.
+ *
+ * Defined here, beside the decision it mirrors, so the two cannot drift again.
+ */
+export const isVipPriceActive = (
+  product: VipPriced,
+  isVip: boolean,
+  quantity: number = 1,
+  exchangeRate: number = getCurrentExchangeRate()
+): boolean => {
+  if (!isVip) return false;
+  const candidate = vipCandidateUSD(product, exchangeRate);
+  if (candidate == null || candidate <= 0) return false;
+  if (!vipIsCheaper(product, candidate, exchangeRate)) return false;
+  return getEffectiveUnitPrice(product, quantity, true, exchangeRate) === candidate;
+};
+
+/**
+ * The dinar figure a VIP is being charged, or null when they are not being
+ * charged a dinar-authored VIP price. Lets the formatter print the shop's exact
+ * number instead of a converted round-trip of it.
+ */
+export const vipDinarUnit = (
+  product: VipPriced,
+  isVip: boolean,
+  unitUSD: number,
+  exchangeRate: number,
+  unitDelta: number
+): number | null => {
+  if (!isVip || unitDelta) return null;
+  const iqd = Number(product.vipPriceIQD);
+  if (!Number.isFinite(iqd) || iqd <= 0) return null;
+  // Only when this dinar price is the one actually winning — a VIP price that
+  // lost the "is it cheaper" test must not be displayed as if it applied.
+  return unitUSD === convertIQDToUSD(iqd, exchangeRate) ? iqd : null;
+};
+
 // The single "from" price to DISPLAY on cards / the hero for this user (qty 1).
 export const getDisplayUnitPrice = (
-  product: Pick<Product, 'priceUSD' | 'vipPriceUSD' | 'priceTiers'>,
-  isVip: boolean = false
-): number => getEffectiveUnitPrice(product, 1, isVip);
+  product: VipPriced,
+  isVip: boolean = false,
+  exchangeRate: number = getCurrentExchangeRate()
+): number => getEffectiveUnitPrice(product, 1, isVip, exchangeRate);
 
 // Stock is at or below this before the "only N left" urgency cue appears.
 // ProductDetailsScreen declares its own copy (it is @ts-nocheck and owned elsewhere);
@@ -171,7 +256,7 @@ export const hasVipPrice = (
  * dinar amount would be plain wrong.
  */
 const baseDinarPriceApplies = (
-  product: Pick<Product, 'priceUSD' | 'vipPriceUSD' | 'priceTiers'> & { priceIQD?: number },
+  product: VipPriced,
   unitUSD: number,
   unitDelta: number
 ): boolean => isIQDPriced(product) && unitUSD === product.priceUSD && !unitDelta;
@@ -190,7 +275,7 @@ const baseDinarPriceApplies = (
  * add up on the same screen.
  */
 const formatPricePart = (
-  product: Pick<Product, 'priceUSD' | 'vipPriceUSD' | 'priceTiers'> & { priceIQD?: number },
+  product: VipPriced,
   isVip: boolean,
   currency: 'USD' | 'IQD',
   exchangeRateIQD: number,
@@ -199,7 +284,18 @@ const formatPricePart = (
   unitDelta: number,
   multiplier: number
 ): string => {
-  const unitUSD = getEffectiveUnitPrice(product, quantity, isVip);
+  const unitUSD = getEffectiveUnitPrice(product, quantity, isVip, exchangeRateIQD);
+
+  // A VIP price authored in dinar is shown to a VIP exactly as typed, before the
+  // base-price rule below gets a look in — the VIP figure is the one being paid.
+  const vipIQD = vipDinarUnit(product, isVip, unitUSD, exchangeRateIQD, unitDelta);
+  if (vipIQD != null) {
+    const total = vipIQD * multiplier;
+    return currency === 'IQD'
+      ? formatCurrencyIQD(total, options)
+      : formatCurrencyUSD(convertIQDToUSD(total, exchangeRateIQD), options);
+  }
+
   if (baseDinarPriceApplies(product, unitUSD, unitDelta)) {
     const iqd = Number(product.priceIQD) * multiplier;
     return currency === 'IQD'
@@ -211,10 +307,10 @@ const formatPricePart = (
 
 /** Price of a single unit. `quantity` only selects the wholesale tier. */
 export const formatUnitPrice = (
-  product: Pick<Product, 'priceUSD' | 'vipPriceUSD' | 'priceTiers'> & { priceIQD?: number },
+  product: VipPriced,
   isVip: boolean = false,
   currency: 'USD' | 'IQD' = 'USD',
-  exchangeRateIQD: number = 1500,
+  exchangeRateIQD: number = getCurrentExchangeRate(),
   options: any = {},
   quantity: number = 1,
   unitDelta: number = 0
@@ -222,10 +318,10 @@ export const formatUnitPrice = (
 
 /** Unit price x quantity, kept in dinar end to end for a dinar-priced product. */
 export const formatLineTotal = (
-  product: Pick<Product, 'priceUSD' | 'vipPriceUSD' | 'priceTiers'> & { priceIQD?: number },
+  product: VipPriced,
   isVip: boolean = false,
   currency: 'USD' | 'IQD' = 'USD',
-  exchangeRateIQD: number = 1500,
+  exchangeRateIQD: number = getCurrentExchangeRate(),
   options: any = {},
   quantity: number = 1,
   unitDelta: number = 0

@@ -17,7 +17,9 @@ import {
   getDisplayUnitPrice,
   getDiscountPercent,
   getEffectiveStock,
-  hasCompareAtDiscount, formatUnitPrice } from "../utils/pricingUtils";
+  hasCompareAtDiscount, formatUnitPrice,
+  isVipPriceActive,
+} from "../utils/pricingUtils";
 import { Product } from "../types";
 import { SHADOW_STYLES } from "../constants/theme";
 import { getProductImageUrl, getThumbnailUrl, logImageDebug } from "../utils/imageUtils";
@@ -146,7 +148,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   // VIP messaging: badge when a VIP is seeing their price; a locked hint for
   // normal users when the product has a VIP-only price.
   // The VIP price is shown ONLY to VIP users — no locked/teaser hint for others.
-  const vipActive = isVip && typeof product.vipPriceUSD === "number" && product.vipPriceUSD > 0;
+  const vipActive = isVipPriceActive(product, isVip);
   // Item discount: "was" price + Save% when compareAtPriceUSD beats the shown price.
   // Measured against what THIS shopper pays, so VIPs get the badge too (previously
   // hidden from them, leaving them unable to tell a product was discounted at all).

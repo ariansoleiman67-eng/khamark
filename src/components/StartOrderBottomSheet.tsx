@@ -218,6 +218,24 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
   );
 
   // Every group the product offers must be answered before there is anything to buy.
+  /**
+   * The chosen variant whose price is charged.
+   *
+   * Size first, then colour — but only if it actually carries a price of its own.
+   * Taking `selectedSize ?? selectedColor` looks equivalent and is not: the value
+   * ladder this replaced fell THROUGH a priceless size to the colour's price, so a
+   * shop that prices by colour and sizes by storage lost the colour price the
+   * moment a size was picked.
+   *
+   * Computed once so the total in the sheet and the price written to the cart line
+   * cannot disagree.
+   */
+  const pricedVariant = useMemo(() => {
+    if (hasOwnPrice(selectedSize)) return selectedSize;
+    if (hasOwnPrice(selectedColor)) return selectedColor;
+    return selectedSize ?? selectedColor;
+  }, [selectedSize, selectedColor, product]);
+
   const selectionComplete = (!hasSizeVars || !!selectedSize) && (!hasColorVars || !!selectedColor);
   const qtyEnabled = !hasAnyVars || selectionComplete;
 
@@ -261,12 +279,11 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
     if (!product) return 0;
     if (!hasAnyVars) return localUnitPrice * localQty;
     if (!selectionComplete) return 0;
-    // One line, one price: the size carries the price when there is one, otherwise
-    // the colour, otherwise the product. Summing both is what charged for two phones.
+    // One line, one price: whichever chosen variant actually carries a price, size
+    // first. Summing both is what charged for two phones.
     // variantPriceUSD, not `?? product.priceUSD`, so a variant priced in dinar is
     // charged at its dinar figure instead of silently falling through to dollars.
-    const priced = selectedSize ?? selectedColor;
-    const price = variantPriceUSD(priced, product, exchangeRateIQD);
+    const price = variantPriceUSD(pricedVariant, product, exchangeRateIQD);
     const base = getPriceUSD(product, exchangeRateIQD);
     const ratio = base > 0 ? localUnitPrice / base : 1;
     return price * localQty * (ratio < 1 ? ratio : 1);
@@ -462,7 +479,7 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
           variationId: selectedSize.variationId,
           name: String(selectedSize.sizeValue ?? ''),
           quantity: localQty,
-          price: variantPriceUSD(selectedSize, product, exchangeRateIQD),
+          price: variantPriceUSD(pricedVariant, product, exchangeRateIQD),
           stock: selectedSize.stockQuantity,
           color: selectedColor?.colorValue,
           colorVariationId: selectedColor?.variationId,
@@ -474,7 +491,7 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
           variationId: selectedColor.variationId,
           name: String(selectedColor.colorValue ?? ''),
           quantity: localQty,
-          price: variantPriceUSD(selectedColor, product, exchangeRateIQD),
+          price: variantPriceUSD(pricedVariant, product, exchangeRateIQD),
           stock: selectedColor.stockQuantity,
         }]
       : [];

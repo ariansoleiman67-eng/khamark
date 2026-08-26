@@ -36,6 +36,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { useTheme } from '../components/ThemeProvider';
 import { formatPrice, isIQDPriced } from '../utils/currency';
+import { vipDinarUnit } from '../utils/pricingUtils';
 import { getProductImageUrl, logImageDebug } from '../utils/imageUtils';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
@@ -866,13 +867,22 @@ const CheckoutScreen: React.FC = () => {
           purchasePrice: purchasePriceById[cartItem.productId] ?? cartItem.product.purchasePrice ?? null,
           shippingCost: cartItem.product.shippingCost || 0,
           imageUrl: cartItem.product.imageUrls?.[0] || '',
-          // Snapshot the dinar price only when the dinar figure is what is
-          // actually being charged. If a wholesale tier or a VIP price won,
-          // tieredPrice is a dollar amount and the line converts normally —
-          // stamping the dinar price here would bill the wrong number.
-          ...(isIQDPriced(cartItem.product) && tieredPrice === cartItem.product.priceUSD
-            ? { priceIQD: Number(cartItem.product.priceIQD) }
-            : {}),
+          // Snapshot the dinar price only when a dinar figure is what is actually
+          // being charged. A wholesale tier is a dollar amount and converts
+          // normally — stamping a dinar price for it would bill the wrong number.
+          //
+          // A VIP price can itself be authored in dinar, and when it wins it is
+          // the figure to stamp. vipDinarUnit reports that and returns null when
+          // the VIP dinar price lost the "is it actually cheaper" test, so a
+          // losing VIP price cannot leak onto the order line.
+          ...(() => {
+            const vipIQD = vipDinarUnit(cartItem.product, isVip, tieredPrice, exchangeRateIQD, 0);
+            if (vipIQD != null) return { priceIQD: vipIQD };
+            if (isIQDPriced(cartItem.product) && tieredPrice === cartItem.product.priceUSD) {
+              return { priceIQD: Number(cartItem.product.priceIQD) };
+            }
+            return {};
+          })(),
           tenantId: cartItem.product.tenantId || null, // carried so OrderService can stamp order.tenant_id
         };
         
@@ -1752,7 +1762,10 @@ const CheckoutScreen: React.FC = () => {
                   </Text>
                   {/* Same look as Order Details: wholesale badge + "qty x price = total" + struck original */}
                   {(() => {
-                    const unitPrice = LocalCartService.getTieredPrice(item.product, item.quantity);
+                    // isVip was missing here, so the review strip quoted every
+                    // VIP shopper the non-VIP price while the summary below it,
+                    // and the order actually placed, used the VIP one.
+                    const unitPrice = LocalCartService.getTieredPrice(item.product, item.quantity, isVip);
                     const basePrice = item.product.priceUSD;
                     const hasWholesaleDiscount = basePrice > unitPrice;
                     const savingsPercent = hasWholesaleDiscount

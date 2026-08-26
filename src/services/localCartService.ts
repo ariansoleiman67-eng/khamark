@@ -6,6 +6,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Cart, CartItem, Product } from '../types';
 import { calculateTieredPrice, getEffectiveUnitPrice } from '../utils/pricingUtils';
+import { getCurrentExchangeRate } from '../utils/exchangeRate';
 
 const CART_STORAGE_KEY = 'local_cart_';
 
@@ -541,10 +542,16 @@ export class LocalCartService {
   /**
    * Get applicable tiered price for a product quantity
    */
-  static getTieredPrice(product: Product, quantity: number, isVip: boolean = false): number {
-    // Routes through getEffectiveUnitPrice so a flat VIP price (vipPriceUSD) is
-    // honoured for VIP users, falling back to the wholesale tiered price.
-    return getEffectiveUnitPrice(product, quantity, isVip);
+  static getTieredPrice(
+    product: Product,
+    quantity: number,
+    isVip: boolean = false,
+    exchangeRate: number = getCurrentExchangeRate(),
+  ): number {
+    // Routes through getEffectiveUnitPrice so a flat VIP price is honoured for
+    // VIP users, falling back to the wholesale tiered price. The rate is needed
+    // because a VIP price can be authored in dinar and the cart is USD arithmetic.
+    return getEffectiveUnitPrice(product, quantity, isVip, exchangeRate);
   }
 
   /**

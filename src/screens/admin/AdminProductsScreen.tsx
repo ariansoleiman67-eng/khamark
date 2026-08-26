@@ -317,6 +317,7 @@ const AdminProductsScreen: React.FC = () => {
     priceIQD: '',
     compareAtPriceUSD: '',
     vipPriceUSD: '',
+    vipPriceIQD: '',
     purchasePrice: '',
     stockQty: '',
     // BOTH OF THESE WERE WRITTEN BY THE FORM AND MISSING FROM ITS INITIAL SHAPE.
@@ -376,7 +377,7 @@ const AdminProductsScreen: React.FC = () => {
     setIsActive(true);
     setFormData({
       name: '', nameAr: '', nameKu: '', partNumber: '', category: '', categoryAr: '', categoryKu: '',
-      priceUSD: '', priceIQD: '', compareAtPriceUSD: '', vipPriceUSD: '', purchasePrice: '', stockQty: '', historicalStockQty: '', condition: '', initialStock: '', shippingCost: '', description: '', descriptionAr: '', descriptionKu: '', brand: '', status: 'available',
+      priceUSD: '', priceIQD: '', compareAtPriceUSD: '', vipPriceUSD: '', vipPriceIQD: '', purchasePrice: '', stockQty: '', historicalStockQty: '', condition: '', initialStock: '', shippingCost: '', description: '', descriptionAr: '', descriptionKu: '', brand: '', status: 'available',
       warranty: '', sku: '', barcode: '', weight: '', dimLength: '', dimWidth: '', dimHeight: '',
     });
     // Also reset view state so a tenant switch doesn't carry over filters/reorder mode.
@@ -492,7 +493,7 @@ const AdminProductsScreen: React.FC = () => {
     setIsActive(true);
     setFormData({
       name: '', nameAr: '', nameKu: '', partNumber: '', category: '', categoryAr: '', categoryKu: '',
-      priceUSD: '', priceIQD: '', compareAtPriceUSD: '', vipPriceUSD: '', purchasePrice: '', stockQty: '', historicalStockQty: '', condition: '', initialStock: '', shippingCost: '', description: '', descriptionAr: '', descriptionKu: '', brand: '', status: 'available',
+      priceUSD: '', priceIQD: '', compareAtPriceUSD: '', vipPriceUSD: '', vipPriceIQD: '', purchasePrice: '', stockQty: '', historicalStockQty: '', condition: '', initialStock: '', shippingCost: '', description: '', descriptionAr: '', descriptionKu: '', brand: '', status: 'available',
       warranty: '', sku: '', barcode: '', weight: '', dimLength: '', dimWidth: '', dimHeight: '',
     });
     setApplyShippingToAll(false);
@@ -791,6 +792,7 @@ const AdminProductsScreen: React.FC = () => {
       priceIQD: (product as any).priceIQD != null ? String((product as any).priceIQD) : '',
       compareAtPriceUSD: product.compareAtPriceUSD != null ? String(product.compareAtPriceUSD) : '',
       vipPriceUSD: product.vipPriceUSD != null ? String(product.vipPriceUSD) : '',
+      vipPriceIQD: (product as any).vipPriceIQD != null ? String((product as any).vipPriceIQD) : '',
       purchasePrice: (product as any).purchasePrice?.toString() || '',
       stockQty: product.stockQty?.toString() || '',
       historicalStockQty: product.historicalStockQty?.toString() || '',
@@ -993,6 +995,11 @@ const AdminProductsScreen: React.FC = () => {
         // compare_at_price_usd / vip_price_usd.
         compareAtPriceUSD: formData.compareAtPriceUSD.trim() !== '' ? sanitizePrice(formData.compareAtPriceUSD) : null,
         vipPriceUSD: formData.vipPriceUSD.trim() !== '' ? sanitizePrice(formData.vipPriceUSD) : null,
+        // Always sent, null when blank, so clearing it actually clears the column.
+        vipPriceIQD: (() => {
+          const iqd = sanitizeIQD(formData.vipPriceIQD);
+          return iqd > 0 ? iqd : null;
+        })(),
         purchasePrice: payloadPurchasePrice,
         stockQty: newStockQty,
         historicalStockQty: historicalStockQty,
@@ -2935,6 +2942,68 @@ const AdminProductsScreen: React.FC = () => {
                       {t('admin.products.form.vipPriceHint', { defaultValue: 'Special price for VIP customers only. Leave blank for none.' })}
                     </Text>
                   </View>
+                </View>
+
+                {/* VIP price in dinar — the VIP counterpart of the dinar price above.
+                    Full width for the same reason: the hint is the only place the
+                    admin can see which of the two VIP figures actually applies. */}
+                <View style={{ marginTop: SPACING.md }}>
+                  <Text allowFontScaling={false}
+                    style={[styles.inputLabel, { color: theme.colors.textSecondary, marginTop: 0 }]}
+                    adjustsFontSizeToFit
+                    numberOfLines={1}
+                  >
+                    {t('admin.products.form.vipPriceIQD', { defaultValue: 'VIP Price (IQD) — optional' })}
+                  </Text>
+                  <TextInput allowFontScaling={false}
+                    style={[
+                      styles.input,
+                      { backgroundColor: theme.colors.background, color: theme.colors.text },
+                      (parseInt(formData.vipPriceIQD || '0', 10) || 0) > 0 && {
+                        borderColor: '#7C3AED',
+                        borderWidth: 1,
+                      },
+                    ]}
+                    value={formData.vipPriceIQD}
+                    onChangeText={(text) => setFormData(prev => ({ ...prev, vipPriceIQD: text.replace(/[^0-9]/g, '') }))}
+                    placeholder="0"
+                    keyboardType="number-pad"
+                    placeholderTextColor={theme.colors.textSecondary}
+                    multiline={false}
+                    scrollEnabled={false}
+                    disableFullscreenUI
+                  />
+                  <Text allowFontScaling={false}
+                    style={{ fontSize: 11, color: theme.colors.textSecondary, marginTop: 4 }}
+                    numberOfLines={3}
+                  >
+                    {(() => {
+                      const vipIqd = parseInt((formData.vipPriceIQD || '').replace(/[^0-9]/g, ''), 10) || 0;
+                      const baseIqd = parseInt((formData.priceIQD || '').replace(/[^0-9]/g, ''), 10) || 0;
+                      const baseUsd = parseFloat(formData.priceUSD) || 0;
+                      if (vipIqd <= 0) {
+                        return t('admin.products.form.vipPriceIQDHint', {
+                          defaultValue: 'Fill this in for VIP stock you priced in dinar. VIPs then see this exact amount and the exchange rate is not applied to it.',
+                        });
+                      }
+                      // Warn rather than silently discard: getEffectiveUnitPrice
+                      // refuses a VIP price that is not actually cheaper.
+                      const notCheaper = baseIqd > 0
+                        ? vipIqd >= baseIqd
+                        : baseUsd > 0 && convertIQDToUSD(vipIqd, exchangeRateIQD) >= baseUsd;
+                      if (notCheaper) {
+                        return t('admin.products.form.vipPriceIQDNotCheaper', {
+                          vip: formatCurrencyIQD(vipIqd),
+                          defaultValue: '{{vip}} is not below this product\u2019s normal price, so VIPs will keep paying the normal price. Lower it, or clear it.',
+                        });
+                      }
+                      return t('admin.products.form.vipPriceIQDActive', {
+                        iqd: formatCurrencyIQD(vipIqd),
+                        usd: formatCurrencyUSD(convertIQDToUSD(vipIqd, exchangeRateIQD)),
+                        defaultValue: 'VIP customers pay {{iqd}} exactly ({{usd}} browsing in dollars). This wins over the VIP dollar price beside it.',
+                      });
+                    })()}
+                  </Text>
                 </View>
 
                 {/* Purchase Price (Cost Price) */}

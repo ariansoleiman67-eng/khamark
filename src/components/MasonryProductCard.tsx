@@ -25,7 +25,9 @@ import {
   getDisplayUnitPrice,
   getDiscountPercent,
   getEffectiveStock,
-  hasCompareAtDiscount, formatUnitPrice } from "../utils/pricingUtils";
+  hasCompareAtDiscount, formatUnitPrice,
+  isVipPriceActive,
+} from "../utils/pricingUtils";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -206,7 +208,7 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
     }
     return formatUnitPrice(product, isVip, currency, exchangeRateIQD);
   };
-  const vipActive = isVip && typeof product.vipPriceUSD === "number" && product.vipPriceUSD > 0;
+  const vipActive = isVipPriceActive(product, isVip);
   // VIP price shown only to VIP users — no locked/teaser hint for normal users.
   // Saving is measured against what THIS shopper pays, so a VIP sees the badge (they
   // used to see no discount cue at all) and the figure matches the product page.

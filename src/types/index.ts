@@ -148,6 +148,14 @@ export interface Product {
   priceIQD?: number;
   compareAtPriceUSD?: number; // "was" price for showing a strikethrough + Save% discount
   vipPriceUSD?: number;      // Special price shown only to VIP users (locked/hinted for others)
+  /**
+   * A VIP price authored directly in IQD, the VIP counterpart of priceIQD.
+   * When set it OUTRANKS vipPriceUSD and is charged to a VIP verbatim — no
+   * exchange-rate conversion, no 250 snap. Never compare it against a USD
+   * figure: a dinar number is always numerically larger and every "is the VIP
+   * price actually cheaper" guard would read backwards.
+   */
+  vipPriceIQD?: number;
   purchasePrice?: number;    // Cost/buy price from supplier (admin-only, not shown to customers)
   priceTiers?: PriceTier[];  // Quantity-based pricing tiers (wholesale pricing)
   shippingCost?: number; // Individual shipping cost for this product in USD

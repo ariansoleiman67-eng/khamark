@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, uniqueChannel } from '../services/supabase';
 import { useAuth } from './AuthContext';
 import { formatPrice } from '../utils/currency';
+import { setCurrentExchangeRate } from '../utils/exchangeRate';
 
 const EXCHANGE_RATE_CACHE_KEY = 'cached_exchangeRateIQD';
 
@@ -33,6 +34,7 @@ export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         // Only seed from cache if the server hasn't already applied a fresher rate.
         if (!isNaN(parsed) && parsed > 0 && !serverRateApplied.current) {
           setExchangeRateIQD(parsed);
+        setCurrentExchangeRate(parsed);
         }
       }
     });
@@ -49,6 +51,9 @@ export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (n > 0) {
         serverRateApplied.current = true;
         setExchangeRateIQD(n);
+        // Mirror it where the pricing layer can read it. Services and reducers
+        // price dinar-authored products without a React context in hand.
+        setCurrentExchangeRate(n);
         AsyncStorage.setItem(EXCHANGE_RATE_CACHE_KEY, String(n)).catch(() => {});
       }
     };

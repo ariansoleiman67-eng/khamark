@@ -30,6 +30,7 @@ export const mapProduct = (data: any): Product => ({
   // isIQDPriced() stays false and every existing USD path behaves as before.
   priceIQD: data.price_iqd != null ? Number(data.price_iqd) : undefined,
   vipPriceUSD: data.vip_price_usd != null ? Number(data.vip_price_usd) : undefined,
+  vipPriceIQD: data.vip_price_iqd != null ? Number(data.vip_price_iqd) : undefined,
   compareAtPriceUSD: data.compare_at_price_usd != null ? Number(data.compare_at_price_usd) : undefined,
   storageOptions: data.storage_options || [],
   purchasePrice: data.purchase_price != null ? Number(data.purchase_price) : data.purchase_price,
@@ -90,7 +91,7 @@ export const mapProduct = (data: any): Product => ({
 // scanned value to Search, which matches it against this already-loaded list — a
 // column that isn't selected is undefined, so every scan returned zero results.
 const LIST_COLUMNS =
-  'id,name,name_ar,name_ku,part_number,barcode,category,category_ar,category_ku,price_usd,price_iqd,vip_price_usd,compare_at_price_usd,storage_options,stock_qty,status,is_featured,is_active,brand,image_urls,price_tiers,variations,color_variations,shipping_cost,shipping_rates,sort_order,tenant_id,created_at,updated_at,condition';
+  'id,name,name_ar,name_ku,part_number,barcode,category,category_ar,category_ku,price_usd,price_iqd,vip_price_usd,vip_price_iqd,compare_at_price_usd,storage_options,stock_qty,status,is_featured,is_active,brand,image_urls,price_tiers,variations,color_variations,shipping_cost,shipping_rates,sort_order,tenant_id,created_at,updated_at,condition';
 
 // Primary ordering for every customer-facing listing: the order the admin set by
 // dragging in AdminProductsScreen (parts.sort_order). The column defaults to 0, so
@@ -137,7 +138,7 @@ const PART_COLUMN_MAP: Record<string, string> = {
   name: 'name', nameAr: 'name_ar', nameKu: 'name_ku',
   partNumber: 'part_number',
   category: 'category', categoryAr: 'category_ar', categoryKu: 'category_ku',
-  priceUSD: 'price_usd', priceIQD: 'price_iqd', vipPriceUSD: 'vip_price_usd', compareAtPriceUSD: 'compare_at_price_usd', storageOptions: 'storage_options',
+  priceUSD: 'price_usd', priceIQD: 'price_iqd', vipPriceUSD: 'vip_price_usd', vipPriceIQD: 'vip_price_iqd', compareAtPriceUSD: 'compare_at_price_usd', storageOptions: 'storage_options',
   purchasePrice: 'purchase_price',
   stockQty: 'stock_qty', historicalStockQty: 'historical_stock_qty', initialStock: 'initial_stock',
   description: 'description', descriptionAr: 'description_ar', descriptionKu: 'description_ku',

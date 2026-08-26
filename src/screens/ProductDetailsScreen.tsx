@@ -37,6 +37,7 @@ import {
   hasCompareAtDiscount,
   getDiscountPercent,
   getEffectiveStock,
+  isVipPriceActive,
 } from '../utils/pricingUtils';
 import { useFavorites } from '../contexts/FavoritesContext';
 import { COLLECTIONS, BRAND, brandContact } from '../constants/config';
@@ -45,7 +46,7 @@ import { Chip, Surface, Divider, Badge } from 'react-native-paper';
 import AppNumber from '../components/AppNumber';
 import AppText from '../components/AppText';
 
-import { formatItemPrice, formatPrice, formatVariantPrice, variantPriceUSD } from '../utils/currency';
+import { convertIQDToUSD, convertUSDToIQD, formatItemPrice, formatPrice, formatVariantPrice, variantPriceUSD } from '../utils/currency';
 import { getProductImageUrls } from '../utils/imageUtils';
 import { ProductService } from '../services/productService';
 import { brandService } from '../services/brandService';
@@ -774,13 +775,7 @@ export const ProductDetailsScreen: React.FC = () => {
           : undefined;
 
       // Bake the storage price delta into the cart line so it's charged correctly.
-      const productForCart = storageDelta > 0
-        ? {
-            ...product,
-            priceUSD: product.priceUSD + storageDelta,
-            vipPriceUSD: typeof product.vipPriceUSD === 'number' ? product.vipPriceUSD + storageDelta : undefined,
-          }
-        : product;
+      const productForCart = priceProductForStorage(product);
 
       await addToCart(product.id, quantity, productForCart, selectedOptions);
 
@@ -1220,7 +1215,7 @@ export const ProductDetailsScreen: React.FC = () => {
   // Uses the flat-VIP-aware helper directly (same path as the product cards).
   const heroUnitPrice = getDisplayUnitPrice(product, isVip);
   // VIP pricing is visible ONLY to VIP users — non-VIPs get no hint it exists.
-  const vipActive = isVip && typeof product.vipPriceUSD === 'number' && product.vipPriceUSD > 0;
+  const vipActive = isVipPriceActive(product, isVip);
   // Storage options (capacity) — selection adds a price delta to the base price.
   const storageOptions = product.storageOptions || [];
   const effectiveStorageId = selectedStorageId ?? (storageOptions[0]?.id ?? null);
@@ -1236,6 +1231,52 @@ export const ProductDetailsScreen: React.FC = () => {
     selectedColor ??
     (product.colorVariations?.find((c) => (c.stockQuantity ?? 0) > 0)?.colorValue ?? null);
   const storageDelta = storageOptions.find((s) => s.id === effectiveStorageId)?.priceDelta ?? 0;
+
+  /**
+   * The product as it should be PRICED once a storage capacity is chosen.
+   *
+   * A storage option's priceDelta is a dollar adjustment, and the old code added
+   * it to priceUSD and vipPriceUSD only. Both of those are outranked by their
+   * dinar counterparts, so for a product priced in dinar the delta was added to a
+   * field nothing reads and the shopper was charged the base capacity's price —
+   * undercharging by exactly the delta on every upgraded handset.
+   *
+   * A capacity may also carry an ABSOLUTE dinar price of its own, which replaces
+   * the base-plus-delta arithmetic outright.
+   */
+  const priceProductForStorage = React.useCallback((base: typeof product) => {
+    if (!base) return base;
+    const option = storageOptions.find((so) => so.id === effectiveStorageId);
+    const delta = option?.priceDelta ?? 0;
+    const absoluteIQD = Number((option as any)?.priceIQD) || 0;
+
+    if (absoluteIQD > 0) {
+      // The shop typed this capacity's dinar price directly. It stands alone, and
+      // a VIP dinar price for the base capacity does not carry over to it.
+      return {
+        ...base,
+        priceIQD: absoluteIQD,
+        priceUSD: convertIQDToUSD(absoluteIQD, exchangeRateIQD),
+        vipPriceIQD: undefined,
+        vipPriceUSD: undefined,
+      };
+    }
+
+    if (!delta) return base;
+
+    const deltaIQD = convertUSDToIQD(delta, exchangeRateIQD);
+    const baseIQD = Number((base as any).priceIQD) || 0;
+    const vipIQD = Number((base as any).vipPriceIQD) || 0;
+
+    return {
+      ...base,
+      priceUSD: base.priceUSD + delta,
+      priceIQD: baseIQD > 0 ? baseIQD + deltaIQD : (base as any).priceIQD,
+      vipPriceUSD: typeof base.vipPriceUSD === 'number' ? base.vipPriceUSD + delta : undefined,
+      vipPriceIQD: vipIQD > 0 ? vipIQD + deltaIQD : undefined,
+    };
+  }, [storageOptions, effectiveStorageId, exchangeRateIQD]);
+
 
   // Gallery images from product. When a colour with its own image is selected,
   // that image leads the gallery so the hero swaps to the chosen colour.
@@ -1434,13 +1475,7 @@ export const ProductDetailsScreen: React.FC = () => {
                 ...(storageOptions.length > 0 && storageLabel && { storage: storageLabel }),
               }
             : undefined;
-        const productForCart = storageDelta > 0
-          ? {
-              ...product,
-              priceUSD: product.priceUSD + storageDelta,
-              vipPriceUSD: typeof product.vipPriceUSD === 'number' ? product.vipPriceUSD + storageDelta : undefined,
-            }
-          : product;
+        const productForCart = priceProductForStorage(product);
         await addToCart(product.id, orderData.quantity, productForCart, selectedOptions);
       }
 
@@ -1531,13 +1566,7 @@ export const ProductDetailsScreen: React.FC = () => {
                 ...(storageOptions.length > 0 && storageLabel && { storage: storageLabel }),
               }
             : undefined;
-        const productForCart = storageDelta > 0
-          ? {
-              ...product,
-              priceUSD: product.priceUSD + storageDelta,
-              vipPriceUSD: typeof product.vipPriceUSD === 'number' ? product.vipPriceUSD + storageDelta : undefined,
-            }
-          : product;
+        const productForCart = priceProductForStorage(product);
         await addToCart(product.id, orderData.quantity, productForCart, selectedOptions);
       }
 
