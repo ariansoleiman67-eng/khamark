@@ -3200,7 +3200,11 @@
         "aiNothing": "It had nothing to add to what you have already written.",
         "aiFailedTitle": "Could not fill it in",
         "aiUnparseable": "The answer came back in a form this could not read. Try again, or fill the fields yourself.",
-        "aiFailed": "The assistant could not be reached. Check the connection, or fill the fields yourself."
+        "aiFailed": "The assistant could not be reached. Check the connection, or fill the fields yourself.",
+        "discardTitle": "Discard this product?",
+        "discardBody": "What you have filled in will be lost. It has not been saved.",
+        "keepEditing": "Keep editing",
+        "discard": "Discard"
       },
       "invalidSizeValue": "Please enter a size",
       "duplicateSizeValue": "This size already exists",

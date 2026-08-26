@@ -686,6 +686,73 @@ const AdminProductsScreen: React.FC = () => {
   // It fills a DRAFT and never saves. Fields the admin already typed are left
   // alone unless they say otherwise — and they are told exactly how many would be
   // replaced before they decide.
+  // ---- Unsaved-changes guard ------------------------------------------------
+  // This form runs to ten sections. Closing it discarded everything typed, with
+  // no warning and no undo — the single most expensive thing it could do to
+  // someone halfway through listing a phone.
+  //
+  // Dirtiness is a snapshot comparison rather than a flag set from three dozen
+  // setState call sites: a flag set by hand goes stale the first time someone
+  // adds a field and forgets to set it, and it also reports "dirty" for a value
+  // typed and then typed back.
+  const [isDirty, setIsDirty] = useState(false);
+  const baselineRef = useRef<string>('');
+
+  const formSnapshot = useCallback(() => JSON.stringify({
+    formData,
+    variations,
+    colorVariations,
+    specEntries,
+    priceTiers,
+    shippingRates,
+    imageUrls,
+    videoUrl,
+    isFeatured,
+    isActive,
+  }), [formData, variations, colorVariations, specEntries, priceTiers, shippingRates, imageUrls, videoUrl, isFeatured, isActive]);
+
+  useEffect(() => {
+    if (!modalVisible) {
+      baselineRef.current = '';
+      setIsDirty(false);
+      return;
+    }
+    // openAddModal / openEditModal set every field in the same batch that flips
+    // modalVisible, so this commit already holds the loaded product.
+    baselineRef.current = formSnapshot();
+    setIsDirty(false);
+    // Intentionally keyed on modalVisible alone: re-baselining on every edit is
+    // exactly what would make the guard never fire.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modalVisible]);
+
+  useEffect(() => {
+    if (!modalVisible || !baselineRef.current) return;
+    setIsDirty(formSnapshot() !== baselineRef.current);
+  }, [modalVisible, formSnapshot]);
+
+  const closeFormModal = useCallback(() => {
+    // Blocked while work is in flight: closing mid-save/mid-upload is what let a
+    // completion land on the next product the admin opened.
+    if (saving || uploadingImage || uploadingVideo) return;
+    const discard = () => {
+      setModalVisible(false);
+      resetForm();
+    };
+    if (!isDirty) {
+      discard();
+      return;
+    }
+    Alert.alert(
+      t('admin.products.form.discardTitle', { defaultValue: 'Discard this product?' }),
+      t('admin.products.form.discardBody', { defaultValue: 'What you have filled in will be lost. It has not been saved.' }),
+      [
+        { text: t('admin.products.form.keepEditing', { defaultValue: 'Keep editing' }), style: 'cancel' },
+        { text: t('admin.products.form.discard', { defaultValue: 'Discard' }), style: 'destructive', onPress: discard },
+      ],
+    );
+  }, [saving, uploadingImage, uploadingVideo, isDirty, t]);
+
   const [aiFilling, setAiFilling] = useState(false);
 
   // The draft is applied SECONDS after the button was tapped — the request takes a
@@ -2418,12 +2485,7 @@ const AdminProductsScreen: React.FC = () => {
         visible={modalVisible}
         transparent={false}
         animationType="none"
-        onRequestClose={() => {
-          // Android hardware back — same guard as the close button.
-          if (saving || uploadingImage || uploadingVideo) return;
-          setModalVisible(false);
-          resetForm();
-        }}
+        onRequestClose={closeFormModal}
       >
         <View style={[styles.modalContainer, { backgroundColor: pageBg, paddingTop: insets.top }]}>
           {/* Luxury Modal Header */}
@@ -2442,11 +2504,7 @@ const AdminProductsScreen: React.FC = () => {
             <TouchableOpacity
               // Blocked while work is in flight: closing mid-save/mid-upload is what
               // let a completion land on the next product the admin opened.
-              onPress={() => {
-                if (saving || uploadingImage || uploadingVideo) return;
-                setModalVisible(false);
-                resetForm();
-              }}
+              onPress={closeFormModal}
               disabled={saving || uploadingImage || uploadingVideo}
               accessibilityState={{ disabled: saving || uploadingImage || uploadingVideo }}
               activeOpacity={0.7}
