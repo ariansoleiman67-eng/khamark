@@ -90,6 +90,56 @@ export const mapProduct = (data: any): Product => ({
 // `barcode` IS included despite being detail-ish: BarcodeScannerScreen hands the
 // scanned value to Search, which matches it against this already-loaded list — a
 // column that isn't selected is undefined, so every scan returned zero results.
+/**
+ * Columns added by a migration that may not have run yet on the database this
+ * build is talking to.
+ *
+ * Postgres rejects the WHOLE query with 42703 when a select names a column that
+ * does not exist — so a single un-applied migration does not degrade one feature,
+ * it empties the catalogue. That is exactly what happened: vip_price_iqd shipped
+ * in the select list before its migration was applied, and every product query in
+ * the app started failing at once.
+ *
+ * The names are dropped from the select on the first 42703 and the query retried,
+ * once per session. A shop whose migration is pending sells as it did yesterday
+ * instead of showing an empty shelf.
+ */
+const PENDING_MIGRATION_COLUMNS = ['vip_price_iqd'] as const;
+
+/** Set on the first 42703, so the fallback costs one failed request, not one per query. */
+let missingColumns: string[] = [];
+
+const withoutMissingColumns = (columns: string): string => {
+  if (missingColumns.length === 0) return columns;
+  return columns
+    .split(',')
+    .filter((c) => !missingColumns.includes(c.trim()))
+    .join(',');
+};
+
+/** True when this error is Postgres telling us a selected column does not exist. */
+const isMissingColumnError = (error: any): boolean =>
+  error?.code === '42703' && typeof error?.message === 'string';
+
+/**
+ * Note which pending column the error names, so the retry drops it. Returns false
+ * when the error is about something else entirely and retrying would be pointless.
+ */
+const noteMissingColumn = (error: any): boolean => {
+  if (!isMissingColumnError(error)) return false;
+  const named = PENDING_MIGRATION_COLUMNS.filter(
+    (c) => !missingColumns.includes(c) && String(error.message).includes(c),
+  );
+  if (named.length === 0) return false;
+  missingColumns = [...missingColumns, ...named];
+  // eslint-disable-next-line no-console
+  console.warn(
+    `[productService] ${named.join(', ')} missing from the database — a migration has not been applied. ` +
+      'Serving products without it. Apply supabase/migrations to restore the feature.',
+  );
+  return true;
+};
+
 const LIST_COLUMNS =
   'id,name,name_ar,name_ku,part_number,barcode,category,category_ar,category_ku,price_usd,price_iqd,vip_price_usd,vip_price_iqd,compare_at_price_usd,storage_options,stock_qty,status,is_featured,is_active,brand,image_urls,price_tiers,variations,color_variations,shipping_cost,shipping_rates,sort_order,tenant_id,created_at,updated_at,condition';
 
@@ -192,7 +242,7 @@ export class ProductService {
         if (cached && !this.isCacheExpired(cached.timestamp)) return cached.data;
       }
 
-      let query = supabase.from('parts').select(LIST_COLUMNS);
+      let query = supabase.from('parts').select(withoutMissingColumns(LIST_COLUMNS));
 
       if (tenantId) query = query.eq('tenant_id', tenantId);
       if (filters.category) query = query.eq('category', filters.category);
@@ -263,7 +313,7 @@ export class ProductService {
       if (cached && !this.isCacheExpired(cached.timestamp)) return cached.data;
 
       // Simple text search implementation (fetches broadly then filters client-side like before)
-      let query = supabase.from('parts').select(LIST_COLUMNS).order('name');
+      let query = supabase.from('parts').select(withoutMissingColumns(LIST_COLUMNS)).order('name');
       if (tenantId) query = query.eq('tenant_id', tenantId);
       if (filters.category) query = query.eq('category', filters.category);
 
@@ -312,7 +362,7 @@ export class ProductService {
       const cached = await this.getCachedData(cacheKey);
       if (cached && !this.isCacheExpired(cached.timestamp)) return cached.data;
 
-      let query = supabase.from('parts').select(DETAIL_COLUMNS).eq('id', productId);
+      let query = supabase.from('parts').select(withoutMissingColumns(DETAIL_COLUMNS)).eq('id', productId);
       if (tenantId) query = query.eq('tenant_id', tenantId);
 
       const { data, error } = await query.single();
@@ -339,7 +389,7 @@ export class ProductService {
 
       let query = supabase
         .from('parts')
-        .select(LIST_COLUMNS)
+        .select(withoutMissingColumns(LIST_COLUMNS))
         .eq('is_featured', true)
         .eq('is_active', true)
         .order(SORT_ORDER_COLUMN, SORT_ORDER_OPTS)
@@ -348,7 +398,23 @@ export class ProductService {
 
       if (tenantId) query = query.eq('tenant_id', tenantId);
 
-      const { data, error } = await query;
+      let { data, error } = await query;
+
+      // First query of the session pays for the discovery: if the database is
+      // behind on a migration, drop the column it does not have and ask again,
+      // rather than showing an empty shop.
+      if (error && noteMissingColumn(error)) {
+        let retry = supabase
+          .from('parts')
+          .select(withoutMissingColumns(LIST_COLUMNS))
+          .eq('is_featured', true)
+          .eq('is_active', true)
+          .order(SORT_ORDER_COLUMN, SORT_ORDER_OPTS)
+          .order('created_at', { ascending: false })
+          .limit(10);
+        if (tenantId) retry = retry.eq('tenant_id', tenantId);
+        ({ data, error } = await retry);
+      }
       if (error) throw error;
 
       const products = (data || []).map(mapProduct);
@@ -373,7 +439,7 @@ export class ProductService {
     const fetcher = async (): Promise<Product[]> => {
       const { data, error } = await supabase
         .from('parts')
-        .select(LIST_COLUMNS)
+        .select(withoutMissingColumns(LIST_COLUMNS))
         .in('id', unique);
       if (error) throw error;
       // Don't surface hidden/deactivated products in Favorites.
@@ -417,7 +483,7 @@ export class ProductService {
     const fetcher = async (): Promise<Product[]> => {
       const { data, error } = await supabase
         .from('parts')
-        .select(LIST_COLUMNS)
+        .select(withoutMissingColumns(LIST_COLUMNS))
         .eq('tenant_id', tenantId)
         .order(SORT_ORDER_COLUMN, SORT_ORDER_OPTS)
         .order('created_at', { ascending: false });
@@ -452,7 +518,7 @@ export class ProductService {
 
       let query = supabase
         .from('parts')
-        .select(LIST_COLUMNS)
+        .select(withoutMissingColumns(LIST_COLUMNS))
         .eq('category', category)
         .eq('is_active', true)
         .order(SORT_ORDER_COLUMN, SORT_ORDER_OPTS)
