@@ -38,6 +38,7 @@ import { createTenantAdminService, TenantCategory } from '../../services/tenantA
 import { categoryStore } from '../../services/categoryStore';
 import { ImageService } from '../../services/imageService';
 import { Brand, brandService } from '../../services/brandService';
+import { AiProductDraft, fetchProductDraft, mergeDraft } from '../../services/aiProductFill';
 import { VideoService, VIDEO_CONFIG, VideoPickResult } from '../../services/videoService';
 import { useTranslation } from 'react-i18next';
 import { Product, PriceTier, ProductStatus, ProductVariation, ColorVariation } from '../../types';
@@ -677,6 +678,105 @@ const AdminProductsScreen: React.FC = () => {
       return { ...v, priceIQD: num };
     }));
   };
+
+  // ---- AI fill -------------------------------------------------------------
+  // Type the product name, tap once, and the model drafts the Arabic and Kurdish
+  // names, three descriptions, the brand, the category and the specifications.
+  //
+  // It fills a DRAFT and never saves. Fields the admin already typed are left
+  // alone unless they say otherwise — and they are told exactly how many would be
+  // replaced before they decide.
+  const [aiFilling, setAiFilling] = useState(false);
+
+  const applyAiDraft = useCallback((draft: AiProductDraft, overwrite: boolean) => {
+    const currentSpecs = specEntries.reduce<Record<string, string>>((acc, e) => {
+      acc[e.key] = e.value;
+      return acc;
+    }, {});
+    const { merged, specs, filled } = mergeDraft(formData, draft, currentSpecs, overwrite);
+    setFormData(merged);
+    // Preserve the admin's ordering; append anything new after it.
+    const existingKeys = specEntries.map(e => e.key);
+    setSpecEntries([
+      ...specEntries.map(e => ({ key: e.key, value: specs[e.key] ?? e.value })),
+      ...Object.keys(specs)
+        .filter(k => !existingKeys.includes(k))
+        .map(k => ({ key: k, value: specs[k] })),
+    ]);
+    return filled.length;
+  }, [formData, specEntries]);
+
+  const handleAiFill = useCallback(async () => {
+    if (aiFilling) return;
+    const name = formData.name.trim();
+    if (!name) {
+      Alert.alert(
+        t('admin.products.form.aiNeedNameTitle', { defaultValue: 'Type the product name first' }),
+        t('admin.products.form.aiNeedName', { defaultValue: 'The name is all it needs — everything else is filled from it.' }),
+      );
+      return;
+    }
+
+    setAiFilling(true);
+    try {
+      const draft = await fetchProductDraft({
+        name,
+        brand: formData.brand,
+        category: formData.category,
+        categories: managedCategories.map(c => c.name).filter(Boolean),
+      });
+
+      // Dry run first, purely to count what would be overwritten.
+      const currentSpecs = specEntries.reduce<Record<string, string>>((acc, e) => {
+        acc[e.key] = e.value;
+        return acc;
+      }, {});
+      const { skipped } = mergeDraft(formData, draft, currentSpecs, false);
+
+      if (skipped.length > 0) {
+        Alert.alert(
+          t('admin.products.form.aiFilledTitle', { defaultValue: 'Filled in' }),
+          t('admin.products.form.aiSomeKept', {
+            count: skipped.length,
+            defaultValue: 'Your own {{count}} field(s) were left as they are. Replace them too?',
+          }),
+          [
+            {
+              text: t('admin.products.form.aiKeepMine', { defaultValue: 'Keep mine' }),
+              style: 'cancel',
+              onPress: () => { applyAiDraft(draft, false); },
+            },
+            {
+              text: t('admin.products.form.aiReplaceMine', { defaultValue: 'Replace' }),
+              style: 'destructive',
+              onPress: () => { applyAiDraft(draft, true); },
+            },
+          ],
+        );
+        return;
+      }
+
+      const filledCount = applyAiDraft(draft, false);
+      if (filledCount === 0) {
+        Alert.alert(
+          t('admin.products.form.aiNothingTitle', { defaultValue: 'Nothing to add' }),
+          t('admin.products.form.aiNothing', { defaultValue: 'It had nothing to add to what you have already written.' }),
+        );
+      }
+    } catch (err: any) {
+      // Every failure here is recoverable by typing the fields, so it says so
+      // rather than reading like something broke.
+      const code = err?.message || '';
+      Alert.alert(
+        t('admin.products.form.aiFailedTitle', { defaultValue: 'Could not fill it in' }),
+        code === 'AI_UNPARSEABLE'
+          ? t('admin.products.form.aiUnparseable', { defaultValue: 'The answer came back in a form this could not read. Try again, or fill the fields yourself.' })
+          : t('admin.products.form.aiFailed', { defaultValue: 'The assistant could not be reached. Check the connection, or fill the fields yourself.' }),
+      );
+    } finally {
+      setAiFilling(false);
+    }
+  }, [aiFilling, formData, specEntries, managedCategories, applyAiDraft, t]);
 
   const addSpec = () => {
     const k = newSpecKey.trim();
@@ -2664,6 +2764,42 @@ const AdminProductsScreen: React.FC = () => {
                   disableFullscreenUI
                   autoComplete="off"
                 />
+
+                {/* One tap fills the rest of this form from the name above. */}
+                <TouchableOpacity
+                  onPress={handleAiFill}
+                  disabled={aiFilling}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  style={{
+                    flexDirection: isRTL ? 'row-reverse' : 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    marginTop: 10,
+                    minHeight: 46,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: theme.colors.primary + '55',
+                    backgroundColor: theme.colors.primary + '12',
+                    opacity: aiFilling ? 0.6 : 1,
+                  }}
+                >
+                  {aiFilling ? (
+                    <ActivityIndicator size="small" color={theme.colors.primary} />
+                  ) : (
+                    <Ionicons name="sparkles-outline" size={17} color={theme.colors.primary} />
+                  )}
+                  <Text
+                    allowFontScaling={false}
+                    numberOfLines={1}
+                    style={{ color: theme.colors.primary, fontWeight: '700', fontSize: 14 }}
+                  >
+                    {aiFilling
+                      ? t('admin.products.form.aiFilling', { defaultValue: 'Filling in\u2026' })
+                      : t('admin.products.form.aiFill', { defaultValue: 'Fill in the rest with AI' })}
+                  </Text>
+                </TouchableOpacity>
 
                 {/* Name Arabic */}
                 <Text allowFontScaling={false} 
