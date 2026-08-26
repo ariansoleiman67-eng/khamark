@@ -93,3 +93,23 @@ describe('mergeDraft — never silently overwrite the admin', () => {
     expect(mergeDraft({} as any, {}, {}, false).filled).toEqual([]);
   });
 });
+
+describe('mergeDraft — specification key casing', () => {
+  it('treats a differently-cased spec key as the same spec, not a second row', () => {
+    const { specs } = mergeDraft({} as any, { specifications: { cable: 'USB-C' } }, { Cable: '' }, false);
+    expect(Object.keys(specs)).toEqual(['Cable']);
+    expect(specs.Cable).toBe('USB-C');
+  });
+
+  it('keeps the admin spelling when overwriting', () => {
+    const { specs } = mergeDraft({} as any, { specifications: { cable: 'Lightning' } }, { Cable: 'USB-C' }, true);
+    expect(Object.keys(specs)).toEqual(['Cable']);
+    expect(specs.Cable).toBe('Lightning');
+  });
+
+  it('skips a cased duplicate the admin already filled', () => {
+    const { specs, skipped } = mergeDraft({} as any, { specifications: { CABLE: 'Lightning' } }, { Cable: 'USB-C' }, false);
+    expect(specs.Cable).toBe('USB-C');
+    expect(skipped).toContain('Cable');
+  });
+});

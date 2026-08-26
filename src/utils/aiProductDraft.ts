@@ -149,15 +149,21 @@ export const mergeDraft = <T extends Record<string, any>>(
   }
 
   const specs: Record<string, string> = { ...currentSpecs };
+  // Case-insensitive, because a model answering "cable" where the admin typed
+  // "Cable" is the same specification, and treating them as two adds a duplicate
+  // row that the shop then has to notice and delete.
+  const keyByLower = new Map(Object.keys(specs).map(k => [k.trim().toLowerCase(), k]));
   for (const [key, value] of Object.entries(draft.specifications || {})) {
-    const existing = String(specs[key] ?? '').trim();
+    const target = keyByLower.get(key.trim().toLowerCase()) ?? key;
+    const existing = String(specs[target] ?? '').trim();
     if (existing && !overwrite) {
-      skipped.push(key);
+      skipped.push(target);
       continue;
     }
     if (existing === value) continue;
-    specs[key] = value;
-    filled.push(key);
+    specs[target] = value;
+    keyByLower.set(target.trim().toLowerCase(), target);
+    filled.push(target);
   }
 
   return { merged: merged as T, specs, filled, skipped };

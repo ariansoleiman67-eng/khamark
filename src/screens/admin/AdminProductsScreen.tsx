@@ -688,23 +688,37 @@ const AdminProductsScreen: React.FC = () => {
   // replaced before they decide.
   const [aiFilling, setAiFilling] = useState(false);
 
+  // The draft is applied SECONDS after the button was tapped — the request takes a
+  // few, and the Keep-mine/Replace choice takes longer still. The form stays
+  // editable throughout, so a callback closed over `formData` writes back a
+  // snapshot from before the admin's last few keystrokes and silently loses them.
+  // These refs are what "the form, now" means at the moment of applying.
+  const formDataRef = useRef(formData);
+  const specEntriesRef = useRef(specEntries);
+  useEffect(() => { formDataRef.current = formData; }, [formData]);
+  useEffect(() => { specEntriesRef.current = specEntries; }, [specEntries]);
+
   const applyAiDraft = useCallback((draft: AiProductDraft, overwrite: boolean) => {
-    const currentSpecs = specEntries.reduce<Record<string, string>>((acc, e) => {
+    const liveForm = formDataRef.current;
+    const liveSpecs = specEntriesRef.current;
+    const currentSpecs = liveSpecs.reduce<Record<string, string>>((acc, e) => {
       acc[e.key] = e.value;
       return acc;
     }, {});
-    const { merged, specs, filled } = mergeDraft(formData, draft, currentSpecs, overwrite);
+    const { merged, specs, filled } = mergeDraft(liveForm, draft, currentSpecs, overwrite);
     setFormData(merged);
-    // Preserve the admin's ordering; append anything new after it.
-    const existingKeys = specEntries.map(e => e.key);
+    // Preserve the admin's ordering; append anything new after it. Compared
+    // case-insensitively, or a model answering "cable" after the admin typed
+    // "Cable" would add a second row for the same spec.
+    const existingKeys = liveSpecs.map(e => e.key.trim().toLowerCase());
     setSpecEntries([
-      ...specEntries.map(e => ({ key: e.key, value: specs[e.key] ?? e.value })),
+      ...liveSpecs.map(e => ({ key: e.key, value: specs[e.key] ?? e.value })),
       ...Object.keys(specs)
-        .filter(k => !existingKeys.includes(k))
+        .filter(k => !existingKeys.includes(k.trim().toLowerCase()))
         .map(k => ({ key: k, value: specs[k] })),
     ]);
     return filled.length;
-  }, [formData, specEntries]);
+  }, []);
 
   const handleAiFill = useCallback(async () => {
     if (aiFilling) return;
@@ -726,12 +740,14 @@ const AdminProductsScreen: React.FC = () => {
         categories: managedCategories.map(c => c.name).filter(Boolean),
       });
 
-      // Dry run first, purely to count what would be overwritten.
-      const currentSpecs = specEntries.reduce<Record<string, string>>((acc, e) => {
+      // Dry run first, purely to count what would be overwritten. Reads the live
+      // form for the same reason applyAiDraft does — the admin may have typed
+      // while the request was in flight.
+      const currentSpecs = specEntriesRef.current.reduce<Record<string, string>>((acc, e) => {
         acc[e.key] = e.value;
         return acc;
       }, {});
-      const { skipped } = mergeDraft(formData, draft, currentSpecs, false);
+      const { skipped } = mergeDraft(formDataRef.current, draft, currentSpecs, false);
 
       if (skipped.length > 0) {
         Alert.alert(
@@ -776,7 +792,7 @@ const AdminProductsScreen: React.FC = () => {
     } finally {
       setAiFilling(false);
     }
-  }, [aiFilling, formData, specEntries, managedCategories, applyAiDraft, t]);
+  }, [aiFilling, formData.name, formData.brand, formData.category, managedCategories, applyAiDraft, t]);
 
   const addSpec = () => {
     const k = newSpecKey.trim();
