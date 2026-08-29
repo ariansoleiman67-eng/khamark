@@ -16,7 +16,8 @@ import { SPACING, SHADOW_STYLES } from '../../constants/theme';
 import { COUNTRIES } from '../../constants/countries';
 import { useTenant } from '../../contexts/TenantContext';
 import { useCurrency } from '../../contexts/CurrencyContext';
-import { computeOrderTotalIQD, convertIQDToUSD, isIQDPriced, variantPriceUSD } from '../../utils/currency';
+import { computeOrderTotalIQD, convertIQDToUSD, isIQDPriced, variantCostUSD, variantPriceUSD } from '../../utils/currency';
+import { getCurrentExchangeRate } from '../../utils/exchangeRate';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createTenantAdminService, TenantProduct } from '../../services/tenantAdminService';
 import { calculateTieredPrice, getEffectiveUnitPrice, vipDinarUnit } from '../../utils/pricingUtils';
@@ -122,8 +123,10 @@ const ReviewLine = React.memo(function ReviewLine({
   // The cart key (productId, or `${productId}__${variationId}` for a variation) — every
   // handler must use THIS, not product.id, or variation lines edit/remove the wrong entry.
   const id = cartKey;
-  const cost = (line.product as any).purchasePrice;
-  const hasCost = cost != null && cost > 0;
+  // ReviewLine sits outside the screen component (it is memoized), so it reads the
+  // shop rate from the module mirror rather than the CurrencyContext hook.
+  const cost = variantCostUSD(line.variation as any, line.product as any, getCurrentExchangeRate());
+  const hasCost = cost > 0;
   const marginPct = hasCost && unitPrice > 0 ? Math.round(((unitPrice - cost) / unitPrice) * 100) : null;
   const marginColor = marginPct == null ? C.textSecondary : marginPct < 0 ? '#EF4444' : marginPct < 15 ? '#F59E0B' : '#10B981';
   return (
@@ -419,7 +422,10 @@ const AdminCreateOrderScreen: React.FC = () => {
   const priceOf = useCallback((l: CartLine) => {
     if (l.manual) return l.price;
     if (l.variation) {
-      const base = variantPriceUSD(l.variation, l.product as any, exchangeRateIQD);
+      // isVip is passed so an OPTION with its own VIP price is honoured at the
+      // counter exactly as it is in the app. variantPriceUSD only substitutes a
+      // VIP figure that is actually cheaper than what the option otherwise costs.
+      const base = variantPriceUSD(l.variation, l.product as any, exchangeRateIQD, isVip);
       return calculateTieredPrice(l.quantity, base, (l.product as any).priceTiers, isVip);
     }
     return getEffectiveUnitPrice(l.product as any, l.quantity, isVip, exchangeRateIQD);
@@ -691,8 +697,8 @@ const AdminCreateOrderScreen: React.FC = () => {
   const lines = Object.values(cart);
   const subtotal = lines.reduce((s, l) => s + (priceOf(l) || 0) * l.quantity, 0);
   const profit = lines.reduce((s, l) => {
-    const cost = (l.product as any).purchasePrice;
-    return cost != null && cost > 0 ? s + (priceOf(l) - cost) * l.quantity : s;
+    const cost = variantCostUSD(l.variation as any, l.product as any, exchangeRateIQD);
+    return cost > 0 ? s + (priceOf(l) - cost) * l.quantity : s;
   }, 0);
   const itemCount = lines.reduce((s, l) => s + l.quantity, 0);
   // Whole-sale discount (flat $ or %), final total, net profit, and cash/change due.
@@ -723,8 +729,8 @@ const AdminCreateOrderScreen: React.FC = () => {
     if (!force) {
       const bad = lines.find((l) => {
         const price = priceOf(l);
-        const cost = (l.product as any).purchasePrice;
-        return price <= 0 || (cost != null && cost > 0 && price <= cost);
+        const cost = variantCostUSD(l.variation as any, l.product as any, exchangeRateIQD);
+        return price <= 0 || (cost > 0 && price <= cost);
       });
       if (bad) {
         Alert.alert(
@@ -757,7 +763,14 @@ const AdminCreateOrderScreen: React.FC = () => {
         // tier or a manual override is a dollar amount and converts normally.
         ...(dinarUnit(l) != null ? { priceIQD: dinarUnit(l) as number } : {}),
         originalPriceUSD: l.variation ? l.variation.priceUSD : l.product.priceUSD,
-        purchasePrice: (l.product as any).purchasePrice,
+        // The OPTION's cost when it has one, so a manual counter sale of a colour
+        // the shop bought at a different price reports the right margin. The
+        // server trigger only knows the product, so for a variation line this is
+        // the only place the option's own cost can come from.
+        purchasePrice: (l.variation as any)?.purchasePrice ?? (l.product as any).purchasePrice,
+        // Sent for completeness; orders_stamp_cost overwrites both server-side
+        // from the parts row, so the client can never decide the shop's margin.
+        purchasePriceIQD: (l.variation as any)?.purchasePriceIQD ?? (l.product as any).purchasePriceIQD,
         quantity: l.quantity,
         variationId: l.variation?.variationId,
       }));

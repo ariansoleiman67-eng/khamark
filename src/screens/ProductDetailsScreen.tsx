@@ -46,7 +46,7 @@ import { Chip, Surface, Divider, Badge } from 'react-native-paper';
 import AppNumber from '../components/AppNumber';
 import AppText from '../components/AppText';
 
-import { convertIQDToUSD, convertUSDToIQD, formatItemPrice, formatPrice, formatVariantPrice, variantPriceUSD } from '../utils/currency';
+import { convertIQDToUSD, convertUSDToIQD, formatCompareAtPrice, formatItemPrice, formatPrice, formatVariantPrice, variantPriceUSD } from '../utils/currency';
 import { getProductImageUrls } from '../utils/imageUtils';
 import { ProductService } from '../services/productService';
 import { brandService } from '../services/brandService';
@@ -1783,7 +1783,7 @@ export const ProductDetailsScreen: React.FC = () => {
                           saw one Save% on the card and a different one here. */}
                       {hasCompareAtDiscount(product, isVip) && (
                         <AppNumber
-                          value={formatPrice(product.compareAtPriceUSD as number, currentCurrency as any, exchangeRateIQD)}
+                          value={formatCompareAtPrice(product as any, currentCurrency as any, exchangeRateIQD)}
                           style={[styles.comparePrice, { color: theme.colors.textSecondary }]}
                         />
                       )}

@@ -97,6 +97,22 @@ export interface ProductVariation {
    * so a variant priced in dinar cannot be mistaken for a dollar figure.
    */
   priceIQD?: number;
+  /**
+   * The remaining three prices, per option, each with the same dinar-wins rule as
+   * priceUSD/priceIQD above. A 256GB in a different colour is often a different
+   * buy, a different VIP deal and a different "was" price, and the shop had no
+   * way to say so — every option inherited the product's.
+   *
+   * All optional: an option that sets none of them inherits the product's, which
+   * is what every existing variation does.
+   */
+  vipPriceUSD?: number;
+  vipPriceIQD?: number;
+  compareAtPriceUSD?: number;
+  compareAtPriceIQD?: number;
+  /** Admin-only, like Product.purchasePrice. Never rendered to a customer. */
+  purchasePrice?: number;
+  purchasePriceIQD?: number;
   stockQuantity: number;         // Per-variation stock (admin-controlled, enforced at runtime)
 }
 
@@ -107,6 +123,13 @@ export interface ColorVariation {
   colorHex?: string;             // Optional hex code for display (e.g., '#0000FF')
   priceUSD?: number;             // Optional price override
   priceIQD?: number;             // Optional dinar price; wins over priceUSD, charged verbatim
+  /** Same four extra prices as ProductVariation — see the note there. */
+  vipPriceUSD?: number;
+  vipPriceIQD?: number;
+  compareAtPriceUSD?: number;
+  compareAtPriceIQD?: number;
+  purchasePrice?: number;
+  purchasePriceIQD?: number;
   imageUrl?: string;             // Optional per-color image (swaps the hero when selected)
   stockQuantity: number;         // Per-color stock
 }
@@ -147,6 +170,12 @@ export interface Product {
    */
   priceIQD?: number;
   compareAtPriceUSD?: number; // "was" price for showing a strikethrough + Save% discount
+  /**
+   * The "was" price authored directly in IQD. When set it OUTRANKS
+   * compareAtPriceUSD and is shown verbatim. Same rule as every other _IQD
+   * field: never compare it against a USD figure.
+   */
+  compareAtPriceIQD?: number;
   vipPriceUSD?: number;      // Special price shown only to VIP users (locked/hinted for others)
   /**
    * A VIP price authored directly in IQD, the VIP counterpart of priceIQD.
@@ -157,6 +186,16 @@ export interface Product {
    */
   vipPriceIQD?: number;
   purchasePrice?: number;    // Cost/buy price from supplier (admin-only, not shown to customers)
+  /**
+   * What the shop PAID, authored directly in IQD — the cost counterpart of
+   * priceIQD, for stock bought in dinar. When set it OUTRANKS purchasePrice.
+   *
+   * Admin-only, and enforced in the database, not here: parts.purchase_price_iqd
+   * is never granted to anon/authenticated and reaches the app only through the
+   * parts_admin view's owner/admin/co-admin test. Do not add it to any
+   * customer-facing select list.
+   */
+  purchasePriceIQD?: number;
   priceTiers?: PriceTier[];  // Quantity-based pricing tiers (wholesale pricing)
   shippingCost?: number; // Individual shipping cost for this product in USD
   shippingRates?: Array<{ city: string; price: number }>; // City-based shipping rates

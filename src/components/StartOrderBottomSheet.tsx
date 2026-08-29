@@ -40,7 +40,7 @@ import { useTheme } from './ThemeProvider';
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { useCurrency } from '../contexts/CurrencyContext';
-import { formatPrice, formatVariantPrice, getPriceUSD, variantPriceUSD } from '../utils/currency';
+import { convertIQDToUSD, formatPrice, formatVariantPrice, getPriceUSD, variantPriceUSD } from '../utils/currency';
 import { Product, Address, RootStackParamList } from '../types';
 import { SPACING } from '../constants/theme';
 import { getDirection } from '../locales';
@@ -269,11 +269,25 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
     return selectionComplete ? localQty : 0;
   }, [hasAnyVars, localQty, selectionComplete]);
 
+  const isVip = user?.role === 'vip';
+
   const localUnitPrice = useMemo(() => {
     if (!product) return 0;
-    const isVip = user?.role === 'vip';
     return LocalCartService.getTieredPrice(product, localTotalQty > 0 ? localTotalQty : 1, isVip);
-  }, [product, localTotalQty, user?.role]);
+  }, [product, localTotalQty, isVip]);
+
+  // Does the CHOSEN option carry a VIP price of its own? If it does, that figure
+  // replaces the discount worked out from the product, rather than stacking on
+  // top of it — the ratio below is the product-level VIP/wholesale saving, and
+  // applying both would discount twice.
+  const variantOwnVipUSD = useMemo(() => {
+    if (!isVip || !pricedVariant) return 0;
+    const v = pricedVariant as any;
+    const iqd = Number(v.vipPriceIQD);
+    if (Number.isFinite(iqd) && iqd > 0) return convertIQDToUSD(iqd, exchangeRateIQD);
+    const usd = Number(v.vipPriceUSD);
+    return Number.isFinite(usd) && usd > 0 ? usd : 0;
+  }, [isVip, pricedVariant, exchangeRateIQD]);
 
   const localTotalPrice = useMemo(() => {
     if (!product) return 0;
@@ -284,10 +298,11 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
     // variantPriceUSD, not `?? product.priceUSD`, so a variant priced in dinar is
     // charged at its dinar figure instead of silently falling through to dollars.
     const price = variantPriceUSD(pricedVariant, product, exchangeRateIQD);
+    if (variantOwnVipUSD > 0 && variantOwnVipUSD < price) return variantOwnVipUSD * localQty;
     const base = getPriceUSD(product, exchangeRateIQD);
     const ratio = base > 0 ? localUnitPrice / base : 1;
     return price * localQty * (ratio < 1 ? ratio : 1);
-  }, [product, hasAnyVars, selectionComplete, selectedSize, selectedColor, localUnitPrice, localQty]);
+  }, [product, hasAnyVars, selectionComplete, pricedVariant, localUnitPrice, localQty, exchangeRateIQD, variantOwnVipUSD]);
 
 
   // Payment methods
@@ -761,7 +776,7 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                             </AppText>
                             {hasOwnPrice(v) && (
                               <AppNumber
-                                value={formatVariantPrice(v, product, currency, exchangeRateIQD)}
+                                value={formatVariantPrice(v, product, currency, exchangeRateIQD, {}, isVip)}
                                 style={[styles.optionChipPrice, { color: sel ? theme.colors.primary : theme.colors.textSecondary }]}
                               />
                             )}
@@ -828,7 +843,7 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                             </View>
                             {hasOwnPrice(v) && (
                               <AppNumber
-                                value={formatVariantPrice(v, product, currency, exchangeRateIQD)}
+                                value={formatVariantPrice(v, product, currency, exchangeRateIQD, {}, isVip)}
                                 style={[styles.optionChipPrice, { color: sel ? theme.colors.primary : theme.colors.textSecondary }]}
                               />
                             )}

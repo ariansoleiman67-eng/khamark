@@ -353,6 +353,33 @@ export class LocalCartService {
             selectedOptions.color = selection.colorValue;
           }
 
+          // A variation may now carry its own VIP price, "was" price and cost as
+          // well as its selling price. They are copied onto the line's product
+          // ONLY when the variation actually sets them: everything downstream —
+          // the cart total, checkout, the order, the profit line — reads this
+          // object, so an option's own VIP price reaches all of them at once.
+          //
+          // Deliberately additive. When the variation sets none of these the
+          // product's own figures are left exactly as they were, so no existing
+          // line changes price.
+          const variantExtras: Record<string, number> = {};
+          const carryOver = (key: string) => {
+            const value = Number((variation as any)?.[key]);
+            if (Number.isFinite(value) && value > 0) variantExtras[key] = value;
+          };
+          ['vipPriceUSD', 'vipPriceIQD', 'compareAtPriceUSD', 'compareAtPriceIQD',
+           'purchasePrice', 'purchasePriceIQD'].forEach(carryOver);
+          // These prices come in pairs, and the dinar side outranks the dollar one.
+          // If the option gives only one half of a pair, the product's OTHER half
+          // must not survive to outrank it — in either direction.
+          const clearSibling = (a: string, b: string) => {
+            if (variantExtras[a] && !variantExtras[b]) variantExtras[b] = 0;
+            if (variantExtras[b] && !variantExtras[a]) variantExtras[a] = 0;
+          };
+          clearSibling('vipPriceUSD', 'vipPriceIQD');
+          clearSibling('compareAtPriceUSD', 'compareAtPriceIQD');
+          clearSibling('purchasePrice', 'purchasePriceIQD');
+
           // Add new cart item for this variation
           const newItem: CartItem = {
             productId: product.id,
@@ -360,6 +387,7 @@ export class LocalCartService {
               ...product,
               priceUSD: variationPrice, // Use variation price for calculations
               priceIQD: linePriceIQD ?? undefined,
+              ...variantExtras,
             },
             quantity: selection.quantity,
             addedAt: new Date() as any,

@@ -35,7 +35,8 @@ import { Order, OrderStatus, normalizeOrderStatus } from '../../types';
 import { InvoiceSettings } from '../../services/tenantAdminService';
 import { BRAND, brandContact } from '../../constants/config';
 import OrderStatusBadge, { getStatusConfig } from '../../components/OrderStatusBadge';
-import { formatPrice, formatItemPrice, formatOrderLineTotal, formatOrderTotal, convertUSDToIQD } from '../../utils/currency';
+import { formatPrice, formatItemPrice, formatOrderLineTotal, formatOrderTotal, convertUSDToIQD, costUSD } from '../../utils/currency';
+import { getCurrentExchangeRate } from '../../utils/exchangeRate';
 import { getThumbnailUrl } from '../../utils/imageUtils';
 import { formatFirestoreDate } from '../../utils/dateUtils';
 import * as Print from 'expo-print';
@@ -1427,11 +1428,17 @@ const AdminOrdersScreen: React.FC = () => {
     const orderItems = (item.items || []) as any[];
     // Partner-tagged orders are the partner's — no owner profit pill on them.
     const isPartnerOrder = !!(item as any).partnerId;
-    const hasProfit = !isPartnerOrder && orderItems.some((itm) => itm.purchasePrice != null && itm.purchasePrice > 0);
+    // costUSD, not itm.purchasePrice: orders_stamp_cost stamps purchasePriceIQD
+    // as well for stock the shop bought in dinar, and that line has no dollar
+    // cost at all — reading purchasePrice alone would report the whole sale as
+    // profit.
+    const lineCost = (itm: any) => costUSD(itm, getCurrentExchangeRate());
+    const hasProfit = !isPartnerOrder && orderItems.some((itm) => lineCost(itm) > 0);
     const orderProfit = orderItems.reduce(
-      (sum, itm) => (itm.purchasePrice != null && itm.purchasePrice > 0
-        ? sum + (itm.priceUSD - itm.purchasePrice) * itm.quantity
-        : sum),
+      (sum, itm) => {
+        const cost = lineCost(itm);
+        return cost > 0 ? sum + (itm.priceUSD - cost) * itm.quantity : sum;
+      },
       0,
     );
     const showProfit = item.status === 'delivered' && hasProfit;

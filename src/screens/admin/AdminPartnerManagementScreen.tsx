@@ -21,6 +21,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import { useTheme } from '../../components/ThemeProvider';
 import { partnerWholesalePrice } from './partnerInvoice';
+import { costUSD } from '../../utils/currency';
+import { getCurrentExchangeRate } from '../../utils/exchangeRate';
 import { SPACING } from '../../constants/theme';
 import { OWNER_UIDS } from '../../constants/config';
 import { useTenant } from '../../contexts/TenantContext';
@@ -102,7 +104,7 @@ export default function AdminPartnerManagementScreen() {
         );
         // Realized wholesale profit EARNED = Σ soldUnits × (wholesale − buy).
         const profitPotential = assigned.reduce((sum: number, prod: any) => {
-          const margin = partnerWholesalePrice(prod) - (prod.purchasePrice || 0);
+          const margin = partnerWholesalePrice(prod) - costUSD(prod as any, getCurrentExchangeRate());
           const sold = soldById.get(prod.id) || 0;
           return sum + margin * sold;
         }, 0);

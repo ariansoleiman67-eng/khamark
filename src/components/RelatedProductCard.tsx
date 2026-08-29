@@ -26,7 +26,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { useTheme } from "../components/ThemeProvider";
 import { Product } from "../types";
-import { formatPrice } from "../utils/currency";
+import { formatCompareAtPrice, formatPrice } from "../utils/currency";
 import { useCurrency } from "../contexts/CurrencyContext";
 import { useAuth } from "../contexts/AuthContext";
 import {
@@ -313,11 +313,7 @@ const RelatedProductCard: React.FC<RelatedProductCardProps> = ({
           {hasDiscount && (
             <View style={styles.saveRow}>
               <AppNumber
-                value={formatPrice(
-                  product.compareAtPriceUSD as number,
-                  currency,
-                  exchangeRateIQD,
-                )}
+                value={formatCompareAtPrice(product as any, currency, exchangeRateIQD)}
                 numberOfLines={1}
                 containerStyle={styles.shrinkable}
                 style={[styles.wasPrice, { color: theme.colors.textSecondary }]}

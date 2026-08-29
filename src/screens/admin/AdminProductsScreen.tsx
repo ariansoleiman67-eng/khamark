@@ -27,12 +27,14 @@ import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useTheme } from '../../components/ThemeProvider';
 import { SPACING } from '../../constants/theme';
+import PriceField from '../../components/admin/PriceField';
+import VariantPriceBlock from '../../components/admin/VariantPriceBlock';
 import { getThumbnailUrl } from '../../utils/imageUtils';
 import { Image as ExpoImage } from 'expo-image';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTenant } from '../../contexts/TenantContext';
 import { useCurrency } from '../../contexts/CurrencyContext';
-import { convertIQDToUSD, formatCurrencyIQD, formatCurrencyUSD } from '../../utils/currency';
+import { convertIQDToUSD, costUSD, formatCurrencyIQD, formatCurrencyUSD } from '../../utils/currency';
 import { createTenantAdminService, TenantCategory } from '../../services/tenantAdminService';
 import { categoryStore } from '../../services/categoryStore';
 import { ImageService } from '../../services/imageService';
@@ -109,104 +111,6 @@ const getEffectiveStock = (p: Product) => {
 type EditablePriceTier = PriceTier & { _key?: string };
 
 const newTierKey = () => `tier_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
-/**
- * The dollar + dinar price pair for one variation.
- *
- * Kept as its own component because sizes and colours need exactly the same
- * control and the same explanation, and because the shop needs to see, at the
- * moment of typing, which of the two figures the customer will actually be
- * charged — a dinar price silently outranks the dollar one beside it.
- */
-const VariantPriceFields: React.FC<{
-  priceUSD?: number;
-  priceIQD?: number;
-  basePriceUSD: number;
-  basePriceIQD?: number;
-  exchangeRateIQD: number;
-  onChangeUSD: (text: string) => void;
-  onChangeIQD: (text: string) => void;
-  theme: any;
-  isRTL: boolean;
-  t: (key: string, opts?: any) => string;
-}> = ({ priceUSD, priceIQD, basePriceUSD, basePriceIQD, exchangeRateIQD, onChangeUSD, onChangeIQD, theme, isRTL, t }) => {
-  const iqd = Number(priceIQD) || 0;
-  const usd = Number(priceUSD) || 0;
-
-  const hint = (() => {
-    if (iqd > 0) {
-      return t('admin.products.form.variantPriceIQDActive', {
-        iqd: formatCurrencyIQD(iqd),
-        usd: formatCurrencyUSD(convertIQDToUSD(iqd, exchangeRateIQD)),
-        defaultValue: 'Customers pay {{iqd}} exactly ({{usd}} for shoppers browsing in dollars). The dollar box beside it is ignored.',
-      });
-    }
-    if (usd > 0) {
-      return t('admin.products.form.variantPriceUSDActive', {
-        usd: formatCurrencyUSD(usd),
-        defaultValue: 'Customers pay {{usd}} for this option.',
-      });
-    }
-    const base = Number(basePriceIQD) > 0
-      ? formatCurrencyIQD(Number(basePriceIQD))
-      : formatCurrencyUSD(basePriceUSD || 0);
-    return t('admin.products.form.variantPriceInherits', {
-      base,
-      defaultValue: 'Leave both blank and this option costs the product price, {{base}}.',
-    });
-  })();
-
-  const inputStyle = {
-    backgroundColor: theme.colors.surface,
-    color: theme.colors.text,
-    borderColor: theme.colors.border,
-    borderWidth: 1,
-    borderRadius: 10,
-    minHeight: 44,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    textAlign: 'center' as const,
-    flex: 1,
-  };
-
-  return (
-    <View style={{ marginTop: 8 }}>
-      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 8 }}>
-        <TextInput
-          allowFontScaling={false}
-          style={inputStyle}
-          value={priceUSD != null ? String(priceUSD) : ''}
-          onChangeText={onChangeUSD}
-          keyboardType="decimal-pad"
-          placeholder={t('admin.products.form.variantPriceUSDPlaceholder', { defaultValue: 'Price $' })}
-          placeholderTextColor={theme.colors.textSecondary}
-          multiline={false}
-          scrollEnabled={false}
-          disableFullscreenUI
-        />
-        <TextInput
-          allowFontScaling={false}
-          style={[inputStyle, iqd > 0 && { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary + '0C' }]}
-          value={priceIQD != null ? String(priceIQD) : ''}
-          onChangeText={onChangeIQD}
-          keyboardType="number-pad"
-          placeholder={t('admin.products.form.variantPriceIQDPlaceholder', { defaultValue: 'Price IQD' })}
-          placeholderTextColor={theme.colors.textSecondary}
-          multiline={false}
-          scrollEnabled={false}
-          disableFullscreenUI
-        />
-      </View>
-      <Text
-        allowFontScaling={false}
-        style={{ fontSize: 11, color: theme.colors.textSecondary, marginTop: 5, textAlign: isRTL ? 'right' : 'left' }}
-        numberOfLines={3}
-      >
-        {hint}
-      </Text>
-    </View>
-  );
-};
 
 const AdminProductsScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
@@ -325,9 +229,11 @@ const AdminProductsScreen: React.FC = () => {
     priceUSD: '',
     priceIQD: '',
     compareAtPriceUSD: '',
+    compareAtPriceIQD: '',
     vipPriceUSD: '',
     vipPriceIQD: '',
     purchasePrice: '',
+    purchasePriceIQD: '',
     stockQty: '',
     // BOTH OF THESE WERE WRITTEN BY THE FORM AND MISSING FROM ITS INITIAL SHAPE.
     // `historicalStockQty` is set by the two reset literals and read at :798;
@@ -395,7 +301,7 @@ const AdminProductsScreen: React.FC = () => {
     setIsActive(true);
     setFormData({
       name: '', nameAr: '', nameKu: '', partNumber: '', category: '', categoryAr: '', categoryKu: '',
-      priceUSD: '', priceIQD: '', compareAtPriceUSD: '', vipPriceUSD: '', vipPriceIQD: '', purchasePrice: '', stockQty: '', historicalStockQty: '', condition: '', initialStock: '', shippingCost: '', description: '', descriptionAr: '', descriptionKu: '', brand: '', status: 'available',
+      priceUSD: '', priceIQD: '', compareAtPriceUSD: '', compareAtPriceIQD: '', vipPriceUSD: '', vipPriceIQD: '', purchasePrice: '', purchasePriceIQD: '', stockQty: '', historicalStockQty: '', condition: '', initialStock: '', shippingCost: '', description: '', descriptionAr: '', descriptionKu: '', brand: '', status: 'available',
       warranty: '', sku: '', barcode: '', weight: '', dimLength: '', dimWidth: '', dimHeight: '',
     });
     // Also reset view state so a tenant switch doesn't carry over filters/reorder mode.
@@ -511,7 +417,7 @@ const AdminProductsScreen: React.FC = () => {
     setIsActive(true);
     setFormData({
       name: '', nameAr: '', nameKu: '', partNumber: '', category: '', categoryAr: '', categoryKu: '',
-      priceUSD: '', priceIQD: '', compareAtPriceUSD: '', vipPriceUSD: '', vipPriceIQD: '', purchasePrice: '', stockQty: '', historicalStockQty: '', condition: '', initialStock: '', shippingCost: '', description: '', descriptionAr: '', descriptionKu: '', brand: '', status: 'available',
+      priceUSD: '', priceIQD: '', compareAtPriceUSD: '', compareAtPriceIQD: '', vipPriceUSD: '', vipPriceIQD: '', purchasePrice: '', purchasePriceIQD: '', stockQty: '', historicalStockQty: '', condition: '', initialStock: '', shippingCost: '', description: '', descriptionAr: '', descriptionKu: '', brand: '', status: 'available',
       warranty: '', sku: '', barcode: '', weight: '', dimLength: '', dimWidth: '', dimHeight: '',
     });
     setApplyShippingToAll(false);
@@ -621,61 +527,51 @@ const AdminProductsScreen: React.FC = () => {
     setNewSizePrice('');
   };
 
-  // Per-tier price override (blank clears it → tier uses the base price).
-  const updateVariationPrice = (variationId: string, newPrice: string) => {
-    const num = parseFloat(newPrice);
-    setVariations(variations.map(v => {
-      if (v.variationId !== variationId) return v;
-      if (newPrice.trim() === '' || isNaN(num) || num <= 0) {
-        const { priceUSD, ...rest } = v;
-        return rest as ProductVariation;
-      }
-      return { ...v, priceUSD: num };
-    }));
+
+
+
+
+  /**
+   * Set or CLEAR any of a variation's six price fields.
+   *
+   * Clearing means deleting the key, not writing 0 or null: these objects are
+   * stored as opaque JSONB and every reader tests "is this field present", so a
+   * leftover 0 would read as a real price of zero. The four price pairs behave
+   * exactly like the product's — the dinar side wins — so switching a variant
+   * price back to dollars has to remove the dinar key, which is why PriceField
+   * always reports BOTH sides of a pair on every change.
+   */
+  type VariantPriceKey =
+    | 'priceUSD' | 'priceIQD'
+    | 'vipPriceUSD' | 'vipPriceIQD'
+    | 'compareAtPriceUSD' | 'compareAtPriceIQD'
+    | 'purchasePrice' | 'purchasePriceIQD';
+
+  const applyVariantPrices = <T extends ProductVariation | ColorVariation>(
+    variant: T,
+    patch: Partial<Record<VariantPriceKey, number | undefined>>,
+  ): T => {
+    const next: any = { ...variant };
+    (Object.keys(patch) as VariantPriceKey[]).forEach((key) => {
+      const value = patch[key];
+      if (value == null || !Number.isFinite(value) || value <= 0) delete next[key];
+      else next[key] = value;
+    });
+    return next as T;
   };
 
-  // Per-variation dinar price. Blank clears it, so the variation falls back to its
-  // dollar override and then to the product price — the same ladder the customer
-  // app walks in variantPriceUSD.
-  const updateVariationPriceIQD = (variationId: string, newPrice: string) => {
-    const digits = newPrice.replace(/[^0-9]/g, '');
-    const num = parseInt(digits, 10);
-    setVariations(variations.map(v => {
-      if (v.variationId !== variationId) return v;
-      if (digits === '' || isNaN(num) || num <= 0) {
-        const { priceIQD, ...rest } = v;
-        return rest as ProductVariation;
-      }
-      return { ...v, priceIQD: num };
-    }));
+  const patchVariationPrices = (
+    variationId: string,
+    patch: Partial<Record<VariantPriceKey, number | undefined>>,
+  ) => {
+    setVariations(prev => prev.map(v => (v.variationId === variationId ? applyVariantPrices(v, patch) : v)));
   };
 
-  // Colours could always carry their own price in the data model and the customer
-  // app has always read it — there was simply no field here to set it, so a colour
-  // that costs more could not be entered at all.
-  const updateColorVariationPrice = (variationId: string, newPrice: string) => {
-    const num = parseFloat(newPrice);
-    setColorVariations(colorVariations.map(v => {
-      if (v.variationId !== variationId) return v;
-      if (newPrice.trim() === '' || isNaN(num) || num <= 0) {
-        const { priceUSD, ...rest } = v;
-        return rest as ColorVariation;
-      }
-      return { ...v, priceUSD: num };
-    }));
-  };
-
-  const updateColorVariationPriceIQD = (variationId: string, newPrice: string) => {
-    const digits = newPrice.replace(/[^0-9]/g, '');
-    const num = parseInt(digits, 10);
-    setColorVariations(colorVariations.map(v => {
-      if (v.variationId !== variationId) return v;
-      if (digits === '' || isNaN(num) || num <= 0) {
-        const { priceIQD, ...rest } = v;
-        return rest as ColorVariation;
-      }
-      return { ...v, priceIQD: num };
-    }));
+  const patchColorVariationPrices = (
+    variationId: string,
+    patch: Partial<Record<VariantPriceKey, number | undefined>>,
+  ) => {
+    setColorVariations(prev => prev.map(v => (v.variationId === variationId ? applyVariantPrices(v, patch) : v)));
   };
 
   // ---- AI fill -------------------------------------------------------------
@@ -1072,9 +968,11 @@ const AdminProductsScreen: React.FC = () => {
       priceUSD: product.priceUSD?.toString() || '',
       priceIQD: (product as any).priceIQD != null ? String((product as any).priceIQD) : '',
       compareAtPriceUSD: product.compareAtPriceUSD != null ? String(product.compareAtPriceUSD) : '',
+      compareAtPriceIQD: (product as any).compareAtPriceIQD != null ? String((product as any).compareAtPriceIQD) : '',
       vipPriceUSD: product.vipPriceUSD != null ? String(product.vipPriceUSD) : '',
       vipPriceIQD: (product as any).vipPriceIQD != null ? String((product as any).vipPriceIQD) : '',
       purchasePrice: (product as any).purchasePrice?.toString() || '',
+      purchasePriceIQD: (product as any).purchasePriceIQD != null ? String((product as any).purchasePriceIQD) : '',
       stockQty: product.stockQty?.toString() || '',
       historicalStockQty: product.historicalStockQty?.toString() || '',
       initialStock: product.initialStock?.toString() || '',
@@ -1185,7 +1083,13 @@ const AdminProductsScreen: React.FC = () => {
     // Pre-save safety warnings (skippable). Both re-call handleSave(true) to proceed.
     if (!force) {
       const price = effectivePriceUSD;
-      const cost = sanitizePrice(formData.purchasePrice);
+      // Costed in whichever currency it was typed in: a dinar cost has
+      // purchasePrice empty, and comparing the price against 0 would let a
+      // below-cost sale through the guard silently.
+      const cost = costUSD(
+        { purchasePrice: sanitizePrice(formData.purchasePrice), purchasePriceIQD: sanitizeIQD(formData.purchasePriceIQD) },
+        exchangeRateIQD,
+      );
       const tierBelow = priceTiers.some(tr => cost > 0 && tr.priceUSD > 0 && tr.priceUSD <= cost);
       if (cost > 0 && ((price > 0 && price <= cost) || tierBelow)) {
         Alert.alert(
@@ -1222,6 +1126,10 @@ const AdminProductsScreen: React.FC = () => {
       const colorVariationsData = colorVariations.length > 0 ? colorVariations : [];
 
       const payloadPurchasePrice = sanitizePrice(formData.purchasePrice);
+      const payloadPurchasePriceIQD = (() => {
+        const iqd = sanitizeIQD(formData.purchasePriceIQD);
+        return iqd > 0 ? iqd : null;
+      })();
 
       const newStockQty = parseInt(formData.stockQty) || 0;
       const newVariationStock = variations.reduce((s, v) => s + (v.stockQuantity || 0), 0);
@@ -1275,6 +1183,10 @@ const AdminProductsScreen: React.FC = () => {
         // so clearing the field removes it; the service maps these to
         // compare_at_price_usd / vip_price_usd.
         compareAtPriceUSD: formData.compareAtPriceUSD.trim() !== '' ? sanitizePrice(formData.compareAtPriceUSD) : null,
+        compareAtPriceIQD: (() => {
+          const iqd = sanitizeIQD(formData.compareAtPriceIQD);
+          return iqd > 0 ? iqd : null;
+        })(),
         vipPriceUSD: formData.vipPriceUSD.trim() !== '' ? sanitizePrice(formData.vipPriceUSD) : null,
         // Always sent, null when blank, so clearing it actually clears the column.
         vipPriceIQD: (() => {
@@ -1282,6 +1194,9 @@ const AdminProductsScreen: React.FC = () => {
           return iqd > 0 ? iqd : null;
         })(),
         purchasePrice: payloadPurchasePrice,
+        // Always sent, null when blank, so switching this price back to dollars
+        // actually clears the dinar column instead of leaving it to outrank.
+        purchasePriceIQD: payloadPurchasePriceIQD,
         stockQty: newStockQty,
         historicalStockQty: historicalStockQty,
         initialStock: parseInt(formData.initialStock) || 0,
@@ -1960,7 +1875,7 @@ const AdminProductsScreen: React.FC = () => {
   // from the owner's inventory money — consistent with the analytics/revenue surfaces. Un-sharing
   // brings them back here. (Counts above still include them, since they remain in the catalog.)
   const ownerStock = products.filter(p => !(Array.isArray((p as any).coAdminIds) && (p as any).coAdminIds.length));
-  const invAtCost = ownerStock.reduce((s, p) => s + ((p as any).purchasePrice || 0) * getEffectiveStock(p), 0);
+  const invAtCost = ownerStock.reduce((s, p) => s + costUSD(p as any, exchangeRateIQD) * getEffectiveStock(p), 0);
   const invAtRetail = ownerStock.reduce((s, p) => s + (p.priceUSD || 0) * getEffectiveStock(p), 0);
   const invProfit = invAtRetail - invAtCost;
 
@@ -1985,7 +1900,7 @@ const AdminProductsScreen: React.FC = () => {
     const cardIsRTL = i18n.language === 'ar' || i18n.language === 'ku';
 
     // Money line + pending-status chip (computed once per card).
-    const cost = (item as any).purchasePrice || 0;
+    const cost = costUSD(item as any, exchangeRateIQD);
     const profit = (item.priceUSD || 0) - cost;
     const belowCost = cost > 0 && (item.priceUSD || 0) <= cost;
     const isPending = item.status === 'coming_soon' || item.status === 'on_the_way';
@@ -3167,218 +3082,108 @@ const AdminProductsScreen: React.FC = () => {
                   {t('admin.products.form.pricingAndStock')}
                 </Text>
 
-                {/* Price and Stock */}
+                {/* PRICES — one box each, with a $ / IQD switch.
+                    This card used to carry six boxes: a dollar price and a dinar
+                    price for the normal price and again for VIP, plus dollar-only
+                    "was" and cost. Two boxes per price is a trap, because the
+                    dinar column silently outranks the dollar one — filling both
+                    looked like giving two prices when one of them was dead. Each
+                    price is now ONE box that says which currency it is in. */}
+                <PriceField
+                  label={t('admin.products.form.price')}
+                  usd={formData.priceUSD}
+                  iqd={formData.priceIQD}
+                  onChange={({ usd, iqd }) => setFormData(prev => ({ ...prev, priceUSD: usd, priceIQD: iqd }))}
+                  exchangeRateIQD={exchangeRateIQD}
+                  theme={theme}
+                  hint={(() => {
+                    const iqd = parseInt((formData.priceIQD || '').replace(/[^0-9]/g, ''), 10) || 0;
+                    if (iqd <= 0) {
+                      return t('admin.products.form.priceUSDSwitchHint', {
+                        defaultValue: 'Priced in dollars: the amount customers pay follows the exchange rate. Switch to IQD for stock you bought in dinar.',
+                      });
+                    }
+                    return t('admin.products.form.priceIQDActive', {
+                      iqd: formatCurrencyIQD(iqd),
+                      usd: formatCurrencyUSD(convertIQDToUSD(iqd, exchangeRateIQD)),
+                      rate: exchangeRateIQD,
+                      defaultValue: 'Customers see {{iqd}} exactly. In dollars it shows as {{usd}} (at the current rate of {{rate}}); the dinar price itself will not change when you edit the rate.',
+                    });
+                  })()}
+                />
+
+                <PriceField
+                  label={t('admin.products.form.compareAtPriceAny', { defaultValue: 'Was Price' })}
+                  usd={formData.compareAtPriceUSD}
+                  iqd={formData.compareAtPriceIQD}
+                  onChange={({ usd, iqd }) => setFormData(prev => ({ ...prev, compareAtPriceUSD: usd, compareAtPriceIQD: iqd }))}
+                  exchangeRateIQD={exchangeRateIQD}
+                  theme={theme}
+                  hint={t('admin.products.form.compareAtHint', { defaultValue: 'Shown crossed-out to display a discount. Leave blank for none.' })}
+                />
+
+                <PriceField
+                  label={t('admin.products.form.vipPriceAny', { defaultValue: 'VIP Price' })}
+                  usd={formData.vipPriceUSD}
+                  iqd={formData.vipPriceIQD}
+                  onChange={({ usd, iqd }) => setFormData(prev => ({ ...prev, vipPriceUSD: usd, vipPriceIQD: iqd }))}
+                  exchangeRateIQD={exchangeRateIQD}
+                  theme={theme}
+                  accentColor="#7C3AED"
+                  hint={(() => {
+                    const vipIqd = parseInt((formData.vipPriceIQD || '').replace(/[^0-9]/g, ''), 10) || 0;
+                    const vipUsd = parseFloat(formData.vipPriceUSD) || 0;
+                    const baseIqd = parseInt((formData.priceIQD || '').replace(/[^0-9]/g, ''), 10) || 0;
+                    const baseUsd = parseFloat(formData.priceUSD) || 0;
+                    if (vipIqd <= 0 && vipUsd <= 0) {
+                      return t('admin.products.form.vipPriceHint', { defaultValue: 'Special price for VIP customers only. Leave blank for none.' });
+                    }
+                    // Warn rather than silently discard: getEffectiveUnitPrice
+                    // refuses a VIP price that is not actually cheaper. Compare
+                    // like with like — a dinar figure is always numerically
+                    // larger than a dollar one, so a raw < would read backwards.
+                    const vipAsUsd = vipIqd > 0 ? convertIQDToUSD(vipIqd, exchangeRateIQD) : vipUsd;
+                    const baseAsUsd = baseIqd > 0 ? convertIQDToUSD(baseIqd, exchangeRateIQD) : baseUsd;
+                    if (baseAsUsd > 0 && vipAsUsd >= baseAsUsd) {
+                      return t('admin.products.form.vipPriceNotCheaper', {
+                        vip: vipIqd > 0 ? formatCurrencyIQD(vipIqd) : formatCurrencyUSD(vipUsd),
+                        defaultValue: '{{vip}} is not below this product’s normal price, so VIPs will keep paying the normal price. Lower it, or clear it.',
+                      });
+                    }
+                    return t('admin.products.form.vipPriceActive', {
+                      vip: vipIqd > 0 ? formatCurrencyIQD(vipIqd) : formatCurrencyUSD(vipUsd),
+                      defaultValue: 'VIP customers pay {{vip}}.',
+                    });
+                  })()}
+                />
+
+                <PriceField
+                  label={t('admin.products.form.purchasePriceAny', { defaultValue: 'Purchase Price (cost)' })}
+                  usd={formData.purchasePrice}
+                  iqd={formData.purchasePriceIQD}
+                  onChange={({ usd, iqd }) => setFormData(prev => ({ ...prev, purchasePrice: usd, purchasePriceIQD: iqd }))}
+                  exchangeRateIQD={exchangeRateIQD}
+                  theme={theme}
+                  hint={t('admin.products.form.purchasePriceHint', {
+                    defaultValue: 'What YOU paid. Never shown to customers — it is what every profit figure is worked out from. Switch to IQD for stock you bought in dinar.',
+                  })}
+                />
+
+                {/* Stock */}
                 <View style={styles.rowInputs}>
                   <View style={styles.halfInput}>
-                    <Text allowFontScaling={false} 
-                      style={[styles.inputLabel, { color: theme.colors.textSecondary }]}
-                      adjustsFontSizeToFit
-                      numberOfLines={1}
-                    >
-                      {t('admin.products.form.price')}
-                    </Text>
-                    <TextInput allowFontScaling={false}                      style={[styles.input, { backgroundColor: theme.colors.background, color: theme.colors.text }]}
-                      value={formData.priceUSD}
-                      onChangeText={(text) => setFormData(prev => ({ ...prev, priceUSD: text }))}
-                      placeholder="0.00"
-                      keyboardType="decimal-pad"
-                      placeholderTextColor={theme.colors.textSecondary}
-                      multiline={false}
-                      scrollEnabled={false}
-                  disableFullscreenUI
-                    />
-                  </View>
-
-                  <View style={styles.halfInput}>
-                    <Text allowFontScaling={false} 
-                      style={[styles.inputLabel, { color: theme.colors.textSecondary }]}
+                    <Text allowFontScaling={false}
+                      style={[styles.inputLabel, { color: theme.colors.textSecondary, marginTop: 0 }]}
                       adjustsFontSizeToFit
                       numberOfLines={1}
                     >
                       {t('admin.products.form.stockQty')}
                     </Text>
-                    <TextInput allowFontScaling={false}                      style={[styles.input, { backgroundColor: theme.colors.background, color: theme.colors.text }]}
+                    <TextInput allowFontScaling={false} style={[styles.input, { backgroundColor: theme.colors.background, color: theme.colors.text }]}
                       value={formData.stockQty}
                       onChangeText={(text) => setFormData(prev => ({ ...prev, stockQty: text }))}
                       placeholder="0"
                       keyboardType="number-pad"
-                      placeholderTextColor={theme.colors.textSecondary}
-                      multiline={false}
-                      scrollEnabled={false}
-                  disableFullscreenUI
-                    />
-                  </View>
-                </View>
-
-                {/* Price in dinar — for stock the shop buys in IQD rather than USD.
-                    Full width because the hint under it does real work: it is the
-                    only place the admin can see what the customer will be charged
-                    in dollars, and that the exchange rate is not being applied. */}
-                <View style={{ marginTop: SPACING.md }}>
-                  <Text allowFontScaling={false}
-                    style={[styles.inputLabel, { color: theme.colors.textSecondary, marginTop: 0 }]}
-                    adjustsFontSizeToFit
-                    numberOfLines={1}
-                  >
-                    {t('admin.products.form.priceIQD', { defaultValue: 'Price (IQD) — optional' })}
-                  </Text>
-                  <TextInput allowFontScaling={false}
-                    style={[styles.input, { backgroundColor: theme.colors.background, color: theme.colors.text }]}
-                    value={formData.priceIQD}
-                    onChangeText={(text) => setFormData(prev => ({ ...prev, priceIQD: text.replace(/[^0-9]/g, '') }))}
-                    placeholder="0"
-                    keyboardType="number-pad"
-                    placeholderTextColor={theme.colors.textSecondary}
-                    multiline={false}
-                    scrollEnabled={false}
-                    disableFullscreenUI
-                  />
-                  <Text allowFontScaling={false}
-                    style={{ fontSize: 11, color: theme.colors.textSecondary, marginTop: 4 }}
-                    numberOfLines={3}
-                  >
-                    {(() => {
-                      const iqd = parseInt((formData.priceIQD || '').replace(/[^0-9]/g, ''), 10) || 0;
-                      if (iqd <= 0) {
-                        return t('admin.products.form.priceIQDHint', {
-                          defaultValue: 'Leave blank to price this product in dollars as usual. Fill it in for stock you bought in dinar — customers then see this exact amount and the exchange rate is not applied to it.',
-                        });
-                      }
-                      return t('admin.products.form.priceIQDActive', {
-                        iqd: formatCurrencyIQD(iqd),
-                        usd: formatCurrencyUSD(convertIQDToUSD(iqd, exchangeRateIQD)),
-                        rate: exchangeRateIQD,
-                        defaultValue: 'Customers see {{iqd}} exactly. In dollars it shows as {{usd}} (at the current rate of {{rate}}); the dinar price itself will not change when you edit the rate.',
-                      });
-                    })()}
-                  </Text>
-                </View>
-
-                {/* "Was" (compare-at) price + VIP price */}
-                <View style={[styles.rowInputs, { marginTop: SPACING.md }]}>
-                  <View style={styles.halfInput}>
-                    <Text allowFontScaling={false}
-                      style={[styles.inputLabel, { color: theme.colors.textSecondary, marginTop: 0 }]}
-                      adjustsFontSizeToFit
-                      numberOfLines={1}
-                    >
-                      {t('admin.products.form.compareAtPrice', { defaultValue: 'Was Price ($)' })}
-                    </Text>
-                    <TextInput allowFontScaling={false} style={[styles.input, { backgroundColor: theme.colors.background, color: theme.colors.text }]}
-                      value={formData.compareAtPriceUSD}
-                      onChangeText={(text) => setFormData(prev => ({ ...prev, compareAtPriceUSD: text }))}
-                      placeholder="0.00"
-                      keyboardType="decimal-pad"
-                      placeholderTextColor={theme.colors.textSecondary}
-                      multiline={false}
-                      scrollEnabled={false}
-                      disableFullscreenUI
-                    />
-                    <Text allowFontScaling={false} style={{ fontSize: 11, color: theme.colors.textSecondary, marginTop: 4 }} numberOfLines={2}>
-                      {t('admin.products.form.compareAtHint', { defaultValue: 'Shown crossed-out to display a discount. Leave blank for none.' })}
-                    </Text>
-                  </View>
-                  <View style={styles.halfInput}>
-                    <Text allowFontScaling={false}
-                      style={[styles.inputLabel, { color: theme.colors.textSecondary, marginTop: 0 }]}
-                      adjustsFontSizeToFit
-                      numberOfLines={1}
-                    >
-                      {t('admin.products.form.vipPrice', { defaultValue: 'VIP Price ($)' })}
-                    </Text>
-                    <TextInput allowFontScaling={false} style={[styles.input, { backgroundColor: theme.colors.background, color: theme.colors.text }]}
-                      value={formData.vipPriceUSD}
-                      onChangeText={(text) => setFormData(prev => ({ ...prev, vipPriceUSD: text }))}
-                      placeholder="0.00"
-                      keyboardType="decimal-pad"
-                      placeholderTextColor={theme.colors.textSecondary}
-                      multiline={false}
-                      scrollEnabled={false}
-                      disableFullscreenUI
-                    />
-                    <Text allowFontScaling={false} style={{ fontSize: 11, color: theme.colors.textSecondary, marginTop: 4 }} numberOfLines={2}>
-                      {t('admin.products.form.vipPriceHint', { defaultValue: 'Special price for VIP customers only. Leave blank for none.' })}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* VIP price in dinar — the VIP counterpart of the dinar price above.
-                    Full width for the same reason: the hint is the only place the
-                    admin can see which of the two VIP figures actually applies. */}
-                <View style={{ marginTop: SPACING.md }}>
-                  <Text allowFontScaling={false}
-                    style={[styles.inputLabel, { color: theme.colors.textSecondary, marginTop: 0 }]}
-                    adjustsFontSizeToFit
-                    numberOfLines={1}
-                  >
-                    {t('admin.products.form.vipPriceIQD', { defaultValue: 'VIP Price (IQD) — optional' })}
-                  </Text>
-                  <TextInput allowFontScaling={false}
-                    style={[
-                      styles.input,
-                      { backgroundColor: theme.colors.background, color: theme.colors.text },
-                      (parseInt(formData.vipPriceIQD || '0', 10) || 0) > 0 && {
-                        borderColor: '#7C3AED',
-                        borderWidth: 1,
-                      },
-                    ]}
-                    value={formData.vipPriceIQD}
-                    onChangeText={(text) => setFormData(prev => ({ ...prev, vipPriceIQD: text.replace(/[^0-9]/g, '') }))}
-                    placeholder="0"
-                    keyboardType="number-pad"
-                    placeholderTextColor={theme.colors.textSecondary}
-                    multiline={false}
-                    scrollEnabled={false}
-                    disableFullscreenUI
-                  />
-                  <Text allowFontScaling={false}
-                    style={{ fontSize: 11, color: theme.colors.textSecondary, marginTop: 4 }}
-                    numberOfLines={3}
-                  >
-                    {(() => {
-                      const vipIqd = parseInt((formData.vipPriceIQD || '').replace(/[^0-9]/g, ''), 10) || 0;
-                      const baseIqd = parseInt((formData.priceIQD || '').replace(/[^0-9]/g, ''), 10) || 0;
-                      const baseUsd = parseFloat(formData.priceUSD) || 0;
-                      if (vipIqd <= 0) {
-                        return t('admin.products.form.vipPriceIQDHint', {
-                          defaultValue: 'Fill this in for VIP stock you priced in dinar. VIPs then see this exact amount and the exchange rate is not applied to it.',
-                        });
-                      }
-                      // Warn rather than silently discard: getEffectiveUnitPrice
-                      // refuses a VIP price that is not actually cheaper.
-                      const notCheaper = baseIqd > 0
-                        ? vipIqd >= baseIqd
-                        : baseUsd > 0 && convertIQDToUSD(vipIqd, exchangeRateIQD) >= baseUsd;
-                      if (notCheaper) {
-                        return t('admin.products.form.vipPriceIQDNotCheaper', {
-                          vip: formatCurrencyIQD(vipIqd),
-                          defaultValue: '{{vip}} is not below this product\u2019s normal price, so VIPs will keep paying the normal price. Lower it, or clear it.',
-                        });
-                      }
-                      return t('admin.products.form.vipPriceIQDActive', {
-                        iqd: formatCurrencyIQD(vipIqd),
-                        usd: formatCurrencyUSD(convertIQDToUSD(vipIqd, exchangeRateIQD)),
-                        defaultValue: 'VIP customers pay {{iqd}} exactly ({{usd}} browsing in dollars). This wins over the VIP dollar price beside it.',
-                      });
-                    })()}
-                  </Text>
-                </View>
-
-                {/* Purchase Price (Cost Price) */}
-                <View style={[styles.rowInputs, { marginTop: SPACING.md }]}>
-                  <View style={styles.halfInput}>
-                    <Text allowFontScaling={false}
-                      style={[styles.inputLabel, { color: theme.colors.textSecondary, marginTop: 0 }]}
-                      adjustsFontSizeToFit
-                      numberOfLines={1}
-                    >
-                      {t('admin.products.form.purchasePrice', { defaultValue: 'Purchase Price ($)' })}
-                    </Text>
-                    <TextInput allowFontScaling={false}                      style={[styles.input, { backgroundColor: theme.colors.background, color: theme.colors.text }]}
-                      value={formData.purchasePrice}
-                      onChangeText={(text) => setFormData(prev => ({ ...prev, purchasePrice: text }))}
-                      placeholder="0.00"
-                      keyboardType="decimal-pad"
                       placeholderTextColor={theme.colors.textSecondary}
                       multiline={false}
                       scrollEnabled={false}
@@ -3957,14 +3762,12 @@ const AdminProductsScreen: React.FC = () => {
                             <Ionicons name="trash-outline" size={16} color="#F44336" />
                           </TouchableOpacity>
                         </View>
-                        <VariantPriceFields
-                          priceUSD={variation.priceUSD}
-                          priceIQD={variation.priceIQD}
+                        <VariantPriceBlock
+                          variant={variation}
                           basePriceUSD={parseFloat(formData.priceUSD) || 0}
                           basePriceIQD={parseInt(formData.priceIQD || '0', 10) || undefined}
                           exchangeRateIQD={exchangeRateIQD}
-                          onChangeUSD={(text) => updateVariationPrice(variation.variationId, text)}
-                          onChangeIQD={(text) => updateVariationPriceIQD(variation.variationId, text)}
+                          onPatch={(patch) => patchVariationPrices(variation.variationId, patch)}
                           theme={theme}
                           isRTL={isRTL}
                           t={t}
@@ -4132,14 +3935,12 @@ const AdminProductsScreen: React.FC = () => {
                             <Ionicons name="trash-outline" size={16} color="#F44336" />
                           </TouchableOpacity>
                         </View>
-                        <VariantPriceFields
-                          priceUSD={variation.priceUSD}
-                          priceIQD={variation.priceIQD}
+                        <VariantPriceBlock
+                          variant={variation}
                           basePriceUSD={parseFloat(formData.priceUSD) || 0}
                           basePriceIQD={parseInt(formData.priceIQD || '0', 10) || undefined}
                           exchangeRateIQD={exchangeRateIQD}
-                          onChangeUSD={(text) => updateColorVariationPrice(variation.variationId, text)}
-                          onChangeIQD={(text) => updateColorVariationPriceIQD(variation.variationId, text)}
+                          onPatch={(patch) => patchColorVariationPrices(variation.variationId, patch)}
                           theme={theme}
                           isRTL={isRTL}
                           t={t}

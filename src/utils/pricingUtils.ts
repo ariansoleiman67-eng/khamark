@@ -1,6 +1,6 @@
 import { PriceTier, Product } from '../types';
 import { getCurrentExchangeRate } from './exchangeRate';
-import { convertIQDToUSD, formatCurrencyIQD, formatCurrencyUSD, formatPrice, isIQDPriced } from './currency';
+import { compareAtUSD, convertIQDToUSD, formatCurrencyIQD, formatCurrencyUSD, formatPrice, isIQDPriced } from './currency';
 
 /**
  * Validates an array of price tiers.
@@ -211,7 +211,13 @@ export const getEffectiveStock = (
 type DiscountableProduct = Pick<
   Product,
   'priceUSD' | 'vipPriceUSD' | 'priceTiers' | 'compareAtPriceUSD'
->;
+> & { compareAtPriceIQD?: number };
+
+// The "was" price as a dollar figure, whichever currency it was authored in.
+// compareAtUSD returns 0 when there is none, which every caller below reads as
+// "no discount".
+const compareAtOf = (product: DiscountableProduct): number =>
+  compareAtUSD(product as any, getCurrentExchangeRate());
 
 // Whether the compare-at ("was") price beats what THIS shopper actually pays.
 // Measured against the displayed price, not `priceUSD`, so a VIP or wholesale buyer
@@ -219,9 +225,10 @@ type DiscountableProduct = Pick<
 export const hasCompareAtDiscount = (
   product: DiscountableProduct,
   isVip: boolean = false
-): boolean =>
-  typeof product.compareAtPriceUSD === 'number' &&
-  product.compareAtPriceUSD > getDisplayUnitPrice(product, isVip);
+): boolean => {
+  const was = compareAtOf(product);
+  return was > 0 && was > getDisplayUnitPrice(product, isVip);
+};
 
 // The single Save% figure for the whole app. Computed off the price the shopper pays,
 // so the grid card and the product page can no longer quote different percentages for
@@ -232,7 +239,7 @@ export const getDiscountPercent = (
 ): number => {
   if (!hasCompareAtDiscount(product, isVip)) return 0;
   const shownPrice = getDisplayUnitPrice(product, isVip);
-  return Math.round((1 - shownPrice / (product.compareAtPriceUSD as number)) * 100);
+  return Math.round((1 - shownPrice / compareAtOf(product)) * 100);
 };
 
 // Whether a product has a VIP-only price that differs from what a non-VIP pays.

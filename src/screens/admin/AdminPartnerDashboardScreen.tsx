@@ -28,6 +28,8 @@ import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/nativ
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import { sharePartnerInventoryInvoice, partnerEffectiveStock as effectiveStock, partnerWholesalePrice } from './partnerInvoice';
+import { costUSD } from '../../utils/currency';
+import { getCurrentExchangeRate } from '../../utils/exchangeRate';
 
 const ACCENT = '#8B5CF6';
 const PROFIT = '#10B981';
@@ -88,7 +90,7 @@ export default function AdminPartnerDashboardScreen() {
       const sold = Number(soldById.get(p.id)) || 0;
       const received = remaining + sold;   // all units ever shared — STABLE as stock sells down
       stock += remaining;                  // current on-hand
-      invested += (Number(p.purchasePrice) || 0) * received;
+      invested += costUSD(p, getCurrentExchangeRate()) * received;
       wholesaleTotal += (Number(partnerWholesalePrice(p)) || 0) * received;
     }
     return { stock, invested, wholesaleTotal, count: products.length };
@@ -187,7 +189,7 @@ export default function AdminPartnerDashboardScreen() {
     );
   };
 
-  const itemReceivedCost = (p: any) => (p?.purchasePrice || 0) * (effectiveStock(p) + (soldById.get(p?.id) || 0));
+  const itemReceivedCost = (p: any) => costUSD(p, getCurrentExchangeRate()) * (effectiveStock(p) + (soldById.get(p?.id) || 0));
 
   // WHOLE-item return: un-share the product → it returns to the owner's revenue/analytics with its
   // full sales history, drops off the partner's list (so Total Invested falls by its cost), and is
@@ -285,7 +287,7 @@ export default function AdminPartnerDashboardScreen() {
         if (ownerTenant) {
           const svc = createTenantAdminService(ownerTenant);
           if (assigned.length) {
-            const marginById = new Map((assigned as any[]).map((p) => [p.id, partnerWholesalePrice(p) - (p.purchasePrice || 0)]));
+            const marginById = new Map((assigned as any[]).map((p) => [p.id, partnerWholesalePrice(p) - costUSD(p, getCurrentExchangeRate())]));
             const sold = new Map<string, number>();
             let earned = 0;
             // Both views use the SAME server-side aggregate (unbounded, tenant-scoped) so the owner
@@ -355,7 +357,7 @@ export default function AdminPartnerDashboardScreen() {
 
   const renderProductItem = ({ item }: { item: Product; index: number }) => {
     const p: any = item;
-    const buyPrice = p.purchasePrice || 0;
+    const buyPrice = costUSD(p, getCurrentExchangeRate());
     // Wholesale-only view: show the wholesale price + wholesale profit, never per-unit retail.
     const wholesalePrice = partnerWholesalePrice(p);
     const profit = wholesalePrice - buyPrice;

@@ -20,7 +20,7 @@ import AppText from "./AppText";
 import AppNumber from "./AppNumber";
 import { useCurrency } from "../contexts/CurrencyContext";
 import { useAuth } from "../contexts/AuthContext";
-import { formatPrice } from "../utils/currency";
+import { formatCompareAtPrice, formatPrice } from "../utils/currency";
 import {
   getDisplayUnitPrice,
   getDiscountPercent,
@@ -540,7 +540,7 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
                 numberOfLines={1}
                 style={[styles.compareAt, { color: theme.colors.textSecondary }]}
               >
-                {formatPrice(product.compareAtPriceUSD as number, currency, exchangeRateIQD)}
+                {formatCompareAtPrice(product as any, currency, exchangeRateIQD)}
               </AppText>
               <View style={[styles.tag, { backgroundColor: SALE_RED }]}>
                 <AppText fontSize={9} style={styles.tagText}>-{savePct}%</AppText>

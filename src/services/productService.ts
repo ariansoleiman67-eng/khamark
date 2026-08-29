@@ -32,8 +32,12 @@ export const mapProduct = (data: any): Product => ({
   vipPriceUSD: data.vip_price_usd != null ? Number(data.vip_price_usd) : undefined,
   vipPriceIQD: data.vip_price_iqd != null ? Number(data.vip_price_iqd) : undefined,
   compareAtPriceUSD: data.compare_at_price_usd != null ? Number(data.compare_at_price_usd) : undefined,
+  compareAtPriceIQD: data.compare_at_price_iqd != null ? Number(data.compare_at_price_iqd) : undefined,
   storageOptions: data.storage_options || [],
   purchasePrice: data.purchase_price != null ? Number(data.purchase_price) : data.purchase_price,
+  // Admin paths only: purchase_price_iqd is not granted to anon/authenticated and
+  // is absent from LIST_COLUMNS/DETAIL_COLUMNS, exactly like purchase_price.
+  purchasePriceIQD: data.purchase_price_iqd != null ? Number(data.purchase_price_iqd) : undefined,
   stockQty: data.stock_qty != null ? Number(data.stock_qty) : data.stock_qty,
   historicalStockQty: data.historical_stock_qty,
   initialStock: data.initial_stock,
@@ -104,7 +108,7 @@ export const mapProduct = (data: any): Product => ({
  * once per session. A shop whose migration is pending sells as it did yesterday
  * instead of showing an empty shelf.
  */
-const PENDING_MIGRATION_COLUMNS = ['vip_price_iqd'] as const;
+const PENDING_MIGRATION_COLUMNS = ['vip_price_iqd', 'compare_at_price_iqd'] as const;
 
 /** Set on the first 42703, so the fallback costs one failed request, not one per query. */
 let missingColumns: string[] = [];
@@ -127,21 +131,49 @@ const isMissingColumnError = (error: any): boolean =>
  */
 const noteMissingColumn = (error: any): boolean => {
   if (!isMissingColumnError(error)) return false;
-  const named = PENDING_MIGRATION_COLUMNS.filter(
-    (c) => !missingColumns.includes(c) && String(error.message).includes(c),
-  );
+  // Every pending column the error names, whether or not it is already recorded.
+  // Concurrent queries all go out with the bad column: the first one records it,
+  // and if the others were then told "nothing new to note, do not retry" they
+  // would throw and the screen behind them would show an empty catalogue while
+  // its neighbour recovered. Retry eligibility is about THIS query, not about
+  // whether some other query already learned the same fact.
+  const named = PENDING_MIGRATION_COLUMNS.filter((c) => String(error.message).includes(c));
   if (named.length === 0) return false;
-  missingColumns = [...missingColumns, ...named];
-  // eslint-disable-next-line no-console
-  console.warn(
-    `[productService] ${named.join(', ')} missing from the database — a migration has not been applied. ` +
-      'Serving products without it. Apply supabase/migrations to restore the feature.',
-  );
+  const unseen = named.filter((c) => !missingColumns.includes(c));
+  if (unseen.length > 0) {
+    missingColumns = [...missingColumns, ...unseen];
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[productService] ${unseen.join(', ')} missing from the database — a migration has not been applied. ` +
+        'Serving products without it. Apply supabase/migrations to restore the feature.',
+    );
+  }
   return true;
 };
 
+/**
+ * Run a select that names a possibly-pending column, and if Postgres rejects it
+ * with 42703, drop the column and run it once more.
+ *
+ * `build` must CONSTRUCT the query, not receive it: a PostgREST builder is a
+ * one-shot thenable, so the retry has to re-create it — and it has to re-read
+ * `withoutMissingColumns`, which noteMissingColumn has just updated.
+ *
+ * Only getFeaturedProducts had this. Everything else threw, and since Postgres
+ * rejects the WHOLE query on an unknown column, one un-applied migration emptied
+ * the catalogue rather than degrading one field. That already happened once with
+ * vip_price_iqd.
+ */
+const runWithColumnFallback = async <T>(
+  build: () => PromiseLike<{ data: T | null; error: any }>,
+): Promise<{ data: T | null; error: any }> => {
+  const first = await build();
+  if (first.error && noteMissingColumn(first.error)) return build();
+  return first;
+};
+
 const LIST_COLUMNS =
-  'id,name,name_ar,name_ku,part_number,barcode,category,category_ar,category_ku,price_usd,price_iqd,vip_price_usd,vip_price_iqd,compare_at_price_usd,storage_options,stock_qty,status,is_featured,is_active,brand,image_urls,price_tiers,variations,color_variations,shipping_cost,shipping_rates,sort_order,tenant_id,created_at,updated_at,condition';
+  'id,name,name_ar,name_ku,part_number,barcode,category,category_ar,category_ku,price_usd,price_iqd,vip_price_usd,vip_price_iqd,compare_at_price_usd,compare_at_price_iqd,storage_options,stock_qty,status,is_featured,is_active,brand,image_urls,price_tiers,variations,color_variations,shipping_cost,shipping_rates,sort_order,tenant_id,created_at,updated_at,condition';
 
 // Primary ordering for every customer-facing listing: the order the admin set by
 // dragging in AdminProductsScreen (parts.sort_order). The column defaults to 0, so
@@ -188,8 +220,9 @@ const PART_COLUMN_MAP: Record<string, string> = {
   name: 'name', nameAr: 'name_ar', nameKu: 'name_ku',
   partNumber: 'part_number',
   category: 'category', categoryAr: 'category_ar', categoryKu: 'category_ku',
-  priceUSD: 'price_usd', priceIQD: 'price_iqd', vipPriceUSD: 'vip_price_usd', vipPriceIQD: 'vip_price_iqd', compareAtPriceUSD: 'compare_at_price_usd', storageOptions: 'storage_options',
-  purchasePrice: 'purchase_price',
+  priceUSD: 'price_usd', priceIQD: 'price_iqd', vipPriceUSD: 'vip_price_usd', vipPriceIQD: 'vip_price_iqd',
+  compareAtPriceUSD: 'compare_at_price_usd', compareAtPriceIQD: 'compare_at_price_iqd', storageOptions: 'storage_options',
+  purchasePrice: 'purchase_price', purchasePriceIQD: 'purchase_price_iqd',
   stockQty: 'stock_qty', historicalStockQty: 'historical_stock_qty', initialStock: 'initial_stock',
   description: 'description', descriptionAr: 'description_ar', descriptionKu: 'description_ku',
   brand: 'brand', imageUrls: 'image_urls',
@@ -242,39 +275,44 @@ export class ProductService {
         if (cached && !this.isCacheExpired(cached.timestamp)) return cached.data;
       }
 
-      let query = supabase.from('parts').select(withoutMissingColumns(LIST_COLUMNS));
+      // Built inside a closure so the 42703 fallback can construct it a SECOND
+      // time with the offending column dropped — a PostgREST builder cannot be
+      // awaited twice, and the column list has to be re-read after the failure.
+      const build = () => {
+        let query = supabase.from('parts').select(withoutMissingColumns(LIST_COLUMNS));
 
-      if (tenantId) query = query.eq('tenant_id', tenantId);
-      if (filters.category) query = query.eq('category', filters.category);
-      if (filters.brand) query = query.eq('brand', filters.brand);
-      // Filter inactive/hidden products in the DB (not after pagination) so pages
-      // aren't left with holes and `hasMore` stays accurate.
-      query = query.eq('is_active', true);
+        if (tenantId) query = query.eq('tenant_id', tenantId);
+        if (filters.category) query = query.eq('category', filters.category);
+        if (filters.brand) query = query.eq('brand', filters.brand);
+        // Filter inactive/hidden products in the DB (not after pagination) so pages
+        // aren't left with holes and `hasMore` stays accurate.
+        query = query.eq('is_active', true);
 
-      if (filters.sortBy) {
-        const ascending = filters.sortOrder === 'asc';
-        switch (filters.sortBy) {
-          case 'name':
-            query = query.order('name', { ascending });
-            break;
-          case 'price':
-            query = query.order('price_usd', { ascending });
-            break;
-          case 'date':
-            query = query.order('created_at', { ascending });
-            break;
-          default:
-            query = query.order(SORT_ORDER_COLUMN, SORT_ORDER_OPTS).order('created_at', { ascending: false });
+        if (filters.sortBy) {
+          const ascending = filters.sortOrder === 'asc';
+          switch (filters.sortBy) {
+            case 'name':
+              query = query.order('name', { ascending });
+              break;
+            case 'price':
+              query = query.order('price_usd', { ascending });
+              break;
+            case 'date':
+              query = query.order('created_at', { ascending });
+              break;
+            default:
+              query = query.order(SORT_ORDER_COLUMN, SORT_ORDER_OPTS).order('created_at', { ascending: false });
+          }
+        } else {
+          query = query.order(SORT_ORDER_COLUMN, SORT_ORDER_OPTS).order('created_at', { ascending: false });
         }
-      } else {
-        query = query.order(SORT_ORDER_COLUMN, SORT_ORDER_OPTS).order('created_at', { ascending: false });
-      }
 
-      const from = (pageInfo.page - 1) * pageInfo.limit;
-      const to = from + pageInfo.limit - 1;
-      query = query.range(from, to);
+        const from = (pageInfo.page - 1) * pageInfo.limit;
+        const to = from + pageInfo.limit - 1;
+        return query.range(from, to);
+      };
 
-      const { data, error } = await query;
+      const { data, error } = await runWithColumnFallback(build);
       if (error) throw error;
 
       const products = (data || [])
@@ -313,11 +351,14 @@ export class ProductService {
       if (cached && !this.isCacheExpired(cached.timestamp)) return cached.data;
 
       // Simple text search implementation (fetches broadly then filters client-side like before)
-      let query = supabase.from('parts').select(withoutMissingColumns(LIST_COLUMNS)).order('name');
-      if (tenantId) query = query.eq('tenant_id', tenantId);
-      if (filters.category) query = query.eq('category', filters.category);
+      const build = () => {
+        let query = supabase.from('parts').select(withoutMissingColumns(LIST_COLUMNS)).order('name');
+        if (tenantId) query = query.eq('tenant_id', tenantId);
+        if (filters.category) query = query.eq('category', filters.category);
+        return query;
+      };
 
-      const { data, error } = await query;
+      const { data, error } = await runWithColumnFallback(build);
       if (error) throw error;
 
       const searchLower = searchQuery.toLowerCase();
@@ -362,10 +403,13 @@ export class ProductService {
       const cached = await this.getCachedData(cacheKey);
       if (cached && !this.isCacheExpired(cached.timestamp)) return cached.data;
 
-      let query = supabase.from('parts').select(withoutMissingColumns(DETAIL_COLUMNS)).eq('id', productId);
-      if (tenantId) query = query.eq('tenant_id', tenantId);
+      const build = () => {
+        let query = supabase.from('parts').select(withoutMissingColumns(DETAIL_COLUMNS)).eq('id', productId);
+        if (tenantId) query = query.eq('tenant_id', tenantId);
+        return query.single();
+      };
 
-      const { data, error } = await query.single();
+      const { data, error } = await runWithColumnFallback(build);
       if (error) {
         if (error.code === 'PGRST116') return null; // Not found
         throw error;
@@ -437,10 +481,10 @@ export class ProductService {
 
     const cacheKey = `products_by_ids_${[...unique].sort().join(',')}`;
     const fetcher = async (): Promise<Product[]> => {
-      const { data, error } = await supabase
+      const { data, error } = await runWithColumnFallback(() => supabase
         .from('parts')
         .select(withoutMissingColumns(LIST_COLUMNS))
-        .in('id', unique);
+        .in('id', unique));
       if (error) throw error;
       // Don't surface hidden/deactivated products in Favorites.
       return (data || []).map(mapProduct).filter(p => p.isActive !== false);
@@ -481,12 +525,12 @@ export class ProductService {
     }
     const cacheKey = `products_by_tenant_${tenantId}`;
     const fetcher = async (): Promise<Product[]> => {
-      const { data, error } = await supabase
+      const { data, error } = await runWithColumnFallback(() => supabase
         .from('parts')
         .select(withoutMissingColumns(LIST_COLUMNS))
         .eq('tenant_id', tenantId)
         .order(SORT_ORDER_COLUMN, SORT_ORDER_OPTS)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }));
       if (error) throw error;
       return (data || []).map(mapProduct).filter(p => p.isActive !== false);
     };
@@ -516,18 +560,21 @@ export class ProductService {
       const cached = await this.getCachedData(cacheKey);
       if (cached && !this.isCacheExpired(cached.timestamp)) return cached.data;
 
-      let query = supabase
-        .from('parts')
-        .select(withoutMissingColumns(LIST_COLUMNS))
-        .eq('category', category)
-        .eq('is_active', true)
-        .order(SORT_ORDER_COLUMN, SORT_ORDER_OPTS)
-        .order('stock_qty', { ascending: false })
-        .order('created_at', { ascending: false });
+      const build = () => {
+        let query = supabase
+          .from('parts')
+          .select(withoutMissingColumns(LIST_COLUMNS))
+          .eq('category', category)
+          .eq('is_active', true)
+          .order(SORT_ORDER_COLUMN, SORT_ORDER_OPTS)
+          .order('stock_qty', { ascending: false })
+          .order('created_at', { ascending: false });
 
-      if (tenantId) query = query.eq('tenant_id', tenantId);
+        if (tenantId) query = query.eq('tenant_id', tenantId);
+        return query;
+      };
 
-      const { data, error } = await query;
+      const { data, error } = await runWithColumnFallback(build);
       if (error) throw error;
 
       const products = (data || []).map(mapProduct);

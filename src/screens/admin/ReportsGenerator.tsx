@@ -9,7 +9,8 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 import { LOGO_BASE64 } from '../../constants/logoBase64';
-import { formatPrice } from '../../utils/currency';
+import { costUSD, formatPrice } from '../../utils/currency';
+import { getCurrentExchangeRate } from '../../utils/exchangeRate';
 import { BRAND } from '../../constants/config';
 import { useNavigation } from '@react-navigation/native';
 
@@ -270,7 +271,7 @@ export const ReportsGenerator = () => {
         sales[id].qty += qty;
         // Use the PRODUCT's current buy price (purchasePrice), not the price recorded on the old
         // order line — those are stale/wrong (showed $3.35 when the real product cost is $4.80).
-        sales[id].cost += (Number(p.purchasePrice) || 0) * qty;
+        sales[id].cost += costUSD(p, getCurrentExchangeRate()) * qty;
       });
     });
 
@@ -291,7 +292,7 @@ export const ReportsGenerator = () => {
       const stock = getAvailableStock(p);
       // Per-unit buy: the average actually paid on sold units, else (never sold) the product's
       // current buy price — so a new product still values its stock at the real purchase cost.
-      const unitBuy = qty > 0 ? cost / qty : (Number(p.purchasePrice) || 0);
+      const unitBuy = qty > 0 ? cost / qty : costUSD(p, getCurrentExchangeRate());
       const totalValue = (qty + stock) * unitBuy;       // Total Buy = (sold + in stock) × buy
       const totalSell = (qty + stock) * unitWholesale;  // Total Sell = (sold + in stock) × wholesale
       const profit = totalSell - totalValue;            // Total Profit = Total Sell − Total Buy

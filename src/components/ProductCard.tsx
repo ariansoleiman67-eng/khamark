@@ -12,7 +12,7 @@ import { useTheme } from "./ThemeProvider";
 import { useFavorites } from "../contexts/FavoritesContext";
 import { useCurrency } from "../contexts/CurrencyContext";
 import { useAuth } from "../contexts/AuthContext";
-import { formatPrice } from "../utils/currency";
+import { formatCompareAtPrice, formatPrice } from "../utils/currency";
 import {
   getDisplayUnitPrice,
   getDiscountPercent,
@@ -465,7 +465,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           {hasDiscount && (
             <View style={styles.saveRow}>
               <AppNumber
-                value={formatPrice(product.compareAtPriceUSD as number, currency, exchangeRateIQD)}
+                value={formatCompareAtPrice(product as any, currency, exchangeRateIQD)}
                 style={[styles.wasPrice, { color: theme.colors.textSecondary }]}
               />
               <View style={styles.saveBadge}>

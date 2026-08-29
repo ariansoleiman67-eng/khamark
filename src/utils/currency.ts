@@ -243,11 +243,19 @@ export const variantPriceUSD = (
   variant: PricedItem | null | undefined,
   product: PricedItem | null | undefined,
   exchangeRate: number = 1500,
+  isVip: boolean = false,
 ): number => {
-  if (isIQDPriced(variant)) return convertIQDToUSD(Number(variant!.priceIQD), exchangeRate);
-  const usd = Number(variant?.priceUSD);
-  if (Number.isFinite(usd) && usd > 0) return usd;
-  return getPriceUSD(product, exchangeRate);
+  const base = (() => {
+    if (isIQDPriced(variant)) return convertIQDToUSD(Number(variant!.priceIQD), exchangeRate);
+    const usd = Number(variant?.priceUSD);
+    if (Number.isFinite(usd) && usd > 0) return usd;
+    return getPriceUSD(product, exchangeRate);
+  })();
+  // isVip defaults to false, so every existing caller keeps the price it had.
+  // Only the screens that know who is looking opt in.
+  if (!isVip) return base;
+  const vip = variantVipUSD(variant, product, exchangeRate, base);
+  return vip > 0 ? vip : base;
 };
 
 /** The dinar figure for one unit of a chosen variant. Mirrors variantPriceUSD. */
@@ -262,6 +270,73 @@ export const variantPriceIQD = (
   return getPriceIQD(product, exchangeRate);
 };
 
+/**
+ * Does this variant price ITSELF, or does it inherit the product's prices?
+ *
+ * The distinction decides whether the product's VIP / "was" / cost figures may
+ * be applied to it. A variant that overrides the selling price has been priced
+ * as its own thing — the product's VIP price was set against the product's
+ * price, so carrying it over would discount from a number that no longer
+ * applies. A variant that overrides nothing is the product, and inherits
+ * everything.
+ */
+const variantPricesItself = (variant: any): boolean =>
+  Number(variant?.priceUSD) > 0 || Number(variant?.priceIQD) > 0;
+
+/** Read one dinar-or-dollar pair off a variant, dinar first. Returns 0 for unset. */
+const pairUSD = (item: any, usdKey: string, iqdKey: string, exchangeRate: number): number => {
+  const iqd = Number(item?.[iqdKey]);
+  if (Number.isFinite(iqd) && iqd > 0) return convertIQDToUSD(iqd, exchangeRate);
+  const usd = Number(item?.[usdKey]);
+  return Number.isFinite(usd) && usd > 0 ? usd : 0;
+};
+
+/**
+ * The VIP price for a chosen variant, in dollars, or 0 when a VIP pays the
+ * normal price for it.
+ *
+ * Honours the same "must actually be cheaper" rule the product-level VIP price
+ * has: a VIP figure that is not below what the shopper would otherwise pay is
+ * ignored rather than charged, so the badge can never promise a saving the till
+ * does not give.
+ */
+export const variantVipUSD = (
+  variant: any,
+  product: any,
+  exchangeRate: number = 1500,
+  baseUSD?: number,
+): number => {
+  const own = pairUSD(variant, 'vipPriceUSD', 'vipPriceIQD', exchangeRate);
+  const vip = own > 0
+    ? own
+    : (variantPricesItself(variant) ? 0 : pairUSD(product, 'vipPriceUSD', 'vipPriceIQD', exchangeRate));
+  if (vip <= 0) return 0;
+  const base = baseUSD ?? variantPriceUSD(variant, product, exchangeRate);
+  return base > 0 && vip < base ? vip : 0;
+};
+
+/** The "was" price for a chosen variant, in dollars. 0 when it has none. */
+export const variantCompareAtUSD = (
+  variant: any,
+  product: any,
+  exchangeRate: number = 1500,
+): number => {
+  const own = pairUSD(variant, 'compareAtPriceUSD', 'compareAtPriceIQD', exchangeRate);
+  if (own > 0) return own;
+  return variantPricesItself(variant) ? 0 : compareAtUSD(product, exchangeRate);
+};
+
+/** What a chosen variant COST the shop, in dollars. Admin surfaces only. */
+export const variantCostUSD = (
+  variant: any,
+  product: any,
+  exchangeRate: number = 1500,
+): number => {
+  const own = costUSD(variant, exchangeRate);
+  if (own > 0) return own;
+  return variantPricesItself(variant) ? 0 : costUSD(product, exchangeRate);
+};
+
 /** Format a variant's price in the shopper's currency, honouring a dinar price. */
 export const formatVariantPrice = (
   variant: PricedItem | null | undefined,
@@ -269,7 +344,28 @@ export const formatVariantPrice = (
   currency: 'USD' | 'IQD' = 'USD',
   exchangeRateIQD: number = 1500,
   options: any = {},
+  isVip: boolean = false,
 ): string => {
+  // A VIP looking at an option with its own VIP price sees THAT price, in the
+  // currency it was authored in when that currency is dinar.
+  if (isVip) {
+    const v = variant as any;
+    const base = variantPriceUSD(variant, product, exchangeRateIQD);
+    const vip = variantVipUSD(variant, product, exchangeRateIQD, base);
+    if (vip > 0) {
+      const vipIQD = Number(v?.vipPriceIQD) > 0
+        ? Number(v.vipPriceIQD)
+        : (!variantPricesItself(v) && Number((product as any)?.vipPriceIQD) > 0
+            ? Number((product as any).vipPriceIQD)
+            : 0);
+      if (vipIQD > 0) {
+        return currency === 'IQD'
+          ? formatCurrencyIQD(vipIQD, options)
+          : formatCurrencyUSD(convertIQDToUSD(vipIQD, exchangeRateIQD), options);
+      }
+      return formatPrice(vip, currency, exchangeRateIQD, options);
+    }
+  }
   if (isIQDPriced(variant)) {
     return currency === 'IQD'
       ? formatCurrencyIQD(Number(variant!.priceIQD), options)
@@ -280,6 +376,65 @@ export const formatVariantPrice = (
     return formatPrice(usd, currency, exchangeRateIQD, options);
   }
   return formatItemPrice(product, currency, exchangeRateIQD, options);
+};
+
+
+/**
+ * What one unit COST the shop, in dollars, whatever currency it was bought in.
+ *
+ * Every profit figure in the app — the inventory-value tiles, the per-card
+ * margin, the stock and sales reports, the partner ledger, the POS profit line —
+ * was reading `purchasePrice` alone. Stock bought in dinar has that column empty
+ * and `purchase_price_iqd` set instead, so those figures would have read the
+ * cost as ZERO and reported the whole sale as profit.
+ *
+ * Accepts an order LINE as readily as a product: orders_stamp_cost stamps both
+ * numbers onto each line under the same two names.
+ *
+ * The dinar figure wins and is converted at the CURRENT rate, exactly as every
+ * other dinar amount in this file is. That is deliberate: a cost frozen at the
+ * rate of the day it was bought is the staleness that authoring in dinar exists
+ * to avoid.
+ */
+export const costUSD = (
+  item: { purchasePrice?: number | null; purchasePriceIQD?: number | null } | null | undefined,
+  exchangeRate: number = 1500,
+): number => {
+  const iqd = Number(item?.purchasePriceIQD);
+  if (Number.isFinite(iqd) && iqd > 0) return convertIQDToUSD(iqd, exchangeRate);
+  const usd = Number(item?.purchasePrice);
+  return Number.isFinite(usd) && usd > 0 ? usd : 0;
+};
+
+/**
+ * The "was" price in dollars — the struck-through number. Same dinar-wins rule.
+ * Returns 0 when the product has no compare-at price at all.
+ */
+export const compareAtUSD = (
+  item: { compareAtPriceUSD?: number | null; compareAtPriceIQD?: number | null } | null | undefined,
+  exchangeRate: number = 1500,
+): number => {
+  const iqd = Number(item?.compareAtPriceIQD);
+  if (Number.isFinite(iqd) && iqd > 0) return convertIQDToUSD(iqd, exchangeRate);
+  const usd = Number(item?.compareAtPriceUSD);
+  return Number.isFinite(usd) && usd > 0 ? usd : 0;
+};
+
+/** Format a "was" price in the shopper's currency, honouring a dinar figure. */
+export const formatCompareAtPrice = (
+  item: { compareAtPriceUSD?: number | null; compareAtPriceIQD?: number | null } | null | undefined,
+  currency: 'USD' | 'IQD' = 'USD',
+  exchangeRateIQD: number = 1500,
+  options: any = {},
+): string => {
+  const iqd = Number(item?.compareAtPriceIQD);
+  if (Number.isFinite(iqd) && iqd > 0) {
+    return currency === 'IQD'
+      ? formatCurrencyIQD(iqd, options)
+      : formatCurrencyUSD(convertIQDToUSD(iqd, exchangeRateIQD), options);
+  }
+  const usd = Number(item?.compareAtPriceUSD) || 0;
+  return formatPrice(usd, currency, exchangeRateIQD, options);
 };
 
 
