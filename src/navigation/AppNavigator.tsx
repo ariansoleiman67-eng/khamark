@@ -64,6 +64,7 @@ import AddEditAddressScreen from '../screens/profile/AddEditAddressScreen';
 import PaymentMethodsScreen from '../screens/profile/PaymentMethodsScreen';
 import HelpSupportScreen from '../screens/profile/HelpSupportScreen';
 import ChatbotScreen from '../screens/ChatbotScreen';
+import OffersScreen from '../screens/OffersScreen';
 import MessengerStack from './MessengerStack';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import StoreLocationScreen from '../screens/StoreLocationScreen';
@@ -398,6 +399,9 @@ const AppNavigator: React.FC = () => {
     config: {
       screens: {
         ProductDetails: 'product/:productId',
+        // Linkable so the shop can put it in a push notification or a
+        // WhatsApp message: asankary://offers opens straight onto the offers.
+        Offers: 'offers',
       },
     },
   }), []);
@@ -534,6 +538,7 @@ const AppNavigator: React.FC = () => {
         <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
         <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
         <Stack.Screen name="Chatbot" component={ChatbotScreen} />
+        <Stack.Screen name="Offers" component={OffersScreen} />
         <Stack.Screen name="TermsAndConditions" component={TermsAndConditionsScreen} />
         <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
         <Stack.Screen name={"ChangePassword" as any} component={ChangePasswordScreen} />

@@ -732,6 +732,7 @@ export type RootStackParamList = {
   PaymentMethods: undefined;
   HelpSupport: undefined;
   Chatbot: undefined;
+  Offers: undefined;
   StoreLocation: undefined;
   TermsAndConditions: undefined;
   PrivacyPolicy: undefined;

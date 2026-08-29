@@ -1555,7 +1555,9 @@
     "bags": "Bags",
     "smartwatches": "Smartwatches",
     "trackers": "Trackers",
-    "security": "Security"
+    "security": "Security",
+    "screenprotector": "Screen Protector",
+    "casephone": "Phone Cases"
   },
   "settings": {
     "title": "Settings",
@@ -3649,5 +3651,11 @@
     "selectedColor": "Selected Color",
     "chooseColor": "Choose a Color",
     "suggestedColors": "Suggested Colors"
+  },
+  "offers": {
+    "title": "Offers",
+    "onOffer": "on offer",
+    "empty": "No offers right now",
+    "emptyHint": "Reduced items appear here as soon as the shop sets a was-price."
   }
 }

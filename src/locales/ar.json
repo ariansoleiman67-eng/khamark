@@ -1521,7 +1521,9 @@
     "bags": "حقائب",
     "smartwatches": "ساعات ذكية",
     "trackers": "أجهزة تتبع",
-    "security": "أنظمة حماية"
+    "security": "أنظمة حماية",
+    "screenprotector": "واقي الشاشة",
+    "casephone": "أغطية الهواتف"
   },
   "settings": {
     "title": "الإعدادات",
@@ -3653,5 +3655,11 @@
     "selectedColor": "اللون المحدد",
     "chooseColor": "اختر لوناً",
     "suggestedColors": "ألوان مقترحة"
+  },
+  "offers": {
+    "title": "العروض",
+    "onOffer": "ضمن العروض",
+    "empty": "لا توجد عروض حالياً",
+    "emptyHint": "تظهر هنا السلع المخفّضة فور تحديد المتجر لسعرها السابق."
   }
 }

@@ -25,6 +25,7 @@ import MasonryProductCard from '../../components/MasonryProductCard';
 import SectionHeader from '../../components/home/SectionHeader';
 import BrandCard from '../../components/home/BrandCard';
 import SearchAiBar from '../../components/SearchAiBar';
+import { getDiscountPercent, hasCompareAtDiscount } from '../../utils/pricingUtils';
 import AutoScrollRail, { type AutoScrollRailHandle } from '../../components/home/AutoScrollRail';
 import { brandService, Brand } from '../../services/brandService';
 import AppNumber from '../../components/AppNumber';
@@ -65,6 +66,9 @@ const chunkPairs = (arr: any[]): any[][] => {
   for (let i = 0; i < arr.length; i += 2) out.push(arr.slice(i, i + 2));
   return out;
 };
+// How many reduced products the Home rail shows before "See All".
+const MAX_OFFER_CARDS = 10;
+
 // How many brand-spotlight carousels to surface at the top of the feed.
 const MAX_SPOTLIGHTS = 4;
 
@@ -441,8 +445,22 @@ const HomeScreen: React.FC = () => {
     return isRTL ? cols.reverse() : cols;
   }, [managedBrands, brands, isRTL]);
 
-  const headerDataRef = useRef({ brands, brandSpotlights, hasArrivals, managedBrands, featuredProducts, brandColumns });
-  headerDataRef.current = { brands, brandSpotlights, hasArrivals, managedBrands, featuredProducts, brandColumns };
+  // Reduced items, biggest saving first. Derived from the products already on
+  // screen — no extra fetch — and measured against what THIS shopper pays, so a
+  // VIP's own price counts as the price the "was" figure has to beat.
+  const offers = useMemo(
+    () =>
+      newArrivals
+        .filter((p) => hasCompareAtDiscount(p as any, isVip))
+        .map((p) => ({ product: p, percent: getDiscountPercent(p as any, isVip) }))
+        .sort((a2, b2) => b2.percent - a2.percent)
+        .slice(0, MAX_OFFER_CARDS)
+        .map((entry) => entry.product),
+    [newArrivals, isVip],
+  );
+
+  const headerDataRef = useRef({ brands, brandSpotlights, hasArrivals, managedBrands, featuredProducts, brandColumns, offers });
+  headerDataRef.current = { brands, brandSpotlights, hasArrivals, managedBrands, featuredProducts, brandColumns, offers };
 
   const renderSpotlightCard = useCallback(({ item }: { item: Product }) => (
     <MasonryProductCard
@@ -456,7 +474,7 @@ const HomeScreen: React.FC = () => {
   ), [handleProductPress, handleAddToCartPress, stableIsFavorite, stableToggleFavorite]);
 
   const renderListHeader = useCallback(() => {
-    const { brandSpotlights: spotlights, hasArrivals: hasItems, featuredProducts: featured, brandColumns: brandCols } = headerDataRef.current;
+    const { brandSpotlights: spotlights, hasArrivals: hasItems, featuredProducts: featured, brandColumns: brandCols, offers: offerCards } = headerDataRef.current;
     return (
       <View>
         {/* a. Hero banner */}
@@ -485,6 +503,27 @@ const HomeScreen: React.FC = () => {
               data={featured}
               renderItem={renderSpotlightCard}
               keyExtractor={(item) => `featured-${item.id}`}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.spotlightList}
+            />
+          </View>
+        )}
+
+        {/* a3. Offers — everything the shop has reduced, biggest saving first, with
+            a See All into the dedicated screen. Hidden entirely when nothing is
+            reduced, so a shop that never sets a was-price never sees an empty
+            row promising a sale. */}
+        {offerCards.length > 0 && (
+          <View>
+            <SectionHeader
+              title={t('offers.title', { defaultValue: 'Offers' })}
+              onSeeAll={() => (navigation as any).navigate('Offers')}
+            />
+            <FlatList {...iosTapFix}
+              data={offerCards}
+              renderItem={renderSpotlightCard}
+              keyExtractor={(item) => `offer-${item.id}`}
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.spotlightList}
