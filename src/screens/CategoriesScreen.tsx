@@ -31,6 +31,7 @@ import { useFavorites } from '../contexts/FavoritesContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Product } from '../types';
 import MasonryProductCard from '../components/MasonryProductCard';
+import SearchAiBar from '../components/SearchAiBar';
 import AppNumber from '../components/AppNumber';
 import ProductService from '../services/productService';
 
@@ -480,10 +481,6 @@ const CategoriesScreen: React.FC = () => {
     }
   };
 
-  const handleSearchPress = () => {
-    (navigation as any).navigate('Search');
-  };
-  
   // ALIBABA: Tap header to scroll to top instantly
   const scrollToTop = () => {
     productListRef.current?.scrollToOffset({ offset: 0, animated: false });
@@ -842,30 +839,9 @@ const CategoriesScreen: React.FC = () => {
 
 
 
-      {/* Search pill — restyled airy/light; still navigates to the Search screen */}
-      <TouchableOpacity
-        onPress={handleSearchPress}
-        activeOpacity={0.85}
-        style={[
-          styles.searchPill,
-          {
-            backgroundColor: isDark ? theme.colors.surface : '#F0F0F2',
-            flexDirection: isRTL ? 'row-reverse' : 'row',
-          },
-        ]}
-      >
-        <Ionicons name="search" size={20} color={theme.colors.textSecondary} />
-        <Text
-          allowFontScaling={false}
-          numberOfLines={1}
-          style={[
-            styles.searchPillText,
-            { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' },
-          ]}
-        >
-          {t('search.placeholder')}
-        </Text>
-      </TouchableOpacity>
+      {/* Search + AI. Was a bare search pill; the shared bar adds the assistant
+          button and is the same control on every browse screen. */}
+      <SearchAiBar style={styles.searchBar} />
 
       {/* Count row: bold "{n} Products" (number LTR) + filter toggle button */}
       <View style={[styles.countRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
@@ -1121,20 +1097,9 @@ const styles = StyleSheet.create({
     marginBottom: 2,
     paddingHorizontal: 12,
   },
-  // aynAlfahad: light search pill
-  searchPill: {
-    alignItems: 'center',
-    borderRadius: 16,
+  searchBar: {
     marginBottom: 18,
     marginTop: 4,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  searchPillText: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '500',
-    marginHorizontal: 10,
   },
   // aynAlfahad: count row + filter toggle
   countRow: {

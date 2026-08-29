@@ -22,7 +22,11 @@ import { StatusBar } from 'expo-status-bar';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+// NOT useBottomTabBarHeight(): that hook THROWS ("Couldn't find the bottom tab
+// bar height") when the screen is not inside a bottom-tab navigator, and this
+// screen is registered on the ROOT stack. Reading the context directly returns
+// undefined there instead, which the fallback below already handles.
+import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import { useTheme } from '../components/ThemeProvider';
 import { useTranslation } from 'react-i18next';
 import { getDirection } from '../locales';
@@ -41,9 +45,15 @@ const ChatbotScreen: React.FC = () => {
   const flatListRef = useRef<FlatList>(null);
   const inputRef = useRef<TextInput>(null);
   const insets = useSafeAreaInsets();
-  const rawTabBarHeight = useBottomTabBarHeight();
-  // Use tab bar height if valid, otherwise fallback to insets.bottom + typical tab bar (~50)
-  const tabBarHeight = rawTabBarHeight > 0 ? rawTabBarHeight : insets.bottom + 75;
+  const rawTabBarHeight = React.useContext(BottomTabBarHeightContext);
+  // The +75 is the app's FLOATING tab bar, which the native tab bar reports as 0
+  // height. It only applies when this screen is actually rendered inside the tab
+  // navigator. Opened from the section headers it is pushed on the root stack
+  // with no tab bar at all, and the 75 became a dead grey band under the input.
+  const insideTabs = rawTabBarHeight !== undefined;
+  const tabBarHeight = rawTabBarHeight && rawTabBarHeight > 0
+    ? rawTabBarHeight
+    : insets.bottom + (insideTabs ? 75 : 0);
 
   const isRTL = i18n?.language ? getDirection(i18n.language) === 'rtl' : false;
 

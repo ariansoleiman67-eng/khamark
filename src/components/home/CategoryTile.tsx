@@ -70,17 +70,17 @@ const CategoryTile: React.FC<CategoryTileProps> = ({
         ) : (
           <Ionicons
             name={icon}
-            size={22}
+            size={30}
             color={selected ? '#FFFFFF' : theme.colors.primary}
           />
         )}
       </View>
 
       <AppText
-        fontSize={12}
+        fontSize={13}
         numberOfLines={2}
         adjustsFontSizeToFit
-        minimumFontScale={0.85}
+        minimumFontScale={0.8}
         style={[
           styles.label,
           { color: selected ? theme.colors.primary : theme.colors.text },
@@ -93,29 +93,33 @@ const CategoryTile: React.FC<CategoryTileProps> = ({
 };
 
 const styles = StyleSheet.create({
+  // Enlarged from 96pt tall with a 46pt badge: at three columns on a 402pt phone
+  // the artwork landed at 46pt square, which the shop could not read at a glance.
+  // minHeight (not height) so a two-line Kurdish label still grows the tile
+  // instead of clipping.
   tile: {
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1.5,
-    minHeight: 96,
-    paddingVertical: 12,
+    minHeight: 126,
+    paddingVertical: 14,
     paddingHorizontal: 6,
     alignItems: 'center',
     justifyContent: 'center',
   },
   badge: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: 62,
+    height: 62,
+    borderRadius: 31,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   img: { width: '100%', height: '100%' },
   label: {
     fontWeight: '700',
     textAlign: 'center',
-    lineHeight: 15,
+    lineHeight: 17,
   },
 });
 

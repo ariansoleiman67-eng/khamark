@@ -55,6 +55,33 @@ async function writeMock(brands: Brand[]): Promise<void> {
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(brands)).catch(() => {});
 }
 
+/**
+ * One tile per brand NAME, not per row.
+ *
+ * The live table holds "Samsung" and "Anker" twice each — one row with an
+ * uploaded logo, one without — so Home's brand rail printed each of them twice,
+ * once as a logo and once as a bare wordmark. Keeping the row that HAS a logo
+ * means the duplicate disappears and the better-looking tile is the survivor.
+ *
+ * Deliberately not applied to getAllBrands: the Brand Manager has to keep showing
+ * every row, or the shop could never delete the duplicate it can no longer see.
+ */
+const dedupeByName = (brands: Brand[]): Brand[] => {
+  const byName = new Map<string, Brand>();
+  brands.forEach((b) => {
+    const key = (b.name || '').trim().toLowerCase();
+    if (!key) return;
+    const kept = byName.get(key);
+    if (!kept) { byName.set(key, b); return; }
+    const keptHasLogo = !!kept.logoUrl && kept.logoUrl.trim().length > 0;
+    const nextHasLogo = !!b.logoUrl && b.logoUrl.trim().length > 0;
+    if (!keptHasLogo && nextHasLogo) byName.set(key, b);
+  });
+  // The query already ordered by sort_order; Map preserves insertion order, so the
+  // shop's chosen order survives.
+  return [...byName.values()];
+};
+
 export const brandService = {
   async getActiveBrands(tenantId?: string): Promise<Brand[]> {
     if (USE_MOCK_DATA) {
@@ -65,7 +92,7 @@ export const brandService = {
     if (tenantId) q = q.eq('tenant_id', tenantId);
     const { data, error } = await q;
     if (error) { console.error('getActiveBrands', error); return []; }
-    return (data || []).map(mapRow);
+    return dedupeByName((data || []).map(mapRow));
   },
 
   async getAllBrands(tenantId?: string): Promise<Brand[]> {

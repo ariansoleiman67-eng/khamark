@@ -24,6 +24,7 @@ import { useTenant } from '../../contexts/TenantContext';
 import MasonryProductCard from '../../components/MasonryProductCard';
 import SectionHeader from '../../components/home/SectionHeader';
 import BrandCard from '../../components/home/BrandCard';
+import SearchAiBar from '../../components/SearchAiBar';
 import AutoScrollRail, { type AutoScrollRailHandle } from '../../components/home/AutoScrollRail';
 import { brandService, Brand } from '../../services/brandService';
 import AppNumber from '../../components/AppNumber';
@@ -726,6 +727,11 @@ const HomeScreen: React.FC = () => {
         </View>
       </View>
 
+      {/* Search + AI. Fixed under the header rather than inside the list header,
+          so it survives a scroll: Home had no search at all and the assistant was
+          unreachable from anywhere in the app. */}
+      <SearchAiBar style={styles.searchBar} />
+
       {/* GOLDEN TEMPLATE: KeyboardAvoidingView same as Login */}
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
@@ -845,6 +851,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
+  },
+  searchBar: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 6,
   },
   headerLeft: {
     alignItems: 'center',

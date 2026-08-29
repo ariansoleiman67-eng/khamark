@@ -914,7 +914,13 @@ const AdminOrdersScreen: React.FC = () => {
       },
       ar: {
         invoice: 'فاتورة',
-        companyName: invoiceSettings?.companyNameAr || 'هرياد أوتو بارت',
+        // Falls through to the base company name, then BRAND.name. It must NEVER
+        // carry a hard-coded Arabic shop name: this line still read 'هرياد أوتو بارت'
+        // — the HaryadAutoparts shop this app was forked from — so every Arabic
+        // invoice this shop printed was headed with another business's name.
+        // No Arabic/Kurdish spelling of 'Asankary' is invented here; when the shop
+        // wants one it types it in Invoice Settings.
+        companyName: invoiceSettings?.companyNameAr || invoiceSettings?.companyName || BRAND.name,
         orderNumber: 'رقم الطلب:',
         date: 'التاريخ:',
         status: 'الحالة:',
@@ -951,7 +957,8 @@ const AdminOrdersScreen: React.FC = () => {
       },
       ku: {
         invoice: 'پسووڵە',
-        companyName: invoiceSettings?.companyNameKu || 'هەریاد ئۆتۆ پارت',
+        // Same as the Arabic block above: was 'هەریاد ئۆتۆ پارت'.
+        companyName: invoiceSettings?.companyNameKu || invoiceSettings?.companyName || BRAND.name,
         orderNumber: 'ژمارەی داواکاری:',
         date: 'بەروار:',
         status: 'دۆخ:',

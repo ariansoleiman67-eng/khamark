@@ -25,6 +25,7 @@ import { useTenant } from '../contexts/TenantContext';
 import { Product } from '../types';
 import BrandCard from '../components/home/BrandCard';
 import { brandService } from '../services/brandService';
+import SearchAiBar from '../components/SearchAiBar';
 import { iosTapFix } from '../ui/iosTapFix';
 
 // 'recommended' = the order the service already returned (parts.sort_order ascending,
@@ -34,7 +35,9 @@ type SortMode = 'recommended' | 'priceAsc' | 'priceDesc';
 // Dedicated screen for one category: tap a category tile -> all its products.
 // Narrower than Home's tiles: this is a filter strip above a product grid, not the
 // page's main content, so several brands should be visible without scrolling.
-const BRAND_FILTER_TILE = 96;
+// Widened from 96 together with BrandCard's compact height — at the old size the
+// wordmarks were too small to pick a brand out of the row at a glance.
+const BRAND_FILTER_TILE = 124;
 
 const CategoryProductsScreen: React.FC = () => {
   const { theme } = useTheme();
@@ -114,9 +117,13 @@ const CategoryProductsScreen: React.FC = () => {
    * Brands present in THIS category, with a count each, ordered by count so the
    * brands the shop actually stocks come first.
    *
-   * Hidden when the screen is already showing a single brand (opened from a brand
-   * card), and when there is only one brand to choose from — a filter with one
-   * option is noise.
+   * Hidden ONLY when the screen is already showing a single brand (opened from a
+   * brand card), where a brand filter would be circular.
+   *
+   * A category stocking one brand still shows the row. It used to be hidden as
+   * "noise", but that is why brands appeared under Phones and nowhere else: the
+   * shop's Chargers are all Anker, so the row vanished from every category with a
+   * single supplier. Seeing the brand it stocks is the point.
    */
   const brandFacets = useMemo(() => {
     if (brand) return [];
@@ -125,7 +132,7 @@ const CategoryProductsScreen: React.FC = () => {
       const b = (p.brand || '').trim();
       if (b) counts.set(b, (counts.get(b) || 0) + 1);
     });
-    if (counts.size < 2) return [];
+    if (counts.size < 1) return [];
     return [...counts.entries()]
       .sort((a, b2) => b2[1] - a[1] || a[0].localeCompare(b2[0]))
       .map(([name, count]) => ({ name, count }));
@@ -189,6 +196,9 @@ const CategoryProductsScreen: React.FC = () => {
           <Ionicons name="cart-outline" size={24} color={theme.colors.primary} />
         </TouchableOpacity>
       </View>
+
+      {/* Search + AI, same bar as Home and Categories. This screen had neither. */}
+      <SearchAiBar style={styles.searchBar} preSelectedCategory={category} />
 
       {/* Brand filter, rendered with the same BrandCard the Home screen uses so the
           two read as one design — and so an uploaded logo appears here automatically.
@@ -321,6 +331,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  searchBar: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 2 },
   title: { flex: 1, fontWeight: '800', textAlign: 'center' },
   countRow: {
     alignItems: 'center',

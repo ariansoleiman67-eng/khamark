@@ -47,7 +47,7 @@ const BrandCard: React.FC<BrandCardProps> = ({ label, imageUrl, width, onPress, 
         {showImage ? (
           <Image
             source={{ uri: imageUrl }}
-            style={styles.logo}
+            style={compact ? styles.logoCompact : styles.logo}
             contentFit="contain"
             transition={0}
             cachePolicy="memory-disk"
@@ -56,7 +56,7 @@ const BrandCard: React.FC<BrandCardProps> = ({ label, imageUrl, width, onPress, 
           />
         ) : (
           <AppText
-            fontSize={compact ? 13 : 19}
+            fontSize={compact ? 15 : 19}
             numberOfLines={1}
             adjustsFontSizeToFit
             // 0.45 rather than 0.6: a long wordmark like PROOVE was rendering
@@ -98,15 +98,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Enlarged: the filter tile used to be 62pt tall with a 36pt logo area, and a
+  // logo drawn at a fixed 48pt height overflowed and clipped inside it. The shop
+  // said the brands read as too small to pick out, so the tile is now ~1.5x and
+  // the logo has its own style that fits the area it sits in.
   tileCompact: {
     borderRadius: 14,
-    minHeight: 62,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
+    minHeight: 96,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
   },
   logoAreaCompact: {
-    height: 36,
+    height: 56,
   },
+  logoCompact: { width: '88%', height: 52 },
   logoArea: {
     height: 52,
     width: '100%',
