@@ -2,7 +2,7 @@ import { supabase } from './supabase';
 import { selectAdminParts } from './partsRead';
 import { Order, Product } from '../types';
 import { safeCall } from '../utils/safeFirebaseCall';
-import { mapProduct, toPartRow, ProductService } from './productService';
+import { mapProduct, toPartRow, ProductService, stripPendingColumns, notePendingWriteColumn } from './productService';
 import { OWNER_UIDS } from '../constants/config';
 
 // Lazily-probed availability of the atomic move_part_stock RPC (see move_part_stock.sql).
@@ -254,13 +254,30 @@ export class TenantAdminService {
       const insertRow: any = { ...row, tenant_id: this.tenantId };
       if (Object.keys(extra).length) insertRow.extra_data = extra;
 
-      const { data, error } = await supabase
+      // Same fallback the read path has, for the same reason: the editor sends
+      // every price key on every save (null when blank, so clearing a field
+      // clears the column), so a column whose migration has not run yet would
+      // fail the whole INSERT and the shop could not add a product at all.
+      const runInsert = (payload: any) => supabase
         .from('parts')
-        .insert([insertRow])
+        .insert([payload])
         .select('id')
         .single();
 
+      // A LOOP, not one retry: PostgREST names ONE unknown column per error, so
+      // with two pending columns a single retry still fails on the second.
+      // Bounded by the number of pending columns, so it cannot spin.
+      let { data, error } = await runInsert(stripPendingColumns(insertRow));
+      for (let attempt = 0; attempt < 4 && error && notePendingWriteColumn(error); attempt++) {
+        ({ data, error } = await runInsert(stripPendingColumns(insertRow)));
+      }
+
       if (error) throw error;
+      // .single() returns null data only when the insert matched nothing, which
+      // should be impossible after a clean insert — but the retry path makes the
+      // type nullable, and reporting "saved" for a row that does not exist is the
+      // failure mode this file already guards against on update.
+      if (!data?.id) throw new Error('Product insert returned no row');
       // Customer Search/Store/Favorites now read from a 10-min product cache.
       // Bust it so a newly added product appears for shoppers immediately.
       await ProductService.clearCache();
@@ -295,12 +312,19 @@ export class TenantAdminService {
 
       // .select('id') so a zero-row match (wrong tenant / RLS / deleted row) is visible:
       // without it PostgREST returns error === null and the admin is told it saved.
-      const { data: updated, error } = await supabase
+      const runUpdate = (payload: any) => supabase
         .from('parts')
-        .update(patch)
+        .update(payload)
         .eq('id', productId)
         .eq('tenant_id', this.tenantId)
         .select('id');
+
+      // See addProduct: a pending migration must cost the shop one FIELD, never
+      // the ability to save.
+      let { data: updated, error } = await runUpdate(stripPendingColumns(patch));
+      for (let attempt = 0; attempt < 4 && error && notePendingWriteColumn(error); attempt++) {
+        ({ data: updated, error } = await runUpdate(stripPendingColumns(patch)));
+      }
 
       if (error) throw error;
       if (!updated || updated.length === 0) throw new Error('Product update matched no rows');

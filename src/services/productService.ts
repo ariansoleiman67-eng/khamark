@@ -108,7 +108,10 @@ export const mapProduct = (data: any): Product => ({
  * once per session. A shop whose migration is pending sells as it did yesterday
  * instead of showing an empty shelf.
  */
-const PENDING_MIGRATION_COLUMNS = ['vip_price_iqd', 'compare_at_price_iqd'] as const;
+// purchase_price_iqd is here for the WRITE path only: the customer app never
+// selects it (it is the shop's cost), but the admin editor sends it on every
+// save, so a pending migration would block saving without it in this list.
+const PENDING_MIGRATION_COLUMNS = ['vip_price_iqd', 'compare_at_price_iqd', 'purchase_price_iqd'] as const;
 
 /** Set on the first 42703, so the fallback costs one failed request, not one per query. */
 let missingColumns: string[] = [];
@@ -170,6 +173,52 @@ const runWithColumnFallback = async <T>(
   const first = await build();
   if (first.error && noteMissingColumn(first.error)) return build();
   return first;
+};
+
+/**
+ * Drop pending-migration columns from a row about to be WRITTEN, and recognise
+ * the error that says we should have.
+ *
+ * The read path and the write path fail differently. A SELECT naming an unknown
+ * column gets Postgres 42703; an INSERT/UPDATE carrying one gets PostgREST
+ * PGRST204 ("Could not find the 'x' column of 'parts' in the schema cache"),
+ * because PostgREST rejects it against its cached schema before it ever reaches
+ * the database.
+ *
+ * Without this, shipping the code ahead of the migration does not degrade one
+ * field — it stops the shop SAVING ANY PRODUCT AT ALL, because the editor always
+ * sends every price key (null when blank, so that clearing a field clears the
+ * column). That is a worse outage than an empty shelf.
+ */
+export const stripPendingColumns = (row: Record<string, any>): Record<string, any> => {
+  if (missingColumns.length === 0) return row;
+  const out: Record<string, any> = {};
+  Object.keys(row).forEach((k) => { if (!missingColumns.includes(k)) out[k] = row[k]; });
+  return out;
+};
+
+/** True when this error is the database or PostgREST saying a column does not exist. */
+const isMissingColumnWriteError = (error: any): boolean =>
+  (error?.code === '42703' || error?.code === 'PGRST204') && typeof error?.message === 'string';
+
+/**
+ * Note the pending column a WRITE error names so the retry drops it. Returns
+ * false when the error is about something else and retrying would be pointless.
+ */
+export const notePendingWriteColumn = (error: any): boolean => {
+  if (!isMissingColumnWriteError(error)) return false;
+  const named = PENDING_MIGRATION_COLUMNS.filter((c) => String(error.message).includes(c));
+  if (named.length === 0) return false;
+  const unseen = named.filter((c) => !missingColumns.includes(c));
+  if (unseen.length > 0) {
+    missingColumns = [...missingColumns, ...unseen];
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[productService] ${unseen.join(', ')} missing from the database — a migration has not been applied. ` +
+        'Saving without it. Apply supabase/migrations to restore the feature.',
+    );
+  }
+  return true;
 };
 
 const LIST_COLUMNS =
