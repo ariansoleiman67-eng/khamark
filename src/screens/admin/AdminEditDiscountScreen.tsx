@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '../../components/ThemeProvider';
@@ -316,14 +317,19 @@ const AdminEditDiscountScreen: React.FC = () => {
 
   if (loading) {
     return (
-      <View style={[styles.container, styles.centered, { backgroundColor: theme.colors.background }]}>
+      <SafeAreaView style={[styles.container, styles.centered, { backgroundColor: theme.colors.background }]} edges={['top']}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    // edges={['top']}, like AdminDiscountsScreen and every other manager in this
+    // stack. Without it the gradient header sat UNDER the status bar: the back
+    // arrow landed on top of the clock and the Dynamic Island cut the title in
+    // half. The header is a plain View inside the screen, not a navigator header,
+    // so nothing else was ever going to reserve that space.
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       
       {/* Header */}
@@ -840,7 +846,7 @@ const AdminEditDiscountScreen: React.FC = () => {
           }}
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 };
 
