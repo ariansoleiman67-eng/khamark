@@ -1,5 +1,6 @@
 import {
   costUSD,
+  productMoneyLine,
   compareAtUSD,
   variantVipUSD,
   variantCompareAtUSD,
@@ -137,5 +138,48 @@ describe('variantCostUSD reads the admin-only cost map', () => {
     // owner/admin/co-admin. That must degrade, not throw.
     expect(variantCostUSD('v_usd', { priceUSD: 100, purchasePrice: 70 }, RATE)).toBe(70);
     expect(variantCostUSD('v_usd', {}, RATE)).toBe(0);
+  });
+});
+
+describe('productMoneyLine keeps dinar business in dinar', () => {
+  // The shop buys a lot of its stock in Erbil, in dinar, and sells it in dinar.
+  // Neither number has anything to do with the dollar, so the exchange rate must
+  // not touch them — a settled purchase cannot change value because somebody
+  // edited today's rate.
+  it('bought in dinar and sold in dinar: no conversion at all', () => {
+    const line = productMoneyLine({ priceIQD: 240250, purchasePriceIQD: 210000 }, RATE);
+    expect(line.currency).toBe('IQD');
+    expect(line.cost).toBe(210000);
+    expect(line.price).toBe(240250);
+    expect(line.profit).toBe(30250);
+    expect(line.converted).toBe(false);
+  });
+
+  it('the same product reports the same profit at a different rate', () => {
+    const a = productMoneyLine({ priceIQD: 240250, purchasePriceIQD: 210000 }, 1500);
+    const b = productMoneyLine({ priceIQD: 240250, purchasePriceIQD: 210000 }, 1620);
+    expect(b.profit).toBe(a.profit);
+  });
+
+  it('bought in dollars and sold in dollars: dollars, unconverted', () => {
+    const line = productMoneyLine({ priceUSD: 155.84, purchasePrice: 145 }, RATE);
+    expect(line.currency).toBe('USD');
+    expect(line.cost).toBe(145);
+    expect(Math.round(line.profit * 100) / 100).toBe(10.84);
+    expect(line.converted).toBe(false);
+  });
+
+  it('a MIXED pair has to convert, and says so', () => {
+    const line = productMoneyLine({ priceUSD: 200, purchasePriceIQD: 150000 }, RATE);
+    expect(line.currency).toBe('USD');
+    expect(line.cost).toBe(100);
+    expect(line.profit).toBe(100);
+    expect(line.converted).toBe(true);
+  });
+
+  it('no cost recorded still reports the price', () => {
+    const line = productMoneyLine({ priceIQD: 240250 }, RATE);
+    expect(line.cost).toBe(0);
+    expect(line.currency).toBe('USD');
   });
 });

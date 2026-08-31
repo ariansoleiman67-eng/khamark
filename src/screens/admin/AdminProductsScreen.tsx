@@ -34,7 +34,7 @@ import { Image as ExpoImage } from 'expo-image';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTenant } from '../../contexts/TenantContext';
 import { useCurrency } from '../../contexts/CurrencyContext';
-import { convertIQDToUSD, costUSD, formatCurrencyIQD, formatCurrencyUSD } from '../../utils/currency';
+import { convertIQDToUSD, costUSD, formatCurrencyIQD, formatCurrencyUSD, productMoneyLine } from '../../utils/currency';
 import { getMissingColumns } from '../../services/productService';
 import { createTenantAdminService, TenantCategory } from '../../services/tenantAdminService';
 import { categoryStore } from '../../services/categoryStore';
@@ -1978,9 +1978,16 @@ const AdminProductsScreen: React.FC = () => {
     const cardIsRTL = i18n.language === 'ar' || i18n.language === 'ku';
 
     // Money line + pending-status chip (computed once per card).
-    const cost = costUSD(item as any, exchangeRateIQD);
-    const profit = (item.priceUSD || 0) - cost;
-    const belowCost = cost > 0 && (item.priceUSD || 0) <= cost;
+    // In the currency the shop actually did business in. Stock bought in dinar
+    // and sold in dinar has a cost, a price and a margin that are all fixed
+    // dinar amounts — the exchange rate must not touch any of them, or a settled
+    // purchase appears to change value every time the rate is edited.
+    const money = productMoneyLine(item as any, exchangeRateIQD);
+    const cost = money.cost;
+    const profit = money.profit;
+    const belowCost = cost > 0 && money.price <= cost;
+    const fmtMoney = (n: number) =>
+      money.currency === 'IQD' ? formatCurrencyIQD(n) : formatCurrencyUSD(n);
     const isPending = item.status === 'coming_soon' || item.status === 'on_the_way';
     const pendingColor = item.status === 'coming_soon' ? '#9C27B0' : '#06b6d4';
     const pendingLabel = item.status === 'coming_soon'
@@ -2162,10 +2169,10 @@ const AdminProductsScreen: React.FC = () => {
           {cost > 0 && (
             <View style={styles.profitLine}>
               <Text allowFontScaling={false} style={[styles.profitText, { color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.4)' }]} numberOfLines={1}>
-                {t('admin.products.cost', { defaultValue: 'Cost' })} ${cost.toFixed(2)}
+                {t('admin.products.cost', { defaultValue: 'Cost' })} {fmtMoney(cost)}
               </Text>
               <Text allowFontScaling={false} style={[styles.profitText, { color: belowCost ? '#DC2626' : '#059669', fontWeight: '700' }]} numberOfLines={1}>
-                {belowCost ? `⚠ ${t('admin.products.belowCost', { defaultValue: 'Below cost' })}` : `+$${profit.toFixed(2)}`}
+                {belowCost ? `⚠ ${t('admin.products.belowCost', { defaultValue: 'Below cost' })}` : `+${fmtMoney(profit)}`}
               </Text>
             </View>
           )}

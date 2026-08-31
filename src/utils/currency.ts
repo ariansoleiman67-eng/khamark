@@ -433,6 +433,37 @@ export const compareAtUSD = (
   return Number.isFinite(usd) && usd > 0 ? usd : 0;
 };
 
+/**
+ * The cost / price / profit of ONE product, in the currency the shop actually
+ * did business in.
+ *
+ * When the shop BOUGHT in dinar and SELLS in dinar, none of these three numbers
+ * has anything to do with the dollar and the exchange rate must not touch them:
+ * the purchase was a fixed dinar amount, the sale is a fixed dinar amount, and
+ * so is the margin between them. Converting them to dollars for display — which
+ * is what every admin money line used to do — made a settled purchase appear to
+ * change value every time somebody edited the shop rate.
+ *
+ * Only a MIXED pair (bought in dinar, priced in dollars, or the reverse) needs a
+ * conversion, and then it is unavoidable. `converted` says which case this is,
+ * so a screen can be honest about it.
+ */
+export const productMoneyLine = (
+  product: any,
+  exchangeRate: number = 1500,
+): { currency: 'USD' | 'IQD'; cost: number; price: number; profit: number; converted: boolean } => {
+  const costIQD = Number(product?.purchasePriceIQD);
+  const priceIQD = Number(product?.priceIQD);
+  const bothDinar = Number.isFinite(costIQD) && costIQD > 0 && Number.isFinite(priceIQD) && priceIQD > 0;
+  if (bothDinar) {
+    return { currency: 'IQD', cost: costIQD, price: priceIQD, profit: priceIQD - costIQD, converted: false };
+  }
+  const cost = costUSD(product, exchangeRate);
+  const price = getPriceUSD(product, exchangeRate);
+  const mixed = (Number.isFinite(costIQD) && costIQD > 0) || (Number.isFinite(priceIQD) && priceIQD > 0);
+  return { currency: 'USD', cost, price, profit: price - cost, converted: mixed };
+};
+
 /** Format a "was" price in the shopper's currency, honouring a dinar figure. */
 export const formatCompareAtPrice = (
   item: { compareAtPriceUSD?: number | null; compareAtPriceIQD?: number | null } | null | undefined,
