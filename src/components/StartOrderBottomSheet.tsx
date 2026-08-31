@@ -280,6 +280,12 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
    */
   const optionWasPrice = useCallback((v: any): string | null => {
     if (!product) return null;
+    // Only an option's OWN "was" price. variantCompareAtUSD falls back to the
+    // product's for an option that does not price itself, and printing that
+    // under every chip would strike a price through beside options whose own
+    // price is not even shown.
+    const ownWas = Number((v as any)?.compareAtPriceIQD) > 0 || Number((v as any)?.compareAtPriceUSD) > 0;
+    if (!ownWas) return null;
     const was = variantCompareAtUSD(v, product, exchangeRateIQD);
     if (!(was > 0)) return null;
     const pays = variantPriceUSD(v, product, exchangeRateIQD, isVip);
