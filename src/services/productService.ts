@@ -346,8 +346,12 @@ export class ProductService {
         let query = supabase.from('parts').select(withoutMissingColumns(LIST_COLUMNS));
 
         if (tenantId) query = query.eq('tenant_id', tenantId);
-        if (filters.category) query = query.eq('category', filters.category);
-        if (filters.brand) query = query.eq('brand', filters.brand);
+        // TRIMMED on both sides of the comparison. The column is trimmed by a DB
+        // trigger (20260831000000), and the filter value arrives from a route
+        // param that may have been read off an older, untrimmed row -- a padded
+        // value here would silently return an empty category or brand page.
+        if (filters.category) query = query.eq('category', filters.category.trim());
+        if (filters.brand) query = query.eq('brand', filters.brand.trim());
         // Filter inactive/hidden products in the DB (not after pagination) so pages
         // aren't left with holes and `hasMore` stays accurate.
         query = query.eq('is_active', true);
