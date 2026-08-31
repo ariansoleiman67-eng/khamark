@@ -333,7 +333,26 @@ const flushPendingRecoveryNav = () => {
   goToSetNewPassword();
 };
 
-const PasswordRecoveryLinkHandler: React.FC = () => {
+/**
+ * A recovery link tapped by somebody who is ALREADY signed in as an admin or a
+ * partner lands in a different navigator — this ref belongs to the customer
+ * container, and SetNewPassword is not registered in the other two. Without this
+ * the link would establish the session and then do nothing at all, silently,
+ * which is the same dead end the customer path used to have.
+ *
+ * They do not need the screen: they are signed in, so the in-app Change Password
+ * is right there. Tell them that instead of leaving them staring at a dashboard.
+ */
+const explainRecoveryToSignedInStaff = () => {
+  Alert.alert(
+    i18n.t('auth.alreadySignedInTitle', { defaultValue: 'You are already signed in' }),
+    i18n.t('auth.alreadySignedInBody', {
+      defaultValue: 'Change your password from Settings → Change Password. You do not need the emailed link.',
+    }),
+  );
+};
+
+const PasswordRecoveryLinkHandler: React.FC<{ signedInStaff?: boolean }> = ({ signedInStaff }) => {
   React.useEffect(() => {
     let cancelled = false;
     const handle = async (url: string | null) => {
@@ -355,7 +374,8 @@ const PasswordRecoveryLinkHandler: React.FC = () => {
         // A link that COLD-STARTS the app also arrives before the navigator is
         // ready — the common case, since the customer taps it from their mail app
         // with Asankary closed. goToSetNewPassword parks it until onReady.
-        goToSetNewPassword();
+        if (signedInStaff) explainRecoveryToSignedInStaff();
+        else goToSetNewPassword();
       } catch (err: any) {
         // An expired or already-used link is the common case, and it is the
         // customer's problem to solve, so say so rather than failing silently.
@@ -371,7 +391,7 @@ const PasswordRecoveryLinkHandler: React.FC = () => {
     Linking.getInitialURL().then(handle).catch(() => {});
     const sub = Linking.addEventListener('url', ({ url }) => { handle(url); });
     return () => { cancelled = true; sub.remove(); };
-  }, []);
+  }, [signedInStaff]);
 
   return null;
 };
@@ -458,6 +478,7 @@ const AppNavigator: React.FC = () => {
     return (
       <ErrorBoundary>
         <React.Suspense fallback={<NavigatorLoading />}>
+          <PasswordRecoveryLinkHandler signedInStaff />
           <LazyPartnerNavigator navigationTheme={navigationTheme} linking={linking} />
         </React.Suspense>
       </ErrorBoundary>
@@ -473,6 +494,7 @@ const AppNavigator: React.FC = () => {
     return (
       <ErrorBoundary>
         <React.Suspense fallback={<NavigatorLoading />}>
+          <PasswordRecoveryLinkHandler signedInStaff />
           <LazyAdminNavigator navigationTheme={navigationTheme} linking={linking} />
         </React.Suspense>
       </ErrorBoundary>

@@ -564,7 +564,9 @@
     "googleSignInFailed": "Google sign-in failed",
     "appleSignInFailed": "Apple sign-in failed",
     "resetLinkFailedTitle": "This reset link did not work",
-    "resetLinkFailed": "It may have expired or already been used. Ask for a new one."
+    "resetLinkFailed": "It may have expired or already been used. Ask for a new one.",
+    "alreadySignedInTitle": "You are already signed in",
+    "alreadySignedInBody": "Change your password from Settings → Change Password. You do not need the emailed link."
   },
   "home": {
     "welcome": "Welcome to Asankary",

@@ -299,9 +299,21 @@ export class AuthService {
    * Configuration -> Redirect URLs. An unlisted redirect is silently ignored and
    * Supabase falls back to the Site URL, which is exactly the bug this fixes.
    */
+  /**
+   * The exact string Supabase must have in Authentication -> URL Configuration ->
+   * Redirect URLs. Exposed so it can be read off a running build rather than
+   * guessed: makeRedirectUri returns an `exp://…` development URL inside the dev
+   * client and `asankary://reset-password` in a real build, and allow-listing the
+   * wrong one is silent — Supabase just falls back to the Site URL and the
+   * customer lands on the website instead of the app.
+   */
+  static recoveryRedirectUri(): string {
+    return makeRedirectUri({ scheme: 'asankary', path: 'reset-password' });
+  }
+
   static async resetPassword(email: string): Promise<void> {
     try {
-      const redirectTo = makeRedirectUri({ scheme: 'asankary', path: 'reset-password' });
+      const redirectTo = AuthService.recoveryRedirectUri();
       const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
       if (error) throw error;
     } catch (error: any) {
