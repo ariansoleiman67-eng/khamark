@@ -1116,13 +1116,13 @@
       "profile": "پرۆفایل",
       "profileSubtitle": "ناو، ئیمەیل، مۆبایل و وشەی نهێنی",
       "brandManager": "بەڕێوەبردنی براندەکان",
-      "brandManagerSub": "براند زیاد بکە و لۆگۆ باربکە (نمایش)",
+      "brandManagerSub": "براند زیاد بکە و لۆگۆ باربکە",
       "categoryManager": "بەڕێوەبردنی هاوپۆلەکان",
-      "categoryManagerSub": "هاوپۆل زیاد بکە و لۆگۆ باربکە (نمایش)",
+      "categoryManagerSub": "بەش زیاد بکە و ئایکۆن باربکە",
       "previewVip": "پیشبینین وەک VIP",
-      "previewVipSub": "بینینی نرخە تایبەتەکانی VIP (نمایش)",
+      "previewVipSub": "نرخەکانی تایبەت بە VIP ببینە",
       "promoManager": "کۆدی داشکاندن",
-      "promoManagerSub": "کۆدی داشکاندن دروست بکە (نمایش)"
+      "promoManagerSub": "کۆدی داشکاندن دروست بکە کە کڕیار لە کاتی پارەداندا دەینووسێت"
     },
     "currency": {
       "select": "دراو هەڵبژێرە",

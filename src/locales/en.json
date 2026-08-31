@@ -1171,13 +1171,13 @@
       "profile": "Profile",
       "profileSubtitle": "Name, email, phone & password",
       "brandManager": "Brand Manager",
-      "brandManagerSub": "Add brands & upload logos (demo)",
+      "brandManagerSub": "Add brands & upload logos",
       "categoryManager": "Category Manager",
-      "categoryManagerSub": "Add categories & upload logos (demo)",
+      "categoryManagerSub": "Add categories & upload logos",
       "previewVip": "Preview as VIP",
-      "previewVipSub": "See VIP-only prices (demo)",
+      "previewVipSub": "See VIP-only prices",
       "promoManager": "Promo Codes",
-      "promoManagerSub": "Create discount codes (demo)"
+      "promoManagerSub": "Create discount codes customers type at checkout"
     },
     "language": {
       "changeTitle": "Change Language",

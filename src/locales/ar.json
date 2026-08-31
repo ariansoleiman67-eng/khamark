@@ -1121,13 +1121,13 @@
       "profile": "الملف الشخصي",
       "profileSubtitle": "الاسم، البريد، الهاتف وكلمة المرور",
       "brandManager": "إدارة العلامات التجارية",
-      "brandManagerSub": "أضف العلامات وارفع الشعارات (تجريبي)",
+      "brandManagerSub": "أضف الماركات وارفع الشعارات",
       "categoryManager": "إدارة الفئات",
-      "categoryManagerSub": "أضف الفئات وارفع الشعارات (تجريبي)",
+      "categoryManagerSub": "أضف الأقسام وارفع الأيقونات",
       "previewVip": "معاينة كـ VIP",
-      "previewVipSub": "شاهد أسعار VIP الحصرية (تجريبي)",
+      "previewVipSub": "اعرض أسعار VIP فقط",
       "promoManager": "أكواد الخصم",
-      "promoManagerSub": "أنشئ أكواد خصم (تجريبي)"
+      "promoManagerSub": "أنشئ أكواد خصم يكتبها الزبون عند الدفع"
     },
     "language": {
       "changeTitle": "تغيير اللغة",

@@ -617,26 +617,26 @@ export const ProfileScreen: React.FC = () => {
                 <View style={{ ...cardStyle, overflow: 'hidden' }}>
                   <LuxuryMenuItem icon="diamond-outline"
                     title={t('profile.menu.previewVip', { defaultValue: 'Preview as VIP' })}
-                    subtitle={t('profile.menu.previewVipSub', { defaultValue: 'See VIP-only prices (demo)' })}
+                    subtitle={t('profile.menu.previewVipSub', { defaultValue: 'See VIP-only prices' })}
                     hasSwitch switchValue={demoVip}
                     onSwitchChange={(v) => setDemoVip(v)}
                     theme={theme} isDark={isDark} tintBg={tintBg} />
                   <Divider isDark={isDark} />
                   <LuxuryMenuItem icon="pricetags-outline"
                     title={t('profile.menu.brandManager', { defaultValue: 'Brand Manager' })}
-                    subtitle={t('profile.menu.brandManagerSub', { defaultValue: 'Add brands & upload logos (demo)' })}
+                    subtitle={t('profile.menu.brandManagerSub', { defaultValue: 'Add brands & upload logos' })}
                     onPress={() => (navigation as any).navigate('AdminBrandManagement')}
                     theme={theme} isDark={isDark} tintBg={tintBg} />
                   <Divider isDark={isDark} />
                   <LuxuryMenuItem icon="grid-outline"
                     title={t('profile.menu.categoryManager', { defaultValue: 'Category Manager' })}
-                    subtitle={t('profile.menu.categoryManagerSub', { defaultValue: 'Add categories & upload logos (demo)' })}
+                    subtitle={t('profile.menu.categoryManagerSub', { defaultValue: 'Add categories & upload logos' })}
                     onPress={() => (navigation as any).navigate('AdminCategoryManagement')}
                     theme={theme} isDark={isDark} tintBg={tintBg} />
                   <Divider isDark={isDark} />
                   <LuxuryMenuItem icon="ticket-outline"
                     title={t('profile.menu.promoManager', { defaultValue: 'Promo Codes' })}
-                    subtitle={t('profile.menu.promoManagerSub', { defaultValue: 'Create discount codes (demo)' })}
+                    subtitle={t('profile.menu.promoManagerSub', { defaultValue: 'Create discount codes customers type at checkout' })}
                     onPress={() => (navigation as any).navigate('AdminPromoManagement')}
                     theme={theme} isDark={isDark} tintBg={tintBg} />
                 </View>
