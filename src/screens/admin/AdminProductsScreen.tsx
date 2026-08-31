@@ -29,6 +29,7 @@ import { useTheme } from '../../components/ThemeProvider';
 import { SPACING } from '../../constants/theme';
 import PriceField from '../../components/admin/PriceField';
 import VariantPriceBlock from '../../components/admin/VariantPriceBlock';
+import FormSection from '../../components/admin/FormSection';
 import { getThumbnailUrl } from '../../utils/imageUtils';
 import { Image as ExpoImage } from 'expo-image';
 import { useAuth } from '../../contexts/AuthContext';
@@ -305,6 +306,7 @@ const AdminProductsScreen: React.FC = () => {
     setNewSpecValue('');
     setColorVariations([]);
     setVariationCosts({});
+    setCollapsedSections({});
     setNewColorStock('');
     setNewColorKey(null);
     setIsFeatured(false);
@@ -448,6 +450,7 @@ const AdminProductsScreen: React.FC = () => {
     setNewSpecValue('');
     setColorVariations([]);
     setVariationCosts({});
+    setCollapsedSections({});
     setNewColorStock('');
     setNewColorKey(null);
     // Video reset
@@ -630,6 +633,19 @@ const AdminProductsScreen: React.FC = () => {
   // the cards are siblings inside one scroll view, so their y values are directly
   // comparable — no measure() round-trip needed.
   const formScrollRef = useRef<any>(null);
+  /**
+   * Which form sections the admin has folded away, this editing session.
+   *
+   * Everything starts OPEN: a shop that never taps a header sees exactly the form
+   * it saw before, and no field is ever hidden from them by a default they did
+   * not choose. Cleared with the rest of the form so a collapse on one product
+   * does not carry to the next.
+   */
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+  const toggleSection = useCallback((key: string) => {
+    setCollapsedSections(prev => ({ ...prev, [key]: !prev[key] }));
+  }, []);
+
   const sectionYRef = useRef<Record<string, number>>({});
   const onSectionLayout = useCallback(
     (key: string) => (e: { nativeEvent: { layout: { y: number } } }) => {
@@ -638,10 +654,18 @@ const AdminProductsScreen: React.FC = () => {
     [],
   );
   const jumpToSection = useCallback((key: string) => {
+    // Jumping to a section the admin folded away must OPEN it. Scrolling to a
+    // collapsed header and stopping there reads as "the tab did nothing".
+    setCollapsedSections(prev => (prev[key] ? { ...prev, [key]: false } : prev));
     const y = sectionYRef.current[key];
     if (typeof y !== 'number') return;
     // A little headroom so the section title is not flush against the header.
-    formScrollRef.current?.scrollToPosition?.(0, Math.max(0, y - 12), true);
+    // Deferred a frame: expanding the section above changes this one's offset,
+    // and scrolling to the stale y would land in the wrong place.
+    requestAnimationFrame(() => {
+      const target = sectionYRef.current[key] ?? y;
+      formScrollRef.current?.scrollToPosition?.(0, Math.max(0, target - 12), true);
+    });
   }, []);
 
   const FORM_SECTIONS: Array<{ key: string; label: string }> = useMemo(() => [
@@ -2650,22 +2674,14 @@ const AdminProductsScreen: React.FC = () => {
             renderScrollComponent={(props: object) => <GHScrollView {...props} />}
           >
               {/* MEDIA SECTION CARD */}
-              <View onLayout={onSectionLayout('media')} style={[styles.formSectionCard, {
-                backgroundColor: isDark ? theme.colors.surface : '#FFFFFF',
-                borderRadius: 16,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: isDark ? 0 : 0.06,
-                shadowRadius: 8,
-                elevation: 2,
-              }]}>
-                <Text allowFontScaling={false} 
-                  style={[styles.sectionTitle, { color: theme.colors.text }]}
-                  adjustsFontSizeToFit
-                  numberOfLines={1}
-                >
-                  {t('admin.products.form.media')}
-                </Text>
+              <FormSection
+                onLayout={onSectionLayout('media')}
+                title={t('admin.products.form.media')}
+                collapsed={!!collapsedSections['media']}
+                onToggle={() => toggleSection('media')}
+                isDark={isDark}
+                theme={theme}
+              >
 
                 <Text allowFontScaling={false} 
                   style={[styles.inputLabel, { color: theme.colors.textSecondary }]}
@@ -2924,17 +2940,17 @@ const AdminProductsScreen: React.FC = () => {
                     </TouchableOpacity>
                   )}
                 </View>
-              </View>
+              </FormSection>
 
               {/* BASIC INFO CARD */}
-              <View onLayout={onSectionLayout('basic')} style={[styles.formSectionCard, { backgroundColor: isDark ? theme.colors.surface : '#FFFFFF', borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: isDark ? 0 : 0.06, shadowRadius: 8, elevation: 2 }]}>
-                <Text allowFontScaling={false} 
-                  style={[styles.sectionTitle, { color: theme.colors.text }]}
-                  adjustsFontSizeToFit
-                  numberOfLines={1}
-                >
-                  {t('admin.products.form.basicInfo')}
-                </Text>
+              <FormSection
+                onLayout={onSectionLayout('basic')}
+                title={t('admin.products.form.basicInfo')}
+                collapsed={!!collapsedSections['basic']}
+                onToggle={() => toggleSection('basic')}
+                isDark={isDark}
+                theme={theme}
+              >
 
                 {/* Name */}
                 <Text allowFontScaling={false} 
@@ -3155,17 +3171,17 @@ const AdminProductsScreen: React.FC = () => {
                     </View>
                   </View>
                 </View>
-              </View>
+              </FormSection>
 
               {/* PRICING & STOCK CARD */}
-              <View onLayout={onSectionLayout('pricing')} style={[styles.formSectionCard, { backgroundColor: isDark ? theme.colors.surface : '#FFFFFF', borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: isDark ? 0 : 0.06, shadowRadius: 8, elevation: 2 }]}>
-                <Text allowFontScaling={false} 
-                  style={[styles.sectionTitle, { color: theme.colors.text }]}
-                  adjustsFontSizeToFit
-                  numberOfLines={1}
-                >
-                  {t('admin.products.form.pricingAndStock')}
-                </Text>
+              <FormSection
+                onLayout={onSectionLayout('pricing')}
+                title={t('admin.products.form.pricingAndStock')}
+                collapsed={!!collapsedSections['pricing']}
+                onToggle={() => toggleSection('pricing')}
+                isDark={isDark}
+                theme={theme}
+              >
 
                 {/* PRICES — one box each, with a $ / IQD switch.
                     This card used to carry six boxes: a dollar price and a dinar
@@ -3497,7 +3513,7 @@ const AdminProductsScreen: React.FC = () => {
                     })}
                   </View>
                 </View>
-              </View>
+              </FormSection>
 
               {/* Featured toggle (pin to the customer "featured" row) */}
               <View onLayout={onSectionLayout('featured')} style={[styles.formSectionCard, { backgroundColor: isDark ? theme.colors.surface : '#FFFFFF', borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: isDark ? 0 : 0.06, shadowRadius: 8, elevation: 2 }]}>
@@ -3699,14 +3715,14 @@ const AdminProductsScreen: React.FC = () => {
               </View>
 
               {/* VARIATIONS (SIZE/COLOR) CARD */}
-              <View onLayout={onSectionLayout('variations')} style={[styles.formSectionCard, { backgroundColor: isDark ? theme.colors.surface : '#FFFFFF', borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: isDark ? 0 : 0.06, shadowRadius: 8, elevation: 2 }]}>
-                <Text allowFontScaling={false} 
-                  style={[styles.sectionTitle, { color: theme.colors.text }]}
-                  adjustsFontSizeToFit
-                  numberOfLines={1}
-                >
-                  {t('admin.products.form.variations')}
-                </Text>
+              <FormSection
+                onLayout={onSectionLayout('variations')}
+                title={t('admin.products.form.variations')}
+                collapsed={!!collapsedSections['variations']}
+                onToggle={() => toggleSection('variations')}
+                isDark={isDark}
+                theme={theme}
+              >
 
                 {/* ALIBABA VARIATION: Size Variations */}
                 <View style={styles.priceTiersSection}>
@@ -4042,13 +4058,17 @@ const AdminProductsScreen: React.FC = () => {
                     </View>
                   )}
                 </View>
-              </View>
+              </FormSection>
 
               {/* SPECIFICATIONS CARD (RAM / screen / battery ...) */}
-              <View onLayout={onSectionLayout('specs')} style={[styles.formSectionCard, { backgroundColor: isDark ? theme.colors.surface : '#FFFFFF', borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: isDark ? 0 : 0.06, shadowRadius: 8, elevation: 2 }]}>
-                <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text }]} numberOfLines={1}>
-                  {t('admin.products.form.specifications', { defaultValue: 'Specifications' })}
-                </Text>
+              <FormSection
+                onLayout={onSectionLayout('specs')}
+                title={t('admin.products.form.specifications', { defaultValue: 'Specifications' })}
+                collapsed={!!collapsedSections['specs']}
+                onToggle={() => toggleSection('specs')}
+                isDark={isDark}
+                theme={theme}
+              >
                 {/* Quick-add common spec keys */}
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
                   {SPEC_PRESETS.map((preset) => {
@@ -4139,13 +4159,17 @@ const AdminProductsScreen: React.FC = () => {
                     ))}
                   </View>
                 )}
-              </View>
+              </FormSection>
 
               {/* DETAILS CARD (SKU / barcode / weight / warranty / dimensions) */}
-              <View onLayout={onSectionLayout('details')} style={[styles.formSectionCard, { backgroundColor: isDark ? theme.colors.surface : '#FFFFFF', borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: isDark ? 0 : 0.06, shadowRadius: 8, elevation: 2 }]}>
-                <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text }]} numberOfLines={1}>
-                  {t('admin.products.form.details', { defaultValue: 'Details' })}
-                </Text>
+              <FormSection
+                onLayout={onSectionLayout('details')}
+                title={t('admin.products.form.details', { defaultValue: 'Details' })}
+                collapsed={!!collapsedSections['details']}
+                onToggle={() => toggleSection('details')}
+                isDark={isDark}
+                theme={theme}
+              >
                 <View style={styles.rowInputs}>
                   <View style={styles.halfInput}>
                     <Text allowFontScaling={false} style={[styles.inputLabel, { color: theme.colors.textSecondary, marginTop: 0 }]} numberOfLines={1}>{t('admin.products.form.sku', { defaultValue: 'SKU' })}</Text>
@@ -4205,17 +4229,17 @@ const AdminProductsScreen: React.FC = () => {
                     value={formData.dimHeight} onChangeText={(text) => setFormData(prev => ({ ...prev, dimHeight: text }))}
                     placeholder="H" keyboardType="decimal-pad" placeholderTextColor={theme.colors.textSecondary} multiline={false} scrollEnabled={false} disableFullscreenUI />
                 </View>
-              </View>
+              </FormSection>
 
               {/* DESCRIPTION CARD */}
-              <View onLayout={onSectionLayout('description')} style={[styles.formSectionCard, { backgroundColor: isDark ? theme.colors.surface : '#FFFFFF', borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: isDark ? 0 : 0.06, shadowRadius: 8, elevation: 2, marginBottom: 100 }]}>
-                <Text allowFontScaling={false} 
-                  style={[styles.sectionTitle, { color: theme.colors.text }]}
-                  adjustsFontSizeToFit
-                  numberOfLines={1}
-                >
-                  {t('admin.products.form.description')}
-                </Text>
+              <FormSection
+                onLayout={onSectionLayout('description')}
+                title={t('admin.products.form.description')}
+                collapsed={!!collapsedSections['description']}
+                onToggle={() => toggleSection('description')}
+                isDark={isDark}
+                theme={theme}
+              >
                 
                 <TextInput allowFontScaling={false}                  style={[
                     styles.input,
@@ -4268,7 +4292,7 @@ const AdminProductsScreen: React.FC = () => {
                   autoComplete="off"
                   textAlignVertical="top"
                 />
-              </View>
+              </FormSection>
             </KeyboardAwareScrollView>
           ) : null}
 
