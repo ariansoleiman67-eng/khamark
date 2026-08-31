@@ -40,7 +40,7 @@ import { useTheme } from './ThemeProvider';
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { useCurrency } from '../contexts/CurrencyContext';
-import { convertIQDToUSD, formatPrice, formatVariantPrice, getPriceUSD, variantPriceUSD } from '../utils/currency';
+import { convertIQDToUSD, formatPrice, formatVariantPrice, getPriceUSD, variantCompareAtUSD, variantPriceUSD } from '../utils/currency';
 import { Product, Address, RootStackParamList } from '../types';
 import { SPACING } from '../constants/theme';
 import { getDirection } from '../locales';
@@ -270,6 +270,22 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
   }, [hasAnyVars, localQty, selectionComplete]);
 
   const isVip = user?.role === 'vip';
+
+  /**
+   * The struck-through "was" price for ONE option, or null when it has none or
+   * the figure does not beat what this shopper actually pays for that option.
+   *
+   * Without this the per-option "was" price the shop can now set had no reader
+   * anywhere: it was saved to the database and never shown to anybody.
+   */
+  const optionWasPrice = useCallback((v: any): string | null => {
+    if (!product) return null;
+    const was = variantCompareAtUSD(v, product, exchangeRateIQD);
+    if (!(was > 0)) return null;
+    const pays = variantPriceUSD(v, product, exchangeRateIQD, isVip);
+    if (!(pays > 0) || was <= pays) return null;
+    return formatPrice(was, currency, exchangeRateIQD);
+  }, [product, exchangeRateIQD, isVip, currency]);
 
   const localUnitPrice = useMemo(() => {
     if (!product) return 0;
@@ -780,6 +796,12 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                                 style={[styles.optionChipPrice, { color: sel ? theme.colors.primary : theme.colors.textSecondary }]}
                               />
                             )}
+                            {optionWasPrice(v) && (
+                              <AppNumber
+                                value={optionWasPrice(v) as string}
+                                style={[styles.optionChipWas, { color: theme.colors.textSecondary }]}
+                              />
+                            )}
                             {soldOut && (
                               <AppText style={[styles.optionChipSoldOut, { color: '#F44336' }]}>
                                 {t('product.outOfStock', { defaultValue: 'Out of Stock' })}
@@ -845,6 +867,12 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                               <AppNumber
                                 value={formatVariantPrice(v, product, currency, exchangeRateIQD, {}, isVip)}
                                 style={[styles.optionChipPrice, { color: sel ? theme.colors.primary : theme.colors.textSecondary }]}
+                              />
+                            )}
+                            {optionWasPrice(v) && (
+                              <AppNumber
+                                value={optionWasPrice(v) as string}
+                                style={[styles.optionChipWas, { color: theme.colors.textSecondary }]}
                               />
                             )}
                             {soldOut && (
@@ -1622,6 +1650,11 @@ const createStyles = (theme: any, isDark: boolean, insets: any, isRTL: boolean) 
       fontSize: 12,
       fontWeight: '600',
     },
+  optionChipWas: {
+    fontSize: 11,
+    marginTop: 1,
+    textDecorationLine: 'line-through',
+  },
     optionChipSoldOut: {
       fontSize: 10,
       fontWeight: '600',

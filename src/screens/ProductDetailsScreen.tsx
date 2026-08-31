@@ -1319,11 +1319,15 @@ export const ProductDetailsScreen: React.FC = () => {
     // Then apply the tiered pricing discount ratio if applicable
     let variationSubtotal = 0;
 
+    // isVip is threaded through every variantPriceUSD call on this page: an
+    // option with its own VIP price is shown and totalled at that price. Without
+    // it the page quoted a VIP the full price for an option while the order sheet
+    // it opens quoted the VIP one — same option, two numbers.
     // Sum up size variations
     if (hasSizeVariations && product.variations) {
       product.variations.forEach(variation => {
         const qty = variationQuantities[variation.variationId] || 0;
-        const price = variantPriceUSD(variation, product, exchangeRateIQD);
+        const price = variantPriceUSD(variation, product, exchangeRateIQD, isVip);
         variationSubtotal += qty * price;
       });
     }
@@ -1332,7 +1336,7 @@ export const ProductDetailsScreen: React.FC = () => {
     if (hasColorVariations && product.colorVariations) {
       product.colorVariations.forEach(variation => {
         const qty = colorVariationQuantities[variation.variationId] || 0;
-        const price = variantPriceUSD(variation, product, exchangeRateIQD);
+        const price = variantPriceUSD(variation, product, exchangeRateIQD, isVip);
         variationSubtotal += qty * price;
       });
     }
@@ -2166,7 +2170,7 @@ export const ProductDetailsScreen: React.FC = () => {
                       const isOutOfStock = variation.stockQuantity <= 0;
                       const selected = (variationQuantities[variation.variationId] || 0) > 0;
                       const sizeDisplay = `${variation.sizeValue} ${variation.sizeUnit}`.trim();
-                      const unitPrice = variantPriceUSD(variation, product, exchangeRateIQD);
+                      const unitPrice = variantPriceUSD(variation, product, exchangeRateIQD, isVip);
                       return (
                         <TouchableOpacity
                           key={variation.variationId}
@@ -3425,7 +3429,7 @@ export const ProductDetailsScreen: React.FC = () => {
             variationId: v.variationId,
             name: v.sizeValue,
             quantity: variationQuantities[v.variationId] || 0,
-            price: variantPriceUSD(v, product, exchangeRateIQD),
+            price: variantPriceUSD(v, product, exchangeRateIQD, isVip),
             stock: v.stockQuantity,
           })) || []
         }
@@ -3434,7 +3438,7 @@ export const ProductDetailsScreen: React.FC = () => {
             variationId: v.variationId,
             name: v.colorValue,
             quantity: colorVariationQuantities[v.variationId] || 0,
-            price: variantPriceUSD(v, product, exchangeRateIQD),
+            price: variantPriceUSD(v, product, exchangeRateIQD, isVip),
             stock: v.stockQuantity,
           })) || []
         }
@@ -3466,7 +3470,7 @@ export const ProductDetailsScreen: React.FC = () => {
             variationId: v.variationId,
             name: v.sizeValue,
             quantity: variationQuantities[v.variationId] || 0,
-            price: variantPriceUSD(v, product, exchangeRateIQD),
+            price: variantPriceUSD(v, product, exchangeRateIQD, isVip),
             stock: v.stockQuantity,
           })) || []
         }
@@ -3475,7 +3479,7 @@ export const ProductDetailsScreen: React.FC = () => {
             variationId: v.variationId,
             name: v.colorValue,
             quantity: colorVariationQuantities[v.variationId] || 0,
-            price: variantPriceUSD(v, product, exchangeRateIQD),
+            price: variantPriceUSD(v, product, exchangeRateIQD, isVip),
             stock: v.stockQuantity,
           })) || []
         }

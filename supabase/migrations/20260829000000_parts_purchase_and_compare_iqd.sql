@@ -20,12 +20,15 @@
 
 alter table public.parts
   add column if not exists purchase_price_iqd  numeric(12,0),
-  add column if not exists compare_at_price_iqd numeric(12,0);
+  add column if not exists compare_at_price_iqd numeric(12,0),
+  add column if not exists variation_costs      jsonb;
 
 comment on column public.parts.purchase_price_iqd is
   'What the shop PAID, authored in IQD. NULL means the cost (if any) is purchase_price (USD). Same protection as purchase_price: never granted to anon/authenticated, readable only through parts_admin.';
 comment on column public.parts.compare_at_price_iqd is
   'The "was" price authored in IQD. NULL means it is compare_at_price_usd. When set it is shown verbatim with no conversion.';
+comment on column public.parts.variation_costs is
+  'Per-option COST, keyed by variationId: {"<variationId>": {"usd": 80, "iqd": 150000}}. Lives here and NOT inside parts.variations because that column is granted to anon and read by every shopper — a cost stored there would be public. Same protection as purchase_price: never granted, readable only through parts_admin.';
 
 -- -----------------------------------------------------------------------------
 -- Grants: these two columns are NOT the same, and that is the whole point.
@@ -43,6 +46,12 @@ comment on column public.parts.compare_at_price_iqd is
 --   granting it here would hand every shopper the margin on every product
 --   through the back door. It is reachable only through parts_admin below, under
 --   the same owner/admin/co-admin test.
+--
+--   variation_costs is the per-OPTION cost. It exists as its own column for
+--   exactly this reason: parts.variations and parts.color_variations ARE granted
+--   to anon — every shopper's catalogue query selects them to render the size and
+--   colour prices — so a per-option cost stored inside those arrays would be
+--   published to the world. It is never granted, like purchase_price.
 grant select (compare_at_price_iqd) on public.parts to anon, authenticated;
 
 -- -----------------------------------------------------------------------------
@@ -95,7 +104,18 @@ select
       then p.purchase_price_iqd
     else null
   end as purchase_price_iqd,
-  p.compare_at_price_iqd
+  p.compare_at_price_iqd,
+  -- Masked exactly like purchase_price above: the per-option cost is the same
+  -- secret, keyed by option instead of by product.
+  case
+    when p.tenant_id = auth.uid() then p.variation_costs
+    when coalesce((select u.is_admin from public.users u where u.id = auth.uid()), false)
+      then p.variation_costs
+    when jsonb_typeof(p.extra_data -> 'coAdminIds') = 'array'
+     and (p.extra_data -> 'coAdminIds') @> to_jsonb(auth.uid()::text)
+      then p.variation_costs
+    else null
+  end as variation_costs
 from public.parts p;
 
 -- Re-assert read-only. 20260819130000 exists because this view, being definer,
@@ -169,25 +189,26 @@ begin
       on p.id::text = nullif(line->>'productId', '')
     -- The sold option, looked up in the product's own variations. Sizes and
     -- colours share one id space, so both arrays are searched.
+    -- The sold option's cost, read from variation_costs — NOT from the variations
+    -- array, which is public.
     left join lateral (
       select
         -- Guarded casts. These values came from an admin form through jsonb and
         -- should always be numeric, but a bad one must not raise: a raising
         -- BEFORE INSERT trigger fails the customer's order.
-        case when elem->>'purchasePrice'    ~ '^[0-9]+(\.[0-9]+)?$'
-             then (elem->>'purchasePrice')::numeric end    as v_usd,
-        case when elem->>'purchasePriceIQD' ~ '^[0-9]+(\.[0-9]+)?$'
-             then (elem->>'purchasePriceIQD')::numeric end as v_iqd
+        case when c.entry->>'usd' ~ '^[0-9]+(\.[0-9]+)?$'
+             then (c.entry->>'usd')::numeric end as v_usd,
+        case when c.entry->>'iqd' ~ '^[0-9]+(\.[0-9]+)?$'
+             then (c.entry->>'iqd')::numeric end as v_iqd
       from (
-        select e from jsonb_array_elements(
-          case when jsonb_typeof(p.variations) = 'array' then p.variations else '[]'::jsonb end) e
-        union all
-        select e from jsonb_array_elements(
-          case when jsonb_typeof(p.color_variations) = 'array' then p.color_variations else '[]'::jsonb end) e
-      ) opts(elem)
-      where nullif(line->>'variationId', '') is not null
-        and elem->>'variationId' = line->>'variationId'
-      limit 1
+        select case
+                 when jsonb_typeof(p.variation_costs) = 'object'
+                  and nullif(line->>'variationId', '') is not null
+                   then p.variation_costs -> (line->>'variationId')
+                 else null
+               end as entry
+      ) c
+      where jsonb_typeof(c.entry) = 'object'
     ) v on true;
 
   if stamped is not null then
@@ -214,7 +235,7 @@ revoke all on function public.orders_stamp_cost() from public, anon, authenticat
 select column_name, data_type, numeric_precision, numeric_scale
 from information_schema.columns
 where table_schema = 'public' and table_name = 'parts'
-  and column_name in ('purchase_price_iqd', 'compare_at_price_iqd')
+  and column_name in ('purchase_price_iqd', 'compare_at_price_iqd', 'variation_costs')
 order by column_name;
 
 -- 2. THE IMPORTANT ONE. compare_at_price_iqd must appear for anon AND
@@ -223,7 +244,7 @@ order by column_name;
 select column_name, grantee, privilege_type
 from information_schema.column_privileges
 where table_schema = 'public' and table_name = 'parts'
-  and column_name in ('purchase_price_iqd', 'compare_at_price_iqd')
+  and column_name in ('purchase_price_iqd', 'compare_at_price_iqd', 'variation_costs')
 order by column_name, grantee;
 
 -- 3. the view carries both

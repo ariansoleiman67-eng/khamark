@@ -35,6 +35,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTenant } from '../../contexts/TenantContext';
 import { useCurrency } from '../../contexts/CurrencyContext';
 import { convertIQDToUSD, costUSD, formatCurrencyIQD, formatCurrencyUSD } from '../../utils/currency';
+import { getMissingColumns } from '../../services/productService';
 import { createTenantAdminService, TenantCategory } from '../../services/tenantAdminService';
 import { categoryStore } from '../../services/categoryStore';
 import { ImageService } from '../../services/imageService';
@@ -169,6 +170,14 @@ const AdminProductsScreen: React.FC = () => {
 
   // ALIBABA VARIATION: Color variations with stock
   const [colorVariations, setColorVariations] = useState<ColorVariation[]>([]);
+  /**
+   * Per-option COST, keyed by variationId. Held apart from the variation objects
+   * because those are stored in parts.variations, which is granted to `anon` and
+   * selected by every shopper's catalogue query — a cost written there would be
+   * public. This map is saved to parts.variation_costs, which is granted to
+   * nobody. Sizes and colours share one id space, so one map covers both.
+   */
+  const [variationCosts, setVariationCosts] = useState<Record<string, { usd?: number; iqd?: number }>>({});
   const [colorImgUploadingId, setColorImgUploadingId] = useState<string | null>(null);
   const [newColorStock, setNewColorStock] = useState('');
 
@@ -295,6 +304,7 @@ const AdminProductsScreen: React.FC = () => {
     setNewSpecKey('');
     setNewSpecValue('');
     setColorVariations([]);
+    setVariationCosts({});
     setNewColorStock('');
     setNewColorKey(null);
     setIsFeatured(false);
@@ -437,6 +447,7 @@ const AdminProductsScreen: React.FC = () => {
     setNewSpecKey('');
     setNewSpecValue('');
     setColorVariations([]);
+    setVariationCosts({});
     setNewColorStock('');
     setNewColorKey(null);
     // Video reset
@@ -567,6 +578,15 @@ const AdminProductsScreen: React.FC = () => {
     setVariations(prev => prev.map(v => (v.variationId === variationId ? applyVariantPrices(v, patch) : v)));
   };
 
+  const setVariationCost = (variationId: string, next: { usd?: number; iqd?: number } | undefined) => {
+    setVariationCosts((prev) => {
+      const out = { ...prev };
+      if (!next || (next.usd == null && next.iqd == null)) delete out[variationId];
+      else out[variationId] = next;
+      return out;
+    });
+  };
+
   const patchColorVariationPrices = (
     variationId: string,
     patch: Partial<Record<VariantPriceKey, number | undefined>>,
@@ -650,6 +670,7 @@ const AdminProductsScreen: React.FC = () => {
     formData,
     variations,
     colorVariations,
+    variationCosts,
     specEntries,
     priceTiers,
     shippingRates,
@@ -657,7 +678,7 @@ const AdminProductsScreen: React.FC = () => {
     videoUrl,
     isFeatured,
     isActive,
-  }), [formData, variations, colorVariations, specEntries, priceTiers, shippingRates, imageUrls, videoUrl, isFeatured, isActive]);
+  }), [formData, variations, colorVariations, variationCosts, specEntries, priceTiers, shippingRates, imageUrls, videoUrl, isFeatured, isActive]);
 
   useEffect(() => {
     if (!modalVisible) {
@@ -1007,6 +1028,7 @@ const AdminProductsScreen: React.FC = () => {
     setColorOptions(product.options?.colors || []);
     setVariations(product.variations || []);
     setColorVariations(product.colorVariations || []);
+    setVariationCosts(((product as any).variationCosts as Record<string, { usd?: number; iqd?: number }>) || {});
     setNewSizeValue('');
     setNewSizeStock('');
     setNewSizePrice('');
@@ -1229,6 +1251,24 @@ const AdminProductsScreen: React.FC = () => {
         options: optionsData,
         variations: variationsData,
         colorVariations: colorVariationsData,
+        // Only options that still exist, so deleting a size or colour does not
+        // leave its cost behind to be re-attached to a future option that happens
+        // to reuse the id.
+        variationCosts: (() => {
+          const live = new Set([
+            ...variationsData.map((v: any) => v.variationId),
+            ...colorVariationsData.map((v: any) => v.variationId),
+          ]);
+          const out: Record<string, { usd?: number; iqd?: number }> = {};
+          Object.keys(variationCosts).forEach((id) => {
+            const entry = variationCosts[id];
+            if (!live.has(id) || !entry) return;
+            const usd = Number(entry.usd) > 0 ? Number(entry.usd) : undefined;
+            const iqd = Number(entry.iqd) > 0 ? Number(entry.iqd) : undefined;
+            if (usd != null || iqd != null) out[id] = { usd, iqd };
+          });
+          return Object.keys(out).length ? out : null;
+        })(),
         // Always sent: spreading it in only when truthy made "no video" unrepresentable,
         // so a removed video was never cleared on the row and kept playing on the storefront.
         videoUrl: videoUrl || null,
@@ -1260,9 +1300,46 @@ const AdminProductsScreen: React.FC = () => {
         }, {} as Record<string, string>),
       };
 
+      /**
+       * Tell the shop when a field they typed did NOT reach the database.
+       *
+       * The write path drops a column whose migration has not run yet and saves
+       * everything else — the right trade, because the alternative is not being
+       * able to save a product at all. But it must never be silent: without this
+       * the shop types a dinar cost, is told "Saved", and the number is simply
+       * gone with nothing on screen to say so.
+       */
+      const warnDroppedFields = () => {
+        const missing = getMissingColumns();
+        if (missing.length === 0) return;
+        const labels: Record<string, string> = {
+          compare_at_price_iqd: t('admin.products.form.compareAtPriceAny', { defaultValue: 'Was Price' }),
+          purchase_price_iqd: t('admin.products.form.purchasePriceAny', { defaultValue: 'Purchase Price (cost)' }),
+          vip_price_iqd: t('admin.products.form.vipPriceAny', { defaultValue: 'VIP Price' }),
+          variation_costs: t('admin.products.form.purchasePriceAny', { defaultValue: 'Purchase Price (cost)' }),
+        };
+        const sent: Record<string, boolean> = {
+          compare_at_price_iqd: sanitizeIQD(formData.compareAtPriceIQD) > 0,
+          purchase_price_iqd: sanitizeIQD(formData.purchasePriceIQD) > 0,
+          vip_price_iqd: sanitizeIQD(formData.vipPriceIQD) > 0,
+          variation_costs: Object.keys(variationCosts).length > 0,
+        };
+        const lost = missing.filter((c) => sent[c]).map((c) => labels[c]).filter(Boolean);
+        if (lost.length === 0) return;
+        Alert.alert(
+          t('admin.products.form.fieldNotSavedTitle', { defaultValue: 'Some prices were not saved' }),
+          t('admin.products.form.fieldNotSavedBody', {
+            fields: Array.from(new Set(lost)).join(', '),
+            defaultValue:
+              'Everything else saved. These were not, because the database has not been updated yet: {{fields}}. Run the pending migration, then set them again.',
+          }),
+        );
+      };
+
       if (editingProduct) {
         await service.updateProduct(editingProduct.id, productData);
         Alert.alert(t('admin.common.success'), t('admin.products.updateSuccess'));
+        warnDroppedFields();
       } else {
         // Create new product. addProduct returns the new product id (a string).
         const newProductId = await service.addProduct(productData as any);
@@ -1294,6 +1371,7 @@ const AdminProductsScreen: React.FC = () => {
           }
         } else {
           Alert.alert(t('admin.common.success'), t('admin.products.addSuccess'));
+          warnDroppedFields();
         }
       }
 
@@ -3090,7 +3168,10 @@ const AdminProductsScreen: React.FC = () => {
                     looked like giving two prices when one of them was dead. Each
                     price is now ONE box that says which currency it is in. */}
                 <PriceField
-                  label={t('admin.products.form.price')}
+                  // priceAny, not price: 'price' is "Price ($)" in all three
+                  // languages, and the box now carries its own currency switch —
+                  // it said dollars while set to dinar.
+                  label={t('admin.products.form.priceAny', { defaultValue: 'Price' })}
                   usd={formData.priceUSD}
                   iqd={formData.priceIQD}
                   onChange={({ usd, iqd }) => setFormData(prev => ({ ...prev, priceUSD: usd, priceIQD: iqd }))}
@@ -3768,6 +3849,8 @@ const AdminProductsScreen: React.FC = () => {
                           basePriceIQD={parseInt(formData.priceIQD || '0', 10) || undefined}
                           exchangeRateIQD={exchangeRateIQD}
                           onPatch={(patch) => patchVariationPrices(variation.variationId, patch)}
+                          cost={variationCosts[variation.variationId]}
+                          onCostChange={(next) => setVariationCost(variation.variationId, next)}
                           theme={theme}
                           isRTL={isRTL}
                           t={t}
@@ -3941,6 +4024,8 @@ const AdminProductsScreen: React.FC = () => {
                           basePriceIQD={parseInt(formData.priceIQD || '0', 10) || undefined}
                           exchangeRateIQD={exchangeRateIQD}
                           onPatch={(patch) => patchColorVariationPrices(variation.variationId, patch)}
+                          cost={variationCosts[variation.variationId]}
+                          onCostChange={(next) => setVariationCost(variation.variationId, next)}
                           theme={theme}
                           isRTL={isRTL}
                           t={t}

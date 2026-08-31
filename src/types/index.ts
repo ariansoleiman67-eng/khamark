@@ -110,9 +110,14 @@ export interface ProductVariation {
   vipPriceIQD?: number;
   compareAtPriceUSD?: number;
   compareAtPriceIQD?: number;
-  /** Admin-only, like Product.purchasePrice. Never rendered to a customer. */
-  purchasePrice?: number;
-  purchasePriceIQD?: number;
+  /**
+   * NO COST FIELD HERE, DELIBERATELY. This object is stored in parts.variations,
+   * which IS granted to `anon` and is selected by every shopper's catalogue query
+   * — it has to be, to render the per-option price. A per-option cost written
+   * here would publish the shop's margin to the world, undoing the whole point of
+   * 20260819090000. Per-option cost lives in Product.variationCosts, backed by
+   * the ungranted parts.variation_costs column.
+   */
   stockQuantity: number;         // Per-variation stock (admin-controlled, enforced at runtime)
 }
 
@@ -123,13 +128,14 @@ export interface ColorVariation {
   colorHex?: string;             // Optional hex code for display (e.g., '#0000FF')
   priceUSD?: number;             // Optional price override
   priceIQD?: number;             // Optional dinar price; wins over priceUSD, charged verbatim
-  /** Same four extra prices as ProductVariation — see the note there. */
+  /**
+   * The same customer-facing extra prices as ProductVariation — and, for the same
+   * reason, no cost field. See the note there.
+   */
   vipPriceUSD?: number;
   vipPriceIQD?: number;
   compareAtPriceUSD?: number;
   compareAtPriceIQD?: number;
-  purchasePrice?: number;
-  purchasePriceIQD?: number;
   imageUrl?: string;             // Optional per-color image (swaps the hero when selected)
   stockQuantity: number;         // Per-color stock
 }
@@ -196,6 +202,16 @@ export interface Product {
    * customer-facing select list.
    */
   purchasePriceIQD?: number;
+  /**
+   * What each OPTION cost the shop, keyed by variationId:
+   *   { "prod_size_1": { usd: 80 }, "prod_color_blue": { iqd: 150000 } }
+   *
+   * Separate from the variation objects on purpose. parts.variations is public;
+   * parts.variation_costs is granted to nobody and reaches the back office only
+   * through the parts_admin view, exactly like purchasePrice. Undefined for every
+   * caller that is not a signed-in owner/admin/co-admin — never render it.
+   */
+  variationCosts?: Record<string, { usd?: number; iqd?: number }>;
   priceTiers?: PriceTier[];  // Quantity-based pricing tiers (wholesale pricing)
   shippingCost?: number; // Individual shipping cost for this product in USD
   shippingRates?: Array<{ city: string; price: number }>; // City-based shipping rates

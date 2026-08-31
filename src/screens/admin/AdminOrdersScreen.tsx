@@ -1,5 +1,5 @@
 import { supabase, uniqueChannel } from '../../services/supabase';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, TextInput, ActivityIndicator, Alert, Modal, ScrollView, Linking, Platform, Pressable, KeyboardAvoidingView, Image, I18nManager } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -150,6 +150,19 @@ const AdminOrdersScreen: React.FC = () => {
   const [selectedFilter, setSelectedFilter] = useState<OrderStatus | 'all' | 'unpaid'>('all');
   const listRef = useRef<FlatList<any>>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  /**
+   * The rate to convert THIS order's stamped dinar cost at.
+   *
+   * The order's own rate, not today's: priceUSD on each line is frozen at the
+   * moment the order was placed, so converting the cost at the live rate would
+   * subtract a moving number from a fixed one and a closed sale's profit would
+   * drift every time the shop edits the exchange rate. Falls back to the current
+   * rate for orders placed before the rate was recorded on the row.
+   */
+  const detailRate = useMemo(() => {
+    const rate = Number((selectedOrder as any)?.exchangeRate);
+    return rate > 0 ? rate : getCurrentExchangeRate();
+  }, [selectedOrder]);
   const [modalVisible, setModalVisible] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [messagingCustomer, setMessagingCustomer] = useState(false); // action-scoped: opening the customer chat (must NOT gate the whole screen)
@@ -1432,7 +1445,15 @@ const AdminOrdersScreen: React.FC = () => {
     // as well for stock the shop bought in dinar, and that line has no dollar
     // cost at all — reading purchasePrice alone would report the whole sale as
     // profit.
-    const lineCost = (itm: any) => costUSD(itm, getCurrentExchangeRate());
+    // The ORDER's own rate, not today's. itm.priceUSD is frozen at the moment the
+    // order was placed, so converting the stamped dinar cost at the live rate
+    // subtracts a moving number from a fixed one and a closed sale's profit
+    // drifts every time the shop edits the exchange rate. Falls back to the
+    // current rate only for orders placed before the rate was recorded.
+    const orderRate = Number((item as any).exchangeRate) > 0
+      ? Number((item as any).exchangeRate)
+      : getCurrentExchangeRate();
+    const lineCost = (itm: any) => costUSD(itm, orderRate);
     const hasProfit = !isPartnerOrder && orderItems.some((itm) => lineCost(itm) > 0);
     const orderProfit = orderItems.reduce(
       (sum, itm) => {
@@ -1918,11 +1939,11 @@ const AdminOrdersScreen: React.FC = () => {
                             {formatOrderLineTotal(item as any, selectedOrder?.currency as any, selectedOrder?.exchangeRate as any)}
                           </Text>
                           {/* 💰 Per-item Profit (admin-only) — hidden on partner-tagged orders (partner's profit, not owner's) */}
-                          {!(selectedOrder as any)?.partnerId && item.purchasePrice != null && item.purchasePrice > 0 && (
+                          {!(selectedOrder as any)?.partnerId && costUSD(item as any, detailRate) > 0 && (
                             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
                               <Ionicons name="trending-up" size={13} color="#10B981" style={{ marginRight: 3 }} />
                               <Text allowFontScaling={false} style={{ fontSize: 12, fontWeight: '700', color: '#10B981' }}>
-                                {formatPrice((item.priceUSD - item.purchasePrice) * item.quantity, selectedOrder?.currency, selectedOrder?.exchangeRate)}
+                                {formatPrice((item.priceUSD - costUSD(item as any, detailRate)) * item.quantity, selectedOrder?.currency, selectedOrder?.exchangeRate)}
                               </Text>
                             </View>
                           )}
@@ -2003,12 +2024,16 @@ const AdminOrdersScreen: React.FC = () => {
                       // netted off here exactly like the in-store ring-up does — otherwise a
                       // discounted sale reads back overstated by the discount amount.
                       const totalProfit = (selectedOrder?.items || []).reduce((sum, itm) => {
-                        if (itm.purchasePrice != null && itm.purchasePrice > 0) {
-                          return sum + (itm.priceUSD - itm.purchasePrice) * itm.quantity;
+                        const lineCostUSD = costUSD(itm as any, detailRate);
+                        if (lineCostUSD > 0) {
+                          return sum + (itm.priceUSD - lineCostUSD) * itm.quantity;
                         }
                         return sum;
                       }, 0) - (selectedOrder?.discountUSD || 0);
-                      const hasAnyPurchasePrice = !isPartnerOrder && (selectedOrder?.items || []).some(itm => itm.purchasePrice != null && itm.purchasePrice > 0);
+                      // costUSD, matching the order card: a dinar-bought line has
+                      // purchasePrice empty, so reading it alone showed a profit pill on
+                      // the card and no profit at all inside the order.
+                      const hasAnyPurchasePrice = !isPartnerOrder && (selectedOrder?.items || []).some(itm => costUSD(itm as any, detailRate) > 0);
                       if (!hasAnyPurchasePrice) return null;
                       return (
                         <View style={[styles.totalRow, { borderTopColor: '#10B981', borderTopWidth: 1, marginTop: 6, paddingTop: 10 }]}>

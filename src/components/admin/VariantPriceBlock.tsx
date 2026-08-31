@@ -24,10 +24,17 @@ const VariantPriceBlock: React.FC<{
   basePriceIQD?: number;
   exchangeRateIQD: number;
   onPatch: (patch: Record<string, number | undefined>) => void;
+  /**
+   * This option's cost, held apart from the variant object because it must never
+   * be written into parts.variations — that column is public. See the note on
+   * ProductVariation.
+   */
+  cost?: { usd?: number; iqd?: number };
+  onCostChange: (next: { usd?: number; iqd?: number } | undefined) => void;
   theme: any;
   isRTL: boolean;
   t: (key: string, opts?: any) => string;
-}> = ({ variant, basePriceUSD, basePriceIQD, exchangeRateIQD, onPatch, theme, isRTL, t }) => {
+}> = ({ variant, basePriceUSD, basePriceIQD, exchangeRateIQD, onPatch, cost, onCostChange, theme, isRTL, t }) => {
   const v = variant as any;
   const [expanded, setExpanded] = useState(false);
 
@@ -47,7 +54,7 @@ const VariantPriceBlock: React.FC<{
   const extrasSet = [
     v.compareAtPriceUSD, v.compareAtPriceIQD,
     v.vipPriceUSD, v.vipPriceIQD,
-    v.purchasePrice, v.purchasePriceIQD,
+    cost?.usd, cost?.iqd,
   ].filter((n) => Number(n) > 0).length;
 
   const inheritsHint = (() => {
@@ -118,7 +125,13 @@ const VariantPriceBlock: React.FC<{
           />
           <PriceField
             label={t('admin.products.form.purchasePriceAny', { defaultValue: 'Purchase Price (cost)' })}
-            {...pair('purchasePrice', 'purchasePriceIQD')}
+            usd={str(cost?.usd)}
+            iqd={str(cost?.iqd)}
+            onChange={({ usd, iqd }) => {
+              const nextUSD = num(usd);
+              const nextIQD = num(iqd);
+              onCostChange(nextUSD == null && nextIQD == null ? undefined : { usd: nextUSD, iqd: nextIQD });
+            }}
             exchangeRateIQD={exchangeRateIQD}
             theme={theme}
           />

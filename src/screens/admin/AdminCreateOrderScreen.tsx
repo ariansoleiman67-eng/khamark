@@ -27,7 +27,25 @@ import { City } from 'country-state-city';
 
 // `manual` = admin typed a custom price; we then stop auto-recomputing it on
 // VIP/qty changes. Otherwise price follows the tiered/VIP pricing for the qty.
-interface VariationSel { variationId: string; label: string; priceUSD: number; priceIQD?: number; stockQuantity: number; kind: 'size' | 'color'; }
+interface VariationSel {
+  variationId: string;
+  label: string;
+  /** The RESOLVED unit price: the option's own, or the product's when it has none. */
+  priceUSD: number;
+  priceIQD?: number;
+  stockQuantity: number;
+  kind: 'size' | 'color';
+  /**
+   * The raw option object off the product, untouched.
+   *
+   * priceUSD above is resolved — it falls back to the product's price — so it
+   * cannot answer "does this option price ITSELF", which is the question that
+   * decides whether the product's VIP and "was" prices may be applied to it. It
+   * also carries the option's own vipPrice/compareAtPrice, which the flattened
+   * shape drops. Everything that prices a line reads THIS.
+   */
+  source?: any;
+}
 interface CartLine { product: TenantProduct; quantity: number; price: number; manual?: boolean; variation?: VariationSel; }
 
 // A product whose stock/price live in per-size or per-color variations (each its own SKU).
@@ -125,7 +143,7 @@ const ReviewLine = React.memo(function ReviewLine({
   const id = cartKey;
   // ReviewLine sits outside the screen component (it is memoized), so it reads the
   // shop rate from the module mirror rather than the CurrencyContext hook.
-  const cost = variantCostUSD(line.variation as any, line.product as any, getCurrentExchangeRate());
+  const cost = variantCostUSD(line.variation?.variationId, line.product as any, getCurrentExchangeRate());
   const hasCost = cost > 0;
   const marginPct = hasCost && unitPrice > 0 ? Math.round(((unitPrice - cost) / unitPrice) * 100) : null;
   const marginColor = marginPct == null ? C.textSecondary : marginPct < 0 ? '#EF4444' : marginPct < 15 ? '#F59E0B' : '#10B981';
@@ -422,10 +440,13 @@ const AdminCreateOrderScreen: React.FC = () => {
   const priceOf = useCallback((l: CartLine) => {
     if (l.manual) return l.price;
     if (l.variation) {
-      // isVip is passed so an OPTION with its own VIP price is honoured at the
-      // counter exactly as it is in the app. variantPriceUSD only substitutes a
-      // VIP figure that is actually cheaper than what the option otherwise costs.
-      const base = variantPriceUSD(l.variation, l.product as any, exchangeRateIQD, isVip);
+      // l.variation.source, NOT l.variation: the flattened selection carries a
+      // RESOLVED price (the product's, when the option has none) and no VIP keys
+      // at all, so pricing off it made every option look self-priced and the VIP
+      // substitution could never fire — VIPs paid full price at the counter while
+      // the app charged them the VIP price.
+      const option = l.variation.source ?? l.variation;
+      const base = variantPriceUSD(option, l.product as any, exchangeRateIQD, isVip);
       return calculateTieredPrice(l.quantity, base, (l.product as any).priceTiers, isVip);
     }
     return getEffectiveUnitPrice(l.product as any, l.quantity, isVip, exchangeRateIQD);
@@ -442,15 +463,30 @@ const AdminCreateOrderScreen: React.FC = () => {
     // 300,000 IQD storage tier rang up at the rate-converted, 250-snapped
     // approximation of itself instead of the figure the shop typed.
     if (l.variation) {
-      const vIQD = Number(l.variation.priceIQD);
+      // The RAW option, for the same reason priceOf uses it: l.variation.priceUSD
+      // is resolved and is therefore never zero, so the `inherits` test below
+      // could never be true and a variation line on a dinar-priced product was
+      // charged the rate-converted approximation instead of the exact figure.
+      const option = (l.variation.source ?? l.variation) as any;
+      const prod = l.product as any;
+      const optionPricesItself = Number(option?.priceUSD) > 0 || Number(option?.priceIQD) > 0;
+
+      // A VIP price authored in dinar, when the VIP is the one being charged, is
+      // the figure to stamp — before the option's own dinar price gets a look in.
+      if (isVip) {
+        const ownVipIQD = Number(option?.vipPriceIQD);
+        const vipIQD = Number.isFinite(ownVipIQD) && ownVipIQD > 0
+          ? ownVipIQD
+          : (optionPricesItself ? 0 : Number(prod?.vipPriceIQD) || 0);
+        if (vipIQD > 0 && unit === convertIQDToUSD(vipIQD, exchangeRateIQD)) return vipIQD;
+      }
+
+      const vIQD = Number(option?.priceIQD);
       if (Number.isFinite(vIQD) && vIQD > 0) {
         return unit === convertIQDToUSD(vIQD, exchangeRateIQD) ? vIQD : null;
       }
       // No price of its own in either currency: it inherits the product's.
-      const vUSD = Number(l.variation.priceUSD);
-      const inherits = !(Number.isFinite(vUSD) && vUSD > 0);
-      const prod = l.product as any;
-      if (inherits && isIQDPriced(prod) && unit === convertIQDToUSD(Number(prod.priceIQD), exchangeRateIQD)) {
+      if (!optionPricesItself && isIQDPriced(prod) && unit === convertIQDToUSD(Number(prod.priceIQD), exchangeRateIQD)) {
         return Number(prod.priceIQD);
       }
       return null;
@@ -563,7 +599,7 @@ const AdminCreateOrderScreen: React.FC = () => {
   }, []);
 
   // Add a specific size/color (its own SKU). Keyed per variation so two sizes are two lines.
-  const addVariation = useCallback((p: TenantProduct, variationId: string, label: string, vPrice: number | undefined, stockQuantity: number, kind: 'size' | 'color', vPriceIQD?: number) => {
+  const addVariation = useCallback((p: TenantProduct, variationId: string, label: string, vPrice: number | undefined, stockQuantity: number, kind: 'size' | 'color', vPriceIQD?: number, source?: any) => {
     if (!p.id) return;
     const key = `${p.id}__${variationId}`;
     // Coerce, don't type-test. variations/color_variations are JSONB, so a
@@ -584,7 +620,7 @@ const AdminCreateOrderScreen: React.FC = () => {
         price: line?.price ?? priceUSD,
         manual: line?.manual,
         quantity: (line?.quantity || 0) + 1,
-        variation: { variationId, label, priceUSD, priceIQD, stockQuantity, kind },
+        variation: { variationId, label, priceUSD, priceIQD, stockQuantity, kind, source },
       } };
     });
   }, [exchangeRateIQD]);
@@ -697,7 +733,7 @@ const AdminCreateOrderScreen: React.FC = () => {
   const lines = Object.values(cart);
   const subtotal = lines.reduce((s, l) => s + (priceOf(l) || 0) * l.quantity, 0);
   const profit = lines.reduce((s, l) => {
-    const cost = variantCostUSD(l.variation as any, l.product as any, exchangeRateIQD);
+    const cost = variantCostUSD(l.variation?.variationId, l.product as any, exchangeRateIQD);
     return cost > 0 ? s + (priceOf(l) - cost) * l.quantity : s;
   }, 0);
   const itemCount = lines.reduce((s, l) => s + l.quantity, 0);
@@ -729,7 +765,7 @@ const AdminCreateOrderScreen: React.FC = () => {
     if (!force) {
       const bad = lines.find((l) => {
         const price = priceOf(l);
-        const cost = variantCostUSD(l.variation as any, l.product as any, exchangeRateIQD);
+        const cost = variantCostUSD(l.variation?.variationId, l.product as any, exchangeRateIQD);
         return price <= 0 || (cost > 0 && price <= cost);
       });
       if (bad) {
@@ -763,14 +799,15 @@ const AdminCreateOrderScreen: React.FC = () => {
         // tier or a manual override is a dollar amount and converts normally.
         ...(dinarUnit(l) != null ? { priceIQD: dinarUnit(l) as number } : {}),
         originalPriceUSD: l.variation ? l.variation.priceUSD : l.product.priceUSD,
-        // The OPTION's cost when it has one, so a manual counter sale of a colour
-        // the shop bought at a different price reports the right margin. The
-        // server trigger only knows the product, so for a variation line this is
-        // the only place the option's own cost can come from.
-        purchasePrice: (l.variation as any)?.purchasePrice ?? (l.product as any).purchasePrice,
+        // Informational only: orders_stamp_cost overwrites both halves server-side
+        // from the parts row — including the per-OPTION cost, which it reads from
+        // parts.variation_costs by the line's variationId. The client must never
+        // decide the shop's margin, and now cannot: the option's cost is not in
+        // anything the client holds.
+        purchasePrice: (l.product as any).purchasePrice,
         // Sent for completeness; orders_stamp_cost overwrites both server-side
         // from the parts row, so the client can never decide the shop's margin.
-        purchasePriceIQD: (l.variation as any)?.purchasePriceIQD ?? (l.product as any).purchasePriceIQD,
+        purchasePriceIQD: (l.product as any).purchasePriceIQD,
         quantity: l.quantity,
         variationId: l.variation?.variationId,
       }));
@@ -1378,13 +1415,13 @@ const AdminCreateOrderScreen: React.FC = () => {
                 const c = cart[key]?.quantity || 0;
                 // Through the same ladder the sale uses, so the picker cannot quote
                 // one figure and the till ring up another.
-                const price = variantPriceUSD(v, variationPicker as any, exchangeRateIQD);
+                const price = variantPriceUSD(v, variationPicker as any, exchangeRateIQD, isVip);
                 const soldOut = (v.stockQuantity ?? 0) <= 0;
                 return (
                   <TouchableOpacity
                     key={v.variationId}
                     disabled={soldOut}
-                    onPress={() => addVariation(variationPicker!, v.variationId, label, v.priceUSD, v.stockQuantity ?? 0, kind, v.priceIQD)}
+                    onPress={() => addVariation(variationPicker!, v.variationId, label, v.priceUSD, v.stockQuantity ?? 0, kind, v.priceIQD, v)}
                     style={[styles.varRow, { borderColor: c > 0 ? C.primary : C.border, opacity: soldOut ? 0.45 : 1 }]}
                     activeOpacity={0.8}
                   >

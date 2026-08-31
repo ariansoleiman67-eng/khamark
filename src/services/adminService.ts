@@ -6,7 +6,8 @@
 import { supabase } from './supabase';
 import { selectAdminParts } from './partsRead';
 import { Order, Product, User } from '../types';
-import { revenueToIQD } from '../utils/currency';
+import { costUSD, revenueToIQD } from '../utils/currency';
+import { getCurrentExchangeRate } from '../utils/exchangeRate';
 
 // Helper to convert snake_case DB fields to camelCase for the frontend
 const mapProduct = (data: any): Product => ({
@@ -489,7 +490,9 @@ export const getAnalyticsData = async (startDate: Date, endDate: Date, tenantId?
     const purchaseById = new Map<string, number>();
     try {
       const { data: parts } = await selectAdminParts(
-        'id, extra_data, price_tiers, price_usd, price_iqd, purchase_price',
+        // purchase_price_iqd too: stock the shop bought in dinar has the dollar
+        // column empty, and costing it at zero reports the whole sale as margin.
+        'id, extra_data, price_tiers, price_usd, price_iqd, purchase_price, purchase_price_iqd',
         (q) => (tenantId ? q.eq('tenant_id', tenantId) : q),
       );
       for (const p of (parts || [])) {
@@ -503,7 +506,13 @@ export const getAnalyticsData = async (startDate: Date, endDate: Date, tenantId?
         if (!valid.length && (p as any).price_iqd != null && pIqd > 0) {
           wholesaleIQDById.set((p as any).id, pIqd);
         }
-        purchaseById.set((p as any).id, Number((p as any).purchase_price) || 0);
+        purchaseById.set(
+          (p as any).id,
+          costUSD(
+            { purchasePrice: (p as any).purchase_price, purchasePriceIQD: (p as any).purchase_price_iqd },
+            getCurrentExchangeRate(),
+          ),
+        );
       }
     } catch { /* best-effort: if parts can't be read, no exclusion */ }
 

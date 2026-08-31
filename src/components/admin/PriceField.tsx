@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { View, StyleSheet, TextInput, TouchableOpacity, I18nManager } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import AppText from '../AppText';
@@ -63,19 +63,43 @@ const PriceField: React.FC<PriceFieldProps> = ({
   const { t, i18n } = useTranslation();
   const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
 
-  // The dinar side wins whenever it holds a value, which mirrors how the rest of
-  // the app reads these pairs. A product saved in dinar therefore opens on IQD.
-  const currency: PriceCurrency = iqd.trim() !== '' ? 'IQD' : 'USD';
+  /**
+   * Which currency this box is in.
+   *
+   * NOT simply derived from "does the IQD string have a value". That was the
+   * first version and it broke twice over: on an EMPTY box tapping IQD did
+   * nothing at all (the switch wrote two empty strings, the derivation read them
+   * back as USD, and the shop could never start typing a dinar price on a new
+   * product), and clearing a dinar price to retype it silently flipped the field
+   * back to dollars mid-edit — so the number retyped was saved as USD.
+   *
+   * So the admin's choice is sticky, and the PROPS win only when they carry a
+   * value in the currency the admin did NOT choose. That is what a different
+   * product being loaded into the form looks like, and it is the only case where
+   * overriding their choice is right.
+   */
+  const [chosen, setChosen] = useState<PriceCurrency | null>(null);
+  const propHasIQD = iqd.trim() !== '';
+  const propHasUSD = usd.trim() !== '';
+  const currency: PriceCurrency =
+    chosen === 'IQD' && !propHasUSD ? 'IQD'
+      : chosen === 'USD' && !propHasIQD ? 'USD'
+        : (propHasIQD ? 'IQD' : 'USD');
   const value = currency === 'IQD' ? iqd : usd;
   const hasValue = value.trim() !== '';
 
   const switchTo = useCallback(
     (next: PriceCurrency) => {
       if (next === currency) return;
+      setChosen(next);
       if (next === 'IQD') {
         const amount = parseFloat(usd);
+        // Math.round, NOT convertUSDToIQD: that helper snaps to the nearest 250,
+        // which is right for a shopper-facing price and wrong here. It would move
+        // a COST the shop typed ($90 at 1540 = 138,600 -> 138,500) and every
+        // profit figure is worked out from that number.
         const converted = Number.isFinite(amount) && amount > 0
-          ? String(convertUSDToIQD(amount, exchangeRateIQD))
+          ? String(Math.round(amount * exchangeRateIQD))
           : '';
         onChange({ usd: '', iqd: converted });
       } else {

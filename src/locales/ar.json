@@ -3267,7 +3267,10 @@
         "vipPriceActive": "زبائن VIP يدفعون {{vip}}.",
         "variantPrice": "سعر هذا الخيار",
         "variantMorePrices": "السعر السابق / VIP / الكلفة لهذا الخيار",
-        "variantMorePricesSet": "السعر السابق / VIP / الكلفة لهذا الخيار ({{n}} مُعبأ)"
+        "variantMorePricesSet": "السعر السابق / VIP / الكلفة لهذا الخيار ({{n}} مُعبأ)",
+        "priceAny": "السعر",
+        "fieldNotSavedTitle": "بعض الأسعار لم تُحفظ",
+        "fieldNotSavedBody": "حُفظ كل شيء آخر. لم تُحفظ هذه لأن قاعدة البيانات لم تُحدَّث بعد: {{fields}}. نفّذ التحديث المعلّق ثم أدخلها من جديد."
       },
       "noSearchResults": "لم يتم العثور على منتجات مطابقة",
       "loadingTenant": "جارٍ تحميل بيانات المتجر...",

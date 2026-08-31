@@ -38,6 +38,11 @@ export const mapProduct = (data: any): Product => ({
   // Admin paths only: purchase_price_iqd is not granted to anon/authenticated and
   // is absent from LIST_COLUMNS/DETAIL_COLUMNS, exactly like purchase_price.
   purchasePriceIQD: data.purchase_price_iqd != null ? Number(data.purchase_price_iqd) : undefined,
+  // Admin paths only, same as purchase_price: parts.variation_costs is granted to
+  // nobody and arrives NULL for anyone who is not the owner/an admin/a co-admin.
+  variationCosts: data.variation_costs && typeof data.variation_costs === 'object'
+    ? data.variation_costs
+    : undefined,
   stockQty: data.stock_qty != null ? Number(data.stock_qty) : data.stock_qty,
   historicalStockQty: data.historical_stock_qty,
   initialStock: data.initial_stock,
@@ -111,7 +116,7 @@ export const mapProduct = (data: any): Product => ({
 // purchase_price_iqd is here for the WRITE path only: the customer app never
 // selects it (it is the shop's cost), but the admin editor sends it on every
 // save, so a pending migration would block saving without it in this list.
-const PENDING_MIGRATION_COLUMNS = ['vip_price_iqd', 'compare_at_price_iqd', 'purchase_price_iqd'] as const;
+const PENDING_MIGRATION_COLUMNS = ['vip_price_iqd', 'compare_at_price_iqd', 'purchase_price_iqd', 'variation_costs'] as const;
 
 /** Set on the first 42703, so the fallback costs one failed request, not one per query. */
 let missingColumns: string[] = [];
@@ -197,6 +202,16 @@ export const stripPendingColumns = (row: Record<string, any>): Record<string, an
   return out;
 };
 
+/**
+ * Which pending-migration columns this session has discovered are missing.
+ *
+ * Exposed so the admin editor can TELL the shop that the dinar cost they just
+ * typed was not saved. Dropping the column silently is right for the read path —
+ * better one blank field than an empty shelf — but on a save it means the shop
+ * types a number, is told "Saved", and the number is gone.
+ */
+export const getMissingColumns = (): string[] => [...missingColumns];
+
 /** True when this error is the database or PostgREST saying a column does not exist. */
 const isMissingColumnWriteError = (error: any): boolean =>
   (error?.code === '42703' || error?.code === 'PGRST204') && typeof error?.message === 'string';
@@ -271,7 +286,7 @@ const PART_COLUMN_MAP: Record<string, string> = {
   category: 'category', categoryAr: 'category_ar', categoryKu: 'category_ku',
   priceUSD: 'price_usd', priceIQD: 'price_iqd', vipPriceUSD: 'vip_price_usd', vipPriceIQD: 'vip_price_iqd',
   compareAtPriceUSD: 'compare_at_price_usd', compareAtPriceIQD: 'compare_at_price_iqd', storageOptions: 'storage_options',
-  purchasePrice: 'purchase_price', purchasePriceIQD: 'purchase_price_iqd',
+  purchasePrice: 'purchase_price', purchasePriceIQD: 'purchase_price_iqd', variationCosts: 'variation_costs',
   stockQty: 'stock_qty', historicalStockQty: 'historical_stock_qty', initialStock: 'initial_stock',
   description: 'description', descriptionAr: 'description_ar', descriptionKu: 'description_ku',
   brand: 'brand', imageUrls: 'image_urls',

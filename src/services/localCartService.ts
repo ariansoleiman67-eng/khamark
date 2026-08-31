@@ -363,12 +363,31 @@ export class LocalCartService {
           // product's own figures are left exactly as they were, so no existing
           // line changes price.
           const variantExtras: Record<string, number> = {};
-          const carryOver = (key: string) => {
-            const value = Number((variation as any)?.[key]);
+          // BOTH chosen options, not just the one that carries the line.
+          // StartOrderBottomSheet deliberately sends ONE selection for a size+colour
+          // pick — the size holds the variationId and the colour rides along as
+          // colorVariationId — so reading extras off `variation` alone silently
+          // dropped every price the shop set on the COLOUR of a product that also
+          // has sizes. The colour is applied first and the size overrides it,
+          // matching which of the two the line is priced by.
+          const ridingColor = selection.colorVariationId && selection.colorVariationId !== selection.variationId
+            ? product.colorVariations?.find(v => v.variationId === selection.colorVariationId)
+            : undefined;
+          const carryOverFrom = (from: any, key: string) => {
+            const value = Number(from?.[key]);
             if (Number.isFinite(value) && value > 0) variantExtras[key] = value;
           };
-          ['vipPriceUSD', 'vipPriceIQD', 'compareAtPriceUSD', 'compareAtPriceIQD',
-           'purchasePrice', 'purchasePriceIQD'].forEach(carryOver);
+          const carryOver = (key: string) => {
+            carryOverFrom(ridingColor, key);
+            carryOverFrom(variation as any, key);
+          };
+          // Customer-facing prices only. NO COST: an option's cost is not on the
+          // variation object at all (parts.variations is public), and the cart is
+          // persisted to the customer's own device — carrying the shop's margin
+          // into it would publish it twice over. The server stamps the real cost
+          // onto the order in orders_stamp_cost, where the client cannot see or
+          // influence it.
+          ['vipPriceUSD', 'vipPriceIQD', 'compareAtPriceUSD', 'compareAtPriceIQD'].forEach(carryOver);
           // These prices come in pairs, and the dinar side outranks the dollar one.
           // If the option gives only one half of a pair, the product's OTHER half
           // must not survive to outrank it — in either direction.
@@ -378,7 +397,26 @@ export class LocalCartService {
           };
           clearSibling('vipPriceUSD', 'vipPriceIQD');
           clearSibling('compareAtPriceUSD', 'compareAtPriceIQD');
-          clearSibling('purchasePrice', 'purchasePriceIQD');
+
+          // An option that prices ITSELF must not inherit the product's VIP or
+          // "was" price. Those were set against the PRODUCT's price: a 512GB that
+          // costs $250 would otherwise be sold to a VIP at the 128GB's $90 VIP
+          // price, because the line's product copy still carried it. The same
+          // rule variantVipUSD applies on the display side — the two have to
+          // agree or the cart quotes one number and the till charges another.
+          const optionPricesItself =
+            Number((variation as any)?.priceUSD) > 0 || Number((variation as any)?.priceIQD) > 0 ||
+            Number((ridingColor as any)?.priceUSD) > 0 || Number((ridingColor as any)?.priceIQD) > 0;
+          if (optionPricesItself) {
+            if (!variantExtras.vipPriceUSD && !variantExtras.vipPriceIQD) {
+              variantExtras.vipPriceUSD = 0;
+              variantExtras.vipPriceIQD = 0;
+            }
+            if (!variantExtras.compareAtPriceUSD && !variantExtras.compareAtPriceIQD) {
+              variantExtras.compareAtPriceUSD = 0;
+              variantExtras.compareAtPriceIQD = 0;
+            }
+          }
 
           // Add new cart item for this variation
           const newItem: CartItem = {

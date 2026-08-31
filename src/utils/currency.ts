@@ -326,15 +326,28 @@ export const variantCompareAtUSD = (
   return variantPricesItself(variant) ? 0 : compareAtUSD(product, exchangeRate);
 };
 
-/** What a chosen variant COST the shop, in dollars. Admin surfaces only. */
+/**
+ * What a chosen option COST the shop, in dollars. Admin surfaces only.
+ *
+ * Takes a variationId, NOT the variation object: an option's cost is deliberately
+ * not stored on the variation (parts.variations is public — see the note on
+ * ProductVariation). It lives in product.variationCosts, which is null for anyone
+ * the database does not consider an owner/admin/co-admin, so this returns the
+ * product's own cost for them rather than leaking anything.
+ */
 export const variantCostUSD = (
-  variant: any,
+  variationId: string | null | undefined,
   product: any,
   exchangeRate: number = 1500,
 ): number => {
-  const own = costUSD(variant, exchangeRate);
-  if (own > 0) return own;
-  return variantPricesItself(variant) ? 0 : costUSD(product, exchangeRate);
+  const entry = variationId ? product?.variationCosts?.[variationId] : undefined;
+  if (entry) {
+    const iqd = Number(entry.iqd);
+    if (Number.isFinite(iqd) && iqd > 0) return convertIQDToUSD(iqd, exchangeRate);
+    const usd = Number(entry.usd);
+    if (Number.isFinite(usd) && usd > 0) return usd;
+  }
+  return costUSD(product, exchangeRate);
 };
 
 /** Format a variant's price in the shopper's currency, honouring a dinar price. */

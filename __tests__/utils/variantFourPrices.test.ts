@@ -74,11 +74,10 @@ describe('inheritance from the product', () => {
     purchasePrice: 70,
   };
 
-  it('an option that sets NO price of its own inherits all four', () => {
+  it('an option that sets NO price of its own inherits the product prices', () => {
     const bare = { variationId: 'v1', stockQuantity: 1 };
     expect(variantVipUSD(bare, product, RATE)).toBe(90);
     expect(variantCompareAtUSD(bare, product, RATE)).toBe(130);
-    expect(variantCostUSD(bare, product, RATE)).toBe(70);
   });
 
   it('an option that prices ITSELF does not borrow the product’s other prices', () => {
@@ -88,20 +87,55 @@ describe('inheritance from the product', () => {
     const priced = { variationId: 'v2', stockQuantity: 1, priceUSD: 250 };
     expect(variantVipUSD(priced, product, RATE)).toBe(0);
     expect(variantCompareAtUSD(priced, product, RATE)).toBe(0);
-    expect(variantCostUSD(priced, product, RATE)).toBe(0);
   });
 
-  it('an option that prices itself DOES use its own four', () => {
+  it('an option that prices itself DOES use its own', () => {
     const priced = {
       variationId: 'v3',
       stockQuantity: 1,
       priceUSD: 250,
       vipPriceUSD: 220,
       compareAtPriceIQD: 450000,
-      purchasePriceIQD: 270000,
     };
     expect(variantVipUSD(priced, product, RATE)).toBe(220);
     expect(variantCompareAtUSD(priced, product, RATE)).toBe(300);
-    expect(variantCostUSD(priced, product, RATE)).toBe(180);
+  });
+});
+
+describe('variantCostUSD reads the admin-only cost map', () => {
+  // The cost is keyed by variationId in product.variationCosts, NOT stored on the
+  // variation object — parts.variations is granted to anon and read by every
+  // shopper, so a cost there would be public.
+  const product = {
+    priceUSD: 100,
+    purchasePrice: 70,
+    variationCosts: {
+      v_usd: { usd: 120 },
+      v_iqd: { iqd: 270000 },
+      v_both: { usd: 999, iqd: 300000 },
+      v_empty: {},
+    },
+  };
+
+  it('uses the option cost when there is one', () => {
+    expect(variantCostUSD('v_usd', product, RATE)).toBe(120);
+  });
+
+  it('prefers the option dinar cost and converts it', () => {
+    expect(variantCostUSD('v_iqd', product, RATE)).toBe(180);
+    expect(variantCostUSD('v_both', product, RATE)).toBe(200);
+  });
+
+  it('falls back to the product cost for an option with none', () => {
+    expect(variantCostUSD('v_none', product, RATE)).toBe(70);
+    expect(variantCostUSD('v_empty', product, RATE)).toBe(70);
+    expect(variantCostUSD(null, product, RATE)).toBe(70);
+  });
+
+  it('returns the product cost when the shopper cannot read the map at all', () => {
+    // variation_costs arrives NULL for anyone the database does not consider an
+    // owner/admin/co-admin. That must degrade, not throw.
+    expect(variantCostUSD('v_usd', { priceUSD: 100, purchasePrice: 70 }, RATE)).toBe(70);
+    expect(variantCostUSD('v_usd', {}, RATE)).toBe(0);
   });
 });

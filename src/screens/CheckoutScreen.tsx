@@ -36,7 +36,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { useTheme } from '../components/ThemeProvider';
 import { formatPrice, isIQDPriced } from '../utils/currency';
-import { vipDinarUnit } from '../utils/pricingUtils';
+import { getEffectiveUnitPrice, vipDinarUnit } from '../utils/pricingUtils';
 import { getProductImageUrl, logImageDebug } from '../utils/imageUtils';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
@@ -848,6 +848,21 @@ const CheckoutScreen: React.FC = () => {
              // No discount met, use full variation price
              tieredPrice = cartItem.product.priceUSD;
           }
+
+          // A VIP price on this line — the option's own, or the product's when the
+          // option does not price itself — wins if it is cheaper. Without this the
+          // cart quoted a VIP one price (it prices through getEffectiveUnitPrice,
+          // which honours the VIP figure) and the ORDER was written at another,
+          // because this branch deliberately bypasses getTieredPrice to avoid
+          // applying the product's absolute tiers to a variation price.
+          //
+          // Math.min, so it can only ever lower the price: a VIP figure that is
+          // not actually cheaper is ignored, exactly as getEffectiveUnitPrice
+          // ignores it.
+          if (isVip) {
+            const vipUnit = getEffectiveUnitPrice(cartItem.product, 1, true, exchangeRateIQD);
+            if (vipUnit > 0 && vipUnit < tieredPrice) tieredPrice = vipUnit;
+          }
         } else {
           // STANDARD: Use existing tiered pricing logic (absolute tiers)
           tieredPrice = LocalCartService.getTieredPrice(cartItem.product, cartItem.quantity, isVip);
@@ -863,6 +878,12 @@ const CheckoutScreen: React.FC = () => {
           quantity: cartItem.quantity,
           priceUSD: tieredPrice,
           originalPriceUSD: cartItem.product.priceUSD, // This shows the unit price before discount (e.g. $25)
+          // WHICH OPTION was sold. The server's orders_stamp_cost reads this to
+          // find that option's cost in parts.variation_costs; without it the
+          // per-option cost lookup could never match and every variation line was
+          // costed at the product's price instead.
+          ...(cartItem.variationId ? { variationId: cartItem.variationId } : {}),
+          ...((cartItem as any).colorVariationId ? { colorVariationId: (cartItem as any).colorVariationId } : {}),
           // Per-unit cost, so the admin can compute profit on this order.
           purchasePrice: purchasePriceById[cartItem.productId] ?? cartItem.product.purchasePrice ?? null,
           shippingCost: cartItem.product.shippingCost || 0,

@@ -3223,7 +3223,10 @@
         "vipPriceActive": "VIP customers pay {{vip}}.",
         "variantPrice": "Price for this option",
         "variantMorePrices": "Was / VIP / cost for this option",
-        "variantMorePricesSet": "Was / VIP / cost for this option ({{n}} set)"
+        "variantMorePricesSet": "Was / VIP / cost for this option ({{n}} set)",
+        "priceAny": "Price",
+        "fieldNotSavedTitle": "Some prices were not saved",
+        "fieldNotSavedBody": "Everything else saved. These were not, because the database has not been updated yet: {{fields}}. Run the pending migration, then set them again."
       },
       "invalidSizeValue": "Please enter a size",
       "duplicateSizeValue": "This size already exists",
