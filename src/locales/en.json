@@ -2571,7 +2571,8 @@
       "minItemsOptional": "Min Items Required (Optional)",
       "minItemsHint": "E.g. Buy 2+ items get $10 off, Buy 30+ items get $30 off",
       "itemsSuffix": "items",
-      "loadFailed": "Failed to load discounts"
+      "loadFailed": "Failed to load discounts",
+      "subtitle": "Automatic price cuts and bundle offers"
     },
     "storeProfile": {
       "title": "Store Profile",
@@ -3479,7 +3480,8 @@
       "offAmount": "${{value}} off",
       "minShort": "min ${{value}}",
       "codePlaceholder": "e.g. WELCOME10",
-      "loadFailed": "Could not load promo codes. Check your connection and try again."
+      "loadFailed": "Could not load promo codes. Check your connection and try again.",
+      "subtitle": "Codes customers type at checkout"
     },
     "noBusinessSelected": "No business selected"
   },

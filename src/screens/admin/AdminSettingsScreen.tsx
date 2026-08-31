@@ -674,6 +674,22 @@ const AdminSettingsScreen: React.FC = () => {
                   color="#F5A00A"
                   theme={theme} isDark={isDark} tintBg={tintBg} />
                 <Divider isDark={isDark} />
+                {/* Promo codes and discounts were built, wired to Supabase, and then
+                    left with no door: both routes exist in AdminNavigator, but the only
+                    buttons that opened them sat in Profile behind USE_MOCK_DATA, which is
+                    false in the real app. That is why both tables were still empty. */}
+                <LuxuryMenuItem icon="ticket" title={t('admin.promos.title', { defaultValue: 'Promo Codes' })}
+                  subtitle={t('admin.promos.subtitle', { defaultValue: 'Codes customers type at checkout' })}
+                  onPress={() => navigation.navigate('AdminPromoManagement')}
+                  color="#00B8D4"
+                  theme={theme} isDark={isDark} tintBg={tintBg} />
+                <Divider isDark={isDark} />
+                <LuxuryMenuItem icon="trending-down" title={t('admin.discounts.title', { defaultValue: 'Discounts' })}
+                  subtitle={t('admin.discounts.subtitle', { defaultValue: 'Automatic price cuts and bundle offers' })}
+                  onPress={() => navigation.navigate('AdminDiscounts')}
+                  color="#43A047"
+                  theme={theme} isDark={isDark} tintBg={tintBg} />
+                <Divider isDark={isDark} />
                 <LuxuryMenuItem icon="receipt" title={t('admin.settings.invoiceSettings', { defaultValue: 'Invoice Settings' })}
                   subtitle={t('admin.settings.invoiceSettingsSubtitle', { defaultValue: 'Logo & business details for invoices' })}
                   onPress={() => navigation.navigate('AdminInvoiceSettings')}
