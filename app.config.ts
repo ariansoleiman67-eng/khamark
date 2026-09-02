@@ -31,7 +31,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   // 1.9.45 -> 1.9.46: 1.9.45 (76) was archived but never uploaded, and a version
   // that MIGHT have been submitted cannot be reused. Going up is always accepted;
   // reusing a number is what produced 90186 last time.
-  version: "1.9.46",
+  //
+  // 1.9.46 -> 1.9.47: same reason again. 1.9.46 (77) was archived on 2026-08-31 and
+  // never uploaded, and four commits landed after that archive was cut (dinar brand
+  // trim, the promo/discount menu entries, the Create Discount safe area, the larger
+  // category badge). A fresh number keeps the two archives apart in Organizer, where
+  // both would otherwise read "1.9.46 (77)".
+  version: "1.9.47",
   newArchEnabled: true,
   orientation: "portrait",
   icon: "./assets/icon.png",
@@ -96,7 +102,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     //   1.0 (5) — HaryadAutoparts fork residue removed from the binary
     //   1.9.44 (75) — reply to 2.1 Information Needed; the recorded review build
     //   1.9.44 (76) — variant + VIP dinar pricing, brand picker, AI product fill
-    buildNumber: "77",
+    //   1.9.46 (77) — archived 2026-08-31, never uploaded
+    buildNumber: "78",
     // associatedDomains removed: it carried "applinks:ASANKARY_DOMAIN_TBD", a
     // placeholder host. That ships a real com.apple.developer.associated-domains
     // entitlement pointing at a domain that cannot serve an
@@ -157,7 +164,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // iOS submission in flight; Play starts its own numbering at 1.0. Changing the
     // root field to 1.0 would drag iOS back with it.
     version: "1.0",
-    versionCode: 138,
+    // Play rejects a reused versionCode. 138 was built and signed but never
+    // uploaded; going up costs nothing and reusing it is the one thing Play
+    // refuses outright.
+    versionCode: 139,
     googleServicesFile: "./google-services.json",
     intentFilters: [
       // The https/autoVerify filter for host "ASANKARY_DOMAIN_TBD" was removed — a
