@@ -70,7 +70,7 @@ const CategoryTile: React.FC<CategoryTileProps> = ({
         ) : (
           <Ionicons
             name={icon}
-            size={30}
+            size={38}
             color={selected ? '#FFFFFF' : theme.colors.primary}
           />
         )}
@@ -100,16 +100,20 @@ const styles = StyleSheet.create({
   tile: {
     borderRadius: 18,
     borderWidth: 1.5,
-    minHeight: 126,
+    minHeight: 142,
     paddingVertical: 14,
     paddingHorizontal: 6,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // 76pt, up from 62. The floor is the narrowest phone this ships to: a 320pt
+  // screen gives a 92pt tile, and 76 + the tile's 6pt padding each side is 88,
+  // so the badge still fits without the grid reflowing. Anything larger clips
+  // there while looking fine on the test device.
   badge: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
+    width: 76,
+    height: 76,
+    borderRadius: 38,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
