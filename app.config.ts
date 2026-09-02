@@ -273,9 +273,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       "expo-build-properties",
       {
         android: {
-          compileSdkVersion: 35,
-          targetSdkVersion: 35,
-          buildToolsVersion: "35.0.0",
+          // API 36 (Android 16). Play blocks a production release below it:
+          //   "Your app currently targets API level 35 and must target at least
+          //    API level 36". android/gradle.properties carries the same three
+          //    values; this block is what rewrites them on prebuild, so they have
+          //    to move together or the next prebuild silently reverts the bump.
+          compileSdkVersion: 36,
+          targetSdkVersion: 36,
+          buildToolsVersion: "36.1.0",
         },
         ios: {
           deploymentTarget: "15.1",
