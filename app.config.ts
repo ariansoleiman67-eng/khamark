@@ -37,7 +37,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   // trim, the promo/discount menu entries, the Create Discount safe area, the larger
   // category badge). A fresh number keeps the two archives apart in Organizer, where
   // both would otherwise read "1.9.46 (77)".
-  version: "1.9.47",
+  //
+  // 1.9.47 -> 1.9.48: 1.9.47 (78) was never built. The whole AI Assistant rebuild
+  // landed after that number was assigned, plus the Universal Links entitlement,
+  // which is native config and therefore only real in a fresh binary. An unbuilt
+  // number costs nothing to abandon; two different binaries sharing one costs an
+  // afternoon working out which is on the phone.
+  version: "1.9.48",
   newArchEnabled: true,
   orientation: "portrait",
   icon: "./assets/icon.png",
@@ -103,7 +109,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     //   1.9.44 (75) — reply to 2.1 Information Needed; the recorded review build
     //   1.9.44 (76) — variant + VIP dinar pricing, brand picker, AI product fill
     //   1.9.46 (77) — archived 2026-08-31, never uploaded
-    buildNumber: "78",
+    //   1.9.47 (78) — assigned, never built
+    buildNumber: "79",
     // Universal Links. This was removed while the domain was a placeholder — an
     // entitlement pointing at a host that cannot serve an
     // apple-app-site-association file makes every link silently fail to verify.
@@ -170,10 +177,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // iOS submission in flight; Play starts its own numbering at 1.0. Changing the
     // root field to 1.0 would drag iOS back with it.
     version: "1.0",
-    // Play rejects a reused versionCode. 138 was built and signed but never
-    // uploaded; going up costs nothing and reusing it is the one thing Play
-    // refuses outright.
-    versionCode: 139,
+    // Play rejects a reused versionCode. 138 and 139 were both built and signed
+    // but never uploaded; going up costs nothing and reusing a number is the one
+    // thing Play refuses outright. 140 is the first to carry the App Links intent
+    // filter, which is native config and cannot reach an existing build.
+    versionCode: 140,
     googleServicesFile: "./google-services.json",
     intentFilters: [
       // Android App Links for the live storefront. Removed while the host was a
