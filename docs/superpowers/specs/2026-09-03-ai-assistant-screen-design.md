@@ -159,6 +159,27 @@ is on the record: version 7.0.2 was published 2023-12-11, and it depends on
 transitive dependency entering RN 0.81 with the New Architecture enabled. This
 project has already lost an App Store submission to a stale package.
 
+**Phase 0 outcome (2026-09-03): KEPT.** `react-native-markdown-display@7.0.2`
+renders correctly on RN 0.81 with the New Architecture. Verified against a real
+Kurdish answer captured from the deployed `askChatbot` (bold, an ordered list and
+nested bullets): no crash, no red box, no deprecation warning, and `tsc --noEmit`
+clean under strict mode. `npx expo install --check` does not flag it or
+`react-native-fit-image`.
+
+One defect found and fixed: the library hardcodes `flexDirection: 'row'` on
+`list_item`, so in Kurdish and Arabic the list marker rendered on the LEFT while
+its text sat on the right. Mirroring the row corrects it, and this override is
+required wherever the renderer is used:
+
+```ts
+list_item: { flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'flex-start' },
+bullet_list_icon: { marginLeft: 10, marginRight: 10, color },
+ordered_list_icon: { marginLeft: 10, marginRight: 10, color },
+```
+
+`MarkdownLite` was therefore not built. If the library later breaks on an RN
+upgrade, the plan's Task 1 Step 6 still carries its full source.
+
 It is therefore gated behind Phase 0, a spike whose only job is to answer
 "does it work here". Fallback if it does not: a purpose-built renderer handling
 bold, bullets and line breaks — roughly 80 lines, no dependency, full RTL
