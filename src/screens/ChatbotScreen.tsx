@@ -34,6 +34,10 @@ import { SPACING } from '../constants/theme';
 import { chatbotService, ChatMessage } from '../services/chatbotService';
 import AssistantMessage from '../components/chat/AssistantMessage';
 import UserBubble from '../components/chat/UserBubble';
+import QuickChips from '../components/chat/QuickChips';
+// Aliased: this screen already imports RN's own `Animated` for the voice-recording
+// overlay, and the two libraries must not share a name in one file.
+import ReAnimated, { FadeInDown } from 'react-native-reanimated';
 import { useAudioRecorder, requestRecordingPermissionsAsync, setAudioModeAsync, RecordingPresets } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 import { VoiceBubble } from '../components/VoiceBubble';
@@ -63,14 +67,11 @@ const ChatbotScreen: React.FC = () => {
 
   const isRTL = i18n?.language ? getDirection(i18n.language) === 'rtl' : false;
 
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: 'welcome',
-      role: 'model',
-      content: t('chatbot.welcomeMessage'),
-      timestamp: new Date(),
-    },
-  ]);
+  // Starts EMPTY. The old seed put a fabricated assistant turn in the transcript
+  // before anyone had asked anything — the assistant had not said it, and it read
+  // as a message rather than as a greeting. The same words now live in the list's
+  // empty state, where they are framed as guidance instead of speech.
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -457,14 +458,9 @@ const ChatbotScreen: React.FC = () => {
           style: 'destructive',
           onPress: () => {
             chatbotService.clearHistory();
-            setMessages([
-              {
-                id: 'welcome',
-                role: 'model',
-                content: t('chatbot.welcomeMessage'),
-                timestamp: new Date(),
-              },
-            ]);
+            // Back to empty, same as a first launch, so "clear" means cleared
+            // rather than "replaced with one message the assistant never sent".
+            setMessages([]);
           },
         },
       ]
@@ -545,52 +541,26 @@ const ChatbotScreen: React.FC = () => {
       );
     }
 
-    return isUser ? (
-      <UserBubble text={item.content} isRTL={isRTL} theme={theme} time={time} />
-    ) : (
-      <AssistantMessage
-        text={item.content}
-        streaming={!!item.streaming}
-        isRTL={isRTL}
-        theme={theme}
-        time={time}
-        onOpenProduct={(id: string) => navigation.navigate('ProductDetails', { productId: id })}
-      />
-    );
-  };
-
-  const renderQuickActions = () => {
-    if (messages.length > 1) return null;
-
     return (
-      <View style={{ paddingHorizontal: SPACING.md, marginBottom: SPACING.md }}>
-        <Text allowFontScaling={false} style={{ fontSize: 14, color: theme.colors.textSecondary, marginBottom: SPACING.sm }}>
-          {t('chatbot.suggestions')}
-        </Text>
-
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm }}>
-          {quickActions.map(action => (
-            <TouchableOpacity
-              key={action.key}
-              onPress={() => handleQuickAction(action.key)}
-              style={{
-                backgroundColor: theme.colors.primary + '15',
-                paddingHorizontal: SPACING.md,
-                paddingVertical: SPACING.sm,
-                borderRadius: 20,
-                borderWidth: 1,
-                borderColor: theme.colors.primary + '30',
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 6,
-              }}
-            >
-              <Ionicons name={action.icon} size={16} color={theme.colors.primary} />
-              <Text allowFontScaling={false} style={{ color: theme.colors.primary, fontSize: 14 }}>{action.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
+      <ReAnimated.View
+        // Streaming rows are excluded. The row is already mounted and its text
+        // grows on every delta; re-running an entrance animation through that
+        // would make the answer jump several times a second.
+        entering={item.streaming ? undefined : FadeInDown.duration(220).springify().damping(18)}
+      >
+        {isUser ? (
+          <UserBubble text={item.content} isRTL={isRTL} theme={theme} time={time} />
+        ) : (
+          <AssistantMessage
+            text={item.content}
+            streaming={!!item.streaming}
+            isRTL={isRTL}
+            theme={theme}
+            time={time}
+            onOpenProduct={(id: string) => navigation.navigate('ProductDetails', { productId: id })}
+          />
+        )}
+      </ReAnimated.View>
     );
   };
 
@@ -868,7 +838,38 @@ const ChatbotScreen: React.FC = () => {
             // Keep content above bar height + tab bar
             paddingBottom: barHeight + tabBarHeight + 16,
           }}
-          ListHeaderComponent={renderQuickActions}
+          ListEmptyComponent={
+            <View style={{ alignItems: 'center', paddingTop: 72, paddingHorizontal: SPACING.xl }}>
+              <Image
+                source={require('../../assets/images/asankarylogo.png')}
+                style={{ width: 56, height: 56, borderRadius: 28, marginBottom: SPACING.md }}
+                contentFit="cover"
+              />
+              <Text
+                allowFontScaling={false}
+                style={{
+                  fontSize: 18,
+                  fontWeight: '700',
+                  color: theme.colors.text,
+                  textAlign: 'center',
+                }}
+              >
+                {t('chatbot.emptyTitle')}
+              </Text>
+              <Text
+                allowFontScaling={false}
+                style={{
+                  fontSize: 14,
+                  color: theme.colors.textSecondary,
+                  textAlign: 'center',
+                  marginTop: 6,
+                  lineHeight: 20,
+                }}
+              >
+                {t('chatbot.emptyBody')}
+              </Text>
+            </View>
+          }
           onContentSizeChange={() => scrollToBottom(false)}
           keyboardShouldPersistTaps="always"
           keyboardDismissMode="none"
@@ -890,6 +891,14 @@ const ChatbotScreen: React.FC = () => {
             backgroundColor: theme.colors.surface,
           }}
         >
+          {messages.length < 8 && (
+            <QuickChips
+              items={quickActions.map(action => ({ key: action.key, label: action.label }))}
+              isRTL={isRTL}
+              theme={theme}
+              onPress={handleQuickAction}
+            />
+          )}
           {renderSecondaryActions()}
           {renderInputArea()}
           {/* When keyboard is closed, we still need bottom safe area */}

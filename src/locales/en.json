@@ -2002,7 +2002,9 @@
     "sendingVoice": "Sending voice message...",
     "voiceMessage": "Voice Message",
     "retry": "Retry",
-    "outOfStock": "Out of stock"
+    "outOfStock": "Out of stock",
+    "emptyTitle": "Ask about anything in the shop",
+    "emptyBody": "Prices, stock, delivery, or your orders. Answers come from the live catalogue."
   },
   "chat": {
     "inbox": "Messages",
