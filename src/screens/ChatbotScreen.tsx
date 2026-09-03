@@ -144,14 +144,20 @@ const ChatbotScreen: React.FC = () => {
 
   // Compute where the bar should sit
   const barTop = useMemo(() => {
-    // keyboard hidden: keep composer ABOVE bottom tab bar
+    // keyboard hidden: keep composer ABOVE bottom tab bar.
+    //
+    // Only the TAB BAR is subtracted here. tabBarHeight folds in insets.bottom for
+    // the tabs case, but the bar already renders its own insets.bottom spacer under
+    // the input when the keyboard is closed. Subtracting a bottom inset in both
+    // places lifted the bar by that much (34pt on a Dynamic Island phone) and left a
+    // strip of the message list showing underneath it, below the text field.
     if (keyboardTopY === null) {
-      return screenH - barHeight - tabBarHeight;
+      return screenH - barHeight - (insideTabs ? tabBarHeight : 0);
     }
     // keyboard shown: bar sits exactly on keyboard
     const openTop = keyboardTopY - barHeight;
     return Math.max(insets.top, openTop);
-  }, [keyboardTopY, barHeight, screenH, tabBarHeight, insets.top]);
+  }, [keyboardTopY, barHeight, screenH, tabBarHeight, insideTabs, insets.top]);
 
   useEffect(() => {
     const showSub = Keyboard.addListener('keyboardDidShow', e => {

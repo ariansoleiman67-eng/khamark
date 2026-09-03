@@ -342,6 +342,27 @@ const RESPONSE_COPY: Record<
   },
 };
 
+/**
+ * Named columns, never `*`.
+ *
+ * `parts` has column-level grants: purchase_price, purchase_price_iqd and
+ * variation_costs are REVOKED from anon and authenticated so the shop's margin is
+ * not readable by customers. Postgres refuses the whole statement when a select
+ * touches a column the role cannot read, so `select('*')` came back as
+ *   401 {"code":"42501","message":"permission denied for table parts"}
+ * for every shopper. Both queries here failed, the catalogue was always empty, and
+ * the assistant told customers "I don't have a complete product catalog available
+ * right now" while the shop had a full one.
+ *
+ * Keep this list in step with mapPartRow below. Adding a column here that is not
+ * granted to anon breaks the assistant for customers while still working for an
+ * admin, which is the hardest version of this bug to notice.
+ */
+const CATALOG_COLUMNS =
+  'id,name,name_ar,name_ku,part_number,brand,category,price_usd,price_iqd,price_tiers,' +
+  'stock_qty,compatible_models,description,description_ar,description_ku,specifications,' +
+  'weight,is_featured,variations,color_variations,is_active';
+
 class ChatbotService {
   private histories = new Map<string, HistoryEntry[]>();
   private productCache = new Map<string, CacheEntry<ProductRecord>>();
@@ -845,9 +866,11 @@ class ChatbotService {
     ]).filter(Boolean);
 
     // parts table has no normalized column — match part_number against all candidates.
+    // CATALOG_COLUMNS, not '*', for the same reason as getActiveProductCatalog:
+    // '*' touches the revoked cost columns and 42501s the whole lookup for shoppers.
     const { data, error } = await supabase
       .from(PARTS_COLLECTION)
-      .select('*')
+      .select(CATALOG_COLUMNS)
       .in('part_number', candidates)
       .limit(1);
 
@@ -1016,14 +1039,19 @@ class ChatbotService {
     }
 
     this.catalogInFlight = (async () => {
-      let { data } = await supabase
+      const { data: activeRows, error: activeError } = await supabase
         .from(PARTS_COLLECTION)
-        .select('*')
+        .select(CATALOG_COLUMNS)
         .eq('is_active', true)
         .limit(MAX_CATALOG_SCAN);
 
+      let data = activeRows;
+      if (activeError) console.warn('ChatbotService catalog fetch failed:', activeError);
+
       if (!data || data.length === 0) {
-        data = (await supabase.from(PARTS_COLLECTION).select('*').limit(MAX_CATALOG_SCAN)).data;
+        const fallback = await supabase.from(PARTS_COLLECTION).select(CATALOG_COLUMNS).limit(MAX_CATALOG_SCAN);
+        if (fallback.error) console.warn('ChatbotService catalog fallback failed:', fallback.error);
+        data = fallback.data;
       }
 
       const products = (data || []).map((row) => this.mapPartRow(row));
