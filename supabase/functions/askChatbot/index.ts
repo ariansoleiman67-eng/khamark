@@ -53,10 +53,11 @@ Deno.serve(async (req: Request) => {
     // safeCallFunction wraps the payload as { data: {...} }
     const body = await req.json().catch(() => ({}));
     const payload = body?.data ?? body ?? {};
-    const { messages, max_tokens, temperature } = payload as {
+    const { messages, max_tokens, temperature, stream } = payload as {
       messages?: IncomingMessage[];
       max_tokens?: number;
       temperature?: number;
+      stream?: boolean;
     };
 
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -89,6 +90,59 @@ Deno.serve(async (req: Request) => {
     }
 
     const client = new Anthropic({ apiKey });
+
+    // STREAMING BRANCH.
+    //
+    // Taken only when the caller explicitly asks for it. Every line below this
+    // block runs exactly as it did before, which is what keeps aiProductFill and
+    // the admin AI out of the blast radius of this change.
+    if (stream === true) {
+      const sse = new ReadableStream({
+        async start(controller) {
+          const encoder = new TextEncoder();
+          const send = (event: string, data: unknown) =>
+            controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+
+          try {
+            const anthropicStream = client.messages.stream({
+              model: DEFAULT_MODEL,
+              max_tokens: max_tokens ?? 700,
+              temperature: temperature ?? 0.2,
+              ...(systemPrompt ? { system: systemPrompt } : {}),
+              messages: conversation,
+            });
+
+            for await (const event of anthropicStream) {
+              if (
+                event.type === 'content_block_delta' &&
+                event.delta.type === 'text_delta' &&
+                event.delta.text
+              ) {
+                send('delta', { text: event.delta.text });
+              }
+            }
+
+            send('done', {});
+          } catch (streamErr) {
+            // By this point the client may already be showing partial text, so an
+            // error EVENT is more useful than a status code it will never read.
+            const message = streamErr instanceof Error ? streamErr.message : String(streamErr);
+            send('error', { error: message });
+          } finally {
+            controller.close();
+          }
+        },
+      });
+
+      return new Response(sse, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          Connection: 'keep-alive',
+        },
+      });
+    }
 
     // presence_penalty and top_p are deliberately not forwarded. Anthropic has no
     // presence_penalty, and its guidance is to set at most one of temperature or
