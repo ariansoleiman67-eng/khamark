@@ -1,4 +1,5 @@
 import { safeCallFunction } from './safeCallFunction';
+import { streamChatbot, StreamUnavailableError } from './chatbotStream';
 import { supabase } from './supabase';
 
 export type ChatLanguage = 'en' | 'ar' | 'ku';
@@ -461,6 +462,70 @@ class ChatbotService {
       content: entry.content,
       timestamp: new Date(entry.timestampMs),
     }));
+  }
+
+  /**
+   * Same conversation as sendMessage — same retrieval, same system prompt, same
+   * history — delivered in pieces instead of all at once.
+   *
+   * Falls back to sendMessage once, silently, when the endpoint cannot stream. A
+   * shopper on a deployment that predates the streaming branch should get a
+   * slower answer, not an error.
+   */
+  async sendMessageStreaming(
+    message: string,
+    opts: {
+      language?: ChatLanguage | string;
+      sessionId?: string;
+      signal?: AbortSignal;
+      onDelta: (chunk: string) => void;
+    },
+  ): Promise<string> {
+    const trimmedMessage = message.trim();
+    if (!trimmedMessage) return '';
+
+    const { language, sessionId } = this.resolveOptions(
+      { language: opts.language, sessionId: opts.sessionId },
+      trimmedMessage,
+    );
+
+    const retrievalMessage = trimmedMessage.slice(0, MAX_SEARCHABLE_MESSAGE_CHARS);
+    const productContext = await this.buildProductContext(retrievalMessage);
+    const systemPrompt = productContext
+      ? `${SYSTEM_PROMPTS[language]}\n\n${productContext}`
+      : SYSTEM_PROMPTS[language];
+
+    const openAIMessages = this.buildOpenAIMessages(sessionId, systemPrompt, trimmedMessage);
+
+    let full = '';
+    try {
+      for await (const delta of streamChatbot(
+        { messages: openAIMessages, max_tokens: 700, temperature: 0.2 },
+        opts.signal,
+      )) {
+        full += delta;
+        opts.onDelta(delta);
+      }
+    } catch (error: unknown) {
+      if (error instanceof StreamUnavailableError) {
+        const buffered = await this.sendMessage(trimmedMessage, { language, sessionId });
+        opts.onDelta(buffered);
+        return buffered;
+      }
+
+      // Aborted, or the connection dropped. Whatever arrived is real output and
+      // belongs in the history, or the next question loses the thread.
+      if (full.trim()) {
+        this.appendHistory(sessionId, 'user', trimmedMessage);
+        this.appendHistory(sessionId, 'model', this.sanitizeAssistantText(full));
+      }
+      throw error;
+    }
+
+    const aiText = this.sanitizeAssistantText(full) || RESPONSE_COPY[language].genericFailure;
+    this.appendHistory(sessionId, 'user', trimmedMessage);
+    this.appendHistory(sessionId, 'model', aiText);
+    return aiText;
   }
 
   clearHistory(sessionId?: string): void {
