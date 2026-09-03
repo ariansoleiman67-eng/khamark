@@ -9,6 +9,7 @@ import {
   Platform,
   ActivityIndicator,
   Animated,
+  Pressable,
   Easing,
   LayoutAnimation,
   UIManager,
@@ -74,6 +75,9 @@ const ChatbotScreen: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   const [inputText, setInputText] = useState('');
+  // The last question asked, kept so a failed answer can be retried without the
+  // customer retyping it. Cleared on success.
+  const [failedPrompt, setFailedPrompt] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   // Audio recorder state
@@ -242,9 +246,11 @@ const ChatbotScreen: React.FC = () => {
         });
 
         setMessages(prev => prev.map(m => (m.id === aiId ? { ...m, streaming: false } : m)));
+        setFailedPrompt(null);
       } catch (error: any) {
         // Whatever arrived stays on screen. Only a completely empty answer is
         // replaced by the error text — partial output is real output.
+        setFailedPrompt(trimmed);
         setMessages(prev =>
           prev.map(m =>
             m.id === aiId
@@ -891,6 +897,47 @@ const ChatbotScreen: React.FC = () => {
             backgroundColor: theme.colors.surface,
           }}
         >
+          {failedPrompt && !isLoading && (
+            <Pressable
+              onPress={() => {
+                const again = failedPrompt;
+                setFailedPrompt(null);
+                // Drop the failed assistant row before resending, or the retry
+                // appends a second answer under a visible failure.
+                setMessages(prev => {
+                  const last = prev[prev.length - 1];
+                  return last && last.role === 'model' && !last.content.trim()
+                    ? prev.slice(0, -1)
+                    : prev;
+                });
+                sendMessage(again);
+              }}
+              accessibilityRole="button"
+              style={({ pressed }) => ({
+                alignSelf: isRTL ? 'flex-end' : 'flex-start',
+                flexDirection: isRTL ? 'row-reverse' : 'row',
+                alignItems: 'center',
+                gap: 6,
+                marginHorizontal: SPACING.md,
+                marginBottom: SPACING.sm,
+                paddingHorizontal: SPACING.md,
+                paddingVertical: 8,
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: theme.colors.primary,
+                backgroundColor: pressed ? theme.colors.primary + '14' : 'transparent',
+              })}
+            >
+              <Ionicons name="refresh" size={15} color={theme.colors.primary} />
+              <Text
+                allowFontScaling={false}
+                style={{ fontSize: 13, fontWeight: '600', color: theme.colors.primary }}
+              >
+                {t('chatbot.retry')}
+              </Text>
+            </Pressable>
+          )}
+
           {messages.length < 8 && (
             <QuickChips
               items={quickActions.map(action => ({ key: action.key, label: action.label }))}
