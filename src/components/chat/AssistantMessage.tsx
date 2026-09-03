@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text } from 'react-native';
 import { Image } from 'expo-image';
 import { SPACING } from '../../constants/theme';
 import TypingDots from './TypingDots';
 import MarkdownBody from './MarkdownBody';
 import { useRevealedText } from './useRevealedText';
+import ProductCardStrip from './ProductCardStrip';
+import { stripProductMarker, visibleDuringStream, extractProductIds } from '../../utils/chatMarkers';
 
 interface Props {
   text: string;
@@ -12,6 +14,7 @@ interface Props {
   isRTL: boolean;
   theme: any;
   time?: string;
+  onOpenProduct?: (id: string) => void;
 }
 
 /**
@@ -27,8 +30,27 @@ interface Props {
  * the swap to formatted text on completion is invisible because the words do not
  * move.
  */
-const AssistantMessage: React.FC<Props> = ({ text, streaming, isRTL, theme, time }) => {
-  const revealed = useRevealedText(text, streaming);
+const AssistantMessage: React.FC<Props> = ({
+  text,
+  streaming,
+  isRTL,
+  theme,
+  time,
+  onOpenProduct,
+}) => {
+  // The marker is stripped BEFORE the reveal animation sees the text, so the
+  // smoothing never counts characters the customer will not be shown.
+  const visible = streaming ? visibleDuringStream(text) : stripProductMarker(text);
+  const revealed = useRevealedText(visible, streaming);
+  // Only once the text stops moving: mid-stream the id list is usually truncated.
+  //
+  // Memoised because this array is ProductCardStrip's effect dependency. A fresh
+  // array on every render would re-run that effect on every render, which for a
+  // streaming message is dozens of times a second.
+  const productIds = useMemo(
+    () => (streaming ? [] : extractProductIds(text)),
+    [streaming, text],
+  );
 
   return (
     <View
@@ -68,10 +90,19 @@ const AssistantMessage: React.FC<Props> = ({ text, streaming, isRTL, theme, time
           </Text>
         ) : (
           <MarkdownBody
-            text={text}
+            text={visible}
             isRTL={isRTL}
             color={theme.colors.text}
             secondaryColor={theme.colors.textSecondary}
+          />
+        )}
+
+        {productIds.length > 0 && onOpenProduct && (
+          <ProductCardStrip
+            ids={productIds}
+            isRTL={isRTL}
+            theme={theme}
+            onOpen={onOpenProduct}
           />
         )}
 

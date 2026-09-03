@@ -2001,7 +2001,8 @@
     "recording": "Recording...",
     "sendingVoice": "Sending voice message...",
     "voiceMessage": "Voice Message",
-    "retry": "Retry"
+    "retry": "Retry",
+    "outOfStock": "Out of stock"
   },
   "chat": {
     "inbox": "Messages",

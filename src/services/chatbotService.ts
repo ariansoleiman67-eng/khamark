@@ -75,7 +75,7 @@ interface ProductDimensions {
   height?: number;
 }
 
-interface ProductRecord {
+export interface ProductRecord {
   id: string;
   name?: string;
   nameAr?: string;
@@ -104,6 +104,7 @@ interface ProductRecord {
   variations?: ProductVariation[];
   colorVariations?: ProductVariation[];
   isActive?: boolean;
+  imageUrls?: string[];
 }
 
 interface OrderItem {
@@ -377,7 +378,7 @@ const RESPONSE_COPY: Record<
 const CATALOG_COLUMNS =
   'id,name,name_ar,name_ku,part_number,brand,category,price_usd,price_iqd,price_tiers,' +
   'stock_qty,compatible_models,description,description_ar,description_ku,specifications,' +
-  'weight,is_featured,variations,color_variations,is_active';
+  'weight,is_featured,variations,color_variations,is_active,image_urls';
 
 class ChatbotService {
   private histories = new Map<string, HistoryEntry[]>();
@@ -530,6 +531,22 @@ class ChatbotService {
     this.appendHistory(sessionId, 'user', trimmedMessage);
     this.appendHistory(sessionId, 'model', aiText);
     return aiText;
+  }
+
+  /**
+   * Resolve marker ids against the catalogue already in memory, so rendering a
+   * card costs no extra request.
+   *
+   * Order is the model's, because the model ranked them. Unknown ids are skipped
+   * rather than rendered as blanks: a hallucinated id must cost nothing.
+   */
+  async getProductsByIds(ids: string[]): Promise<ProductRecord[]> {
+    if (!ids.length) return [];
+    const catalog = await this.getActiveProductCatalog();
+    const byId = new Map(catalog.map(product => [product.id, product]));
+    return ids
+      .map(id => byId.get(id))
+      .filter((product): product is ProductRecord => !!product);
   }
 
   clearHistory(sessionId?: string): void {
@@ -1169,6 +1186,11 @@ class ChatbotService {
       variations: row.variations,
       colorVariations: row.color_variations,
       isActive: row.is_active,
+      // Read for the product cards the assistant renders under an answer. Granted
+      // to anon — verified against the live table, not assumed, because a column
+      // that is not granted turns the whole select into a 42501 for customers
+      // while still working for an admin.
+      imageUrls: Array.isArray(row.image_urls) ? row.image_urls : [],
     };
   }
 

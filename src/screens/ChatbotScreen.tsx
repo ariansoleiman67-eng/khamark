@@ -554,6 +554,7 @@ const ChatbotScreen: React.FC = () => {
         isRTL={isRTL}
         theme={theme}
         time={time}
+        onOpenProduct={(id: string) => navigation.navigate('ProductDetails', { productId: id })}
       />
     );
   };

@@ -2117,7 +2117,8 @@
     "recording": "تۆمارکردن...",
     "sendingVoice": "ناردنی پەیامی دەنگی...",
     "voiceMessage": "پەیامی دەنگی",
-    "retry": "هەوڵدانەوە"
+    "retry": "هەوڵدانەوە",
+    "outOfStock": "نەماوە"
   },
   "shippingInfo": {
     "title": "زانیاری ئۆفیسی گواستنەوە",
