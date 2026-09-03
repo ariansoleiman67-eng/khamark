@@ -32,6 +32,8 @@ import { useTranslation } from 'react-i18next';
 import { getDirection } from '../locales';
 import { SPACING } from '../constants/theme';
 import { chatbotService, ChatMessage } from '../services/chatbotService';
+import AssistantMessage from '../components/chat/AssistantMessage';
+import UserBubble from '../components/chat/UserBubble';
 import { useAudioRecorder, requestRecordingPermissionsAsync, setAudioModeAsync, RecordingPresets } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 import { VoiceBubble } from '../components/VoiceBubble';
@@ -72,7 +74,6 @@ const ChatbotScreen: React.FC = () => {
 
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [typingDots, setTypingDots] = useState('.');
 
   // Audio recorder state
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
@@ -179,16 +180,6 @@ const ChatbotScreen: React.FC = () => {
       hideSub.remove();
     };
   }, []);
-
-  // Animated typing dots
-  useEffect(() => {
-    if (isLoading) {
-      const interval = setInterval(() => {
-        setTypingDots(prev => (prev.length >= 3 ? '.' : prev + '.'));
-      }, 400);
-      return () => clearInterval(interval);
-    }
-  }, [isLoading]);
 
   const scrollToBottom = (animated = true) => {
     requestAnimationFrame(() => {
@@ -536,65 +527,34 @@ const ChatbotScreen: React.FC = () => {
       index === messages.length - 1 ||
       (messages[index + 1] &&
         new Date(messages[index + 1].timestamp).getTime() - new Date(item.timestamp).getTime() > 60000);
+    const time = showTimestamp ? formatTime(new Date(item.timestamp)) : undefined;
 
-    return (
-      <View style={{ marginVertical: SPACING.xs, paddingHorizontal: SPACING.md }}>
-        <View style={{ flexDirection: 'row', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
-          {item.type === 'voice' ? (
-             <VoiceBubble 
-                mine={isUser}
-                attachmentUrl={item.attachmentUrl}
-                fileMetadata={item.fileMetadata as any}
-                theme={theme}
-                time={formatTime(new Date(item.timestamp))}
-             />
-          ) : (
-             <View
-               style={{
-                 maxWidth: '75%',
-                 backgroundColor: isUser ? theme.colors.primary : theme.colors.surface,
-                 paddingHorizontal: SPACING.md,
-                 paddingVertical: Platform.OS === 'android' ? SPACING.sm + 2 : SPACING.sm,
-                 paddingTop: Platform.OS === 'android' ? SPACING.sm + 3 : SPACING.sm,
-                 borderRadius: 16,
-                 borderTopLeftRadius: isUser ? 16 : 4,
-                 borderTopRightRadius: isUser ? 4 : 16,
-               }}
-             >
-               <Text allowFontScaling={false}
-                 style={{
-                   fontSize: 15,
-                   color: isUser ? 'white' : theme.colors.text,
-                   fontFamily: Platform.OS === 'android' ? 'sans-serif' : undefined,
-                   lineHeight: Platform.OS === 'android' ? 24 : 22,
-                   includeFontPadding: false,
-                   textAlign: isRTL ? 'right' : 'left',
-                   flexShrink: 1,
-                   flexWrap: 'wrap',
-                   transform: Platform.OS === 'android' ? [{ translateY: 1 }] : undefined,
-                 }}
-               >
-                 {item.role !== 'user' && item.streaming && !item.content
-                   ? t('chatbot.typing')
-                   : item.content}
-               </Text>
-             </View>
-          )}
+    if (item.type === 'voice') {
+      return (
+        <View style={{ marginVertical: SPACING.xs, paddingHorizontal: SPACING.md }}>
+          <View style={{ flexDirection: 'row', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
+            <VoiceBubble
+              mine={isUser}
+              attachmentUrl={item.attachmentUrl}
+              fileMetadata={item.fileMetadata as any}
+              theme={theme}
+              time={formatTime(new Date(item.timestamp))}
+            />
+          </View>
         </View>
+      );
+    }
 
-        {showTimestamp && (
-          <Text allowFontScaling={false}
-            style={{
-              fontSize: 11,
-              color: theme.colors.textSecondary,
-              textAlign: isUser ? 'right' : 'left',
-              marginTop: 4,
-            }}
-          >
-            {formatTime(new Date(item.timestamp))}
-          </Text>
-        )}
-      </View>
+    return isUser ? (
+      <UserBubble text={item.content} isRTL={isRTL} theme={theme} time={time} />
+    ) : (
+      <AssistantMessage
+        text={item.content}
+        streaming={!!item.streaming}
+        isRTL={isRTL}
+        theme={theme}
+        time={time}
+      />
     );
   };
 
@@ -668,62 +628,6 @@ const ChatbotScreen: React.FC = () => {
             <Text allowFontScaling={false} style={{ fontSize: 11, color: theme.colors.textSecondary }}>{action.label}</Text>
           </TouchableOpacity>
         ))}
-      </View>
-    );
-  };
-
-  const renderTypingIndicator = () => {
-    if (!isLoading) return null;
-    return (
-      <View
-        pointerEvents="none"
-        style={{
-          // Mirrored in Arabic and Kurdish, like the header and the message rows.
-          // It read left-to-right in every language before, which put the avatar on
-          // the wrong side of its own bubble.
-          flexDirection: isRTL ? 'row-reverse' : 'row',
-          alignItems: 'center',
-          paddingHorizontal: SPACING.md,
-          paddingBottom: SPACING.sm,
-        }}
-      >
-        <View
-          style={{
-            width: 32,
-            height: 32,
-            borderRadius: 16,
-            backgroundColor: theme.colors.primary + '20',
-            justifyContent: 'center',
-            alignItems: 'center',
-            ...(isRTL ? { marginLeft: SPACING.sm } : { marginRight: SPACING.sm }),
-          }}
-        >
-          <ActivityIndicator size="small" color={theme.colors.primary} />
-        </View>
-        <View
-          style={{
-            backgroundColor: theme.colors.surface,
-            paddingHorizontal: SPACING.md,
-            paddingVertical: SPACING.sm,
-            borderRadius: 16,
-            // The squared-off corner is the bubble's tail, so it points at the
-            // avatar -- which is on the right in Arabic and Kurdish.
-            ...(isRTL ? { borderTopRightRadius: 4 } : { borderTopLeftRadius: 4 }),
-          }}
-        >
-          <Text allowFontScaling={false}
-            style={{
-              color: theme.colors.textSecondary,
-              fontSize: 14,
-              lineHeight: 20,
-              includeFontPadding: false,
-              textAlign: isRTL ? 'right' : 'left',
-            }}
-          >
-            {t('chatbot.typing')}
-            {typingDots}
-          </Text>
-        </View>
       </View>
     );
   };
@@ -964,13 +868,6 @@ const ChatbotScreen: React.FC = () => {
             paddingBottom: barHeight + tabBarHeight + 16,
           }}
           ListHeaderComponent={renderQuickActions}
-          // The typing bubble belongs INSIDE the list, not after it. The bottom bar
-          // below is position:'absolute' and so takes no space in the flex column;
-          // a sibling rendered after a flex:1 list therefore landed at the bottom of
-          // the SCREEN, underneath that bar and half off the display. As the footer
-          // it follows the last message, scrolls with it, and clears the bar through
-          // the list's own paddingBottom.
-          ListFooterComponent={renderTypingIndicator()}
           onContentSizeChange={() => scrollToBottom(false)}
           keyboardShouldPersistTaps="always"
           keyboardDismissMode="none"
