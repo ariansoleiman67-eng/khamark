@@ -2000,7 +2000,8 @@
     "recordFailed": "Failed to start recording",
     "recording": "Recording...",
     "sendingVoice": "Sending voice message...",
-    "voiceMessage": "Voice Message"
+    "voiceMessage": "Voice Message",
+    "retry": "Retry"
   },
   "chat": {
     "inbox": "Messages",

@@ -43,6 +43,10 @@ const ChatbotScreen: React.FC = () => {
   const { t, i18n } = useTranslation();
   const navigation = useNavigation<any>();
   const flatListRef = useRef<FlatList>(null);
+  // Aborts the in-flight answer when the screen goes away, so a half-finished
+  // stream cannot call setState on an unmounted component.
+  const abortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => abortRef.current?.abort(), []);
   const inputRef = useRef<TextInput>(null);
   const insets = useSafeAreaInsets();
   const rawTabBarHeight = React.useContext(BottomTabBarHeightContext);
@@ -221,29 +225,47 @@ const ChatbotScreen: React.FC = () => {
 
       setTimeout(() => scrollToBottom(true), 50);
 
+      // The assistant row exists before a single byte arrives, so the waiting
+      // state sits where the answer will be rather than in a separate widget.
+      const aiId = `ai-${Date.now()}`;
+      setMessages(prev => [
+        ...prev,
+        { id: aiId, role: 'model', content: '', timestamp: new Date(), streaming: true },
+      ]);
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+
       try {
         // Detect the language from the message text, not the app UI language
         const messageLanguage = detectMessageLanguage(trimmed);
-        const response = await chatbotService.sendMessage(trimmed, messageLanguage);
+        await chatbotService.sendMessageStreaming(trimmed, {
+          language: messageLanguage,
+          signal: controller.signal,
+          onDelta: chunk => {
+            setMessages(prev =>
+              prev.map(m => (m.id === aiId ? { ...m, content: m.content + chunk } : m)),
+            );
+          },
+        });
 
-        const aiMessage: ChatMessage = {
-          id: `ai-${Date.now()}`,
-          role: 'model',
-          content: response,
-          timestamp: new Date(),
-        };
-
-        setMessages(prev => [...prev, aiMessage]);
+        setMessages(prev => prev.map(m => (m.id === aiId ? { ...m, streaming: false } : m)));
       } catch (error: any) {
-        const errorMessage: ChatMessage = {
-          id: `error-${Date.now()}`,
-          role: 'model',
-          content: error.message || t('chatbot.errorMessage'),
-          timestamp: new Date(),
-        };
-
-        setMessages(prev => [...prev, errorMessage]);
+        // Whatever arrived stays on screen. Only a completely empty answer is
+        // replaced by the error text — partial output is real output.
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === aiId
+              ? {
+                  ...m,
+                  streaming: false,
+                  content: m.content || error?.message || t('chatbot.errorMessage'),
+                }
+              : m,
+          ),
+        );
       } finally {
+        abortRef.current = null;
         setIsLoading(false);
         setTimeout(() => scrollToBottom(true), 50);
       }
@@ -552,7 +574,9 @@ const ChatbotScreen: React.FC = () => {
                    transform: Platform.OS === 'android' ? [{ translateY: 1 }] : undefined,
                  }}
                >
-                 {item.content}
+                 {item.role !== 'user' && item.streaming && !item.content
+                   ? t('chatbot.typing')
+                   : item.content}
                </Text>
              </View>
           )}

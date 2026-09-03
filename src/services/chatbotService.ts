@@ -13,6 +13,8 @@ export interface ChatMessage {
   content: string;
   timestamp: Date;
   type?: 'text' | 'voice' | string;
+  /** True while the text is still arriving. Drives the dots and defers markdown. */
+  streaming?: boolean;
   attachmentUrl?: string | null;
   fileMetadata?: {
     duration?: number;

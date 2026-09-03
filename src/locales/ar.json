@@ -1971,7 +1971,8 @@
     "recordFailed": "فشل بدء التسجيل",
     "recording": "جاري التسجيل...",
     "sendingVoice": "جاري إرسال الرسالة الصوتية...",
-    "voiceMessage": "رسالة صوتية"
+    "voiceMessage": "رسالة صوتية",
+    "retry": "إعادة المحاولة"
   },
   "chat": {
     "inbox": "الرسائل",
