@@ -9,6 +9,7 @@ import {
   Platform,
   ActivityIndicator,
   Animated,
+  Pressable,
   Easing,
   LayoutAnimation,
   UIManager,
@@ -32,6 +33,12 @@ import { useTranslation } from 'react-i18next';
 import { getDirection } from '../locales';
 import { SPACING } from '../constants/theme';
 import { chatbotService, ChatMessage } from '../services/chatbotService';
+import AssistantMessage from '../components/chat/AssistantMessage';
+import UserBubble from '../components/chat/UserBubble';
+import QuickChips from '../components/chat/QuickChips';
+// Aliased: this screen already imports RN's own `Animated` for the voice-recording
+// overlay, and the two libraries must not share a name in one file.
+import ReAnimated, { FadeInDown } from 'react-native-reanimated';
 import { useAudioRecorder, requestRecordingPermissionsAsync, setAudioModeAsync, RecordingPresets } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 import { VoiceBubble } from '../components/VoiceBubble';
@@ -43,6 +50,10 @@ const ChatbotScreen: React.FC = () => {
   const { t, i18n } = useTranslation();
   const navigation = useNavigation<any>();
   const flatListRef = useRef<FlatList>(null);
+  // Aborts the in-flight answer when the screen goes away, so a half-finished
+  // stream cannot call setState on an unmounted component.
+  const abortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => abortRef.current?.abort(), []);
   const inputRef = useRef<TextInput>(null);
   const insets = useSafeAreaInsets();
   const rawTabBarHeight = React.useContext(BottomTabBarHeightContext);
@@ -57,18 +68,17 @@ const ChatbotScreen: React.FC = () => {
 
   const isRTL = i18n?.language ? getDirection(i18n.language) === 'rtl' : false;
 
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: 'welcome',
-      role: 'model',
-      content: t('chatbot.welcomeMessage'),
-      timestamp: new Date(),
-    },
-  ]);
+  // Starts EMPTY. The old seed put a fabricated assistant turn in the transcript
+  // before anyone had asked anything — the assistant had not said it, and it read
+  // as a message rather than as a greeting. The same words now live in the list's
+  // empty state, where they are framed as guidance instead of speech.
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   const [inputText, setInputText] = useState('');
+  // The last question asked, kept so a failed answer can be retried without the
+  // customer retyping it. Cleared on success.
+  const [failedPrompt, setFailedPrompt] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [typingDots, setTypingDots] = useState('.');
 
   // Audio recorder state
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
@@ -176,16 +186,6 @@ const ChatbotScreen: React.FC = () => {
     };
   }, []);
 
-  // Animated typing dots
-  useEffect(() => {
-    if (isLoading) {
-      const interval = setInterval(() => {
-        setTypingDots(prev => (prev.length >= 3 ? '.' : prev + '.'));
-      }, 400);
-      return () => clearInterval(interval);
-    }
-  }, [isLoading]);
-
   const scrollToBottom = (animated = true) => {
     requestAnimationFrame(() => {
       flatListRef.current?.scrollToEnd({ animated });
@@ -221,29 +221,49 @@ const ChatbotScreen: React.FC = () => {
 
       setTimeout(() => scrollToBottom(true), 50);
 
+      // The assistant row exists before a single byte arrives, so the waiting
+      // state sits where the answer will be rather than in a separate widget.
+      const aiId = `ai-${Date.now()}`;
+      setMessages(prev => [
+        ...prev,
+        { id: aiId, role: 'model', content: '', timestamp: new Date(), streaming: true },
+      ]);
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+
       try {
         // Detect the language from the message text, not the app UI language
         const messageLanguage = detectMessageLanguage(trimmed);
-        const response = await chatbotService.sendMessage(trimmed, messageLanguage);
+        await chatbotService.sendMessageStreaming(trimmed, {
+          language: messageLanguage,
+          signal: controller.signal,
+          onDelta: chunk => {
+            setMessages(prev =>
+              prev.map(m => (m.id === aiId ? { ...m, content: m.content + chunk } : m)),
+            );
+          },
+        });
 
-        const aiMessage: ChatMessage = {
-          id: `ai-${Date.now()}`,
-          role: 'model',
-          content: response,
-          timestamp: new Date(),
-        };
-
-        setMessages(prev => [...prev, aiMessage]);
+        setMessages(prev => prev.map(m => (m.id === aiId ? { ...m, streaming: false } : m)));
+        setFailedPrompt(null);
       } catch (error: any) {
-        const errorMessage: ChatMessage = {
-          id: `error-${Date.now()}`,
-          role: 'model',
-          content: error.message || t('chatbot.errorMessage'),
-          timestamp: new Date(),
-        };
-
-        setMessages(prev => [...prev, errorMessage]);
+        // Whatever arrived stays on screen. Only a completely empty answer is
+        // replaced by the error text — partial output is real output.
+        setFailedPrompt(trimmed);
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === aiId
+              ? {
+                  ...m,
+                  streaming: false,
+                  content: m.content || error?.message || t('chatbot.errorMessage'),
+                }
+              : m,
+          ),
+        );
       } finally {
+        abortRef.current = null;
         setIsLoading(false);
         setTimeout(() => scrollToBottom(true), 50);
       }
@@ -444,14 +464,9 @@ const ChatbotScreen: React.FC = () => {
           style: 'destructive',
           onPress: () => {
             chatbotService.clearHistory();
-            setMessages([
-              {
-                id: 'welcome',
-                role: 'model',
-                content: t('chatbot.welcomeMessage'),
-                timestamp: new Date(),
-              },
-            ]);
+            // Back to empty, same as a first launch, so "clear" means cleared
+            // rather than "replaced with one message the assistant never sent".
+            setMessages([]);
           },
         },
       ]
@@ -514,98 +529,44 @@ const ChatbotScreen: React.FC = () => {
       index === messages.length - 1 ||
       (messages[index + 1] &&
         new Date(messages[index + 1].timestamp).getTime() - new Date(item.timestamp).getTime() > 60000);
+    const time = showTimestamp ? formatTime(new Date(item.timestamp)) : undefined;
+
+    if (item.type === 'voice') {
+      return (
+        <View style={{ marginVertical: SPACING.xs, paddingHorizontal: SPACING.md }}>
+          <View style={{ flexDirection: 'row', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
+            <VoiceBubble
+              mine={isUser}
+              attachmentUrl={item.attachmentUrl}
+              fileMetadata={item.fileMetadata as any}
+              theme={theme}
+              time={formatTime(new Date(item.timestamp))}
+            />
+          </View>
+        </View>
+      );
+    }
 
     return (
-      <View style={{ marginVertical: SPACING.xs, paddingHorizontal: SPACING.md }}>
-        <View style={{ flexDirection: 'row', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
-          {item.type === 'voice' ? (
-             <VoiceBubble 
-                mine={isUser}
-                attachmentUrl={item.attachmentUrl}
-                fileMetadata={item.fileMetadata as any}
-                theme={theme}
-                time={formatTime(new Date(item.timestamp))}
-             />
-          ) : (
-             <View
-               style={{
-                 maxWidth: '75%',
-                 backgroundColor: isUser ? theme.colors.primary : theme.colors.surface,
-                 paddingHorizontal: SPACING.md,
-                 paddingVertical: Platform.OS === 'android' ? SPACING.sm + 2 : SPACING.sm,
-                 paddingTop: Platform.OS === 'android' ? SPACING.sm + 3 : SPACING.sm,
-                 borderRadius: 16,
-                 borderTopLeftRadius: isUser ? 16 : 4,
-                 borderTopRightRadius: isUser ? 4 : 16,
-               }}
-             >
-               <Text allowFontScaling={false}
-                 style={{
-                   fontSize: 15,
-                   color: isUser ? 'white' : theme.colors.text,
-                   fontFamily: Platform.OS === 'android' ? 'sans-serif' : undefined,
-                   lineHeight: Platform.OS === 'android' ? 24 : 22,
-                   includeFontPadding: false,
-                   textAlign: isRTL ? 'right' : 'left',
-                   flexShrink: 1,
-                   flexWrap: 'wrap',
-                   transform: Platform.OS === 'android' ? [{ translateY: 1 }] : undefined,
-                 }}
-               >
-                 {item.content}
-               </Text>
-             </View>
-          )}
-        </View>
-
-        {showTimestamp && (
-          <Text allowFontScaling={false}
-            style={{
-              fontSize: 11,
-              color: theme.colors.textSecondary,
-              textAlign: isUser ? 'right' : 'left',
-              marginTop: 4,
-            }}
-          >
-            {formatTime(new Date(item.timestamp))}
-          </Text>
+      <ReAnimated.View
+        // Streaming rows are excluded. The row is already mounted and its text
+        // grows on every delta; re-running an entrance animation through that
+        // would make the answer jump several times a second.
+        entering={item.streaming ? undefined : FadeInDown.duration(220).springify().damping(18)}
+      >
+        {isUser ? (
+          <UserBubble text={item.content} isRTL={isRTL} theme={theme} time={time} />
+        ) : (
+          <AssistantMessage
+            text={item.content}
+            streaming={!!item.streaming}
+            isRTL={isRTL}
+            theme={theme}
+            time={time}
+            onOpenProduct={(id: string) => navigation.navigate('ProductDetails', { productId: id })}
+          />
         )}
-      </View>
-    );
-  };
-
-  const renderQuickActions = () => {
-    if (messages.length > 1) return null;
-
-    return (
-      <View style={{ paddingHorizontal: SPACING.md, marginBottom: SPACING.md }}>
-        <Text allowFontScaling={false} style={{ fontSize: 14, color: theme.colors.textSecondary, marginBottom: SPACING.sm }}>
-          {t('chatbot.suggestions')}
-        </Text>
-
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm }}>
-          {quickActions.map(action => (
-            <TouchableOpacity
-              key={action.key}
-              onPress={() => handleQuickAction(action.key)}
-              style={{
-                backgroundColor: theme.colors.primary + '15',
-                paddingHorizontal: SPACING.md,
-                paddingVertical: SPACING.sm,
-                borderRadius: 20,
-                borderWidth: 1,
-                borderColor: theme.colors.primary + '30',
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 6,
-              }}
-            >
-              <Ionicons name={action.icon} size={16} color={theme.colors.primary} />
-              <Text allowFontScaling={false} style={{ color: theme.colors.primary, fontSize: 14 }}>{action.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
+      </ReAnimated.View>
     );
   };
 
@@ -644,62 +605,6 @@ const ChatbotScreen: React.FC = () => {
             <Text allowFontScaling={false} style={{ fontSize: 11, color: theme.colors.textSecondary }}>{action.label}</Text>
           </TouchableOpacity>
         ))}
-      </View>
-    );
-  };
-
-  const renderTypingIndicator = () => {
-    if (!isLoading) return null;
-    return (
-      <View
-        pointerEvents="none"
-        style={{
-          // Mirrored in Arabic and Kurdish, like the header and the message rows.
-          // It read left-to-right in every language before, which put the avatar on
-          // the wrong side of its own bubble.
-          flexDirection: isRTL ? 'row-reverse' : 'row',
-          alignItems: 'center',
-          paddingHorizontal: SPACING.md,
-          paddingBottom: SPACING.sm,
-        }}
-      >
-        <View
-          style={{
-            width: 32,
-            height: 32,
-            borderRadius: 16,
-            backgroundColor: theme.colors.primary + '20',
-            justifyContent: 'center',
-            alignItems: 'center',
-            ...(isRTL ? { marginLeft: SPACING.sm } : { marginRight: SPACING.sm }),
-          }}
-        >
-          <ActivityIndicator size="small" color={theme.colors.primary} />
-        </View>
-        <View
-          style={{
-            backgroundColor: theme.colors.surface,
-            paddingHorizontal: SPACING.md,
-            paddingVertical: SPACING.sm,
-            borderRadius: 16,
-            // The squared-off corner is the bubble's tail, so it points at the
-            // avatar -- which is on the right in Arabic and Kurdish.
-            ...(isRTL ? { borderTopRightRadius: 4 } : { borderTopLeftRadius: 4 }),
-          }}
-        >
-          <Text allowFontScaling={false}
-            style={{
-              color: theme.colors.textSecondary,
-              fontSize: 14,
-              lineHeight: 20,
-              includeFontPadding: false,
-              textAlign: isRTL ? 'right' : 'left',
-            }}
-          >
-            {t('chatbot.typing')}
-            {typingDots}
-          </Text>
-        </View>
       </View>
     );
   };
@@ -939,14 +844,38 @@ const ChatbotScreen: React.FC = () => {
             // Keep content above bar height + tab bar
             paddingBottom: barHeight + tabBarHeight + 16,
           }}
-          ListHeaderComponent={renderQuickActions}
-          // The typing bubble belongs INSIDE the list, not after it. The bottom bar
-          // below is position:'absolute' and so takes no space in the flex column;
-          // a sibling rendered after a flex:1 list therefore landed at the bottom of
-          // the SCREEN, underneath that bar and half off the display. As the footer
-          // it follows the last message, scrolls with it, and clears the bar through
-          // the list's own paddingBottom.
-          ListFooterComponent={renderTypingIndicator()}
+          ListEmptyComponent={
+            <View style={{ alignItems: 'center', paddingTop: 72, paddingHorizontal: SPACING.xl }}>
+              <Image
+                source={require('../../assets/images/asankarylogo.png')}
+                style={{ width: 56, height: 56, borderRadius: 28, marginBottom: SPACING.md }}
+                contentFit="cover"
+              />
+              <Text
+                allowFontScaling={false}
+                style={{
+                  fontSize: 18,
+                  fontWeight: '700',
+                  color: theme.colors.text,
+                  textAlign: 'center',
+                }}
+              >
+                {t('chatbot.emptyTitle')}
+              </Text>
+              <Text
+                allowFontScaling={false}
+                style={{
+                  fontSize: 14,
+                  color: theme.colors.textSecondary,
+                  textAlign: 'center',
+                  marginTop: 6,
+                  lineHeight: 20,
+                }}
+              >
+                {t('chatbot.emptyBody')}
+              </Text>
+            </View>
+          }
           onContentSizeChange={() => scrollToBottom(false)}
           keyboardShouldPersistTaps="always"
           keyboardDismissMode="none"
@@ -968,6 +897,55 @@ const ChatbotScreen: React.FC = () => {
             backgroundColor: theme.colors.surface,
           }}
         >
+          {failedPrompt && !isLoading && (
+            <Pressable
+              onPress={() => {
+                const again = failedPrompt;
+                setFailedPrompt(null);
+                // Drop the failed assistant row before resending, or the retry
+                // appends a second answer under a visible failure.
+                setMessages(prev => {
+                  const last = prev[prev.length - 1];
+                  return last && last.role === 'model' && !last.content.trim()
+                    ? prev.slice(0, -1)
+                    : prev;
+                });
+                sendMessage(again);
+              }}
+              accessibilityRole="button"
+              style={({ pressed }) => ({
+                alignSelf: isRTL ? 'flex-end' : 'flex-start',
+                flexDirection: isRTL ? 'row-reverse' : 'row',
+                alignItems: 'center',
+                gap: 6,
+                marginHorizontal: SPACING.md,
+                marginBottom: SPACING.sm,
+                paddingHorizontal: SPACING.md,
+                paddingVertical: 8,
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: theme.colors.primary,
+                backgroundColor: pressed ? theme.colors.primary + '14' : 'transparent',
+              })}
+            >
+              <Ionicons name="refresh" size={15} color={theme.colors.primary} />
+              <Text
+                allowFontScaling={false}
+                style={{ fontSize: 13, fontWeight: '600', color: theme.colors.primary }}
+              >
+                {t('chatbot.retry')}
+              </Text>
+            </Pressable>
+          )}
+
+          {messages.length < 8 && (
+            <QuickChips
+              items={quickActions.map(action => ({ key: action.key, label: action.label }))}
+              isRTL={isRTL}
+              theme={theme}
+              onPress={handleQuickAction}
+            />
+          )}
           {renderSecondaryActions()}
           {renderInputArea()}
           {/* When keyboard is closed, we still need bottom safe area */}
