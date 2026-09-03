@@ -796,11 +796,14 @@ export const ProductDetailsScreen: React.FC = () => {
     if (!product) return;
 
     try {
-      // Only link out once a real domain exists. This used to interpolate
-      // BRAND.domain's placeholder directly, so every share sent the recipient
-      // "https://ASANKARY_DOMAIN_TBD/product/<id>" — a link that cannot resolve.
+      // The storefront's product page, in the language the shopper is using.
+      // asankare.com serves /<lang>/p/<product id> with the SAME uuids the app
+      // uses, so no mapping is needed. brandContact still guards it: if the
+      // domain is ever cleared back to a placeholder, the share degrades to text
+      // instead of sending a dead link.
       const domain = brandContact(BRAND.domain);
-      const shareUrl = domain ? `https://${domain}/product/${product.id}` : null;
+      const lang = ['en', 'ar', 'ku'].includes(i18n.language) ? i18n.language : 'en';
+      const shareUrl = domain ? `https://${domain}/${lang}/p/${product.id}` : null;
 
       // partNumber is optional on a product; without the guard an unset one
       // shares the literal "undefined" after the name.
@@ -814,7 +817,15 @@ export const ProductDetailsScreen: React.FC = () => {
           t('product.shareText'),
           shareUrl,
         ].filter(line => line !== null && line !== undefined).join('\n'),
-        url: product.imageUrls?.[0],
+        // `url` is deliberately the PRODUCT PAGE, not the photo.
+        //
+        // iOS gives `url` precedence over `message` in most share targets, so
+        // passing the image meant every share sent a bare JPEG: the recipient got
+        // a picture with no price, no name and no way back to the shop. The link
+        // carries all three, and messengers render their own preview from it.
+        //
+        // Omitted entirely when there is no domain, so the text share survives.
+        ...(shareUrl ? { url: shareUrl } : {}),
       });
     } catch (error) {
       // Silent fail

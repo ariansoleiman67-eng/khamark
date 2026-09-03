@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import i18n from '../locales';
 import { View, Text, Platform, ActivityIndicator, Alert, Linking, StatusBar as RNStatusBar } from 'react-native';
-import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
+import { NavigationContainer, getStateFromPath, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
@@ -415,7 +415,9 @@ const AppNavigator: React.FC = () => {
   }), [theme]);
 
   const linking = React.useMemo(() => ({
-    prefixes: ['https://ASANKARY_DOMAIN_TBD', 'https://www.ASANKARY_DOMAIN_TBD', 'asankary://'],
+    // asankare.com is the live storefront. The placeholder host that used to sit
+    // here could never resolve, so a shared link opened nothing.
+    prefixes: ['https://asankare.com', 'https://www.asankare.com', 'asankary://'],
     config: {
       screens: {
         ProductDetails: 'product/:productId',
@@ -423,6 +425,17 @@ const AppNavigator: React.FC = () => {
         // WhatsApp message: asankary://offers opens straight onto the offers.
         Offers: 'offers',
       },
+    },
+    /**
+     * The website is locale-prefixed — /en/p/<id>, /ar/p/<id>, /ku/p/<id> — while
+     * the app's own scheme uses asankary://product/<id>. React Navigation allows
+     * one path per screen, so the web shape is rewritten to the app's before the
+     * default resolver sees it. Changing ProductDetails' path instead would break
+     * every asankary:// link already in the wild.
+     */
+    getStateFromPath: (path: string, options: any) => {
+      const web = path.match(/^\/?(?:en|ar|ku)\/p\/([^/?#]+)/);
+      return getStateFromPath(web ? `product/${web[1]}` : path, options);
     },
   }), []);
 

@@ -12,13 +12,15 @@
 // contactPhone2 / contactPhone3 fields are gone rather than left empty: the legal
 // screens used to print "Alternate Phone:" lines that had no number behind them.
 //
-// `domain` is intentionally empty — the shop has no domain of its own yet. The
-// published legal pages live on GitHub Pages (see LEGAL_URLS). brandContact()
-// treats '' as unset, so the product share sheet omits the link entirely instead
-// of sending a URL that cannot resolve.
+// `domain` is asankare.com, the shop's live storefront. It was empty for a long
+// time — the shop had no domain — and brandContact() treats '' as unset, so the
+// product share sheet omitted the link rather than sending one that could not
+// resolve. The site is live now, and its product pages are
+// https://asankare.com/<lang>/p/<product id>, using the SAME uuids as parts.id.
+// Verified: en, ar and ku all return 200 for a real product.
 export const BRAND = {
   name: 'Asankary',
-  domain: '',
+  domain: 'asankare.com',
   // Note the "e": asankarye@gmail.com, matching the published legal site and the
   // asankarye-hub GitHub account. Confirmed by the owner.
   contactEmail: 'asankarye@gmail.com',

@@ -71,7 +71,14 @@ describe('the shipped BRAND block', () => {
     expect(rendered).not.toMatch(/TODO_|_TBD/);
   });
 
-  it('leaves domain unset, so the share sheet omits the link rather than sending a dead URL', () => {
-    expect(brandContact(BRAND.domain)).toBeNull();
+  it('has a real domain, so the share sheet can send a link that resolves', () => {
+    // This assertion used to be the opposite: the shop had no domain, and the
+    // share sheet deliberately omitted the link rather than send a dead one.
+    // asankare.com is live now and serves /<lang>/p/<product id>.
+    expect(brandContact(BRAND.domain)).toBe('asankare.com');
+  });
+
+  it('keeps the domain free of a scheme or a trailing slash, since callers add both', () => {
+    expect(BRAND.domain).not.toMatch(/^https?:|\/$/);
   });
 });

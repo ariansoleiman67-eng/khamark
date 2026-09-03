@@ -104,11 +104,17 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     //   1.9.44 (76) — variant + VIP dinar pricing, brand picker, AI product fill
     //   1.9.46 (77) — archived 2026-08-31, never uploaded
     buildNumber: "78",
-    // associatedDomains removed: it carried "applinks:ASANKARY_DOMAIN_TBD", a
-    // placeholder host. That ships a real com.apple.developer.associated-domains
-    // entitlement pointing at a domain that cannot serve an
-    // apple-app-site-association file, so universal links silently never verify.
-    // Restore as ["applinks:<real domain>"] once the domain exists.
+    // Universal Links. This was removed while the domain was a placeholder — an
+    // entitlement pointing at a host that cannot serve an
+    // apple-app-site-association file makes every link silently fail to verify.
+    // asankare.com is live and serves the product pages the app shares, so the
+    // claim is real now.
+    //
+    // REQUIRES: https://asankare.com/.well-known/apple-app-site-association,
+    // served as application/json with NO redirect, listing
+    // DRXM8C5M2F.com.asankary.app and the /*/p/* paths. Without that file iOS
+    // simply opens Safari — no error, no warning.
+    associatedDomains: ["applinks:asankare.com", "applinks:www.asankare.com"],
     usesAppleSignIn: true,
     googleServicesFile: "./GoogleService-Info.plist",
     config: {
@@ -170,10 +176,30 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     versionCode: 139,
     googleServicesFile: "./google-services.json",
     intentFilters: [
-      // The https/autoVerify filter for host "ASANKARY_DOMAIN_TBD" was removed — a
-      // placeholder host can never serve /.well-known/assetlinks.json, so Android App
-      // Links verification failed on every install. Re-add with the real domain once
-      // it exists. The asankary:// scheme below is what deep links actually use.
+      // Android App Links for the live storefront. Removed while the host was a
+      // placeholder, because verification runs against
+      // /.well-known/assetlinks.json and a host that cannot serve it fails on
+      // every install.
+      //
+      // REQUIRES: https://asankare.com/.well-known/assetlinks.json listing
+      // com.asankary.app with the release signing fingerprint
+      // D0:2C:A1:38:96:ED:AD:CB:77:8C:18:FA:8F:DC:D7:94:C5:F3:04:D2:9E:DC:24:B9:9D:DD:39:DD:1D:3D:22:09
+      // Without it Android opens the browser instead, silently.
+      {
+        action: "VIEW",
+        autoVerify: true,
+        data: [
+          { scheme: "https", host: "asankare.com", pathPrefix: "/en/p" },
+          { scheme: "https", host: "asankare.com", pathPrefix: "/ar/p" },
+          { scheme: "https", host: "asankare.com", pathPrefix: "/ku/p" },
+          { scheme: "https", host: "www.asankare.com", pathPrefix: "/en/p" },
+          { scheme: "https", host: "www.asankare.com", pathPrefix: "/ar/p" },
+          { scheme: "https", host: "www.asankare.com", pathPrefix: "/ku/p" }
+        ],
+        category: ["BROWSABLE", "DEFAULT"]
+      },
+      // The app's own scheme, unchanged — every asankary:// link already in the
+      // wild keeps working.
       {
         action: "VIEW",
         data: [
