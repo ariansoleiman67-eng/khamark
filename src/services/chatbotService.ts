@@ -302,6 +302,8 @@ const BASE_SYSTEM_PROMPT = [
   '7. Reply in plain text only. No markdown, no bullets, no numbered lists, no URLs, no emojis.',
   '7b. NEVER state how many units are in stock, and never guess a number. Say only that an item is available, low in stock, or out of stock. If asked for a quantity, say the store confirms exact availability when ordering.',
   '8. Keep the answer concise but complete, using short paragraphs.',
+  '8b. When you recommend specific products from the provided context, end your reply with a final line in exactly this form, using the ID values given in that context: <<products:ID1,ID2>>',
+  '8c. List at most three ids, most relevant first. Never mention that line, never explain it, and never write it when you are not recommending specific products from the context.',
   '9. CRITICAL: Always respond in the SAME language the customer used in their message. If the customer writes in Arabic, you MUST respond entirely in Arabic. If in Kurdish Sorani, respond entirely in Kurdish Sorani. If in English, respond in English. Never switch to English unless the customer wrote in English.',
 ].join('\n');
 
@@ -1183,6 +1185,12 @@ class ChatbotService {
 
   private formatProductDetails(product: ProductRecord, index: number): string {
     const lines: string[] = [`Product ${index}:`];
+
+    // The id is here so the model can name the products it recommends in the
+    // <<products:...>> marker the app parses. Without it the model has nothing to
+    // put in the marker, and no cards can ever render.
+    const id = this.safeContextValue(product.id);
+    if (id) lines.push(`ID: ${id}`);
 
     const names = [product.name, product.nameAr, product.nameKu]
       .map((value) => this.safeContextValue(value))
