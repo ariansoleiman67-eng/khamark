@@ -642,6 +642,62 @@ const ChatbotScreen: React.FC = () => {
     );
   };
 
+  const renderTypingIndicator = () => {
+    if (!isLoading) return null;
+    return (
+      <View
+        pointerEvents="none"
+        style={{
+          // Mirrored in Arabic and Kurdish, like the header and the message rows.
+          // It read left-to-right in every language before, which put the avatar on
+          // the wrong side of its own bubble.
+          flexDirection: isRTL ? 'row-reverse' : 'row',
+          alignItems: 'center',
+          paddingHorizontal: SPACING.md,
+          paddingBottom: SPACING.sm,
+        }}
+      >
+        <View
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 16,
+            backgroundColor: theme.colors.primary + '20',
+            justifyContent: 'center',
+            alignItems: 'center',
+            ...(isRTL ? { marginLeft: SPACING.sm } : { marginRight: SPACING.sm }),
+          }}
+        >
+          <ActivityIndicator size="small" color={theme.colors.primary} />
+        </View>
+        <View
+          style={{
+            backgroundColor: theme.colors.surface,
+            paddingHorizontal: SPACING.md,
+            paddingVertical: SPACING.sm,
+            borderRadius: 16,
+            // The squared-off corner is the bubble's tail, so it points at the
+            // avatar -- which is on the right in Arabic and Kurdish.
+            ...(isRTL ? { borderTopRightRadius: 4 } : { borderTopLeftRadius: 4 }),
+          }}
+        >
+          <Text allowFontScaling={false}
+            style={{
+              color: theme.colors.textSecondary,
+              fontSize: 14,
+              lineHeight: 20,
+              includeFontPadding: false,
+              textAlign: isRTL ? 'right' : 'left',
+            }}
+          >
+            {t('chatbot.typing')}
+            {typingDots}
+          </Text>
+        </View>
+      </View>
+    );
+  };
+
   const renderInputArea = () => {
     if (isRecording || isUploadingVoice) {
       return (
@@ -878,60 +934,19 @@ const ChatbotScreen: React.FC = () => {
             paddingBottom: barHeight + tabBarHeight + 16,
           }}
           ListHeaderComponent={renderQuickActions}
+          // The typing bubble belongs INSIDE the list, not after it. The bottom bar
+          // below is position:'absolute' and so takes no space in the flex column;
+          // a sibling rendered after a flex:1 list therefore landed at the bottom of
+          // the SCREEN, underneath that bar and half off the display. As the footer
+          // it follows the last message, scrolls with it, and clears the bar through
+          // the list's own paddingBottom.
+          ListFooterComponent={renderTypingIndicator()}
           onContentSizeChange={() => scrollToBottom(false)}
           keyboardShouldPersistTaps="always"
           keyboardDismissMode="none"
           removeClippedSubviews={false}
           style={{ flex: 1 }}
         />
-
-        {/* Loading indicator */}
-        {isLoading && (
-          <View
-            pointerEvents="none"
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              paddingHorizontal: SPACING.md,
-              paddingBottom: SPACING.sm,
-            }}
-          >
-            <View
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 16,
-                backgroundColor: theme.colors.primary + '20',
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginRight: SPACING.sm,
-              }}
-            >
-              <ActivityIndicator size="small" color={theme.colors.primary} />
-            </View>
-            <View
-              style={{
-                backgroundColor: theme.colors.surface,
-                paddingHorizontal: SPACING.md,
-                paddingVertical: SPACING.sm,
-                borderRadius: 16,
-                borderTopLeftRadius: 4,
-              }}
-            >
-              <Text allowFontScaling={false}
-                style={{
-                  color: theme.colors.textSecondary,
-                  fontSize: 14,
-                  lineHeight: 20,
-                  includeFontPadding: false,
-                }}
-              >
-                {t('chatbot.typing')}
-                {typingDots}
-              </Text>
-            </View>
-          </View>
-        )}
 
         {/* Bottom bar: positioned by TOP, so it sits EXACTLY on keyboard */}
         <View
