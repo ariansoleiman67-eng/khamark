@@ -37,6 +37,21 @@ interface IncomingMessage {
   content: string;
 }
 
+/**
+ * Newer Claude models reject `temperature` outright:
+ *   400 invalid_request_error: `temperature` is deprecated for this model.
+ *
+ * Older ones still honour it, and this assistant wants a low temperature for
+ * catalogue answers, so dropping it unconditionally would make every answer
+ * looser on the models where it still works. Instead: send it, and retry once
+ * without it if the model says no. That survives a model change made through the
+ * ANTHROPIC_MODEL secret without a redeploy — which is exactly how this broke.
+ */
+function isTemperatureRejection(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return message.includes('temperature') && message.includes('deprecated');
+}
+
 Deno.serve(async (req: Request) => {
   const json = (payload: unknown, status = 200) =>
     new Response(JSON.stringify(payload), {
@@ -104,22 +119,43 @@ Deno.serve(async (req: Request) => {
             controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
 
           try {
-            const anthropicStream = client.messages.stream({
+            const baseStreamRequest = {
               model: DEFAULT_MODEL,
               max_tokens: max_tokens ?? 700,
-              temperature: temperature ?? 0.2,
               ...(systemPrompt ? { system: systemPrompt } : {}),
               messages: conversation,
-            });
+            };
 
-            for await (const event of anthropicStream) {
-              if (
-                event.type === 'content_block_delta' &&
-                event.delta.type === 'text_delta' &&
-                event.delta.text
-              ) {
-                send('delta', { text: event.delta.text });
+            let emitted = false;
+
+            const run = async (withTemperature: boolean) => {
+              const anthropicStream = client.messages.stream(
+                withTemperature
+                  ? { ...baseStreamRequest, temperature: temperature ?? 0.2 }
+                  : baseStreamRequest,
+              );
+
+              for await (const event of anthropicStream) {
+                if (
+                  event.type === 'content_block_delta' &&
+                  event.delta.type === 'text_delta' &&
+                  event.delta.text
+                ) {
+                  emitted = true;
+                  send('delta', { text: event.delta.text });
+                }
               }
+            };
+
+            try {
+              await run(true);
+            } catch (err) {
+              // Retry only while nothing has reached the client. A temperature
+              // rejection arrives on the first round trip, before any delta, so
+              // this restarts cleanly; a failure mid-answer must not replay text
+              // the shopper has already read.
+              if (emitted || !isTemperatureRejection(err)) throw err;
+              await run(false);
             }
 
             send('done', {});
@@ -147,13 +183,20 @@ Deno.serve(async (req: Request) => {
     // presence_penalty and top_p are deliberately not forwarded. Anthropic has no
     // presence_penalty, and its guidance is to set at most one of temperature or
     // top_p — the client sends both, so temperature alone is used.
-    const response = await client.messages.create({
+    const baseRequest = {
       model: DEFAULT_MODEL,
       max_tokens: max_tokens ?? 700,
-      temperature: temperature ?? 0.2,
       ...(systemPrompt ? { system: systemPrompt } : {}),
       messages: conversation,
-    });
+    };
+
+    let response;
+    try {
+      response = await client.messages.create({ ...baseRequest, temperature: temperature ?? 0.2 });
+    } catch (err) {
+      if (!isTemperatureRejection(err)) throw err;
+      response = await client.messages.create(baseRequest);
+    }
 
     // content is a discriminated union and a turn may hold several text blocks,
     // so filter and join rather than reading content[0].
