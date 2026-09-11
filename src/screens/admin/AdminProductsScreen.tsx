@@ -2666,6 +2666,22 @@ const AdminProductsScreen: React.FC = () => {
             keyboardShouldPersistTaps="always"
             nestedScrollEnabled
             keyboardDismissMode="on-drag"
+            // WHY THIS IS HERE: without it, filling a field sent the form back to
+            // the top and the admin had to scroll down again for every field.
+            //
+            // On keyboardWillShow the library saves the current offset, and on
+            // keyboardWillHide it scrolls back to it — falling back to (0, 0) when
+            // it has none (KeyboardAwareHOC.js:470-477). Combined with
+            // keyboardDismissMode="on-drag" above, the loop is: tap the first field
+            // near the top, so the saved offset is 0; fill it; DRAG to reach the
+            // next field, which dismisses the keyboard; the library restores 0 and
+            // the form jumps to the top. It then clears the saved value, so the
+            // next field does it again.
+            //
+            // Restoring scroll after the keyboard closes is a reasonable default
+            // for a short login form. It is wrong for a two-thousand-point editor
+            // the admin scrolls through while typing.
+            enableResetScrollToCoords={false}
             extraScrollHeight={20}
             showsVerticalScrollIndicator={false}
             style={styles.formScroll}
