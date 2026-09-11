@@ -351,7 +351,18 @@ export class ProductService {
         // param that may have been read off an older, untrimmed row -- a padded
         // value here would silently return an empty category or brand page.
         if (filters.category) query = query.eq('category', filters.category.trim());
-        if (filters.brand) query = query.eq('brand', filters.brand.trim());
+        // ilike, not eq, and with NO wildcards — so it stays an exact match that
+        // simply ignores case. `parts.brand` is free text: the live catalogue holds
+        // "TECNO" and "Tecno", "Realme" and "realme". With eq, a brand page built
+        // from one spelling hid every product stored under the other — two of the
+        // shop's five Tecno phones were unreachable from the Tecno tile.
+        //
+        // Escaped because ilike treats % and _ as wildcards: an unescaped brand
+        // containing either would silently widen the filter.
+        if (filters.brand) {
+          const wanted = filters.brand.trim().replace(/[%_]/g, m => `\\${m}`);
+          query = query.ilike('brand', wanted);
+        }
         // Filter inactive/hidden products in the DB (not after pagination) so pages
         // aren't left with holes and `hasMore` stays accurate.
         query = query.eq('is_active', true);

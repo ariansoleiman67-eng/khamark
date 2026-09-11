@@ -127,28 +127,52 @@ const CategoryProductsScreen: React.FC = () => {
    */
   const brandFacets = useMemo(() => {
     if (brand) return [];
-    const counts = new Map<string, number>();
+    // Keyed case-INSENSITIVELY, and this is not cosmetic.
+    //
+    // `parts.brand` is free text and the live catalogue holds both spellings of
+    // two brands: "TECNO"/"Tecno" and "Realme"/"realme". Keyed by the exact
+    // string, Phones rendered NINE tiles for seven brands — and because the logo
+    // lookup below already folds case and BrandCard uppercases the wordmark, the
+    // extra tiles were pixel-identical. Two tiles, same picture, same name.
+    //
+    // The worse half was invisible: tapping "TECNO" filtered on that exact
+    // spelling, so two of the shop's five Tecno phones did not appear.
+    //
+    // The first spelling seen becomes the label; they render identically anyway.
+    const counts = new Map<string, { name: string; count: number }>();
     products.forEach((p) => {
       const b = (p.brand || '').trim();
-      if (b) counts.set(b, (counts.get(b) || 0) + 1);
+      if (!b) return;
+      const key = b.toLowerCase();
+      const hit = counts.get(key);
+      if (hit) hit.count += 1;
+      else counts.set(key, { name: b, count: 1 });
     });
     if (counts.size < 1) return [];
-    return [...counts.entries()]
-      .sort((a, b2) => b2[1] - a[1] || a[0].localeCompare(b2[0]))
-      .map(([name, count]) => ({ name, count }));
+    return [...counts.values()].sort(
+      (a, b2) => b2.count - a.count || a.name.localeCompare(b2.name),
+    );
   }, [products, brand]);
 
   // A brand that disappears after a refresh (last unit sold, product hidden) would
   // otherwise leave the list filtered to nothing with no way back.
   useEffect(() => {
-    if (selectedBrand && !brandFacets.some((f) => f.name === selectedBrand)) {
+    // Compared case-insensitively for the same reason the facets are keyed that
+    // way: the label is now whichever spelling was seen first, so an exact match
+    // here would clear the customer's selection when the product order changes.
+    if (!selectedBrand) return;
+    const sel = selectedBrand.trim().toLowerCase();
+    if (!brandFacets.some((f) => f.name.trim().toLowerCase() === sel)) {
       setSelectedBrand(null);
     }
   }, [brandFacets, selectedBrand]);
 
   const sorted = useMemo(() => {
-    const base = selectedBrand
-      ? products.filter((p) => (p.brand || '').trim() === selectedBrand)
+    // Case-folded, so the merged tile actually returns every product under that
+    // brand. Without this the merged "TECNO" tile would count five and list three.
+    const sel = selectedBrand ? selectedBrand.trim().toLowerCase() : null;
+    const base = sel
+      ? products.filter((p) => (p.brand || '').trim().toLowerCase() === sel)
       : products;
     // Re-sorting by price here was unconditional, which threw away the admin's
     // sort_order the service had already applied — return the list untouched instead.
