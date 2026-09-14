@@ -45,7 +45,18 @@ const DEFAULT_CONFIG: AppConfig = {
   updateMessageAr: 'يتطلب الأمر تحديثًا إلزاميًا لمتابعة استخدام تطبيق Asankary. يرجى التحديث إلى أحدث إصدار.',
   updateMessageKu: 'پێویستە نوێکردنەوەیەکی گرنگ ئەنجام بدەیت بۆ بەردەوامبوون لە بەکارهێنانی Asankary. تکایە بۆ دوا وەشان نوێی بکەرەوە.',
   androidStoreUrl: 'https://play.google.com/store/apps/details?id=com.asankary.app',
-  iosStoreUrl: 'https://apps.apple.com/app/asankary/id6759567908',
+  // id6794673336 is Asankary. The id here used to be 6759567908, which is
+  // HARYAD AUTOPARTS (bundle com.haryad.autopart) — fork residue that survived
+  // because the slug says "asankary", so it reads correct at a glance. Every iOS
+  // customer who tapped Update was sent to a different company's app.
+  //
+  // Verified against Apple's own lookup API:
+  //   id6794673336 -> Asankary,          com.asankary.app
+  //   id6759567908 -> Haryad Autoparts,  com.haryad.autopart
+  //
+  // This default also SEEDS the app_config row on a fresh install, so a wrong
+  // value here propagates into the database and outlives the code fix.
+  iosStoreUrl: 'https://apps.apple.com/app/asankary/id6794673336',
   latestVersionCode: 26,
   latestBuildNumber: 1,
 };
