@@ -71,6 +71,21 @@ const MAX_OFFER_CARDS = 10;
 
 // How many brand-spotlight carousels to surface at the top of the feed.
 const MAX_SPOTLIGHTS = 4;
+// Products per spotlight rail. The rail is a taster with a "See All" beside it —
+// a "Featured Samsung" row holding sixty phones is not a feature, it is sixty
+// mounted cards sitting permanently off-screen, because ListHeaderComponent is
+// never virtualized away.
+const MAX_SPOTLIGHT_CARDS = 10;
+// The header is built from the FIRST PAGE ONLY, never from the growing feed.
+//
+// It used to derive from `newArrivals`, which grows by PAGE_SIZE every time the
+// shopper paginates. Each page could push a brand from one product to two, which
+// QUALIFIES IT for a spotlight rail, and the rails also re-sort by product count.
+// So the header gained a row, or reshuffled, while the shopper was scrolled far
+// below it — and content changing height above the viewport makes the list jump
+// under your thumb. That is the "it glitches after scrolling a while" report: it
+// only happens once you have scrolled far enough to trigger pagination.
+const HEADER_SOURCE_LIMIT = PAGE_SIZE;
 
 interface Banner {
   id: string;
@@ -398,7 +413,11 @@ const HomeScreen: React.FC = () => {
   const { brands, brandSpotlights, hasArrivals } = useMemo(() => {
     const order: string[] = [];
     const groups = new Map<string, BrandGroup>();
-    for (const p of newArrivals) {
+    // First page only — see HEADER_SOURCE_LIMIT. Everything below this line is
+    // header content, and the header must stop changing once the shopper scrolls
+    // past it.
+    const headerSource = newArrivals.slice(0, HEADER_SOURCE_LIMIT);
+    for (const p of headerSource) {
       const b = (p.brand || '').trim();
       if (!b) continue;
       const key = b.toLowerCase();
@@ -415,8 +434,16 @@ const HomeScreen: React.FC = () => {
       .map((k) => groups.get(k)!)
       .filter((g) => g.products.length >= 2)
       .sort((a, b) => b.products.length - a.products.length)
-      .slice(0, MAX_SPOTLIGHTS);
+      .slice(0, MAX_SPOTLIGHTS)
+      // Capped like `offers` already is. Without this each rail inherits the
+      // default windowSize of 21 and mounts far more cards than anyone will swipe.
+      .map((g) => ({ ...g, products: g.products.slice(0, MAX_SPOTLIGHT_CARDS) }));
     return { brands: brandList, brandSpotlights: spots, hasArrivals: newArrivals.length > 0 };
+    // Still keyed on newArrivals, so this recomputes on pagination — but it now
+    // recomputes to the SAME VALUES, because the slice above ignores everything
+    // after the first page. Cheap, and the header's height stops moving, which is
+    // the whole point. A pull-to-refresh replaces newArrivals and correctly
+    // rebuilds it.
   }, [newArrivals]);
 
   // GOLDEN TEMPLATE: keep ListHeaderComponent a STABLE reference so the
