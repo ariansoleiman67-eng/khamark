@@ -176,13 +176,33 @@ Deno.serve(async (req: Request) => {
       if (turns.length === 0) return;
 
       const claude = new Anthropic({ apiKey });
-      const response = await claude.messages.create({
+
+      // Newer Claude models reject `temperature` outright:
+      //   400 invalid_request_error: `temperature` is deprecated for this model.
+      //
+      // MODEL comes from the ANTHROPIC_MODEL secret, so changing that secret —
+      // which needs no deploy and therefore warns nobody — can break this
+      // function without a single line of code changing. It already did: the
+      // shop moved to claude-sonnet-5 for better Kurdish, and every automatic
+      // reply to a customer silently 400'd from that moment.
+      //
+      // Send it, retry once without it. Older models still honour a low
+      // temperature, which this function wants for factual catalogue answers.
+      const baseRequest = {
         model: MODEL,
         max_tokens: 400,
-        temperature: 0.2,
         system,
         messages: turns,
-      });
+      };
+
+      let response;
+      try {
+        response = await claude.messages.create({ ...baseRequest, temperature: 0.2 });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (!(message.includes('temperature') && message.includes('deprecated'))) throw err;
+        response = await claude.messages.create(baseRequest);
+      }
 
       const text = response.content
         .filter((b): b is Anthropic.TextBlock => b.type === 'text')
