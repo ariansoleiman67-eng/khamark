@@ -48,7 +48,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   // assigned — the product form scrolling to the top while being filled, brand
   // tiles duplicating and hiding products behind a case mismatch, and the VIP
   // action, whose Edge Function half is already deployed and live.
-  version: "1.9.49",
+  //
+  // 1.9.49 -> 1.9.50: also never built. Carries the Home feed no longer jumping
+  // while you scroll, brand tiles no longer duplicating (and four phones no
+  // longer unreachable behind a case mismatch), the product form no longer
+  // scrolling to the top while being filled, and the corrected iOS store URL
+  // default.
+  version: "1.9.50",
   newArchEnabled: true,
   orientation: "portrait",
   icon: "./assets/icon.png",
@@ -116,7 +122,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     //   1.9.46 (77) — archived 2026-08-31, never uploaded
     //   1.9.47 (78) — assigned, never built
     //   1.9.48 (79) — assigned, never built
-    buildNumber: "80",
+    //   1.9.49 (80) — assigned, never built
+    buildNumber: "81",
     // Universal Links. This was removed while the domain was a placeholder — an
     // entitlement pointing at a host that cannot serve an
     // apple-app-site-association file makes every link silently fail to verify.
@@ -187,7 +194,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // but never uploaded; going up costs nothing and reusing a number is the one
     // thing Play refuses outright. 140 is the first to carry the App Links intent
     // filter, which is native config and cannot reach an existing build.
-    versionCode: 141,
+    versionCode: 142,
     googleServicesFile: "./google-services.json",
     intentFilters: [
       // Android App Links for the live storefront. Removed while the host was a
