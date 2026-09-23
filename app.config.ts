@@ -54,7 +54,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   // longer unreachable behind a case mismatch), the product form no longer
   // scrolling to the top while being filled, and the corrected iOS store URL
   // default.
-  version: "1.9.50",
+  //
+  // 1.9.50 -> 1.9.51: 1.9.50 (81) WAS archived, on 2026-09-20, and never uploaded
+  // — unlike the four numbers before it, which were never built at all. The custom
+  // colour picker landed three days after that archive was cut, so the archive and
+  // the source now disagree. Reusing the number would put two different binaries
+  // under one name, which is the thing that costs an afternoon later.
+  version: "1.9.51",
   newArchEnabled: true,
   orientation: "portrait",
   icon: "./assets/icon.png",
@@ -123,7 +129,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     //   1.9.47 (78) — assigned, never built
     //   1.9.48 (79) — assigned, never built
     //   1.9.49 (80) — assigned, never built
-    buildNumber: "81",
+    //   1.9.50 (81) — archived 2026-09-20, never uploaded
+    buildNumber: "82",
     // Universal Links. This was removed while the domain was a placeholder — an
     // entitlement pointing at a host that cannot serve an
     // apple-app-site-association file makes every link silently fail to verify.
@@ -194,7 +201,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // but never uploaded; going up costs nothing and reusing a number is the one
     // thing Play refuses outright. 140 is the first to carry the App Links intent
     // filter, which is native config and cannot reach an existing build.
-    versionCode: 142,
+    versionCode: 143,
     googleServicesFile: "./google-services.json",
     intentFilters: [
       // Android App Links for the live storefront. Removed while the host was a
