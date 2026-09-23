@@ -3114,7 +3114,7 @@
         "optionsTitle": "Product Options (Optional)",
         "optionsSubtitle": "These options do not affect price or stock",
         "colors": "Colors",
-        "addColor": "Add color...",
+        "addColor": "Add colour",
         "sizes": "Sizes",
         "addSize": "Add size...",
         "updateProduct": "Update Product",
@@ -3233,7 +3233,11 @@
         "variantMorePricesSet": "Was / VIP / cost for this option ({{n}} set)",
         "priceAny": "Price",
         "fieldNotSavedTitle": "Some prices were not saved",
-        "fieldNotSavedBody": "Everything else saved. These were not, because the database has not been updated yet: {{fields}}. Run the pending migration, then set them again."
+        "fieldNotSavedBody": "Everything else saved. These were not, because the database has not been updated yet: {{fields}}. Run the pending migration, then set them again.",
+        "customColor": "Custom colour",
+        "colorName": "Colour name",
+        "colorNamePlaceholder": "e.g. Sierra Blue",
+        "colorHexHint": "Type any hex code, or pick below."
       },
       "invalidSizeValue": "Please enter a size",
       "duplicateSizeValue": "This size already exists",

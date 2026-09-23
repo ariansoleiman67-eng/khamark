@@ -30,6 +30,7 @@ import { SPACING } from '../../constants/theme';
 import PriceField from '../../components/admin/PriceField';
 import VariantPriceBlock from '../../components/admin/VariantPriceBlock';
 import FormSection from '../../components/admin/FormSection';
+import ColorPickerSheet from '../../components/admin/ColorPickerSheet';
 import { getThumbnailUrl } from '../../utils/imageUtils';
 import { Image as ExpoImage } from 'expo-image';
 import { useAuth } from '../../contexts/AuthContext';
@@ -185,7 +186,13 @@ const AdminProductsScreen: React.FC = () => {
   // Calculate total stocks for variations
   const totalSizeStock = variations.reduce((sum, v) => sum + (v.stockQuantity || 0), 0);
   const totalColorStock = colorVariations.reduce((sum, v) => sum + (v.stockQuantity || 0), 0);
-  const [newColorKey, setNewColorKey] = useState<ProductColor | null>(null);
+  // string, not ProductColor: a custom colour's name is whatever the shop types.
+  // The preset union only ever described the ten hardcoded swatches.
+  const [newColorKey, setNewColorKey] = useState<string | null>(null);
+  // Carried alongside the name because a custom colour has no preset row to look
+  // its hex up from — which is exactly why the old picker could not support one.
+  const [newColorHex, setNewColorHex] = useState<string | null>(null);
+  const [colorPickerVisible, setColorPickerVisible] = useState(false);
   const [categoryPickerVisible, setCategoryPickerVisible] = useState(false);
   const [managedCategories, setManagedCategories] = useState<TenantCategory[]>([]);
   // Load the shop's managed categories each time the picker opens (fresh if the
@@ -911,7 +918,9 @@ const AdminProductsScreen: React.FC = () => {
   };
 
   // ALIBABA VARIATION: Color variation management
-  const addColorVariation = (colorKey: ProductColor) => {
+  // string, not ProductColor: a custom colour's name is free text typed by the
+  // shop. The union only ever described the ten hardcoded swatches.
+  const addColorVariation = (colorKey: string) => {
     const stockNum = parseInt(newColorStock, 10) || 0;
 
     if (colorVariations.some(v => v.colorValue === colorKey)) {
@@ -923,18 +932,22 @@ const AdminProductsScreen: React.FC = () => {
       return;
     }
 
+    // Prefer the hex actually chosen. The preset lookup is only a fallback for a
+    // selection made before this state existed; a custom colour has no row to
+    // find, and losing its hex would render it as a blank swatch to customers.
     const colorOption = PRODUCT_COLOR_OPTIONS.find(c => c.key === colorKey);
-    
+
     const newVariation: ColorVariation = {
       variationId: `color_${Date.now()}_${colorKey}`,
       colorValue: colorKey,
-      colorHex: colorOption?.hex,
+      colorHex: newColorHex ?? colorOption?.hex,
       stockQuantity: stockNum,
     };
 
     setColorVariations([...colorVariations, newVariation]);
     setNewColorStock('');
     setNewColorKey(null);
+    setNewColorHex(null);
   };
 
   const removeColorVariation = (variationId: string) => {
@@ -3927,7 +3940,10 @@ const AdminProductsScreen: React.FC = () => {
                     {PRODUCT_COLOR_OPTIONS.map((option) => (
                       <TouchableOpacity
                         key={option.key}
-                        onPress={() => setNewColorKey(option.key)}
+                        onPress={() => {
+                          setNewColorKey(option.key);
+                          setNewColorHex(option.hex);
+                        }}
                         style={{
                           marginRight: 10,
                           padding: 2,
@@ -3948,6 +3964,33 @@ const AdminProductsScreen: React.FC = () => {
                         />
                       </TouchableOpacity>
                     ))}
+
+                    {/* Anything the ten swatches cannot express — which is most
+                        of what this shop sells. Cases, cables and covers come in
+                        whatever colour the supplier made them, and phones ship as
+                        Midnight or Sierra Blue, not "Gray". */}
+                    <TouchableOpacity
+                      onPress={() => setColorPickerVisible(true)}
+                      accessibilityRole="button"
+                      style={{
+                        marginRight: 10,
+                        paddingHorizontal: 12,
+                        height: 36,
+                        borderRadius: 18,
+                        borderWidth: 1,
+                        borderStyle: 'dashed',
+                        borderColor: theme.colors.primary,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Text
+                        allowFontScaling={false}
+                        style={{ color: theme.colors.primary, fontSize: 13, fontWeight: '700' }}
+                      >
+                        {t('admin.products.form.customColor', { defaultValue: 'Custom colour' })}
+                      </Text>
+                    </TouchableOpacity>
                   </ScrollView>
 
                   {/* Stock Input & Add Button */}
@@ -4683,6 +4726,23 @@ const AdminProductsScreen: React.FC = () => {
             </View>
           </TouchableOpacity>
         </Modal>
+
+        {/* Mounted INSIDE the form's Modal, as an overlay rather than a second
+            Modal — see ColorPickerSheet's header for why a nested presentation
+            can latch iOS into a frozen state. */}
+        <ColorPickerSheet
+          visible={colorPickerVisible}
+          isDark={isDark}
+          theme={theme}
+          onCancel={() => setColorPickerVisible(false)}
+          onConfirm={(name, hex) => {
+            // Select it, do not add it. The admin still types the stock count in
+            // the row below, exactly as a preset colour behaves.
+            setNewColorKey(name);
+            setNewColorHex(hex);
+            setColorPickerVisible(false);
+          }}
+        />
         </View>
       </Modal>
     </SafeAreaView>
