@@ -15,10 +15,12 @@
 //
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected automatically.
 //
+// Only the service role or a staff login may call it — see callerMaySend.
+//
 // Request body: { userIds: string[], title: string, body: string, data?: object }
 // =============================================================================
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 interface ServiceAccount {
   client_email: string;
@@ -79,17 +81,68 @@ async function getAccessToken(sa: ServiceAccount): Promise<string> {
   return json.access_token;
 }
 
+// Length-independent comparison, so the key cannot be guessed a byte at a time
+// from response timing.
+function sameSecret(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  const x = new TextEncoder().encode(a);
+  const y = new TextEncoder().encode(b);
+  let diff = x.length ^ y.length;
+  for (let i = 0; i < Math.max(x.length, y.length); i++) diff |= (x[i] ?? 0) ^ (y[i] ?? 0);
+  return diff === 0;
+}
+
+// -----------------------------------------------------------------------------
+// WHO MAY SEND. This function pushes whatever title and body it is given to
+// whatever users it is given, with the service role. The gateway's JWT check
+// does not protect it: the anon key that ships inside the app IS a valid JWT,
+// so before this check anyone who unpacked the APK could put any text on the
+// lock screen of any user — the shop owner's id is public as parts.tenant_id.
+//
+// Three callers exist, and each is let through:
+//   - on-db-change and qicard-webhook, server-side, with the service-role key;
+//   - the admin app (Send Notification, trade-in replies), with a staff login.
+// Staff means the same three flags verifyAdminActionPassword accepts.
+// -----------------------------------------------------------------------------
+async function callerMaySend(req: Request, supabase: SupabaseClient): Promise<boolean> {
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  const auth = req.headers.get('Authorization') ?? '';
+  const bearer = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+
+  if (sameSecret(bearer, serviceKey) || sameSecret(req.headers.get('apikey') ?? '', serviceKey)) {
+    return true;
+  }
+  if (!bearer) return false;
+
+  // getUser rejects the anon key (it carries no user), so an anonymous caller
+  // stops here.
+  const { data: authData, error } = await supabase.auth.getUser(bearer);
+  const caller = authData?.user;
+  if (error || !caller) return false;
+
+  const { data: row } = await supabase
+    .from('users')
+    .select('is_admin, role, is_partner')
+    .eq('id', caller.id)
+    .maybeSingle();
+  return row?.is_admin === true || row?.role === 'admin' || row?.is_partner === true;
+}
+
 Deno.serve(async (req: Request) => {
   try {
-    const { userIds, title, body, data } = await req.json();
-    if (!Array.isArray(userIds) || userIds.length === 0 || !title) {
-      return new Response(JSON.stringify({ error: 'userIds[] and title required' }), { status: 400 });
-    }
-
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
+
+    if (!(await callerMaySend(req, supabase))) {
+      return new Response(JSON.stringify({ error: 'Not authorized' }), { status: 401 });
+    }
+
+    const { userIds, title, body, data } = await req.json();
+    if (!Array.isArray(userIds) || userIds.length === 0 || !title) {
+      return new Response(JSON.stringify({ error: 'userIds[] and title required' }), { status: 400 });
+    }
 
     // ---------------------------------------------------------------------
     // Honour the in-app "Push Notifications" switch.

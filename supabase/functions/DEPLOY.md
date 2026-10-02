@@ -43,9 +43,10 @@ npx supabase secrets set QICARD_PUBLIC_BASE="https://ASANKARY_DOMAIN_TBD"
 
 ```bash
 npx supabase functions deploy askChatbot
-# send-push is called server-to-server by on-db-change (and by the admin app) —
-# it MUST be --no-verify-jwt, or on-db-change's call gets 401 and pushes never send.
-npx supabase functions deploy send-push --no-verify-jwt
+# send-push is called server-to-server by on-db-change and qicard-webhook (service
+# role) and by the admin app (staff login). It checks its caller itself, so the
+# gateway flag is not what protects it: the anon key is a valid JWT and would pass.
+npx supabase functions deploy send-push
 npx supabase functions deploy on-db-change --no-verify-jwt
 npx supabase functions deploy login --no-verify-jwt
 npx supabase functions deploy verifyAdminActionPassword --no-verify-jwt
