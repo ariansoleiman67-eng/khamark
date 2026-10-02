@@ -105,6 +105,11 @@ Deno.serve(async (req: Request) => {
       const history = recent ?? [];
       if (history.length === 0) return;
       if (history[0].id !== messageId) return; // superseded — stay quiet
+      // The sender check above read the REQUEST, and this URL is public (the
+      // trigger sends no Authorization header). Re-check it on the stored row, or
+      // a request naming the shop's own latest message as 'user' gets the
+      // assistant answering the shop.
+      if (history[0].sender_type !== 'user') return;
 
       // The whole catalogue. At this size sending it beats retrieval: it is a
       // few hundred tokens, it cannot miss a relevant product, and it keeps the
