@@ -12,7 +12,8 @@
 //   on Supabase; Firebase can be retired once logins have drained over.
 //
 // Phone users have synthetic emails ("<digits>@asankaryapp.internal" from
-// phoneToEmail, or "<firebase_uid>@asankaryapp.internal"). We try all candidates.
+// phoneToEmail, or "<firebase_uid>@asankaryapp.internal"). A Firebase answer is
+// trusted only when it comes from the user's own recorded firebase_uid — see 3.
 //
 // SETUP:
 //   supabase secrets set FIREBASE_WEB_API_KEY="AIza..."   # Firebase console → Project settings → Web API Key
@@ -32,16 +33,20 @@ function digitsOnly(s: string): string {
   return (s || '').replace(/[^\d]/g, '');
 }
 
-async function verifyAgainstFirebase(email: string, password: string, apiKey: string): Promise<boolean> {
+/** The Firebase uid (localId) that accepted these credentials, or null. */
+async function verifyAgainstFirebase(email: string, password: string, apiKey: string): Promise<string | null> {
   try {
     const res = await fetch(`${FIREBASE_VERIFY_URL}?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password, returnSecureToken: true }),
     });
-    return res.ok; // 200 → credentials valid
+    if (!res.ok) return null;
+    const body = await res.json().catch(() => null);
+    const localId = (body as { localId?: unknown } | null)?.localId;
+    return typeof localId === 'string' && localId ? localId : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -79,18 +84,34 @@ Deno.serve(async (req: Request) => {
     const authUser = authData?.user;
     const firebaseUid = (authUser?.user_metadata as any)?.firebase_uid;
 
-    // 3. Build Firebase email candidates and verify the password against Firebase.
+    // 3. Verify the password against Firebase — and against THIS user's Firebase
+    //    account only.
+    //
+    //    This used to accept any Firebase 200 for any candidate address. The
+    //    Firebase Web API key ships inside the app, so accounts:signUp is open to
+    //    anyone: an attacker could register "<victim's phone>@asankaryapp.internal"
+    //    (or the victim's own email, if it was never on Firebase) with a password
+    //    of their choosing, then sign in here with the victim's phone and that
+    //    password, and step 4 would overwrite the victim's Supabase password.
+    //    Account takeover from a phone number alone.
+    //
+    //    Now the account that answers must BE this user's: its uid must equal the
+    //    firebase_uid recorded at import. No firebase_uid, nothing to bind to, so
+    //    refuse. Those users still have password reset and OTP sign-in, which
+    //    prove ownership properly. The phone-derived address is no longer even a
+    //    candidate: it is the cheapest one for an attacker to pre-register.
+    if (!firebaseUid) return json({ success: false, error: 'Incorrect password' });
+
     const candidates = new Set<string>();
     if (isEmail) candidates.add(String(identifier));
     if (userRow.email) candidates.add(userRow.email);
     if (authUser?.email) candidates.add(authUser.email);
-    const phoneDigits = digitsOnly(userRow.phone || (isEmail ? '' : identifier));
-    if (phoneDigits) candidates.add(`${phoneDigits}@asankaryapp.internal`);
-    if (firebaseUid) candidates.add(`${firebaseUid}@asankaryapp.internal`);
+    candidates.add(`${firebaseUid}@asankaryapp.internal`);
 
     let verified = false;
     for (const email of candidates) {
-      if (await verifyAgainstFirebase(email, password, apiKey)) {
+      const localId = await verifyAgainstFirebase(email, password, apiKey);
+      if (localId && localId === firebaseUid) {
         verified = true;
         break;
       }
