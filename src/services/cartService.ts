@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { buildLineProduct, linePriceSignature, isSellable } from '../utils/cartLinePricing';
 import { supabase, uniqueChannel } from './supabase';
 import { Cart, CartItem, Product } from '../types';
 import ProductService from './productService';
@@ -521,28 +522,36 @@ export class CartService {
           }
         }
 
-        let correctPrice = latestProduct.priceUSD;
-        let linkedVariation: any = null;
-        
-        if (item.variationId) {
-           linkedVariation = latestProduct.variations?.find((v: any) => v.variationId === item.variationId) || 
-                             latestProduct.colorVariations?.find((v: any) => v.variationId === item.variationId);
+        // Re-price this line with the SAME function the add path uses
+        // (src/utils/cartLinePricing.ts). This used to be its own copy that only
+        // knew `variation.priceUSD`. Most options here are priced in dinar only,
+        // so it fell back to the BASE product and rewrote the line from it — the
+        // A37 12GB/256GB added at IQD 740,000 was charged the base 549,000.
+        //
+        // The option is resolved by id first, then by the size or colour text for
+        // lines written before variationId existed, exactly as before.
+        let resolvedVariationId: string | null = item.variationId || null;
+        if (!resolvedVariationId && itemSize) {
+          resolvedVariationId =
+            latestProduct.variations?.find((v: any) => v.sizeValue?.trim().toLowerCase() === itemSize)
+              ?.variationId ?? null;
         }
-        
-        if (!linkedVariation && itemSize) {
-           linkedVariation = latestProduct.variations?.find((v: any) => v.sizeValue?.trim().toLowerCase() === itemSize);
-        } 
-        
-        if (!linkedVariation && itemColor) {
-           linkedVariation = latestProduct.colorVariations?.find((v: any) => v.colorValue?.trim().toLowerCase() === itemColor);
-        }
-        
-        if (linkedVariation && linkedVariation.priceUSD) {
-           correctPrice = linkedVariation.priceUSD;
+        if (!resolvedVariationId && itemColor) {
+          resolvedVariationId =
+            latestProduct.colorVariations?.find((v: any) => v.colorValue?.trim().toLowerCase() === itemColor)
+              ?.variationId ?? null;
         }
 
-        // Reject items whose (possibly updated) price is $0 / invalid — no buying for $0.
-        if (!(correctPrice > 0)) {
+        const freshLine = buildLineProduct(latestProduct, {
+          variationId: resolvedVariationId,
+          colorVariationId: (item as any).colorVariationId ?? null,
+        });
+
+        // Reject a line with no positive price in EITHER currency. The old check
+        // looked at dollars only, so a dinar-only option could have been refused
+        // as "not available for purchase" for want of a dollar figure it never
+        // needed.
+        if (!isSellable(freshLine)) {
           errors.push(`Product ${latestProduct.name} is not available for purchase`);
           updatedCart.items.splice(i, 1);
           hasUpdates = true;
@@ -550,20 +559,27 @@ export class CartService {
           continue;
         }
 
-        const priceChanged = item.product.priceUSD !== correctPrice;
+        // Compare what the shopper would actually be CHARGED, not the dollar
+        // column. On a dinar line the dollar figure is derived and drifts, and
+        // comparing it raised "prices updated" for lines whose price had not
+        // moved at all.
+        const priceChanged = linePriceSignature(item.product) !== linePriceSignature(freshLine);
         const metaChanged = item.product.updatedAt !== latestProduct.updatedAt;
-        
+
         if (priceChanged) pricesChanged = true;
 
+        // Refreshing on a metadata change is still right — names, photos and
+        // stock move — but the refresh now carries the OPTION's price. Before,
+        // it spread the base product over the line on every admin save, which
+        // is how a timestamp change alone could re-price a phone.
         if (priceChanged || metaChanged) {
-           if (updatedCart.items[i]) {
-              updatedCart.items[i].product = {
-                ...latestProduct,
-                priceUSD: correctPrice,
-                basePriceUSD: latestProduct.priceUSD
-              } as any; 
-              hasUpdates = true;
-           }
+          if (updatedCart.items[i]) {
+            updatedCart.items[i].product = {
+              ...freshLine,
+              basePriceUSD: latestProduct.priceUSD,
+            } as any;
+            hasUpdates = true;
+          }
         }
       }
 
