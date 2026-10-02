@@ -3463,7 +3463,8 @@
       "saveError": "Could not save the category. Please try again.",
       "title": "Categories",
       "namePlaceholder": "e.g. Chargers",
-      "loadFailed": "Could not load categories. Check your connection and try again."
+      "loadFailed": "Could not load categories. Check your connection and try again.",
+      "deleteHasProducts": "{{count}} products are in this category. After you delete it they will not show on any category page until you move them to another category."
     },
     "hidden": "Hidden",
     "promos": {

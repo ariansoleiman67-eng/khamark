@@ -129,10 +129,19 @@ const AdminCategoryManagerScreen: React.FC = () => {
     }
   };
 
-  const remove = (c: StoredCategory) => {
+  const remove = async (c: StoredCategory) => {
+    // Products name their category by text, so deleting the tile strands every
+    // product in it: they stay in the shop but on no category page. Say so.
+    const count = await categoryStore.countProducts(c.name, tenantId || undefined);
+    const stranded = count
+      ? '\n\n' + t('admin.categoryMgr.deleteHasProducts', {
+          count,
+          defaultValue: '{{count}} products are in this category. After you delete it they will not show on any category page until you move them to another category.',
+        })
+      : '';
     Alert.alert(
       t('admin.categoryMgr.deleteTitle', { defaultValue: 'Delete category?' }),
-      c.name,
+      c.name + stranded,
       [
         { text: t('common.cancel', { defaultValue: 'Cancel' }), style: 'cancel' },
         { text: t('common.delete', { defaultValue: 'Delete' }), style: 'destructive', onPress: async () => {

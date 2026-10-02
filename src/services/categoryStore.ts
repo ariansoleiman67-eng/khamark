@@ -100,6 +100,31 @@ export const categoryStore = {
       // Always stamp the owning tenant — without it the row is orphaned and the
       // product editor's tenant-scoped picker can't see the category.
       if (cat.tenantId) row.tenant_id = cat.tenantId;
+
+      // A RENAME MUST MOVE THE PRODUCTS. Products name their category by text
+      // (parts.category), not by id, so renaming only this row left every
+      // product in it under a name no tile has — gone from every category page.
+      // Live, 11 products were stranded that way ("Earphone", "Headsets").
+      //
+      // Products first, tile second: if the rename then fails, a retry still
+      // reads the old name here and finishes the job. The other order would
+      // leave the products stranded with no way back from this screen.
+      if (cat.id) {
+        const { data: existing } = await supabase
+          .from('categories')
+          .select('name')
+          .eq('id', cat.id)
+          .maybeSingle();
+        const before = (existing?.name ?? '').trim();
+        const after = cat.name.trim();
+        if (before && before !== after) {
+          let move = supabase.from('parts').update({ category: after }).eq('category', before);
+          if (cat.tenantId) move = move.eq('tenant_id', cat.tenantId);
+          const { error: moveError } = await move;
+          if (moveError) throw moveError;
+        }
+      }
+
       const { data, error } = await supabase.from('categories').upsert(row).select().single();
       if (error) throw error;
       return mapRow(data);
@@ -123,6 +148,18 @@ export const categoryStore = {
     list.push(created);
     await writeMock(list);
     return created;
+  },
+
+  /**
+   * How many of the tenant's products are filed under this category name, so a
+   * delete can say what it strands. null when it cannot be counted.
+   */
+  async countProducts(name: string, tenantId?: string): Promise<number | null> {
+    if (USE_MOCK_DATA) return null;
+    let q = supabase.from('parts').select('id', { count: 'exact', head: true }).eq('category', name.trim());
+    if (tenantId) q = q.eq('tenant_id', tenantId);
+    const { count, error } = await q;
+    return error ? null : count ?? 0;
   },
 
   async remove(id: string): Promise<void> {
