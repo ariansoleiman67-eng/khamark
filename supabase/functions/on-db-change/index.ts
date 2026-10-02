@@ -14,9 +14,9 @@
 //
 // SETUP:
 //   1. Deploy:  supabase functions deploy on-db-change --no-verify-jwt
-//      (--no-verify-jwt because the DB webhook authenticates via the service-role
-//       key in the Authorization header, which this function trusts implicitly;
-//       it is only reachable with that header from the webhook.)
+//      (--no-verify-jwt because the pg_net trigger sends no Authorization header.
+//       That makes the URL public, which is why the payload is not trusted —
+//       see "THE PAYLOAD IS A POINTER" below.)
 //   2. Dashboard → Database → Webhooks → Create:
 //        a) Name: notify_on_order   | Table: orders   | Events: Insert
 //           Type: Supabase Edge Function → on-db-change
@@ -25,6 +25,15 @@
 //      (The dashboard auto-attaches the service-role key.)
 //
 // Webhook payload: { type: 'INSERT', table, schema, record, old_record }
+//
+// THE PAYLOAD IS A POINTER, NOT THE DATA. The SQL trigger calls this with no
+// Authorization header at all, so anything that can reach the URL can send a
+// payload — and this used to build the notification straight from it: any text,
+// to any user id, from the service role. Now only `table` and `record.id` are
+// read from the request. The row is re-read from the database and the
+// notification is built from THAT, so a forged payload can at most point at a
+// real row, and each row is notified once (see alreadyNotified), so it cannot
+// be replayed into a flood either.
 // =============================================================================
 
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -37,16 +46,40 @@ interface WebhookPayload {
   old_record: Record<string, any> | null;
 }
 
+const NOTIFIED_TABLES = new Set(['orders', 'messages', 'trade_in_requests']);
+
+// One notification per row and recipient. Matched on the same data object
+// written below ({ orderId }, { conversationId, messageId }, { tradeInId }), and
+// scoped to these recipients and this type: the app writes its own notifications
+// that carry an orderId too (status updates to the customer), and one of those
+// must never suppress the shop's "New order".
+async function alreadyNotified(
+  supabase: SupabaseClient,
+  userIds: string[],
+  type: string,
+  once: Record<string, string>,
+): Promise<boolean> {
+  const { data } = await supabase
+    .from('notifications')
+    .select('id')
+    .in('user_id', userIds)
+    .eq('type', type)
+    .contains('data', once)
+    .limit(1);
+  return (data?.length ?? 0) > 0;
+}
+
 async function notify(
   supabase: SupabaseClient,
   userIds: string[],
   title: string,
   body: string,
   type: string,
-  data: Record<string, unknown>,
+  data: Record<string, string>,
 ): Promise<void> {
   const targets = userIds.filter(Boolean);
   if (targets.length === 0) return;
+  if (await alreadyNotified(supabase, targets, type, data)) return;
 
   // 1. In-app notification rows (delivered instantly via the client's realtime sub)
   await supabase.from('notifications').insert(
@@ -69,14 +102,23 @@ Deno.serve(async (req: Request) => {
   try {
     const payload = (await req.json()) as WebhookPayload;
     if (payload.type !== 'INSERT' || !payload.record) return ok();
+    if (!NOTIFIED_TABLES.has(payload.table)) return ok();
+
+    const rowId = String(payload.record.id ?? '');
+    if (!rowId) return ok();
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
+    // Everything below reads `row`, never payload.record. A malformed id makes
+    // the lookup fail, which is the same as no row: nothing is sent.
+    const { data: row } = await supabase.from(payload.table).select('*').eq('id', rowId).maybeSingle();
+    if (!row) return ok();
+
     if (payload.table === 'orders') {
-      const order = payload.record;
+      const order = row;
       // tenant_id references users(id) — the admin/owner user is the tenant.
       const adminId = order.tenant_id;
       if (adminId) {
@@ -86,11 +128,11 @@ Deno.serve(async (req: Request) => {
           'New order',
           `Order ${order.order_number ?? ''} • $${order.total_usd ?? 0}`,
           'order',
-          { orderId: order.id },
+          { orderId: String(order.id) },
         );
       }
     } else if (payload.table === 'messages') {
-      const msg = payload.record;
+      const msg = row;
       const { data: conv } = await supabase
         .from('conversations')
         .select('user_id, admin_id')
@@ -129,12 +171,12 @@ Deno.serve(async (req: Request) => {
             msg.sender_name || 'New message',
             body,
             'chat',
-            { conversationId: msg.conversation_id },
+            { conversationId: String(msg.conversation_id), messageId: String(msg.id) },
           );
         }
       }
     } else if (payload.table === 'trade_in_requests') {
-      const request = payload.record;
+      const request = row;
       // trade_in_requests.tenant_id holds the shop owner's user id, the same
       // convention orders uses, so the owner is the notification target.
       const adminId = request.tenant_id;
@@ -151,7 +193,7 @@ Deno.serve(async (req: Request) => {
             ? `${device}${request.contact_name ? ` — ${request.contact_name}` : ''}`
             : 'A customer wants to sell or trade a phone',
           'trade_in',
-          { tradeInId: request.id },
+          { tradeInId: String(request.id) },
         );
       }
     }
