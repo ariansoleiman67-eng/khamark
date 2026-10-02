@@ -3,6 +3,21 @@
 These replace the Firebase Cloud Functions. Run all commands with **your** Supabase
 login (use the `!` prefix in Claude Code so they run in your shell):
 
+> **Deploy one function at a time, by name, with `--project-ref ucopzrdubjnyfprbaqus`.**
+> On 2026-09-07 the functions from `HAryad-main` (a different app, different project)
+> were deployed onto this project. As of 2026-10-02 these live functions are HAryad's
+> build, not this folder: askChatbot, login, send-sms-otp, phone-otp-session,
+> resetPassword, payment-complete and the three QiCard functions, plus three that
+> exist only in HAryad (chatAutoReply, huawei-auth, syncStoreVersion). HAryad's
+> askChatbot streams a format older app builds could not read (ISSUE-007), and this
+> folder's login had an account-takeover hole (fixed, ISSUE-008). Diff a function
+> against `supabase functions download <name>` before redeploying it. HAryad's
+> rate limits need a `login_attempts` table and a `check_otp_rate_limit` RPC that do
+> not exist in this database, so they fail open here.
+>
+> `supabase login` uses whichever account the browser is signed into. The project
+> belongs to asankarye@gmail.com; any other account gets 403.
+
 ```bash
 # Link the repo to the project once (project-ref = the REPLACE_WITH_ASANKARY_SUPABASE_PROJECT_REF part):
 npx supabase link --project-ref <project-ref>
