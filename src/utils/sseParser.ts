@@ -58,3 +58,49 @@ function parseFrame(raw: string): SSEEvent | null {
   if (dataLines.length === 0) return null;
   return { event, data: dataLines.join('\n') };
 }
+
+/** What one askChatbot frame means. null: a frame this app cannot read. */
+export type ChatbotFrame =
+  | { kind: 'text'; text: string }
+  | { kind: 'done' }
+  | { kind: 'error'; message: string }
+  | null;
+
+const parseJSON = (data: string): any => {
+  try {
+    return JSON.parse(data);
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * Reads BOTH envelopes askChatbot has been deployed with:
+ *
+ *   named events (this repo):  event: delta / data: {"text": "..."}
+ *                              event: done | event: error / data: {"error": "..."}
+ *   bare data (the build that has been LIVE since 2026-09-07):
+ *                              data: {"t": "..."} ... data: {"done": true}
+ *
+ * The app used to read only the first. The second arrived as the default
+ * 'message' event and every frame was dropped, so each answer ended empty and the
+ * shopper saw the generic "having trouble" reply. Reading both means a deploy of
+ * either version cannot silence the assistant again.
+ */
+export function readChatbotFrame(e: SSEEvent): ChatbotFrame {
+  const data = parseJSON(e.data);
+
+  if (e.event === 'delta') {
+    return typeof data?.text === 'string' ? { kind: 'text', text: data.text } : null;
+  }
+  if (e.event === 'done') return { kind: 'done' };
+  if (e.event === 'error') {
+    return { kind: 'error', message: typeof data?.error === 'string' ? data.error : 'AI stream failed' };
+  }
+  if (e.event === 'message' && data && typeof data === 'object') {
+    if (typeof data.t === 'string') return { kind: 'text', text: data.t };
+    if (data.done === true) return { kind: 'done' };
+    if (typeof data.error === 'string') return { kind: 'error', message: data.error };
+  }
+  return null;
+}

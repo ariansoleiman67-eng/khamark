@@ -1,6 +1,6 @@
 import { fetch as expoFetch } from 'expo/fetch';
 import { SUPABASE_CONFIG } from '../constants/config';
-import { createSSEParser } from '../utils/sseParser';
+import { createSSEParser, readChatbotFrame } from '../utils/sseParser';
 
 /**
  * Why expo/fetch, and not the global fetch or supabase.functions.invoke:
@@ -63,6 +63,11 @@ export async function* streamChatbot(
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   const parser = createSSEParser();
+  // Whether ANY frame was readable. A stream that ends without one is a format
+  // this build does not know, not an empty answer: report it as unavailable so
+  // the caller falls back to the buffered call instead of showing the generic
+  // failure for an answer that was actually sent.
+  let understood = false;
 
   try {
     while (true) {
@@ -73,38 +78,23 @@ export async function* streamChatbot(
       // Kurdish and Arabic are multi-byte throughout, so without it a chunk that
       // splits a character mid-sequence renders as a replacement glyph.
       for (const event of parser.push(decoder.decode(value, { stream: true }))) {
-        if (event.event === 'delta') {
-          const text = safeText(event.data);
-          if (text) yield text;
-        } else if (event.event === 'error') {
-          throw new Error(safeError(event.data));
-        } else if (event.event === 'done') {
+        const frame = readChatbotFrame(event);
+        if (!frame) continue;
+        understood = true;
+        if (frame.kind === 'text') {
+          if (frame.text) yield frame.text;
+        } else if (frame.kind === 'error') {
+          throw new Error(frame.message);
+        } else {
           return;
         }
       }
     }
+    if (!understood) {
+      throw new StreamUnavailableError('askChatbot streamed nothing this app can read');
+    }
   } finally {
     // Matters on abort: without releasing, the socket stays open until GC.
     reader.releaseLock();
-  }
-}
-
-function safeText(data: string): string {
-  try {
-    const parsed = JSON.parse(data);
-    return typeof parsed?.text === 'string' ? parsed.text : '';
-  } catch {
-    // A malformed frame is one lost token, not a failed answer. Dropping it beats
-    // throwing away everything that already arrived.
-    return '';
-  }
-}
-
-function safeError(data: string): string {
-  try {
-    const parsed = JSON.parse(data);
-    return typeof parsed?.error === 'string' ? parsed.error : 'AI stream failed';
-  } catch {
-    return 'AI stream failed';
   }
 }

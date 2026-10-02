@@ -1,4 +1,4 @@
-import { createSSEParser } from '../../src/utils/sseParser';
+import { createSSEParser, readChatbotFrame } from '../../src/utils/sseParser';
 
 describe('createSSEParser', () => {
   it('parses a single complete event', () => {
@@ -62,5 +62,35 @@ describe('createSSEParser', () => {
     const b = createSSEParser();
     a.push('event: x\ndata: half');
     expect(b.push('event: y\ndata: 9\n\n')).toEqual([{ event: 'y', data: '9' }]);
+  });
+});
+
+describe('readChatbotFrame', () => {
+  const frames = (raw: string) => createSSEParser().push(raw).map(readChatbotFrame);
+
+  it('reads the named-event envelope (Asankary askChatbot)', () => {
+    expect(
+      frames('event: delta\ndata: {"text":"Hi"}\n\nevent: done\ndata: \n\n'),
+    ).toEqual([{ kind: 'text', text: 'Hi' }, { kind: 'done' }]);
+  });
+
+  it('reads the bare envelope the LIVE function sent on 2026-10-02', () => {
+    // Captured verbatim from production (probe-009). Every frame of it used to be
+    // ignored, so each answer ended empty and the shopper saw "Sorry, I am having
+    // trouble right now".
+    expect(frames('data: {"t":"OK"}\n\ndata: {"done":true}\n\n')).toEqual([
+      { kind: 'text', text: 'OK' },
+      { kind: 'done' },
+    ]);
+  });
+
+  it('reads errors in both envelopes', () => {
+    expect(frames('event: error\ndata: {"error":"boom"}\n\n')).toEqual([{ kind: 'error', message: 'boom' }]);
+    expect(frames('data: {"error":"boom"}\n\n')).toEqual([{ kind: 'error', message: 'boom' }]);
+  });
+
+  it('returns null for frames it does not understand, so the caller can tell', () => {
+    expect(frames('data: not json\n\n')).toEqual([null]);
+    expect(frames('event: ping\ndata: {}\n\n')).toEqual([null]);
   });
 });
