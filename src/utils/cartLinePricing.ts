@@ -155,3 +155,50 @@ export function linePriceSignature(p: any): string {
 export function isSellable(p: any): boolean {
   return Number(p?.priceIQD) > 0 || Number(p?.priceUSD) > 0;
 }
+
+const findOption = (product: any, id: string | null | undefined): any =>
+  id
+    ? product?.variations?.find((v: any) => v?.variationId === id) ??
+      product?.colorVariations?.find((v: any) => v?.variationId === id)
+    : undefined;
+
+/**
+ * Which option a stored cart line was bought as: by its id, then by the size or
+ * colour text for lines written before variationId existed. An id the product
+ * no longer has is not trusted over the text. null means a plain line.
+ *
+ * validateCart (checkout) and syncCartWithLatestData (cart open) both call
+ * this, so they cannot resolve the same line to different options.
+ */
+export function resolveLineVariationId(
+  product: any,
+  item: { variationId?: string | null; selectedOptions?: { size?: string; color?: string } | null },
+): string | null {
+  if (item.variationId && findOption(product, item.variationId)) return item.variationId;
+
+  const size = item.selectedOptions?.size?.trim().toLowerCase();
+  if (size) {
+    const v = product?.variations?.find((o: any) => o?.sizeValue?.trim().toLowerCase() === size);
+    if (v?.variationId) return v.variationId;
+  }
+  const color = item.selectedOptions?.color?.trim().toLowerCase();
+  if (color) {
+    const v = product?.colorVariations?.find((o: any) => o?.colorValue?.trim().toLowerCase() === color);
+    if (v?.variationId) return v.variationId;
+  }
+  return null;
+}
+
+/**
+ * Units available for a line: the option's own stock for an option line, the
+ * product's for a plain one. variations are JSONB, so stockQuantity can arrive
+ * as a string or not at all. null means UNKNOWN, which callers must never treat
+ * as zero — that is how unknown stock used to delete items as "out of stock".
+ */
+export function lineStock(product: any, variationId: string | null): number | null {
+  const option = findOption(product, variationId);
+  const raw = option ? option.stockQuantity : product?.stockQty;
+  if (raw === null || raw === undefined || raw === '') return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}

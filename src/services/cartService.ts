@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { buildLineProduct, linePriceSignature, isSellable } from '../utils/cartLinePricing';
+import { buildLineProduct, linePriceSignature, isSellable, resolveLineVariationId, lineStock } from '../utils/cartLinePricing';
 import { supabase, uniqueChannel } from './supabase';
 import { Cart, CartItem, Product } from '../types';
 import ProductService from './productService';
@@ -455,49 +455,15 @@ export class CartService {
           continue;
         }
 
-        // variations / colorVariations are JSONB, so stockQuantity is whatever the
-        // writer stored — the website can send a string, or omit the key entirely.
-        // Returns null for "unknown", which must never be treated as zero.
-        const toStock = (v: any): number | null => {
-          const n = Number(v);
-          return Number.isFinite(n) ? n : null;
-        };
-
-        let availableStock = toStock(latestProduct.stockQty);
-
-        const itemSize = item.selectedOptions?.size?.trim().toLowerCase();
-        const itemColor = item.selectedOptions?.color?.trim().toLowerCase();
-        
-        let variationFound = false;
-
-        if (item.variationId) {
-          const sizeVar = latestProduct.variations?.find((v: any) => v.variationId === item.variationId);
-          const colorVar = latestProduct.colorVariations?.find((v: any) => v.variationId === item.variationId);
-          
-          if (sizeVar) {
-             availableStock = toStock(sizeVar.stockQuantity);
-             variationFound = true;
-          } else if (colorVar) {
-             availableStock = toStock(colorVar.stockQuantity);
-             variationFound = true;
-          }
-        }
-
-        if (!variationFound && itemSize) {
-          const v = latestProduct.variations?.find((v: any) => v.sizeValue?.trim().toLowerCase() === itemSize);
-          if (v) {
-             availableStock = toStock(v.stockQuantity);
-             variationFound = true;
-          }
-        }
-
-        if (!variationFound && itemColor) {
-          const v = latestProduct.colorVariations?.find((v: any) => v.colorValue?.trim().toLowerCase() === itemColor);
-          if (v) {
-             availableStock = toStock(v.stockQuantity);
-             variationFound = true;
-          }
-        }
+        // The option this line was bought as — by id, then by the size or colour
+        // text for lines written before variationId existed — and its stock.
+        // Both helpers live in src/utils/cartLinePricing.ts and are shared with
+        // syncCartWithLatestData, so the two paths cannot resolve a line to
+        // different options. variations are JSONB, so stockQuantity can be a
+        // string or missing; lineStock returns null for "unknown", which must
+        // never be treated as zero.
+        const resolvedVariationId = resolveLineVariationId(latestProduct, item);
+        const availableStock = lineStock(latestProduct, resolvedVariationId);
 
         // `availableStock === null` means we could not determine the stock level, which
         // is NOT the same as zero — never remove or clamp on it.
@@ -528,20 +494,8 @@ export class CartService {
         // so it fell back to the BASE product and rewrote the line from it — the
         // A37 12GB/256GB added at IQD 740,000 was charged the base 549,000.
         //
-        // The option is resolved by id first, then by the size or colour text for
-        // lines written before variationId existed, exactly as before.
-        let resolvedVariationId: string | null = item.variationId || null;
-        if (!resolvedVariationId && itemSize) {
-          resolvedVariationId =
-            latestProduct.variations?.find((v: any) => v.sizeValue?.trim().toLowerCase() === itemSize)
-              ?.variationId ?? null;
-        }
-        if (!resolvedVariationId && itemColor) {
-          resolvedVariationId =
-            latestProduct.colorVariations?.find((v: any) => v.colorValue?.trim().toLowerCase() === itemColor)
-              ?.variationId ?? null;
-        }
-
+        // The option is the one resolved above for stock, so price and stock
+        // always describe the same option.
         const freshLine = buildLineProduct(latestProduct, {
           variationId: resolvedVariationId,
           colorVariationId: (item as any).colorVariationId ?? null,
@@ -707,21 +661,29 @@ export class CartService {
           continue;
         }
 
-        // Unknown/invalid stock (null/undefined column) must not silently
-        // shrink the quantity to 0 and drop the item. Only a real number <= 0
-        // should remove it.
-        const latestStock = Number.isFinite(latestProduct.stockQty)
-          ? latestProduct.stockQty
-          : item.quantity;
+        // The line's OWN option, priced and stocked by the same helpers checkout
+        // uses. This used to put the BASE product on every line, which rewrote
+        // an option line at the base price (the A37 12GB/256GB at IQD 740,000
+        // became the 8GB/128GB's 549,000) and clamped it by the product's stock
+        // rather than the option's.
+        const variationId = resolveLineVariationId(latestProduct, item);
+        const freshLine = buildLineProduct(latestProduct, {
+          variationId,
+          colorVariationId: item.colorVariationId ?? null,
+        });
+
+        // Unknown stock (null) must not silently shrink the quantity to 0 and
+        // drop the item. Only a real number <= 0 should remove it.
+        const latestStock = lineStock(latestProduct, variationId) ?? item.quantity;
 
         const updatedItem: CartItem = {
           ...item,
-          product: latestProduct,
+          product: { ...freshLine, basePriceUSD: latestProduct.priceUSD },
           quantity: Math.min(item.quantity, latestStock),
         };
 
-        const productDataChanged = 
-          item.product.priceUSD !== latestProduct.priceUSD ||
+        const productDataChanged =
+          linePriceSignature(item.product) !== linePriceSignature(freshLine) ||
           item.product.shippingCost !== latestProduct.shippingCost ||
           JSON.stringify(item.product.shippingRates) !== JSON.stringify(latestProduct.shippingRates) ||
           item.product.updatedAt !== latestProduct.updatedAt;

@@ -1,4 +1,4 @@
-import { buildLineProduct, linePriceSignature, isSellable } from '../../src/utils/cartLinePricing';
+import { buildLineProduct, linePriceSignature, isSellable, resolveLineVariationId, lineStock } from '../../src/utils/cartLinePricing';
 
 /**
  * Real figures from the live catalogue: Samsung A37 5G, priced in dinar, with
@@ -106,5 +106,42 @@ describe('isSellable', () => {
   });
   it('rejects a line with no positive price at all', () => {
     expect(isSellable({ priceIQD: 0, priceUSD: 0 })).toBe(false);
+  });
+});
+
+describe('resolveLineVariationId', () => {
+  const P = {
+    variations: [{ variationId: 's1', sizeValue: '12GB/256GB' }],
+    colorVariations: [{ variationId: 'c1', colorValue: 'Sierra Blue' }],
+  };
+
+  it('uses the stored id when the product still has that option', () => {
+    expect(resolveLineVariationId(P, { variationId: 's1' })).toBe('s1');
+    expect(resolveLineVariationId(P, { variationId: 'c1' })).toBe('c1');
+  });
+
+  it('falls back to the size, then the colour text, for lines without a usable id', () => {
+    expect(resolveLineVariationId(P, { selectedOptions: { size: ' 12gb/256gb ' } })).toBe('s1');
+    expect(resolveLineVariationId(P, { selectedOptions: { color: 'sierra blue' } })).toBe('c1');
+    // An id the product no longer has is not trusted over the text.
+    expect(resolveLineVariationId(P, { variationId: 'gone', selectedOptions: { size: '12GB/256GB' } })).toBe('s1');
+  });
+
+  it('returns null for a plain line', () => {
+    expect(resolveLineVariationId(P, {})).toBeNull();
+  });
+});
+
+describe('lineStock', () => {
+  it("reads the OPTION's stock for an option line, not the product's", () => {
+    expect(lineStock({ stockQty: 9, variations: [{ variationId: 'v', stockQuantity: 3 }] }, 'v')).toBe(3);
+  });
+  it("reads the product's stock for a plain line", () => {
+    expect(lineStock({ stockQty: 9 }, null)).toBe(9);
+  });
+  it('coerces the JSONB string "3", and reports unknown stock as null, never 0', () => {
+    expect(lineStock({ colorVariations: [{ variationId: 'c', stockQuantity: '3' }] }, 'c')).toBe(3);
+    expect(lineStock({ variations: [{ variationId: 'v' }] }, 'v')).toBeNull();
+    expect(lineStock({}, null)).toBeNull();
   });
 });
