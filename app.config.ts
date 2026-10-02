@@ -60,7 +60,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   // colour picker landed three days after that archive was cut, so the archive and
   // the source now disagree. Reusing the number would put two different binaries
   // under one name, which is the thing that costs an afternoon later.
-  version: "1.9.51",
+  //
+  // 1.9.51 -> 1.9.52: 1.9.51 (82) was cut before the checkout fix, so on it a
+  // phone option can still be charged at the base product's price (A37
+  // 12GB/256GB: IQD 549,000 instead of 740,000). 1.9.52 carries that fix, the AI
+  // assistant reading the stream format that is actually deployed, category
+  // renames moving their products, and the cart sync keeping option prices.
+  version: "1.9.52",
   newArchEnabled: true,
   orientation: "portrait",
   icon: "./assets/icon.png",
@@ -130,7 +136,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     //   1.9.48 (79) — assigned, never built
     //   1.9.49 (80) — assigned, never built
     //   1.9.50 (81) — archived 2026-09-20, never uploaded
-    buildNumber: "82",
+    //   1.9.51 (82) — cut before the checkout variant-price fix
+    buildNumber: "83",
     // Universal Links. This was removed while the domain was a placeholder — an
     // entitlement pointing at a host that cannot serve an
     // apple-app-site-association file makes every link silently fail to verify.
@@ -201,7 +208,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // but never uploaded; going up costs nothing and reusing a number is the one
     // thing Play refuses outright. 140 is the first to carry the App Links intent
     // filter, which is native config and cannot reach an existing build.
-    versionCode: 143,
+    versionCode: 144,
     googleServicesFile: "./google-services.json",
     intentFilters: [
       // Android App Links for the live storefront. Removed while the host was a
