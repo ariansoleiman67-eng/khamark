@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { openWhatsApp } from '../utils/whatsapp';
+import { chatListBottomPadding } from '../utils/chatLayout';
 import {
   View,
   Text,
@@ -168,6 +169,29 @@ const ChatbotScreen: React.FC = () => {
     const openTop = keyboardTopY - barHeight;
     return Math.max(insets.top, openTop);
   }, [keyboardTopY, barHeight, screenH, tabBarHeight, insideTabs, insets.top]);
+
+  // Where the message list actually ends, in the same parent the bar is
+  // positioned in. Measured, not derived from the keyboard: Android resizes the
+  // window for the keyboard (softwareKeyboardLayoutMode "resize") and iOS does
+  // not, so only the real frame says how much of the list the bar covers.
+  const [listFrame, setListFrame] = useState<{ y: number; height: number } | null>(null);
+
+  // The list runs under the composer and, while the keyboard is open, under the
+  // keyboard too. Its bottom padding used to clear only the composer, so with the
+  // keyboard up (and it stays up after Send) the newest rows — the question just
+  // sent and the answer streaming in — were scrolled to a position BEHIND the
+  // keyboard. The chat looked like it vanished mid-answer and came back when the
+  // keyboard closed. Clear whatever the bar really covers; never less than before.
+  const listBottomPadding = useMemo(
+    () =>
+      chatListBottomPadding({
+        barHeight,
+        tabBarHeight,
+        barTop,
+        listBottom: listFrame ? listFrame.y + listFrame.height : null,
+      }),
+    [listFrame, barTop, barHeight, tabBarHeight],
+  );
 
   useEffect(() => {
     const showSub = Keyboard.addListener('keyboardDidShow', e => {
@@ -841,8 +865,14 @@ const ChatbotScreen: React.FC = () => {
           keyExtractor={item => item.id}
           contentContainerStyle={{
             paddingVertical: SPACING.md,
-            // Keep content above bar height + tab bar
-            paddingBottom: barHeight + tabBarHeight + 16,
+            // Clears the composer AND the keyboard — see listBottomPadding.
+            paddingBottom: listBottomPadding,
+          }}
+          onLayout={e => {
+            const { y, height } = e.nativeEvent.layout;
+            setListFrame(prev =>
+              prev && Math.abs(prev.y - y) < 1 && Math.abs(prev.height - height) < 1 ? prev : { y, height },
+            );
           }}
           ListEmptyComponent={
             <View style={{ alignItems: 'center', paddingTop: 72, paddingHorizontal: SPACING.xl }}>
