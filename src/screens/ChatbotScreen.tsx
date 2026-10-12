@@ -240,7 +240,12 @@ const ChatbotScreen: React.FC = () => {
       };
 
       setMessages(prev => [...prev, userMessage]);
+      // Cleared through the native field as well as state. Clearing state alone
+      // left the sent text sitting in the box on iPhone: the same render also
+      // locked the field (editable={!isLoading}), and iOS skipped the value
+      // update on a field being made non-editable.
       setInputText('');
+      inputRef.current?.clear();
       setIsLoading(true);
 
       setTimeout(() => scrollToBottom(true), 50);
@@ -754,7 +759,10 @@ const ChatbotScreen: React.FC = () => {
           blurOnSubmit={false}
           returnKeyType="send"
           onSubmitEditing={Platform.OS === 'ios' ? handleSendPress : undefined}
-          editable={!isLoading}
+          // Deliberately NOT locked while an answer loads. Locking it in the same
+          // render that cleared it is what left sent text in the box, and the
+          // shopper can type the next question while this answer arrives — Send
+          // is already disabled until it finishes.
         />
 
         {inputText.trim() ? (
