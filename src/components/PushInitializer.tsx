@@ -34,6 +34,13 @@ export function PushInitializer() {
         // Navigate based on push notification type
         const target = getNavigationTarget(type, data);
         if (target) {
+          // The shop runs in AdminNavigator, which has no customer OrderDetail
+          // route: tapping "New order" did nothing. Open the order in the admin
+          // Orders tab instead, the way the admin reports already do.
+          if (isAdmin && target.screen === 'OrderDetail') {
+            navigation.navigate('Main', { screen: 'AdminOrders', params: target.params });
+            return;
+          }
           // Admins reply from the store-side chat screen, not the customer one.
           const screen =
             target.screen === 'ChatScreen' && isAdmin ? 'AdminChatScreen' : target.screen;

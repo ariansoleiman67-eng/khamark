@@ -768,7 +768,12 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
             stays above it. box-none so a tap above the sheet still reaches the
             backdrop. */}
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          // Android too: with edge-to-edge on, the modal's window no longer
+          // resizes for the keyboard, and the quantity field and Buy now sit at
+          // the very bottom of the sheet. KeyboardAvoidingView measures its own
+          // overlap with the keyboard, so where the window DOES resize it adds
+          // nothing.
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.keyboardLayer}
           pointerEvents="box-none"
         >
