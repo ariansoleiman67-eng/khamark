@@ -3,7 +3,7 @@
     "name": "Asankary",
     "slug": "Asankary",
     "scheme": "asankary",
-    "version": "1.9.53",
+    "version": "1.9.54",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -33,7 +33,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.asankary.app",
-      "buildNumber": "84",
+      "buildNumber": "85",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Asankary uses your location to fill in your delivery address and to show you the nearest shop branch — for example, dropping a pin on your street so a delivery rider can find you.",
         "NSCameraUsageDescription": "Asankary uses the camera so you can photograph a phone you want to trade in, or take a profile picture — for example, snapping the back of your old handset so the shop can price it.",
@@ -48,7 +48,7 @@
     },
     "android": {
       "package": "com.asankary.app",
-      "versionCode": 145,
+      "versionCode": 146,
       "versionName": "1.0",
       "googleServicesFile": "./google-services.json",
       "softwareKeyboardLayoutMode": "resize",

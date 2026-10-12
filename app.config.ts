@@ -72,7 +72,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   // new look), priceless options keeping the dinar price in the cart (no false
   // "prices updated"), the chat answer no longer behind the keyboard and the
   // sent text clearing, and notification taps opening the right screen.
-  version: "1.9.53",
+  //
+  // 1.9.53 -> 1.9.54: categories treated as one however they are spelled
+  // (Earphone / Earphones), Category Manager autocorrect and the "used by
+  // products, not a category yet" list, on top of everything in 1.9.53.
+  version: "1.9.54",
   newArchEnabled: true,
   orientation: "portrait",
   icon: "./assets/icon.png",
@@ -144,7 +148,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     //   1.9.50 (81) — archived 2026-09-20, never uploaded
     //   1.9.51 (82) — cut before the checkout variant-price fix
     //   1.9.52 (83) — cut before the order-sheet, cart dinar and chat fixes
-    buildNumber: "84",
+    //   1.9.53 (84) — cut before the category spelling match and autocorrect
+    buildNumber: "85",
     // Universal Links. This was removed while the domain was a placeholder — an
     // entitlement pointing at a host that cannot serve an
     // apple-app-site-association file makes every link silently fail to verify.
@@ -215,7 +220,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // but never uploaded; going up costs nothing and reusing a number is the one
     // thing Play refuses outright. 140 is the first to carry the App Links intent
     // filter, which is native config and cannot reach an existing build.
-    versionCode: 145,
+    versionCode: 146,
     googleServicesFile: "./google-services.json",
     intentFilters: [
       // Android App Links for the live storefront. Removed while the host was a
