@@ -14,6 +14,7 @@ function mockBuilder(table: string) {
   const b: any = {
     select: (...a: unknown[]) => (record('select', a), b),
     eq: (...a: unknown[]) => (record('eq', a), b),
+    or: (...a: unknown[]) => (record('or', a), b),
     update: (...a: unknown[]) => (record('update', a), b),
     upsert: (...a: unknown[]) => (record('upsert', a), b),
     maybeSingle: async () => ({ data: existingName === null ? null : { name: existingName }, error: null }),
@@ -33,7 +34,8 @@ jest.mock('../../src/services/supabase', () => ({ supabase: { from: (t: string) 
 import { categoryStore } from '../../src/services/categoryStore';
 
 const partsUpdates = () => calls.filter(c => c.table === 'parts' && c.op === 'update');
-const partsFilters = () => calls.filter(c => c.table === 'parts' && c.op === 'eq').map(c => c.args);
+const partsFilters = () =>
+  calls.filter(c => c.table === 'parts' && (c.op === 'eq' || c.op === 'or')).map(c => [c.op, ...c.args]);
 
 beforeEach(() => {
   calls.length = 0;
@@ -47,9 +49,10 @@ describe('categoryStore.save — renaming moves the products with it', () => {
 
     expect(partsUpdates()).toHaveLength(1);
     expect(partsUpdates()[0].args[0]).toEqual({ category: 'Headphones' });
+    // Every spelling of the old name moves ("Headsets" and "Headset").
     expect(partsFilters()).toEqual([
-      ['category', 'Headsets'],
-      ['tenant_id', 't1'],
+      ['or', 'category.ilike."Headsets",category.ilike."Headset"'],
+      ['eq', 'tenant_id', 't1'],
     ]);
   });
 

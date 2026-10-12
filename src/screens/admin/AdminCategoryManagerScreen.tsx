@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -29,6 +29,7 @@ import { categoryStore, StoredCategory } from '../../services/categoryStore';
 import { categoryService } from '../../services/categoryService';
 import { ImageService } from '../../services/imageService';
 import { USE_MOCK_DATA } from '../../services/mockData';
+import { sameCategory, suggestCategory } from '../../utils/categoryMatch';
 
 // Admin: manage categories (name + logo) shown as the Categories screen tiles,
 // replacing the auto icons. Mock-backed (AsyncStorage) so it works offline.
@@ -50,11 +51,20 @@ const AdminCategoryManagerScreen: React.FC = () => {
   // A failed fetch must not look like an empty store — the owner would think
   // their categories were gone and re-create them.
   const [loadFailed, setLoadFailed] = useState(false);
+  // The names the shop's products actually use, spellings merged, with counts.
+  const [productCats, setProductCats] = useState<Array<{ name: string; count: number }>>([]);
 
   const load = useCallback(async () => {
     try {
       setLoadFailed(false);
-      setItems(await categoryStore.getAll(tenantId || undefined));
+      const [tiles, used] = await Promise.all([
+        categoryStore.getAll(tenantId || undefined),
+        // Best effort: without it the screen still manages tiles, it just
+        // cannot point out names with no tile or suggest spellings.
+        categoryStore.productCategoryCounts(tenantId || undefined).catch(() => []),
+      ]);
+      setItems(tiles);
+      setProductCats(used);
     } catch (e) {
       console.warn('[AdminCategoryManager] Failed to load categories', e);
       setItems([]);
@@ -65,7 +75,25 @@ const AdminCategoryManagerScreen: React.FC = () => {
   }, [tenantId]);
   useEffect(() => { load(); }, [load]);
 
-  const openAdd = () => { setForm(emptyForm()); setModalVisible(true); };
+  const openAdd = (name = '') => { setForm({ ...emptyForm(), name }); setModalVisible(true); };
+
+  // Names products use that no tile covers (spelling variants count as covered).
+  // On a category page these show as bare auto-tiles: no logo, no Arabic or
+  // Kurdish name, not in the shop's order. One tap turns them into real ones.
+  const unmatched = useMemo(
+    () => productCats.filter(pc => !items.some(i => sameCategory(i.name, pc.name))),
+    [productCats, items],
+  );
+
+  // Autocorrect: the name the products already use that the admin most likely
+  // means — "Heatset" -> "Headsets", "Earphones" -> "Earphone". Only product
+  // names are offered, so following a suggestion always lands on real products.
+  const suggestion = useMemo(() => {
+    const typed = form.name || '';
+    const s = suggestCategory(typed, productCats.map(p => p.name));
+    if (!s || s.trim() === typed.trim()) return null;
+    return productCats.find(p => p.name === s) ?? null;
+  }, [form.name, productCats]);
   const openEdit = (c: StoredCategory) => { setForm({ ...c }); setModalVisible(true); };
 
   const pickLogo = async () => {
@@ -102,7 +130,9 @@ const AdminCategoryManagerScreen: React.FC = () => {
     }
     // Storefront tiles are keyed by name, so two categories sharing one name collide
     // into a single tile (and only one logo wins) — reject it here instead.
-    if (items.some(c => c.id !== form.id && (c.name || '').trim().toLowerCase() === name.toLowerCase())) {
+    // Same category however it is spelled: "Phone" beside "Phones" would be two
+    // tiles for one set of products.
+    if (items.some(c => c.id !== form.id && sameCategory(c.name, name))) {
       Alert.alert(t('common.error', { defaultValue: 'Error' }), t('admin.categoryMgr.duplicateName', { defaultValue: 'A category with this name already exists' }));
       return;
     }
@@ -190,7 +220,7 @@ const AdminCategoryManagerScreen: React.FC = () => {
           <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={24} color={theme.colors.text} />
         </TouchableOpacity>
         <Text style={[styles.title, { color: theme.colors.text }]}>{t('admin.categoryMgr.title', { defaultValue: 'Categories' })}</Text>
-        <TouchableOpacity onPress={openAdd} hitSlop={10} style={styles.iconBtn}>
+        <TouchableOpacity onPress={() => openAdd()} hitSlop={10} style={styles.iconBtn}>
           <Ionicons name="add" size={28} color={theme.colors.primary} />
         </TouchableOpacity>
       </View>
@@ -213,6 +243,37 @@ const AdminCategoryManagerScreen: React.FC = () => {
           renderItem={renderItem}
           keyExtractor={c => c.id}
           contentContainerStyle={{ padding: 16 }}
+          ListHeaderComponent={
+            unmatched.length > 0 ? (
+              <View style={[styles.unmatchedCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.primary + '40' }]}>
+                <Text style={[styles.unmatchedTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+                  {t('admin.categoryMgr.unmatchedTitle', { defaultValue: 'Used by products, not a category yet' })}
+                </Text>
+                <Text style={[styles.unmatchedHint, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
+                  {t('admin.categoryMgr.unmatchedHint', { defaultValue: 'Add them so they get your logo, translations and order.' })}
+                </Text>
+                {unmatched.map(pc => (
+                  <View key={pc.name} style={[styles.unmatchedRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={[styles.name, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>{pc.name}</Text>
+                      <Text style={[styles.sub, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
+                        {t('admin.categoryMgr.productCount', { count: pc.count, defaultValue: '{{count}} products' })}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => openAdd(pc.name)}
+                      style={[styles.addThisBtn, { backgroundColor: theme.colors.primary }]}
+                      accessibilityRole="button"
+                    >
+                      <Text style={{ color: theme.colors.textOnPrimary, fontWeight: '700' }}>
+                        {t('admin.categoryMgr.addThis', { defaultValue: 'Add' })}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            ) : null
+          }
           ListEmptyComponent={<View style={styles.center}><Text style={{ color: theme.colors.textSecondary }}>{t('admin.categoryMgr.empty', { defaultValue: 'No categories yet. Tap + to add one.' })}</Text></View>}
         />
       )}
@@ -255,6 +316,20 @@ const AdminCategoryManagerScreen: React.FC = () => {
               placeholderTextColor={theme.colors.placeholder}
               style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.border, textAlign: isRTL ? 'right' : 'left' }]}
             />
+            {!!suggestion && (
+              <TouchableOpacity
+                onPress={() => setForm(f => ({ ...f, name: suggestion.name }))}
+                style={[styles.suggestion, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: theme.colors.primary + '14' }]}
+                accessibilityRole="button"
+              >
+                <Ionicons name="sparkles-outline" size={16} color={theme.colors.primary} />
+                <Text style={[styles.suggestionText, { color: theme.colors.primary, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={2}>
+                  {t('admin.categoryMgr.didYouMean', { name: suggestion.name, defaultValue: 'Did you mean “{{name}}”?' })}
+                  {'  ·  '}
+                  {t('admin.categoryMgr.productCount', { count: suggestion.count, defaultValue: '{{count}} products' })}
+                </Text>
+              </TouchableOpacity>
+            )}
 
             <View style={[styles.switchRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Text style={{ color: theme.colors.text }}>{t('admin.active', { defaultValue: 'Active' })}</Text>
@@ -302,6 +377,13 @@ const styles = StyleSheet.create({
   label: { fontSize: 13, fontWeight: '600', marginBottom: 6 },
   input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16 },
   switchRow: { alignItems: 'center', justifyContent: 'space-between', marginTop: 16 },
+  suggestion: { alignItems: 'center', gap: 8, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, marginTop: 8 },
+  suggestionText: { flex: 1, fontSize: 14, fontWeight: '600' },
+  unmatchedCard: { borderRadius: 16, borderWidth: 1, padding: 14, marginBottom: 16, gap: 4 },
+  unmatchedTitle: { fontSize: 15, fontWeight: '800' },
+  unmatchedHint: { fontSize: 13, marginBottom: 6 },
+  unmatchedRow: { alignItems: 'center', gap: 12, paddingVertical: 8 },
+  addThisBtn: { borderRadius: 999, paddingHorizontal: 18, paddingVertical: 8 },
   modalActions: { marginTop: 22, gap: 12 },
   btn: { flex: 1, borderRadius: 999, paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
 });

@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { USE_MOCK_DATA } from './mockData';
 import { supabase } from './supabase';
 import type { TenantCategory } from './tenantAdminService';
+import { categoryOrFilter, groupCategoryNames } from '../utils/categoryMatch';
 
 // Map a Supabase `categories` row to the StoredCategory type.
 const mapRow = (r: any): StoredCategory => ({
@@ -118,7 +119,9 @@ export const categoryStore = {
         const before = (existing?.name ?? '').trim();
         const after = cat.name.trim();
         if (before && before !== after) {
-          let move = supabase.from('parts').update({ category: after }).eq('category', before);
+          // Every spelling of the old name moves, not just the exact one —
+          // "Earphone" products follow an "Earphones" tile (categoryOrFilter).
+          let move = supabase.from('parts').update({ category: after }).or(categoryOrFilter(before));
           if (cat.tenantId) move = move.eq('tenant_id', cat.tenantId);
           const { error: moveError } = await move;
           if (moveError) throw moveError;
@@ -156,10 +159,25 @@ export const categoryStore = {
    */
   async countProducts(name: string, tenantId?: string): Promise<number | null> {
     if (USE_MOCK_DATA) return null;
-    let q = supabase.from('parts').select('id', { count: 'exact', head: true }).eq('category', name.trim());
+    let q = supabase.from('parts').select('id', { count: 'exact', head: true }).or(categoryOrFilter(name));
     if (tenantId) q = q.eq('tenant_id', tenantId);
     const { count, error } = await q;
     return error ? null : count ?? 0;
+  },
+
+  /**
+   * The category names the tenant's products actually use — one entry per
+   * category however it is spelled, with a count. Category Manager compares
+   * these with its tiles to show what has no tile yet, and to autocorrect a
+   * name as it is typed. [] when it cannot be read.
+   */
+  async productCategoryCounts(tenantId?: string): Promise<Array<{ name: string; count: number }>> {
+    if (USE_MOCK_DATA) return [];
+    let q = supabase.from('parts').select('category').limit(5000);
+    if (tenantId) q = q.eq('tenant_id', tenantId);
+    const { data, error } = await q;
+    if (error || !data) return [];
+    return groupCategoryNames(data.map((r: { category: string | null }) => r.category));
   },
 
   async remove(id: string): Promise<void> {

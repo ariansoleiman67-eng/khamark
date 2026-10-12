@@ -3466,7 +3466,12 @@
       "title": "Categories",
       "namePlaceholder": "e.g. Chargers",
       "loadFailed": "Could not load categories. Check your connection and try again.",
-      "deleteHasProducts": "{{count}} products are in this category. After you delete it they will not show on any category page until you move them to another category."
+      "deleteHasProducts": "{{count}} products are in this category. After you delete it they will not show on any category page until you move them to another category.",
+      "didYouMean": "Did you mean “{{name}}”?",
+      "productCount": "{{count}} products",
+      "unmatchedTitle": "Used by products, not a category yet",
+      "unmatchedHint": "Add them so they get your logo, translations and order.",
+      "addThis": "Add"
     },
     "hidden": "Hidden",
     "promos": {
