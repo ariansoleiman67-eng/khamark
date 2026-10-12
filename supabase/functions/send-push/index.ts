@@ -47,7 +47,23 @@ function base64url(input: string | Uint8Array): string {
   return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+// Google access tokens last an hour. Fetching a fresh one for EVERY push added
+// a JWT signature plus a round trip to oauth2.googleapis.com in front of every
+// notification. A warm function instance now reuses it until 5 minutes before
+// it expires; a cold one fetches it once, as before.
+let cachedToken: { value: string; expiresAt: number; client: string } | null = null;
+
 async function getAccessToken(sa: ServiceAccount): Promise<string> {
+  const nowMs = Date.now();
+  if (cachedToken && cachedToken.client === sa.client_email && cachedToken.expiresAt - 5 * 60_000 > nowMs) {
+    return cachedToken.value;
+  }
+  const token = await fetchAccessToken(sa);
+  cachedToken = { value: token, expiresAt: nowMs + 55 * 60_000, client: sa.client_email };
+  return token;
+}
+
+async function fetchAccessToken(sa: ServiceAccount): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const header = { alg: 'RS256', typ: 'JWT' };
   const claim = {
@@ -274,7 +290,18 @@ Deno.serve(async (req: Request) => {
               token,
               notification: { title: copy.title, body: copy.body },
               data: stringData,
-              android: { priority: 'high', notification: { channel_id: 'default_v1' } },
+              // Deliver now, with sound, on both platforms. iOS had no apns block
+              // at all, so the push carried no explicit priority and no sound:
+              // Apple may hold a non-urgent push back, and a soundless one only
+              // gets seen when someone happens to look — both read as "late".
+              android: {
+                priority: 'high',
+                notification: { channel_id: 'default_v1', sound: 'default', default_vibrate_timings: true },
+              },
+              apns: {
+                headers: { 'apns-priority': '10', 'apns-push-type': 'alert' },
+                payload: { aps: { sound: 'default' } },
+              },
             },
           }),
         });
