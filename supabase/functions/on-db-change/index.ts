@@ -136,7 +136,11 @@ Deno.serve(async (req: Request) => {
       // call can only repeat the notice for the status the order really has —
       // and `once` makes that a no-op after the first time.
       const order = row;
-      const copy = orderStatusCopy(order.status, order.order_number);
+      // A counter sale is recorded under the admin who rang it up (user_id must
+      // satisfy orders RLS), so a later status change would send the SHOP a
+      // customer-style "Order cancelled". The customer was standing at the till.
+      const inStore = String(order.extra_data?.source ?? '').startsWith('in-store');
+      const copy = inStore ? null : orderStatusCopy(order.status, order.order_number);
       if (copy && order.user_id) {
         const key = { orderId: String(order.id), status: String(order.status) };
         await notify(
