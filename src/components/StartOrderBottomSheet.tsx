@@ -40,12 +40,13 @@ import { useTheme } from './ThemeProvider';
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { useCurrency } from '../contexts/CurrencyContext';
-import { convertIQDToUSD, formatPrice, formatVariantPrice, getPriceUSD, variantCompareAtUSD, variantPriceUSD } from '../utils/currency';
+import { formatPrice, formatVariantPrice, variantCompareAtUSD, variantPriceUSD } from '../utils/currency';
+import { formatLineTotal, formatUnitPrice } from '../utils/pricingUtils';
+import { orderSheetLine } from '../utils/orderSheetPricing';
 import { Product, Address, RootStackParamList } from '../types';
 import { SPACING } from '../constants/theme';
 import { getDirection } from '../locales';
 import addressService from '../services/addressService';
-import { LocalCartService } from '../services/localCartService';
 import AppText from './AppText';
 import AppNumber from './AppNumber';
 import { clampQty, parseQtyInput, commitQtyInput, qtyBounds, qtyMaxLength } from '../utils/quantityStepper';
@@ -356,45 +357,31 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
     return formatPrice(was, currency, exchangeRateIQD);
   }, [product, exchangeRateIQD, isVip, currency]);
 
-  const localUnitPrice = useMemo(() => {
-    if (!product) return 0;
-    return LocalCartService.getTieredPrice(product, localTotalQty > 0 ? localTotalQty : 1, isVip);
-  }, [product, localTotalQty, isVip]);
+  // The cart line this choice becomes, priced with the cart's OWN formatters
+  // (formatUnitPrice / formatLineTotal), so the sheet prints exactly what the
+  // cart and the product page print. It used to do its own dollar arithmetic and
+  // convert back, which put today's rate on a price_usd stored at an older one:
+  // the Redmi Note 17 Pro Max (665,000 IQD) showed as 707,250. See
+  // src/utils/orderSheetPricing.ts.
+  const linePreview = useMemo(
+    () => orderSheetLine(product, {
+      size: selectedSize,
+      color: selectedColor,
+      pricedVariant,
+      exchangeRate: exchangeRateIQD,
+    }),
+    [product, selectedSize, selectedColor, pricedVariant, exchangeRateIQD],
+  );
 
-  // Does the CHOSEN option carry a VIP price of its own? If it does, that figure
-  // replaces the discount worked out from the product, rather than stacking on
-  // top of it — the ratio below is the product-level VIP/wholesale saving, and
-  // applying both would discount twice.
-  const variantOwnVipUSD = useMemo(() => {
-    if (!isVip || !pricedVariant) return 0;
-    const v = pricedVariant as any;
-    const iqd = Number(v.vipPriceIQD);
-    if (Number.isFinite(iqd) && iqd > 0) return convertIQDToUSD(iqd, exchangeRateIQD);
-    const usd = Number(v.vipPriceUSD);
-    return Number.isFinite(usd) && usd > 0 ? usd : 0;
-  }, [isVip, pricedVariant, exchangeRateIQD]);
-
-  const localTotalPrice = useMemo(() => {
-    if (!product) return 0;
-    if (!hasAnyVars) return localUnitPrice * localQty;
-    if (!selectionComplete) return 0;
-    // One line, one price: whichever chosen variant actually carries a price, size
-    // first. Summing both is what charged for two phones.
-    // variantPriceUSD, not `?? product.priceUSD`, so a variant priced in dinar is
-    // charged at its dinar figure instead of silently falling through to dollars.
-    const price = variantPriceUSD(pricedVariant, product, exchangeRateIQD);
-    if (variantOwnVipUSD > 0 && variantOwnVipUSD < price) return variantOwnVipUSD * localQty;
-    const base = getPriceUSD(product, exchangeRateIQD);
-    const ratio = base > 0 ? localUnitPrice / base : 1;
-    return price * localQty * (ratio < 1 ? ratio : 1);
-  }, [product, hasAnyVars, selectionComplete, pricedVariant, localUnitPrice, localQty, exchangeRateIQD, variantOwnVipUSD]);
-
-  // The price on the product card. Once an option is chosen it is THAT option's
-  // unit price — the card used to keep showing the base product (A37: 549,000)
-  // while the total underneath charged the 12GB/256GB's 740,000.
-  const displayUnitPrice = hasAnyVars && selectionComplete && localQty > 0
-    ? localTotalPrice / localQty
-    : localUnitPrice;
+  // The card shows the chosen line's unit price once there is one, and the
+  // product's own price until then. The tier is picked by the quantity chosen.
+  const tierQty = localTotalQty > 0 ? localTotalQty : 1;
+  const unitPriceLabel = product
+    ? formatUnitPrice(linePreview ?? product, isVip, currency, exchangeRateIQD, {}, tierQty)
+    : '';
+  const totalPriceLabel = linePreview && localTotalQty > 0
+    ? formatLineTotal(linePreview, isVip, currency, exchangeRateIQD, {}, localTotalQty)
+    : formatPrice(0, currency, exchangeRateIQD);
 
   // Sorted on a COPY. Sorting product.priceTiers in place reordered the product
   // object every other screen is holding.
@@ -857,7 +844,7 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                   )}
 
                   <AppNumber
-                    value={formatPrice(displayUnitPrice, currency, exchangeRateIQD)}
+                    value={unitPriceLabel}
                     numberOfLines={1}
                     adjustsFontSizeToFit
                     minimumFontScale={0.7}
@@ -1198,7 +1185,9 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                       style={[styles.optionalLabel, { color: theme.colors.textSecondary }]}
                       numberOfLines={1}
                     >
-                      ({t('common.optional', { defaultValue: 'Optional' })})
+                      {/* The translation carries its own brackets — "(Optional)" — so
+                          wrapping it again printed "((Optional))". */}
+                      {t('common.optional', { defaultValue: '(Optional)' })}
                     </Text>
                   </View>
 
@@ -1258,7 +1247,7 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                   // One line, always. A long dinar total shrinks its font instead
                   // of wrapping — the wrapping is what used to grow the footer.
                   <AppNumber
-                    value={formatPrice(localTotalPrice, currency, exchangeRateIQD)}
+                    value={totalPriceLabel}
                     numberOfLines={1}
                     adjustsFontSizeToFit
                     minimumFontScale={0.5}
