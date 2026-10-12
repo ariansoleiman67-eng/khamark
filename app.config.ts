@@ -66,7 +66,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   // 12GB/256GB: IQD 549,000 instead of 740,000). 1.9.52 carries that fix, the AI
   // assistant reading the stream format that is actually deployed, category
   // renames moving their products, and the cart sync keeping option prices.
-  version: "1.9.52",
+  //
+  // 1.9.52 -> 1.9.53: everything since 1.9.52 was cut — the order sheet
+  // (stepper never covered, fits 320pt phones, prices the cart's way in dinar,
+  // new look), priceless options keeping the dinar price in the cart (no false
+  // "prices updated"), the chat answer no longer behind the keyboard and the
+  // sent text clearing, and notification taps opening the right screen.
+  version: "1.9.53",
   newArchEnabled: true,
   orientation: "portrait",
   icon: "./assets/icon.png",
@@ -137,7 +143,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     //   1.9.49 (80) — assigned, never built
     //   1.9.50 (81) — archived 2026-09-20, never uploaded
     //   1.9.51 (82) — cut before the checkout variant-price fix
-    buildNumber: "83",
+    //   1.9.52 (83) — cut before the order-sheet, cart dinar and chat fixes
+    buildNumber: "84",
     // Universal Links. This was removed while the domain was a placeholder — an
     // entitlement pointing at a host that cannot serve an
     // apple-app-site-association file makes every link silently fail to verify.
@@ -208,7 +215,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // but never uploaded; going up costs nothing and reusing a number is the one
     // thing Play refuses outright. 140 is the first to carry the App Links intent
     // filter, which is native config and cannot reach an existing build.
-    versionCode: 144,
+    versionCode: 145,
     googleServicesFile: "./google-services.json",
     intentFilters: [
       // Android App Links for the live storefront. Removed while the host was a
