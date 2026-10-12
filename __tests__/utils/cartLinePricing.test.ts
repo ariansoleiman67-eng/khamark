@@ -145,3 +145,37 @@ describe('lineStock', () => {
     expect(lineStock({}, null)).toBeNull();
   });
 });
+
+describe('buildLineProduct — options that do not price themselves', () => {
+  // Live: "Clear Plastic Phone Case", 3,000 IQD, 23 sizes, none with a price of
+  // its own. The order sheet passes the dollar figure it derived for the
+  // selection (3000 / 1670). That is not an override — the size sets no price —
+  // so the line must stay at the product's dinar price.
+  const RATE_NOW = 1670;
+  const cases = {
+    id: 'c', priceUSD: 1.94, priceIQD: 3000,
+    variations: [{ variationId: '17pm', sizeValue: '17promax', stockQuantity: 50 }],
+    colorVariations: [],
+  };
+
+  it('keeps the product dinar price when the caller passes a derived dollar figure', () => {
+    const line = buildLineProduct(cases, { variationId: '17pm', priceUSD: 3000 / RATE_NOW });
+    expect(line.priceIQD).toBe(3000);
+  });
+
+  it('agrees between the add path and checkout, so no false "prices updated"', () => {
+    const atAdd = buildLineProduct(cases, { variationId: '17pm', priceUSD: 3000 / RATE_NOW });
+    const atCheckout = buildLineProduct(cases, { variationId: '17pm' });
+    expect(linePriceSignature(atAdd)).toBe(linePriceSignature(atCheckout));
+  });
+
+  it("prices a priceless size by the colour riding on it when the colour has a dinar price", () => {
+    const p = {
+      id: 'p', priceUSD: 100, priceIQD: 157000,
+      variations: [{ variationId: 's', sizeValue: '128GB' }],
+      colorVariations: [{ variationId: 'gold', colorValue: 'Gold', priceIQD: 170000 }],
+    };
+    const line = buildLineProduct(p, { variationId: 's', colorVariationId: 'gold', priceUSD: 170000 / RATE_NOW });
+    expect(line.priceIQD).toBe(170000);
+  });
+});

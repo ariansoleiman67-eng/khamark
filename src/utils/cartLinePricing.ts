@@ -42,24 +42,6 @@ export function buildLineProduct(
     variation = product?.colorVariations?.find((v: any) => v?.variationId === variationId);
   }
 
-  const variationPrice = opts.priceUSD ?? variation?.priceUSD ?? product?.priceUSD;
-
-  // A line inherits product.priceIQD from the spread below, so an option that
-  // overrides the price in DOLLARS on a dinar-priced product would be displayed
-  // and charged at the product's dinar figure — the override silently discarded.
-  // Decide the line's dinar price explicitly:
-  //   the option's own dinar price if it has one;
-  //   otherwise null when the option overrides in dollars;
-  //   otherwise the product's, because the option sets no price at all.
-  const selectionIQD = Number(opts.priceIQD ?? variation?.priceIQD);
-  const hasVariantIQD = Number.isFinite(selectionIQD) && selectionIQD > 0;
-  const hasVariantUSD = opts.priceUSD != null || variation?.priceUSD != null;
-  const linePriceIQD = hasVariantIQD
-    ? selectionIQD
-    : hasVariantUSD
-      ? null
-      : (product?.priceIQD ?? null);
-
   // BOTH chosen options, not only the one that carries the line. A size+colour
   // pick arrives as ONE selection — the size holds variationId and the colour
   // rides along as colorVariationId — so reading extras off `variation` alone
@@ -69,6 +51,41 @@ export function buildLineProduct(
     opts.colorVariationId && opts.colorVariationId !== variationId
       ? product?.colorVariations?.find((v: any) => v?.variationId === opts.colorVariationId)
       : undefined;
+
+  const ownIQD = (v: any): number | null => (Number(v?.priceIQD) > 0 ? Number(v.priceIQD) : null);
+  const ownUSD = (v: any): number | null => (Number(v?.priceUSD) > 0 ? Number(v.priceUSD) : null);
+  const pricesItself = (v: any) => ownIQD(v) !== null || ownUSD(v) !== null;
+
+  // The option that sets this line's price: the one carrying the line if it has
+  // a price of its own, else a riding colour that does — the same order the
+  // order sheet picks its `pricedVariant` in. null: the line is the product's
+  // own price.
+  const pricer = pricesItself(variation) ? variation : pricesItself(ridingColor) ? ridingColor : null;
+
+  const variationPrice = opts.priceUSD ?? ownUSD(pricer) ?? product?.priceUSD;
+
+  // A line inherits product.priceIQD from the spread below, so an option that
+  // overrides the price in DOLLARS on a dinar-priced product would be displayed
+  // and charged at the product's dinar figure — the override silently discarded.
+  // Decide the line's dinar price explicitly:
+  //   the selection's own dinar price if it has one;
+  //   otherwise null when the pricing option overrides in dollars;
+  //   otherwise the product's, because no option sets a price at all.
+  //
+  // Whether an option overrides in dollars is read off the OPTION, never off
+  // opts.priceUSD. The order sheet passes a dollar figure for every selection —
+  // for a priceless option that is just the product's dinar price converted —
+  // and treating that as an override dropped the dinar price: 50 phone cases at
+  // 3,000 IQD came to 150,250, and checkout (which passes no opts) disagreed and
+  // raised a false "prices updated".
+  const selectionIQD = Number(opts.priceIQD ?? ownIQD(pricer));
+  const hasVariantIQD = Number.isFinite(selectionIQD) && selectionIQD > 0;
+  const hasVariantUSD = pricer !== null && ownUSD(pricer) !== null;
+  const linePriceIQD = hasVariantIQD
+    ? selectionIQD
+    : hasVariantUSD
+      ? null
+      : (product?.priceIQD ?? null);
 
   const variantExtras: Record<string, number> = {};
   const carryOverFrom = (from: any, key: string) => {
@@ -98,11 +115,7 @@ export function buildLineProduct(
   // An option that prices ITSELF must not inherit the product's VIP or "was"
   // price — those were set against the PRODUCT's price. A 512GB at $250 would
   // otherwise sell to a VIP at the 128GB's $90 VIP price.
-  const optionPricesItself =
-    Number(variation?.priceUSD) > 0 ||
-    Number(variation?.priceIQD) > 0 ||
-    Number(ridingColor?.priceUSD) > 0 ||
-    Number(ridingColor?.priceIQD) > 0;
+  const optionPricesItself = pricer !== null;
   if (optionPricesItself) {
     if (!variantExtras.vipPriceUSD && !variantExtras.vipPriceIQD) {
       variantExtras.vipPriceUSD = 0;
