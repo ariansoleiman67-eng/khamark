@@ -144,7 +144,11 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
 
   // Read per render, not once at import: the window size the sheet was first
   // imported under is not necessarily the one it opens in.
-  const { height: windowHeight } = useWindowDimensions();
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
+  // Narrow phones (320-359pt: small Androids, older iPhones). The footer holds a
+  // ~142pt stepper beside the button; at 320pt that leaves the button ~126pt, so
+  // everything that can give a little room, does.
+  const compact = windowWidth < 360;
   // Tall enough for a long option list, never under the status bar.
   const sheetMaxHeight = Math.min(windowHeight * 0.92, windowHeight - insets.top - 8);
 
@@ -443,7 +447,7 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
     },
   ], []);
 
-  const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
+  const styles = useMemo(() => createStyles(theme, isDark, compact), [theme, isDark, compact]);
 
   // Drop any address state belonging to the previous account the moment the
   // signed-in user changes, so nothing can survive into the next session.
@@ -1340,14 +1344,15 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                       </>
                     ) : maxStock === 0 ? (
                       <>
-                        <Ionicons name="alert-circle" size={20} color="#FFFFFF" />
+                        {!compact && <Ionicons name="alert-circle" size={20} color="#FFFFFF" />}
                         <Text allowFontScaling={false} style={styles.confirmText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
                           {t('product.outOfStock', { defaultValue: 'Out of Stock' })}
                         </Text>
                       </>
                     ) : (
                       <>
-                        <Ionicons name={isCartMode ? 'cart' : (user ? 'cart' : 'log-in')} size={20} color="#FFFFFF" />
+                        {/* At 320-359pt the words need the room more than the glyph does. */}
+                        {!compact && <Ionicons name={isCartMode ? 'cart' : (user ? 'cart' : 'log-in')} size={20} color="#FFFFFF" />}
                         <Text allowFontScaling={false} style={styles.confirmText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
                           {isCartMode
                             ? t('cart.addToCart', { defaultValue: 'Add to Cart' })
@@ -1368,7 +1373,7 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
   );
 };
 
-const createStyles = (theme: any, isDark: boolean) =>
+const createStyles = (theme: any, isDark: boolean, compact: boolean) =>
   StyleSheet.create({
     // ========== SHEET ==========
     root: {
@@ -1416,7 +1421,7 @@ const createStyles = (theme: any, isDark: boolean) =>
       borderBottomWidth: StyleSheet.hairlineWidth,
       gap: 12,
       paddingBottom: 14,
-      paddingHorizontal: 20,
+      paddingHorizontal: compact ? 16 : 20,
     },
     headerTitle: {
       flex: 1,
@@ -1440,9 +1445,9 @@ const createStyles = (theme: any, isDark: boolean) =>
       flexShrink: 1,
     },
     scrollContent: {
-      gap: 14,
+      gap: compact ? 12 : 14,
       paddingBottom: 16,
-      paddingHorizontal: 20,
+      paddingHorizontal: compact ? 16 : 20,
       paddingTop: 16,
     },
 
@@ -1457,8 +1462,8 @@ const createStyles = (theme: any, isDark: boolean) =>
       borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
       borderRadius: 14,
       borderWidth: 1,
-      height: 96,
-      width: 96,
+      height: compact ? 80 : 96,
+      width: compact ? 80 : 96,
     },
     productInfo: {
       flex: 1,
@@ -1769,7 +1774,7 @@ const createStyles = (theme: any, isDark: boolean) =>
     footer: {
       borderTopWidth: StyleSheet.hairlineWidth,
       gap: 10,
-      paddingHorizontal: 20,
+      paddingHorizontal: compact ? 16 : 20,
       paddingTop: 12,
     },
     summaryRow: {
@@ -1803,12 +1808,12 @@ const createStyles = (theme: any, isDark: boolean) =>
     },
     actionRow: {
       alignItems: 'center',
-      gap: 12,
+      gap: compact ? 8 : 12,
     },
 
     // ========== QUANTITY STEPPER ==========
-    // Fixed width and never shrinks: 4 + 40 + 52 + 40 + 4 + borders = ~142pt.
-    // The button beside it takes whatever is left.
+    // Fixed width and never shrinks: 4 + 40 + 52 + 40 + 4 + borders = ~142pt
+    // (~126pt compact). The button beside it takes whatever is left.
     quantitySelector: {
       alignItems: 'center',
       backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#f2f2f2',
@@ -1823,26 +1828,26 @@ const createStyles = (theme: any, isDark: boolean) =>
       backgroundColor: theme.colors.background,
       borderRadius: 20,
       elevation: 2,
-      height: 40,
+      height: compact ? 36 : 40,
       justifyContent: 'center',
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 1 },
       shadowOpacity: 0.1,
       shadowRadius: 2,
-      width: 40,
+      width: compact ? 36 : 40,
     },
     qtyButtonDisabled: {
       opacity: 0.35,
     },
     qtyInput: {
-      fontSize: 20,
+      fontSize: compact ? 18 : 20,
       fontWeight: '700',
-      height: 40,
+      height: compact ? 36 : 40,
       includeFontPadding: false,
       padding: 0,
       textAlign: 'center',
       textAlignVertical: 'center',
-      width: 52,
+      width: compact ? 46 : 52,
     },
 
     // ========== CONFIRM BUTTON ==========
@@ -1861,14 +1866,14 @@ const createStyles = (theme: any, isDark: boolean) =>
       alignItems: 'center',
       gap: 8,
       justifyContent: 'center',
-      minHeight: 50,
-      paddingHorizontal: 12,
+      minHeight: compact ? 46 : 50,
+      paddingHorizontal: compact ? 8 : 12,
       paddingVertical: 12,
     },
     confirmText: {
       color: '#FFFFFF',
       flexShrink: 1,
-      fontSize: 16,
+      fontSize: compact ? 15 : 16,
       fontWeight: '700',
       letterSpacing: 0.3,
     },
