@@ -17,6 +17,7 @@ import { useTheme } from '../components/ThemeProvider';
 import { Notification as AppNotification } from '../types';
 import { NotificationService } from '../services/NotificationService';
 import { useNotification } from '../contexts/NotificationContext';
+import { useAuth } from '../contexts/AuthContext';
 import Button from '../components/Button';
 import { formatDate } from '../utils/currency';
 import { getDirection } from '../locales';
@@ -40,6 +41,7 @@ export const NotificationsScreen: React.FC = () => {
   const { theme, isDark } = useTheme();
   const { t, i18n } = useTranslation();
   const navigation = useNavigation<any>();
+  const { isAdmin } = useAuth();
   // ALIBABA-STYLE: Clear badge when user opens notifications
   const { clearBadge } = useNotification();
   
@@ -227,11 +229,22 @@ export const NotificationsScreen: React.FC = () => {
           productId: notification.data.productId
         });
       } else if (notification.type === 'chat' && notification.data?.conversationId) {
-        // Message notification → open that conversation
-        navigation.navigate('ChatScreen', {
+        // Message notification → open that conversation. The shop reads its
+        // conversations in the ADMIN chat screen; the customer one opened from
+        // here showed the owner the customer's side. Same remap the push tap
+        // does in PushInitializer.
+        navigation.navigate(isAdmin ? 'AdminChatScreen' : 'ChatScreen', {
           conversationId: notification.data.conversationId,
           targetName: getNotificationTitle(notification),
         } as any);
+      } else if (notification.type === 'trade_in') {
+        // "New trade-in request" (to the shop) used to fall through to a popup
+        // that repeated the title. Open the request, as the push tap does.
+        if (notification.data?.tradeInId) {
+          navigation.navigate('AdminTradeInDetail', { requestId: notification.data.tradeInId });
+        } else {
+          navigation.navigate('AdminTradeIns');
+        }
       } else {
         // Fallback for general notifications (like warnings/apologies that have no specific nav targets)
         Alert.alert(

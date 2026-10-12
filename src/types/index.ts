@@ -543,7 +543,9 @@ export interface Notification {
   body: string;
   bodyAr?: string;
   bodyKu?: string;
-  type: 'order' | 'shipping' | 'promo' | 'system' | 'chat' | 'promotion';
+  // 'trade_in': on-db-change, a new trade-in request (to the shop).
+  // 'general': the shop's own messages (Send Notification, trade-in replies).
+  type: 'order' | 'shipping' | 'promo' | 'system' | 'chat' | 'promotion' | 'trade_in' | 'general';
   relatedId?: string;        // For grouping (orderId, productId)
   data?: Record<string, any>;
   read: boolean;
