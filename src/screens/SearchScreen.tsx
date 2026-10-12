@@ -38,6 +38,7 @@ import { useTenant } from '../contexts/TenantContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getTimeFromTimestamp } from '../utils/timestampUtils';
 import { iosTapFix } from '../ui/iosTapFix';
+import { sameCategory } from '../utils/categoryMatch';
 
 // Visual search analysis type from the AI backend
 interface VisualAnalysis {
@@ -351,7 +352,7 @@ const SearchScreen: React.FC = () => {
 
     // Category filter
     if (filters.category && filters.category !== t('categories.all')) {
-      filtered = filtered.filter(product => product.category === filters.category);
+      filtered = filtered.filter(product => sameCategory(product.category, filters.category));
     }
 
     // Price range filter

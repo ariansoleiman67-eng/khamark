@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, uniqueChannel } from './supabase';
 import { Product, SearchFilters, PaginationInfo } from '../types';
+import { categoryOrFilter } from '../utils/categoryMatch';
 import { CACHE_EXPIRATION, PAGINATION } from '../constants/config';
 import {
   USE_MOCK_DATA,
@@ -346,11 +347,12 @@ export class ProductService {
         let query = supabase.from('parts').select(withoutMissingColumns(LIST_COLUMNS));
 
         if (tenantId) query = query.eq('tenant_id', tenantId);
-        // TRIMMED on both sides of the comparison. The column is trimmed by a DB
-        // trigger (20260831000000), and the filter value arrives from a route
-        // param that may have been read off an older, untrimmed row -- a padded
-        // value here would silently return an empty category or brand page.
-        if (filters.category) query = query.eq('category', filters.category.trim());
+        // Any spelling of the category: case-insensitive, singular or plural
+        // (categoryOrFilter). An exact eq split one category into several — a
+        // tile named "Earphones" missed the 9 products filed as "Earphone".
+        // The column is trimmed by a DB trigger (20260831000000); the filter
+        // value is trimmed inside categoryNameVariants.
+        if (filters.category) query = query.or(categoryOrFilter(filters.category));
         // ilike, not eq, and with NO wildcards — so it stays an exact match that
         // simply ignores case. `parts.brand` is free text: the live catalogue holds
         // "TECNO" and "Tecno", "Realme" and "realme". With eq, a brand page built
@@ -433,7 +435,7 @@ export class ProductService {
       const build = () => {
         let query = supabase.from('parts').select(withoutMissingColumns(LIST_COLUMNS)).order('name');
         if (tenantId) query = query.eq('tenant_id', tenantId);
-        if (filters.category) query = query.eq('category', filters.category);
+        if (filters.category) query = query.or(categoryOrFilter(filters.category));
         return query;
       };
 
@@ -643,7 +645,7 @@ export class ProductService {
         let query = supabase
           .from('parts')
           .select(withoutMissingColumns(LIST_COLUMNS))
-          .eq('category', category)
+          .or(categoryOrFilter(category))
           .eq('is_active', true)
           .order(SORT_ORDER_COLUMN, SORT_ORDER_OPTS)
           .order('stock_qty', { ascending: false })

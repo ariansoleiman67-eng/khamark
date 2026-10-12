@@ -42,6 +42,7 @@ import { storeProfileService, StoreProfile } from '../services/storeProfileServi
 import BannerCarousel from '../components/BannerCarousel';
 import CategoryTile from '../components/home/CategoryTile';
 import { iosTapFix } from '../ui/iosTapFix';
+import { categoryKey, groupCategoryNames, sameCategory } from '../utils/categoryMatch';
 
 
 
@@ -222,11 +223,10 @@ const CategoriesScreen: React.FC = () => {
       // Product.category is typed `string` but the DB column is nullable, so guard
       // against null/undefined/'' here — a null category name would later crash
       // renderCategoryFilter's cat.name.toLowerCase() (source of the S0 crash).
-      const uniqueCategories = Array.from(
-        new Set(fetchedProducts.map(p => p.category).filter((c): c is string => !!c))
-      );
-      const categoriesWithCounts = uniqueCategories.map((categoryName, index) => {
-        const categoryProducts = fetchedProducts.filter(p => p.category === categoryName);
+      // Grouped by category, not exact text: "Earphone" and "earphones" are one
+      // category and must be one tile with one count, named after the spelling
+      // most products use (groupCategoryNames).
+      const categoriesWithCounts = groupCategoryNames(fetchedProducts.map(p => p.category)).map(({ name: categoryName, count }, index) => {
         return {
           id: (index + 1).toString(),
           name: categoryName,
@@ -236,7 +236,7 @@ const CategoriesScreen: React.FC = () => {
           nameAr: '',
           nameKu: '',
           icon: getCategoryIcon(categoryName),
-          count: categoryProducts.length,
+          count,
           description: `${categoryName} parts and components`,
           descriptionAr: `قطع ومكونات ${categoryName}`,
           descriptionKu: `پارچەکانی ${categoryName}`,
@@ -343,7 +343,7 @@ const CategoriesScreen: React.FC = () => {
     let filtered = products;
     
     if (selectedCategory !== 'All') {
-      filtered = filtered.filter(product => product.category === selectedCategory);
+      filtered = filtered.filter(product => sameCategory(product.category, selectedCategory));
     }
     
     if (searchQuery.trim() !== '') {
@@ -679,11 +679,13 @@ const CategoriesScreen: React.FC = () => {
     // Tiles = the shop's managed categories (admin order, so their logos show even
     // with zero products yet) + any category a product uses that isn't managed.
     const productCategories = categories.filter(c => !!c.name);
-    const managedSet = new Set(managedCategories.map(c => (c.name || '').toLowerCase()));
+    // Matched by categoryKey, so the shop's "Earphones" tile takes in products
+    // filed as "Earphone" instead of an auto-tile appearing beside it.
+    const managedKeys = new Set(managedCategories.map(c => categoryKey(c.name)));
     const orderedCategories = [
       ...managedCategories.map(managed => {
         const name = managed.name || '';
-        const existing = productCategories.find(c => (c.name || '').toLowerCase() === name.toLowerCase());
+        const existing = productCategories.find(c => sameCategory(c.name, name));
         // Merge the admin's saved translations onto the product-derived entry, which
         // only ever carries the English name.
         return {
@@ -693,11 +695,14 @@ const CategoriesScreen: React.FC = () => {
             isActive: true,
             count: 0,
           } as Category)),
+          // The tile carries the ADMIN's spelling, so its logo (iconByName is keyed
+          // by the managed name) and filter both follow the managed category.
+          name,
           nameAr: managed.nameAr || '',
           nameKu: managed.nameKu || '',
         } as Category;
       }),
-      ...productCategories.filter(c => !managedSet.has((c.name || '').toLowerCase())),
+      ...productCategories.filter(c => !managedKeys.has(categoryKey(c.name))),
     ];
 
     // Original name (for filter logic) + translated name (for display).
