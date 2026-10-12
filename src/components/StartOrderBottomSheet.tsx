@@ -44,7 +44,6 @@ import { formatPrice, formatVariantPrice, variantCompareAtUSD, variantPriceUSD }
 import { formatLineTotal, formatUnitPrice } from '../utils/pricingUtils';
 import { orderSheetLine } from '../utils/orderSheetPricing';
 import { Product, Address, RootStackParamList } from '../types';
-import { SPACING } from '../constants/theme';
 import { getDirection } from '../locales';
 import addressService from '../services/addressService';
 import AppText from './AppText';
@@ -201,6 +200,7 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [addressesLoading, setAddressesLoading] = useState(false);
   const [showAddressSelector, setShowAddressSelector] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
 
   // ===== LOCAL QUANTITY STATE (editable in sheet) =====
   const [localQty, setLocalQty] = useState(totalQuantity || 1);
@@ -644,70 +644,86 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
   const rowDir = isRTL ? 'row-reverse' : 'row';
   const textStart = isRTL ? 'right' : 'left';
   const textEnd = isRTL ? 'left' : 'right';
-  const cardBg = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)';
   const sheetBg = isDark ? 'rgba(30,30,30,0.95)' : 'rgba(255,255,255,0.97)';
   const qtyLocked = isProcessing || !qtyEnabled;
   const totalLabel = isCartMode
     ? t('cart.total', { defaultValue: 'Total' })
     : t('startOrder.totalToPay', { defaultValue: 'Total to Pay' });
 
-  // One chip for a size or a colour. These were two copies of the same 60 lines;
-  // a fix to one (the border width that made the row jump) had to be made twice.
+  // Sections are separated by a hairline and a label, not boxed in cards: the
+  // grey card around every section, with bordered chips and bordered payment
+  // cards inside it, was three layers of box for one choice.
+  const hairline = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)';
+  const renderDivider = () => <View style={[styles.divider, { backgroundColor: hairline }]} />;
+  const renderSectionLabel = (text: string) => (
+    <AppText style={[styles.sectionLabel, { color: theme.colors.text, textAlign: textStart }]} numberOfLines={1}>
+      {text}
+    </AppText>
+  );
+
+  // One renderer for both groups. A SIZE is a tile that can carry its own price
+  // underneath; a COLOUR is a slim pill led by its swatch.
   const renderOptionChip = (
     v: any,
     label: string,
     selected: boolean,
     onPress: () => void,
+    kind: 'size' | 'color',
     colorHex?: string,
   ) => {
     const soldOut = v.stockQuantity === 0;
     const was = optionWasPrice(v);
+    const showPrice = hasOwnPrice(v);
     return (
       <TouchableOpacity
         key={v.variationId}
         disabled={soldOut || isProcessing}
         activeOpacity={0.8}
         onPress={onPress}
+        hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
         accessibilityRole="button"
         accessibilityLabel={label}
         accessibilityState={{ selected, disabled: soldOut }}
         style={[
-          styles.optionChip,
+          kind === 'size' ? styles.sizeTile : styles.colorPill,
           {
-            backgroundColor: selected ? theme.colors.primary + '12' : 'transparent',
-            borderColor: selected ? theme.colors.primary : theme.colors.border,
-            opacity: soldOut ? 0.45 : 1,
+            flexDirection: kind === 'color' ? rowDir : 'column',
+            backgroundColor: selected ? theme.colors.primary + '14' : 'transparent',
+            borderColor: selected ? theme.colors.primary : hairline,
+            opacity: soldOut ? 0.4 : 1,
           },
         ]}
       >
-        <View style={[styles.optionChipLine, { flexDirection: rowDir }]}>
-          {!!colorHex && (
-            <View
-              style={[
-                styles.colorDot,
-                { backgroundColor: colorHex, borderColor: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.15)' },
-              ]}
-            />
-          )}
-          <AppText
-            numberOfLines={2}
+        {kind === 'color' && (
+          <View
             style={[
-              styles.optionChipText,
+              styles.colorDot,
               {
-                color: selected ? theme.colors.primary : theme.colors.text,
-                textDecorationLine: soldOut ? 'line-through' : 'none',
+                backgroundColor: colorHex || theme.colors.border,
+                borderColor: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.12)',
               },
             ]}
-          >
-            {label}
-          </AppText>
-        </View>
-        {hasOwnPrice(v) && (
+          />
+        )}
+        <AppText
+          numberOfLines={2}
+          style={[
+            styles.optionChipText,
+            {
+              color: selected ? theme.colors.primary : theme.colors.text,
+              textDecorationLine: soldOut ? 'line-through' : 'none',
+            },
+          ]}
+        >
+          {label}
+        </AppText>
+        {showPrice && (
           <AppNumber
             value={formatVariantPrice(v, product, currency, exchangeRateIQD, {}, isVip)}
             numberOfLines={1}
             adjustsFontSizeToFit
             minimumFontScale={0.75}
+            containerStyle={kind === 'size' ? styles.chipPriceBox : undefined}
             style={[styles.optionChipPrice, { color: selected ? theme.colors.primary : theme.colors.textSecondary }]}
           />
         )}
@@ -715,11 +731,12 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
           <AppNumber
             value={was}
             numberOfLines={1}
+            containerStyle={kind === 'size' ? styles.chipPriceBox : undefined}
             style={[styles.optionChipWas, { color: theme.colors.textSecondary }]}
           />
         )}
-        {soldOut && (
-          <AppText numberOfLines={1} style={[styles.optionChipSoldOut, { color: '#F44336' }]}>
+        {soldOut && kind === 'size' && (
+          <AppText numberOfLines={1} style={[styles.optionChipSoldOut, { color: '#E5484D' }]}>
             {t('product.outOfStock', { defaultValue: 'Out of Stock' })}
           </AppText>
         )}
@@ -811,11 +828,14 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
               keyboardDismissMode="on-drag"
               showsVerticalScrollIndicator={false}
             >
-              {/* ==================== PRODUCT CARD ==================== */}
-              <View style={[styles.productCard, { flexDirection: rowDir }]}>
+              {/* ==================== PRICE TAG ==================== */}
+              {/* The one strong element: what you are buying and what it costs,
+                  updating live as you choose. The spec line replaces the grey
+                  badges, and reads like the label on the box. */}
+              <View style={[styles.productHeader, { flexDirection: rowDir }]}>
                 <Image
                   source={{ uri: product.imageUrls?.[0] }}
-                  style={styles.productImage}
+                  style={[styles.productImage, { borderColor: hairline }]}
                   contentFit="cover"
                   transition={200}
                 />
@@ -827,196 +847,200 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                     {getProductName()}
                   </AppText>
 
-                  {/* What is chosen right now, in this sheet. */}
                   {selectionLabels.length > 0 && (
-                    <View style={[styles.selectedBadges, { flexDirection: rowDir }]}>
-                      {selectionLabels.map((label) => (
-                        <View
-                          key={label}
-                          style={[styles.variationBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#f2f2f2' }]}
-                        >
-                          <AppText style={[styles.variationText, { color: theme.colors.textSecondary }]} numberOfLines={1}>
-                            {label}
-                          </AppText>
-                        </View>
-                      ))}
-                    </View>
+                    <AppText
+                      numberOfLines={1}
+                      style={[styles.specLine, { color: theme.colors.textSecondary, textAlign: textStart }]}
+                    >
+                      {selectionLabels.join('  ·  ')}
+                    </AppText>
                   )}
 
-                  <AppNumber
-                    value={unitPriceLabel}
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.7}
-                    containerStyle={styles.unitPriceBox}
-                    style={[styles.unitPrice, { color: theme.colors.primary }]}
-                  />
-
-                  {/* Availability only — never a quantity. */}
-                  <View style={[styles.stockRow, { flexDirection: rowDir }]}>
-                    <View
-                      style={[
-                        styles.stockDot,
-                        { backgroundColor: maxStock > 10 ? '#4CAF50' : maxStock > 0 ? '#FF9800' : '#F44336' },
-                      ]}
+                  <View style={[styles.priceLine, { flexDirection: rowDir }]}>
+                    <AppNumber
+                      value={unitPriceLabel}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.7}
+                      containerStyle={styles.unitPriceBox}
+                      style={[styles.unitPrice, { color: theme.colors.text }]}
                     />
-                    <AppText style={[styles.stockText, { color: maxStock > 0 ? '#4CAF50' : '#F44336' }]}>
-                      {maxStock > 0
-                        ? t('product.inStock', { defaultValue: 'In Stock' })
-                        : t('product.outOfStock', { defaultValue: 'Out of Stock' })}
-                    </AppText>
+                    {/* Availability only — never a quantity. */}
+                    <View style={[styles.stockTag, { flexDirection: rowDir }]}>
+                      <View
+                        style={[
+                          styles.stockDot,
+                          { backgroundColor: maxStock > 10 ? '#34A853' : maxStock > 0 ? '#F29900' : '#E5484D' },
+                        ]}
+                      />
+                      <AppText style={[styles.stockText, { color: maxStock > 0 ? theme.colors.textSecondary : '#E5484D' }]}>
+                        {maxStock > 0
+                          ? t('product.inStock', { defaultValue: 'In Stock' })
+                          : t('product.outOfStock', { defaultValue: 'Out of Stock' })}
+                      </AppText>
+                    </View>
                   </View>
 
                   {/* Bulk discounts */}
                   {maxStock > 0 && sortedTiers.length > 0 && (
-                    <View style={[styles.tiersBlock, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
-                      <View style={[styles.tiersTitleRow, { flexDirection: rowDir }]}>
-                        <Ionicons name="flash" size={14} color="#FF6B00" />
-                        <AppText style={styles.tiersTitle}>
-                          {t('product.bulkDiscount', { defaultValue: 'Bulk Discounts' })}
-                        </AppText>
-                      </View>
-                      <View style={[styles.tiersRow, { flexDirection: rowDir }]}>
-                        {sortedTiers.map((tier, idx) => {
-                          const isActive = localTotalQty >= tier.minQty && (!tier.maxQty || localTotalQty <= tier.maxQty);
-                          return (
-                            <View
-                              key={`${tier.minQty}-${idx}`}
-                              style={[
-                                styles.tierChip,
-                                {
-                                  flexDirection: rowDir,
-                                  backgroundColor: isActive ? '#FF6B0015' : 'transparent',
-                                  borderColor: isActive ? '#FF6B00' : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'),
-                                },
-                              ]}
-                            >
-                              <AppText style={[styles.tierQty, { color: isActive ? '#FF6B00' : theme.colors.textSecondary }]}>
-                                {`${tier.minQty}+`}
-                              </AppText>
-                              <AppNumber
-                                value={formatPrice(tier.priceUSD, currency, exchangeRateIQD)}
-                                numberOfLines={1}
-                                style={[styles.tierPrice, { color: isActive ? '#FF6B00' : theme.colors.text }]}
-                              />
-                            </View>
-                          );
-                        })}
-                      </View>
+                    <View style={[styles.tiersRow, { flexDirection: rowDir }]}>
+                      {sortedTiers.map((tier, idx) => {
+                        const isActive = localTotalQty >= tier.minQty && (!tier.maxQty || localTotalQty <= tier.maxQty);
+                        return (
+                          <View
+                            key={`${tier.minQty}-${idx}`}
+                            style={[
+                              styles.tierChip,
+                              {
+                                flexDirection: rowDir,
+                                backgroundColor: isActive ? theme.colors.primary + '14' : 'transparent',
+                                borderColor: isActive ? theme.colors.primary : hairline,
+                              },
+                            ]}
+                          >
+                            <AppText style={[styles.tierQty, { color: isActive ? theme.colors.primary : theme.colors.textSecondary }]}>
+                              {`${tier.minQty}+`}
+                            </AppText>
+                            <AppNumber
+                              value={formatPrice(tier.priceUSD, currency, exchangeRateIQD)}
+                              numberOfLines={1}
+                              style={[styles.tierPrice, { color: isActive ? theme.colors.primary : theme.colors.text }]}
+                            />
+                          </View>
+                        );
+                      })}
                     </View>
                   )}
                 </View>
               </View>
 
               {/* ==================== OPTIONS ==================== */}
-              {hasAnyVars && (
-                <View style={[styles.sectionCard, { backgroundColor: cardBg }]}>
-                  <View style={[styles.sectionHeader, { flexDirection: rowDir }]}>
-                    <Ionicons name="cube-outline" size={20} color={theme.colors.primary} />
-                    <Text
-                      allowFontScaling={false}
-                      style={[styles.sectionTitle, { color: theme.colors.text, textAlign: textStart }]}
-                      numberOfLines={1}
-                      adjustsFontSizeToFit
-                    >
-                      {t('startOrder.selectVariants', { defaultValue: 'Select Items' })}
-                    </Text>
+              {/* No section card and no "Select Items" heading: the size and colour
+                  labels already say what each row is. */}
+              {hasSizeVars && product.variations && (
+                <View style={styles.section}>
+                  {renderDivider()}
+                  {renderSectionLabel(t('product.size', { defaultValue: 'Size' }))}
+                  <View style={[styles.chipWrap, { flexDirection: rowDir }]}>
+                    {product.variations.map((v) => {
+                      const sel = selectedSizeId === v.variationId;
+                      return renderOptionChip(
+                        v,
+                        String(v.sizeValue ?? ''),
+                        sel,
+                        () => setSelectedSizeId(sel ? null : v.variationId),
+                        'size',
+                      );
+                    })}
                   </View>
+                </View>
+              )}
 
-                  {/* Size: pick one */}
-                  {hasSizeVars && product.variations && (
-                    <View>
-                      <AppText style={[styles.varSectionLabel, { color: theme.colors.textSecondary, textAlign: textStart }]}>
-                        {t('product.size', { defaultValue: 'Size' })}
-                      </AppText>
-                      <View style={[styles.chipWrap, { flexDirection: rowDir }]}>
-                        {product.variations.map((v) => {
-                          const sel = selectedSizeId === v.variationId;
-                          return renderOptionChip(
-                            v,
-                            String(v.sizeValue ?? ''),
-                            sel,
-                            () => setSelectedSizeId(sel ? null : v.variationId),
-                          );
-                        })}
-                      </View>
-                    </View>
-                  )}
-
-                  {/* Colour: pick one */}
-                  {hasColorVars && product.colorVariations && (
-                    <View>
-                      <AppText style={[styles.varSectionLabel, { color: theme.colors.textSecondary, textAlign: textStart }]}>
-                        {t('product.color', { defaultValue: 'Color' })}
-                      </AppText>
-                      <View style={[styles.chipWrap, { flexDirection: rowDir }]}>
-                        {product.colorVariations.map((v) => {
-                          const sel = selectedColorId === v.variationId;
-                          return renderOptionChip(
-                            v,
-                            String(v.colorValue ?? ''),
-                            sel,
-                            () => setSelectedColorId(sel ? null : v.variationId),
-                            v.colorHex || undefined,
-                          );
-                        })}
-                      </View>
-                    </View>
-                  )}
+              {hasColorVars && product.colorVariations && (
+                <View style={styles.section}>
+                  {!hasSizeVars && renderDivider()}
+                  {renderSectionLabel(t('product.color', { defaultValue: 'Color' }))}
+                  <View style={[styles.chipWrap, { flexDirection: rowDir }]}>
+                    {product.colorVariations.map((v) => {
+                      const sel = selectedColorId === v.variationId;
+                      return renderOptionChip(
+                        v,
+                        String(v.colorValue ?? ''),
+                        sel,
+                        () => setSelectedColorId(sel ? null : v.variationId),
+                        'color',
+                        v.colorHex || undefined,
+                      );
+                    })}
+                  </View>
                 </View>
               )}
 
               {/* ==================== DELIVERY ADDRESS (order mode only) ==================== */}
               {!isCartMode && user && (
-                <View style={[styles.sectionCard, { backgroundColor: cardBg }]}>
-                  <View style={[styles.sectionHeader, { flexDirection: rowDir }]}>
-                    <Ionicons name="location-outline" size={20} color={theme.colors.primary} />
-                    <Text
-                      allowFontScaling={false}
-                      style={[styles.sectionTitle, { color: theme.colors.text, textAlign: textStart }]}
-                      numberOfLines={1}
-                      adjustsFontSizeToFit
-                    >
-                      {t('startOrder.deliveryAddress', { defaultValue: 'Delivery Address' })}
-                    </Text>
-                  </View>
+                <View style={styles.section}>
+                  {renderDivider()}
+                  {renderSectionLabel(t('startOrder.deliveryAddress', { defaultValue: 'Delivery Address' }))}
 
                   {addressesLoading ? (
                     <View style={styles.addressLoading}>
                       <ActivityIndicator size="small" color={theme.colors.primary} />
                     </View>
                   ) : selectedAddress ? (
-                    <TouchableOpacity
-                      style={[styles.addressCard, { flexDirection: rowDir, borderColor: theme.colors.primary + '40' }]}
-                      onPress={() => setShowAddressSelector(!showAddressSelector)}
-                      accessibilityRole="button"
-                      accessibilityState={{ expanded: showAddressSelector }}
-                    >
-                      <View style={styles.addressBody}>
-                        <Text
-                          allowFontScaling={false}
-                          style={[styles.addressTitle, { color: theme.colors.text, textAlign: textStart }]}
-                          numberOfLines={1}
-                          adjustsFontSizeToFit
-                        >
-                          {selectedAddress.title || selectedAddress.fullName}
-                        </Text>
-                        <Text
-                          allowFontScaling={false}
-                          style={[styles.addressText, { color: theme.colors.textSecondary, textAlign: textStart }]}
-                          numberOfLines={2}
-                        >
-                          {selectedAddress.address}, {selectedAddress.city}
-                        </Text>
-                      </View>
-                      {addresses.length > 1 && (
-                        <Ionicons
-                          name={showAddressSelector ? 'chevron-up' : 'chevron-down'}
-                          size={20}
-                          color={theme.colors.textSecondary}
-                        />
-                      )}
-                    </TouchableOpacity>
+                    <View style={[styles.listGroup, { borderColor: hairline }]}>
+                      <TouchableOpacity
+                        style={[styles.listRow, { flexDirection: rowDir }]}
+                        onPress={() => setShowAddressSelector(!showAddressSelector)}
+                        disabled={addresses.length < 2}
+                        accessibilityRole="button"
+                        accessibilityState={{ expanded: showAddressSelector }}
+                      >
+                        <Ionicons name="location-outline" size={20} color={theme.colors.primary} />
+                        <View style={styles.listRowBody}>
+                          <Text
+                            allowFontScaling={false}
+                            style={[styles.rowTitle, { color: theme.colors.text, textAlign: textStart }]}
+                            numberOfLines={1}
+                          >
+                            {selectedAddress.title || selectedAddress.fullName}
+                          </Text>
+                          <Text
+                            allowFontScaling={false}
+                            style={[styles.rowDetail, { color: theme.colors.textSecondary, textAlign: textStart }]}
+                            numberOfLines={2}
+                          >
+                            {selectedAddress.address}, {selectedAddress.city}
+                          </Text>
+                        </View>
+                        {addresses.length > 1 && (
+                          <Ionicons
+                            name={showAddressSelector ? 'chevron-up' : 'chevron-down'}
+                            size={18}
+                            color={theme.colors.textSecondary}
+                          />
+                        )}
+                      </TouchableOpacity>
+
+                      {showAddressSelector && addresses.length > 1 &&
+                        addresses.map((addr) => {
+                          const isSelected = selectedAddress?.id === addr.id;
+                          return (
+                            <TouchableOpacity
+                              key={addr.id}
+                              style={[
+                                styles.listRow,
+                                styles.listRowDivided,
+                                { flexDirection: rowDir, borderTopColor: hairline },
+                                isSelected && { backgroundColor: theme.colors.primary + '0F' },
+                              ]}
+                              onPress={() => {
+                                setSelectedAddress(addr);
+                                setShowAddressSelector(false);
+                              }}
+                              accessibilityRole="button"
+                              accessibilityState={{ selected: isSelected }}
+                            >
+                              <View style={styles.listRowBody}>
+                                <Text
+                                  allowFontScaling={false}
+                                  style={[styles.rowTitle, { color: theme.colors.text, textAlign: textStart }]}
+                                  numberOfLines={1}
+                                >
+                                  {addr.title || addr.fullName}
+                                </Text>
+                                <Text
+                                  allowFontScaling={false}
+                                  style={[styles.rowDetail, { color: theme.colors.textSecondary, textAlign: textStart }]}
+                                  numberOfLines={1}
+                                >
+                                  {addr.address}
+                                </Text>
+                              </View>
+                              {isSelected && <Ionicons name="checkmark" size={20} color={theme.colors.primary} />}
+                            </TouchableOpacity>
+                          );
+                        })}
+                    </View>
                   ) : (
                     <TouchableOpacity
                       style={[styles.addAddressButton, { flexDirection: rowDir, borderColor: theme.colors.primary }]}
@@ -1026,7 +1050,7 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                       }}
                       accessibilityRole="button"
                     >
-                      <Ionicons name="add-circle-outline" size={24} color={theme.colors.primary} />
+                      <Ionicons name="add" size={20} color={theme.colors.primary} />
                       <Text
                         allowFontScaling={false}
                         style={[styles.addAddressText, { color: theme.colors.primary }]}
@@ -1037,183 +1061,152 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                       </Text>
                     </TouchableOpacity>
                   )}
-
-                  {/* Address picker */}
-                  {showAddressSelector && addresses.length > 1 && (
-                    <View style={[styles.addressDropdown, { backgroundColor: theme.colors.surface }]}>
-                      {addresses.map((addr) => {
-                        const isSelected = selectedAddress?.id === addr.id;
-                        return (
-                          <TouchableOpacity
-                            key={addr.id}
-                            style={[
-                              styles.addressOption,
-                              { flexDirection: rowDir },
-                              isSelected && { backgroundColor: theme.colors.primary + '10' },
-                            ]}
-                            onPress={() => {
-                              setSelectedAddress(addr);
-                              setShowAddressSelector(false);
-                            }}
-                            accessibilityRole="button"
-                            accessibilityState={{ selected: isSelected }}
-                          >
-                            <View style={styles.addressBody}>
-                              <Text
-                                allowFontScaling={false}
-                                style={[styles.addressOptionTitle, { color: theme.colors.text, textAlign: textStart }]}
-                                numberOfLines={1}
-                              >
-                                {addr.title || addr.fullName}
-                              </Text>
-                              <Text
-                                allowFontScaling={false}
-                                style={[styles.addressOptionText, { color: theme.colors.textSecondary, textAlign: textStart }]}
-                                numberOfLines={1}
-                              >
-                                {addr.address}
-                              </Text>
-                            </View>
-                            {isSelected && (
-                              <Ionicons name="checkmark-circle" size={20} color={theme.colors.primary} />
-                            )}
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  )}
                 </View>
               )}
 
               {/* ==================== PAYMENT METHODS (order mode only) ==================== */}
+              {/* One grouped list instead of three tall cards. Only the chosen
+                  method shows its one-line explanation. */}
               {!isCartMode && (
-                <View style={[styles.sectionCard, { backgroundColor: cardBg }]}>
-                  <View style={[styles.sectionHeader, { flexDirection: rowDir }]}>
-                    <Ionicons name="wallet-outline" size={20} color={theme.colors.primary} />
-                    <Text
-                      allowFontScaling={false}
-                      style={[styles.sectionTitle, { color: theme.colors.text, textAlign: textStart }]}
-                      numberOfLines={1}
-                      adjustsFontSizeToFit
-                    >
-                      {t('startOrder.paymentMethod', { defaultValue: 'Payment Method' })}
-                    </Text>
-                  </View>
-
-                  {PAYMENT_METHODS.map((method) => {
-                    const isSelected = selectedPaymentMethod === method.id;
-                    return (
-                      <TouchableOpacity
-                        key={method.id}
-                        style={[
-                          styles.paymentOption,
-                          {
-                            flexDirection: rowDir,
-                            borderColor: isSelected ? method.color : theme.colors.border,
-                            backgroundColor: isSelected ? method.color + '10' : 'transparent',
-                            opacity: method.isAvailable ? 1 : 0.5,
-                          },
-                        ]}
-                        onPress={() => method.isAvailable && setSelectedPaymentMethod(method.id)}
-                        disabled={!method.isAvailable}
-                        accessibilityRole="radio"
-                        accessibilityState={{ checked: isSelected, disabled: !method.isAvailable }}
-                      >
-                        <View style={[styles.paymentIconContainer, { backgroundColor: method.color + '20' }]}>
-                          {method.iconType === 'ionicons' ? (
-                            <Ionicons name={method.icon as any} size={24} color={method.color} />
-                          ) : (
-                            <MaterialCommunityIcons name={method.icon as any} size={24} color={method.color} />
-                          )}
-                        </View>
-
-                        <View style={[styles.paymentInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
-                          <View style={[styles.paymentNameRow, { flexDirection: rowDir }]}>
-                            <Text
-                              allowFontScaling={false}
-                              style={[styles.paymentName, { color: theme.colors.text, textAlign: textStart }]}
-                              numberOfLines={1}
-                              adjustsFontSizeToFit
-                            >
-                              {getLocalizedName(method)}
-                            </Text>
-                            {!method.isAvailable && (
-                              <View style={[styles.comingSoonBadge, { backgroundColor: theme.colors.warning + '20' }]}>
-                                <Text
-                                  allowFontScaling={false}
-                                  style={[styles.comingSoonText, { color: theme.colors.warning }]}
-                                  numberOfLines={1}
-                                >
-                                  {t('common.comingSoon', { defaultValue: 'Soon' })}
-                                </Text>
-                              </View>
+                <View style={styles.section}>
+                  {renderDivider()}
+                  {renderSectionLabel(t('startOrder.paymentMethod', { defaultValue: 'Payment Method' }))}
+                  <View style={[styles.listGroup, { borderColor: hairline }]}>
+                    {PAYMENT_METHODS.map((method, i) => {
+                      const isSelected = selectedPaymentMethod === method.id;
+                      return (
+                        <TouchableOpacity
+                          key={method.id}
+                          style={[
+                            styles.listRow,
+                            i > 0 && styles.listRowDivided,
+                            {
+                              flexDirection: rowDir,
+                              borderTopColor: hairline,
+                              backgroundColor: isSelected ? theme.colors.primary + '0F' : 'transparent',
+                              opacity: method.isAvailable ? 1 : 0.5,
+                            },
+                          ]}
+                          onPress={() => method.isAvailable && setSelectedPaymentMethod(method.id)}
+                          disabled={!method.isAvailable}
+                          accessibilityRole="radio"
+                          accessibilityState={{ checked: isSelected, disabled: !method.isAvailable }}
+                        >
+                          <View style={[styles.payIcon, { backgroundColor: method.color + '1F' }]}>
+                            {method.iconType === 'ionicons' ? (
+                              <Ionicons name={method.icon as any} size={18} color={method.color} />
+                            ) : (
+                              <MaterialCommunityIcons name={method.icon as any} size={18} color={method.color} />
                             )}
                           </View>
-                          <Text
-                            allowFontScaling={false}
-                            style={[styles.paymentDescription, { color: theme.colors.textSecondary, textAlign: textStart }]}
-                            numberOfLines={2}
-                          >
-                            {getLocalizedDescription(method)}
-                          </Text>
-                        </View>
 
-                        <View style={[styles.radioOuter, { borderColor: isSelected ? method.color : theme.colors.border }]}>
-                          {isSelected && <View style={[styles.radioInner, { backgroundColor: method.color }]} />}
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
+                          <View style={[styles.listRowBody, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
+                            <View style={[styles.payNameRow, { flexDirection: rowDir }]}>
+                              <Text
+                                allowFontScaling={false}
+                                style={[styles.rowTitle, { color: theme.colors.text, textAlign: textStart }]}
+                                numberOfLines={1}
+                                adjustsFontSizeToFit
+                                minimumFontScale={0.8}
+                              >
+                                {getLocalizedName(method)}
+                              </Text>
+                              {!method.isAvailable && (
+                                <View style={[styles.comingSoonBadge, { backgroundColor: theme.colors.warning + '20' }]}>
+                                  <Text
+                                    allowFontScaling={false}
+                                    style={[styles.comingSoonText, { color: theme.colors.warning }]}
+                                    numberOfLines={1}
+                                  >
+                                    {t('common.comingSoon', { defaultValue: 'Soon' })}
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
+                            {isSelected && (
+                              <Text
+                                allowFontScaling={false}
+                                style={[styles.rowDetail, { color: theme.colors.textSecondary, textAlign: textStart }]}
+                                numberOfLines={2}
+                              >
+                                {getLocalizedDescription(method)}
+                              </Text>
+                            )}
+                          </View>
+
+                          <View
+                            style={[
+                              styles.radioOuter,
+                              { borderColor: isSelected ? theme.colors.primary : theme.colors.border },
+                            ]}
+                          >
+                            {isSelected && <View style={[styles.radioInner, { backgroundColor: theme.colors.primary }]} />}
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
                 </View>
               )}
 
               {/* ==================== ORDER NOTES (order mode only) ==================== */}
+              {/* Folded to one line. Most orders carry no note, and an empty 88pt
+                  box took the room the options needed. */}
               {!isCartMode && (
-                <View style={[styles.sectionCard, { backgroundColor: cardBg }]}>
-                  <View style={[styles.sectionHeader, { flexDirection: rowDir }]}>
-                    <Ionicons name="document-text-outline" size={20} color={theme.colors.primary} />
-                    <Text
-                      allowFontScaling={false}
-                      style={[styles.sectionTitle, { color: theme.colors.text, textAlign: textStart }]}
-                      numberOfLines={1}
-                      adjustsFontSizeToFit
+                <View style={styles.section}>
+                  {renderDivider()}
+                  {notesOpen || orderNotes.length > 0 ? (
+                    <>
+                      {renderSectionLabel(
+                        `${t('startOrder.notes', { defaultValue: 'Order Notes' })} ${t('common.optional', { defaultValue: '(Optional)' })}`,
+                      )}
+                      <TextInput
+                        allowFontScaling={false}
+                        autoFocus={notesOpen && orderNotes.length === 0}
+                        style={[
+                          styles.notesInput,
+                          {
+                            color: theme.colors.text,
+                            borderColor: hairline,
+                            textAlign: textStart,
+                          },
+                        ]}
+                        placeholder={t('startOrder.notesPlaceholder', { defaultValue: 'Add special instructions...' })}
+                        placeholderTextColor={theme.colors.placeholder}
+                        value={orderNotes}
+                        onChangeText={setOrderNotes}
+                        // The notes are the last thing in the list. When the keyboard
+                        // lifts the sheet, the list shrinks and they can end up below
+                        // its fold — bring them back into view.
+                        onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 250)}
+                        multiline
+                        numberOfLines={3}
+                        textAlignVertical="top"
+                      />
+                    </>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.noteToggle, { flexDirection: rowDir }]}
+                      onPress={() => setNotesOpen(true)}
+                      accessibilityRole="button"
                     >
-                      {t('startOrder.notes', { defaultValue: 'Order Notes' })}
-                    </Text>
-                    <Text
-                      allowFontScaling={false}
-                      style={[styles.optionalLabel, { color: theme.colors.textSecondary }]}
-                      numberOfLines={1}
-                    >
-                      {/* The translation carries its own brackets — "(Optional)" — so
-                          wrapping it again printed "((Optional))". */}
-                      {t('common.optional', { defaultValue: '(Optional)' })}
-                    </Text>
-                  </View>
-
-                  <TextInput
-                    allowFontScaling={false}
-                    style={[
-                      styles.notesInput,
-                      {
-                        color: theme.colors.text,
-                        backgroundColor: cardBg,
-                        borderColor: theme.colors.border,
-                        textAlign: textStart,
-                      },
-                    ]}
-                    placeholder={t('startOrder.notesPlaceholder', { defaultValue: 'Add special instructions...' })}
-                    placeholderTextColor={theme.colors.placeholder}
-                    value={orderNotes}
-                    onChangeText={setOrderNotes}
-                    // The notes are the last thing in the list. When the keyboard
-                    // lifts the sheet, the list shrinks and they can end up below
-                    // its fold — bring them back into view.
-                    onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 250)}
-                    multiline
-                    numberOfLines={3}
-                    textAlignVertical="top"
-                  />
+                      <Ionicons name="create-outline" size={18} color={theme.colors.primary} />
+                      <Text
+                        allowFontScaling={false}
+                        style={[styles.noteToggleText, { color: theme.colors.primary, textAlign: textStart }]}
+                        numberOfLines={1}
+                      >
+                        {t('startOrder.notes', { defaultValue: 'Order Notes' })}
+                      </Text>
+                      <Text
+                        allowFontScaling={false}
+                        style={[styles.noteToggleHint, { color: theme.colors.textSecondary }]}
+                        numberOfLines={1}
+                      >
+                        {t('common.optional', { defaultValue: '(Optional)' })}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               )}
             </ScrollView>
@@ -1327,14 +1320,14 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                     {isProcessing ? (
                       <>
                         <ActivityIndicator size="small" color="#FFFFFF" />
-                        <Text allowFontScaling={false} style={styles.confirmText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                        <Text allowFontScaling={false} style={styles.confirmText} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.85}>
                           {t('startOrder.processing', { defaultValue: 'Starting…' })}
                         </Text>
                       </>
                     ) : maxStock === 0 ? (
                       <>
                         {!compact && <Ionicons name="alert-circle" size={20} color="#FFFFFF" />}
-                        <Text allowFontScaling={false} style={styles.confirmText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                        <Text allowFontScaling={false} style={styles.confirmText} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.85}>
                           {t('product.outOfStock', { defaultValue: 'Out of Stock' })}
                         </Text>
                       </>
@@ -1342,7 +1335,7 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                       <>
                         {/* At 320-359pt the words need the room more than the glyph does. */}
                         {!compact && <Ionicons name={isCartMode ? 'cart' : (user ? 'cart' : 'log-in')} size={20} color="#FFFFFF" />}
-                        <Text allowFontScaling={false} style={styles.confirmText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                        <Text allowFontScaling={false} style={styles.confirmText} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.85}>
                           {isCartMode
                             ? t('cart.addToCart', { defaultValue: 'Add to Cart' })
                             : user
@@ -1406,15 +1399,13 @@ const createStyles = (theme: any, isDark: boolean, compact: boolean) =>
     },
     header: {
       alignItems: 'center',
-      borderBottomColor: theme.colors.border + '15',
-      borderBottomWidth: StyleSheet.hairlineWidth,
       gap: 12,
-      paddingBottom: 14,
+      paddingBottom: 6,
       paddingHorizontal: compact ? 16 : 20,
     },
     headerTitle: {
       flex: 1,
-      fontSize: 20,
+      fontSize: 18,
       fontWeight: '700',
       letterSpacing: 0.2,
       minWidth: 0,
@@ -1434,92 +1425,72 @@ const createStyles = (theme: any, isDark: boolean, compact: boolean) =>
       flexShrink: 1,
     },
     scrollContent: {
-      gap: compact ? 12 : 14,
-      paddingBottom: 16,
+      gap: compact ? 14 : 18,
+      paddingBottom: 18,
       paddingHorizontal: compact ? 16 : 20,
-      paddingTop: 16,
+      paddingTop: 10,
     },
 
-    // ========== PRODUCT CARD ==========
-    productCard: {
-      alignItems: 'flex-start',
+    // ========== PRICE TAG ==========
+    productHeader: {
+      alignItems: 'center',
       gap: 14,
-      paddingVertical: 4,
     },
     productImage: {
       backgroundColor: theme.colors.background,
-      borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
-      borderRadius: 14,
-      borderWidth: 1,
-      height: compact ? 80 : 96,
-      width: compact ? 80 : 96,
+      borderRadius: 16,
+      borderWidth: StyleSheet.hairlineWidth,
+      height: compact ? 72 : 84,
+      width: compact ? 72 : 84,
     },
     productInfo: {
       flex: 1,
       minWidth: 0,
     },
     productName: {
-      fontSize: 17,
+      fontSize: 16,
       fontWeight: '600',
-      lineHeight: 23,
+      lineHeight: 21,
     },
-    selectedBadges: {
-      flexWrap: 'wrap',
-      gap: 6,
-      marginTop: 6,
-    },
-    variationBadge: {
-      borderRadius: 8,
-      maxWidth: '100%',
-      paddingHorizontal: 8,
-      paddingVertical: 2,
-    },
-    variationText: {
-      fontSize: 12,
-      fontWeight: '600',
+    specLine: {
+      fontSize: 13,
+      fontWeight: '500',
       letterSpacing: 0.2,
+      marginTop: 3,
+    },
+    priceLine: {
+      alignItems: 'center',
+      gap: 10,
+      marginTop: 6,
+      maxWidth: '100%',
     },
     unitPriceBox: {
-      marginTop: 6,
-      maxWidth: '100%',
+      flexShrink: 1,
+      minWidth: 0,
     },
     unitPrice: {
-      fontSize: 20,
+      fontSize: compact ? 20 : 22,
       fontWeight: '800',
-      letterSpacing: -0.3,
+      letterSpacing: -0.4,
     },
-    stockRow: {
+    stockTag: {
       alignItems: 'center',
+      flexShrink: 0,
       gap: 5,
-      marginTop: 2,
     },
     stockDot: {
-      borderRadius: 4,
+      borderRadius: 3.5,
       height: 7,
       width: 7,
     },
     stockText: {
       fontSize: 12,
       fontWeight: '600',
-      letterSpacing: 0.2,
-    },
-    tiersBlock: {
-      marginTop: 8,
-      width: '100%',
-    },
-    tiersTitleRow: {
-      alignItems: 'center',
-      gap: 4,
-      marginBottom: 4,
-    },
-    tiersTitle: {
-      color: '#FF6B00',
-      fontSize: 13,
-      fontWeight: '700',
     },
     tiersRow: {
       flexWrap: 'wrap',
       gap: 6,
+      marginTop: 8,
     },
     tierChip: {
       alignItems: 'center',
@@ -1527,8 +1498,8 @@ const createStyles = (theme: any, isDark: boolean, compact: boolean) =>
       borderWidth: 1,
       gap: 4,
       maxWidth: '100%',
-      paddingHorizontal: 6,
-      paddingVertical: 2,
+      paddingHorizontal: 7,
+      paddingVertical: 3,
     },
     tierQty: {
       fontSize: 11,
@@ -1539,78 +1510,64 @@ const createStyles = (theme: any, isDark: boolean, compact: boolean) =>
       fontWeight: '800',
     },
 
-    // ========== SECTION CARDS ==========
-    sectionCard: {
-      borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-      borderRadius: 20,
-      borderWidth: 1,
-      padding: 16,
+    // ========== SECTIONS ==========
+    section: {
+      gap: 10,
     },
-    sectionHeader: {
-      alignItems: 'center',
-      gap: 8,
-      marginBottom: 12,
+    divider: {
+      height: StyleSheet.hairlineWidth,
+      marginBottom: 6,
     },
-    sectionTitle: {
-      flex: 1,
-      fontSize: 16,
+    sectionLabel: {
+      fontSize: 15,
       fontWeight: '700',
       letterSpacing: 0.1,
-      minWidth: 0,
-    },
-    optionalLabel: {
-      fontSize: 12,
-      fontWeight: '400',
-      opacity: 0.5,
     },
 
-    // ========== OPTION CHIPS ==========
-    varSectionLabel: {
-      fontSize: 12,
-      fontWeight: '700',
-      letterSpacing: 1,
-      marginBottom: 8,
-      marginTop: 6,
-      opacity: 0.5,
-      textTransform: 'uppercase',
-    },
+    // ========== OPTIONS ==========
     chipWrap: {
       flexWrap: 'wrap',
       gap: 8,
-      marginBottom: 4,
     },
-    optionChip: {
+    sizeTile: {
       alignItems: 'center',
-      borderRadius: 14,
-      // Always 2: a selected chip that grew from 1.5 to 2 nudged the whole row.
-      borderWidth: 2,
+      borderRadius: 12,
+      // Constant: a selected tile that thickened its border nudged the row.
+      borderWidth: 1.5,
       gap: 2,
       justifyContent: 'center',
       maxWidth: '100%',
       minHeight: 48,
-      minWidth: 72,
+      minWidth: 84,
       paddingHorizontal: 14,
       paddingVertical: 8,
     },
-    optionChipLine: {
+    colorPill: {
       alignItems: 'center',
+      borderRadius: 999,
+      borderWidth: 1.5,
       gap: 8,
       maxWidth: '100%',
+      minHeight: 40,
+      paddingHorizontal: 14,
+      paddingVertical: 6,
     },
     optionChipText: {
       flexShrink: 1,
-      fontSize: 15,
-      fontWeight: '700',
-      letterSpacing: 0.1,
+      fontSize: 14,
+      fontWeight: '600',
       textAlign: 'center',
+    },
+    chipPriceBox: {
+      alignItems: 'center',
+      alignSelf: 'stretch',
     },
     optionChipPrice: {
       fontSize: 12,
-      fontWeight: '600',
+      fontWeight: '500',
     },
     optionChipWas: {
       fontSize: 11,
-      marginTop: 1,
       textDecorationLine: 'line-through',
     },
     optionChipSoldOut: {
@@ -1618,111 +1575,58 @@ const createStyles = (theme: any, isDark: boolean, compact: boolean) =>
       fontWeight: '600',
     },
     colorDot: {
-      borderRadius: 11,
-      borderWidth: 2,
-      height: 22,
-      width: 22,
+      borderRadius: 9,
+      borderWidth: 1,
+      height: 18,
+      width: 18,
     },
 
-    // ========== ADDRESS ==========
-    addressLoading: {
-      alignItems: 'center',
-      padding: 20,
+    // ========== GROUPED LISTS (address, payment) ==========
+    listGroup: {
+      borderRadius: 14,
+      borderWidth: StyleSheet.hairlineWidth,
+      overflow: 'hidden',
     },
-    addressCard: {
+    listRow: {
       alignItems: 'center',
-      borderRadius: 16,
-      borderWidth: 1,
-      gap: SPACING.sm,
-      padding: 14,
+      gap: 12,
+      minHeight: 52,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
     },
-    addressBody: {
+    listRowDivided: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+    },
+    listRowBody: {
       flex: 1,
       minWidth: 0,
     },
-    addressTitle: {
-      fontSize: 15,
-      fontWeight: '600',
-      letterSpacing: 0.1,
-    },
-    addressText: {
-      fontSize: 13,
-      marginTop: 3,
-      opacity: 0.7,
-    },
-    addAddressButton: {
-      alignItems: 'center',
-      borderRadius: 16,
-      borderStyle: 'dashed',
-      borderWidth: 1.5,
-      gap: 10,
-      justifyContent: 'center',
-      padding: 16,
-    },
-    addAddressText: {
+    rowTitle: {
       flexShrink: 1,
       fontSize: 15,
       fontWeight: '600',
     },
-    addressDropdown: {
-      borderColor: theme.colors.border + '40',
-      borderRadius: 16,
-      borderWidth: 1,
-      marginTop: 10,
-      overflow: 'hidden',
-    },
-    addressOption: {
-      alignItems: 'center',
-      borderBottomColor: theme.colors.border + '15',
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      gap: SPACING.sm,
-      padding: 14,
-    },
-    addressOptionTitle: {
-      fontSize: 14,
-      fontWeight: '600',
-    },
-    addressOptionText: {
+    rowDetail: {
       fontSize: 13,
+      lineHeight: 18,
       marginTop: 2,
-      opacity: 0.6,
     },
-
-    // ========== PAYMENT METHODS ==========
-    paymentOption: {
+    payIcon: {
       alignItems: 'center',
-      borderRadius: 18,
-      borderWidth: 1.5,
-      gap: 12,
-      marginBottom: 10,
-      padding: 14,
-    },
-    paymentIconContainer: {
-      alignItems: 'center',
-      borderRadius: 16,
-      height: 48,
+      borderRadius: 10,
+      height: 34,
       justifyContent: 'center',
-      width: 48,
+      width: 34,
     },
-    paymentInfo: {
-      flex: 1,
-      minWidth: 0,
-    },
-    paymentNameRow: {
+    payNameRow: {
       alignItems: 'center',
       gap: 8,
       maxWidth: '100%',
     },
-    paymentName: {
-      flexShrink: 1,
-      fontSize: 15,
-      fontWeight: '600',
-      letterSpacing: 0.1,
-    },
     comingSoonBadge: {
       borderRadius: 6,
-      paddingHorizontal: 8,
-      paddingVertical: 3,
+      paddingHorizontal: 7,
+      paddingVertical: 2,
     },
     comingSoonText: {
       fontSize: 10,
@@ -1730,33 +1634,62 @@ const createStyles = (theme: any, isDark: boolean, compact: boolean) =>
       letterSpacing: 0.3,
       textTransform: 'uppercase',
     },
-    paymentDescription: {
-      fontSize: 13,
-      marginTop: 3,
-      opacity: 0.6,
-    },
     radioOuter: {
       alignItems: 'center',
-      borderRadius: 12,
+      borderRadius: 11,
       borderWidth: 2,
-      height: 24,
+      height: 22,
       justifyContent: 'center',
-      width: 24,
+      width: 22,
     },
     radioInner: {
-      borderRadius: 7,
-      height: 14,
-      width: 14,
+      borderRadius: 6,
+      height: 12,
+      width: 12,
+    },
+    addressLoading: {
+      alignItems: 'center',
+      padding: 16,
+    },
+    addAddressButton: {
+      alignItems: 'center',
+      borderRadius: 14,
+      borderStyle: 'dashed',
+      borderWidth: 1.5,
+      gap: 8,
+      justifyContent: 'center',
+      minHeight: 52,
+      paddingHorizontal: 14,
+    },
+    addAddressText: {
+      flexShrink: 1,
+      fontSize: 15,
+      fontWeight: '600',
     },
 
     // ========== NOTES ==========
-    notesInput: {
-      borderRadius: 16,
-      borderWidth: 1,
+    noteToggle: {
+      alignItems: 'center',
+      gap: 8,
+      minHeight: 40,
+    },
+    noteToggleText: {
+      flexShrink: 1,
       fontSize: 15,
-      lineHeight: 22,
-      minHeight: 88,
-      padding: 14,
+      fontWeight: '600',
+    },
+    noteToggleHint: {
+      fontSize: 13,
+    },
+    notesInput: {
+      borderRadius: 14,
+      borderWidth: StyleSheet.hairlineWidth,
+      fontSize: 15,
+      lineHeight: 21,
+      minHeight: 76,
+      paddingHorizontal: 14,
+      paddingTop: 12,
+      paddingBottom: 12,
     },
 
     // ========== FOOTER ==========
@@ -1773,12 +1706,9 @@ const createStyles = (theme: any, isDark: boolean, compact: boolean) =>
     },
     footerLabel: {
       flexShrink: 0,
-      fontSize: 12,
-      fontWeight: '600',
-      letterSpacing: 0.3,
+      fontSize: 14,
+      fontWeight: '500',
       maxWidth: '45%',
-      opacity: 0.7,
-      textTransform: 'uppercase',
     },
     footerHint: {
       flex: 1,
@@ -1859,10 +1789,14 @@ const createStyles = (theme: any, isDark: boolean, compact: boolean) =>
       paddingHorizontal: compact ? 8 : 12,
       paddingVertical: 12,
     },
+    // Up to two lines: the Kurdish labels ("چوونە ژوورەوە بۆ داواکردن") run
+    // nearly twice the English, and one line cut them off with "…".
     confirmText: {
       color: '#FFFFFF',
       flexShrink: 1,
       fontSize: compact ? 15 : 16,
+      lineHeight: compact ? 18 : 19,
+      textAlign: 'center',
       fontWeight: '700',
       letterSpacing: 0.3,
     },
