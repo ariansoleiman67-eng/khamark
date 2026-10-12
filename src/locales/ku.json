@@ -887,6 +887,8 @@
     "confirmOrder": "پشتڕاستکردنی داواکاری",
     "selectVariants": "کاڵاکان هەڵبژێرە",
     "quantity": "بڕ",
+    "increaseQuantity": "زیادکردنی بڕ",
+    "decreaseQuantity": "کەمکردنەوەی بڕ",
     "processing": "داواکاریەکەت دەست پێدەکرێت...",
     "noAddress": "ناونیشان نییە",
     "addAddressFirst": "تکایە سەرەتا ناونیشانێکی گەیاندن زیاد بکە.",

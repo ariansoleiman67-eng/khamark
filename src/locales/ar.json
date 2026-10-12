@@ -890,6 +890,8 @@
     "confirmOrder": "تأكيد الطلب",
     "selectVariants": "اختر العناصر",
     "quantity": "الكمية",
+    "increaseQuantity": "زيادة الكمية",
+    "decreaseQuantity": "تقليل الكمية",
     "processing": "جاري بدء طلبك...",
     "noAddress": "لا يوجد عنوان",
     "addAddressFirst": "الرجاء إضافة عنوان توصيل أولاً.",

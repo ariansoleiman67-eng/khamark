@@ -20,13 +20,13 @@ import {
   TouchableOpacity,
   ScrollView,
   Animated,
-  Dimensions,
   ActivityIndicator,
   Alert,
   TextInput,
   Platform,
   PanResponder,
   KeyboardAvoidingView,
+  useWindowDimensions,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
@@ -48,9 +48,24 @@ import addressService from '../services/addressService';
 import { LocalCartService } from '../services/localCartService';
 import AppText from './AppText';
 import AppNumber from './AppNumber';
+import { clampQty, parseQtyInput, commitQtyInput, qtyBounds, qtyMaxLength } from '../utils/quantityStepper';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const SHEET_MAX_HEIGHT = SCREEN_HEIGHT * 0.85;
+/*
+ * LAYOUT, and why it is shaped like this.
+ *
+ * The sheet is one column: drag handle + header, a ScrollView, and the footer —
+ * all IN FLOW. The footer used to be position:absolute over the bottom of the
+ * ScrollView, with a fixed 120pt spacer to make room. Two things grew it past
+ * that spacer: a long dinar total ("IQD 1,480,000" at 28pt) wrapping onto extra
+ * lines in a column ~146pt wide, and a long option list (23 sizes on the clear
+ * cases) pushing the quantity stepper down under it. The stepper ended up
+ * underneath the footer, which is what "the +/- buttons break" was.
+ *
+ * The ScrollView fills the space remaining above the footer and can shrink
+ * without covering controls. The quantity stepper lives IN the footer,
+ * beside the button, so it is on screen however many options the product has.
+ * Totals stay on one line and shrink their font to fit.
+ */
 
 interface PaymentMethod {
   id: string;
@@ -127,9 +142,17 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
   const insets = useSafeAreaInsets();
   const isRTL = getDirection(i18n.language) === 'rtl';
 
-  // Animation
-  const slideAnim = useState(new Animated.Value(SHEET_MAX_HEIGHT))[0];
-  const fadeAnim = useState(new Animated.Value(0))[0];
+  // Read per render, not once at import: the window size the sheet was first
+  // imported under is not necessarily the one it opens in.
+  const { height: windowHeight } = useWindowDimensions();
+  // Tall enough for a long option list, never under the status bar.
+  const sheetMaxHeight = Math.min(windowHeight * 0.92, windowHeight - insets.top - 8);
+
+  // Animation. The sheet slides from a full window height down, which is always
+  // past its own height, so it starts fully off screen whatever its content.
+  const slideAnim = useRef(new Animated.Value(windowHeight)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scrollRef = useRef<ScrollView>(null);
 
   // Declared here rather than beside handleConfirm because the PanResponder below
   // closes over it. A ref (not state) so it is readable and settable synchronously.
@@ -149,7 +172,7 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
       if (gestureState.dy > 100 || gestureState.vy > 0.5) {
         // Swipe far enough or fast enough — dismiss
         Animated.timing(slideAnim, {
-          toValue: SHEET_MAX_HEIGHT,
+          toValue: windowHeight,
           duration: 250,
           useNativeDriver: true,
         }).start(() => { if (!submittingRef.current) onClose(); });
@@ -163,7 +186,7 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
         }).start();
       }
     },
-  }), [slideAnim, onClose]);
+  }), [slideAnim, onClose, windowHeight]);
 
   // State
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('cash_on_delivery');
@@ -180,6 +203,7 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
   // ONE choice per group, not a quantity per variation. The sheet is a chooser.
   const [selectedSizeId, setSelectedSizeId] = useState<string | null>(null);
   const [selectedColorId, setSelectedColorId] = useState<string | null>(null);
+  const initializedProductRef = useRef<string | null>(null);
 
   const hasSizeVars = !!(product?.variations && product.variations.length > 0);
   const hasColorVars = !!(product?.colorVariations && product.colorVariations.length > 0);
@@ -187,26 +211,33 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
 
   // Initialize local state from props when the sheet opens
   useEffect(() => {
+    if (!visible) {
+      initializedProductRef.current = null;
+      return;
+    }
+    if (initializedProductRef.current === product?.id) return;
     if (visible && product) {
+      initializedProductRef.current = product.id;
       // Re-open on whatever was already chosen, if anything.
       const preSize = variationSelections.find(v => v.quantity > 0);
       const preColor = colorSelections.find(v => v.quantity > 0);
       setSelectedSizeId(preSize?.variationId ?? null);
       setSelectedColorId(preColor?.variationId ?? null);
       const preQty = preSize?.quantity ?? preColor?.quantity ?? totalQuantity ?? 1;
-      setLocalQty(Math.max(1, preQty));
-      setLocalQtyText(String(Math.max(1, preQty)));
+      const initialQty = clampQty(preQty, Number.MAX_SAFE_INTEGER);
+      setLocalQty(initialQty);
+      setLocalQtyText(String(initialQty));
     }
-  }, [visible, product, totalQuantity]);
+  }, [visible, product, totalQuantity, variationSelections, colorSelections]);
 
   // A chip shows a price only when the variant carries one of its own — in either
   // currency. Comparing priceUSD to product.priceUSD missed a dinar-only variant
   // entirely, so the one variant whose price actually differs showed nothing.
-  const hasOwnPrice = (v: { priceUSD?: number; priceIQD?: number } | null | undefined) => {
+  const hasOwnPrice = useCallback((v: { priceUSD?: number; priceIQD?: number } | null | undefined) => {
     if (!v || !product) return false;
     if (typeof v.priceIQD === 'number' && v.priceIQD > 0) return true;
     return typeof v.priceUSD === 'number' && v.priceUSD > 0 && v.priceUSD !== product.priceUSD;
-  };
+  }, [product]);
 
   const selectedSize = useMemo(
     () => product?.variations?.find(v => v.variationId === selectedSizeId) ?? null,
@@ -234,7 +265,7 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
     if (hasOwnPrice(selectedSize)) return selectedSize;
     if (hasOwnPrice(selectedColor)) return selectedColor;
     return selectedSize ?? selectedColor;
-  }, [selectedSize, selectedColor, product]);
+  }, [selectedSize, selectedColor, hasOwnPrice]);
 
   const selectionComplete = (!hasSizeVars || !!selectedSize) && (!hasColorVars || !!selectedColor);
   const qtyEnabled = !hasAnyVars || selectionComplete;
@@ -257,11 +288,39 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
 
   // Changing the choice can lower the ceiling under a quantity already typed in.
   useEffect(() => {
-    if (localQty > maxSelectable) {
-      setLocalQty(maxSelectable);
-      setLocalQtyText(String(maxSelectable));
+    if (qtyEnabled && localQty > maxSelectable) {
+      const capped = clampQty(maxSelectable, maxSelectable);
+      setLocalQty(capped);
+      setLocalQtyText(String(capped));
     }
-  }, [maxSelectable, localQty]);
+  }, [maxSelectable, localQty, qtyEnabled]);
+
+  const { canDecrease, canIncrease } = qtyBounds(localQty, maxSelectable);
+
+  const stepQty = useCallback((delta: number) => {
+    const next = clampQty(localQty + delta, maxSelectable);
+    setLocalQty(next);
+    setLocalQtyText(String(next));
+  }, [localQty, maxSelectable]);
+
+  const onQtyTextChange = useCallback((text: string) => {
+    const parsed = parseQtyInput(text, maxSelectable);
+    setLocalQtyText(parsed.text);
+    if (parsed.qty !== null) setLocalQty(parsed.qty);
+  }, [maxSelectable]);
+
+  const onQtyBlur = useCallback(() => {
+    const settled = commitQtyInput(localQtyText, maxSelectable);
+    setLocalQty(settled);
+    setLocalQtyText(String(settled));
+  }, [localQtyText, maxSelectable]);
+
+  // What the product card says was chosen. Read from THIS sheet's choice — it used
+  // to print the product page's selections as "256GB: 1", which went stale the
+  // moment a different chip was tapped here.
+  const selectionLabels = [selectedSize?.sizeValue, selectedColor?.colorValue]
+    .filter(v => v !== undefined && v !== null && String(v).trim() !== '')
+    .map(v => String(v));
 
   // Computed local totals
   const localTotalQty = useMemo(() => {
@@ -326,6 +385,20 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
     return price * localQty * (ratio < 1 ? ratio : 1);
   }, [product, hasAnyVars, selectionComplete, pricedVariant, localUnitPrice, localQty, exchangeRateIQD, variantOwnVipUSD]);
 
+  // The price on the product card. Once an option is chosen it is THAT option's
+  // unit price — the card used to keep showing the base product (A37: 549,000)
+  // while the total underneath charged the 12GB/256GB's 740,000.
+  const displayUnitPrice = hasAnyVars && selectionComplete && localQty > 0
+    ? localTotalPrice / localQty
+    : localUnitPrice;
+
+  // Sorted on a COPY. Sorting product.priceTiers in place reordered the product
+  // object every other screen is holding.
+  const sortedTiers = useMemo(
+    () => [...(product?.priceTiers ?? [])].sort((a, b) => a.minQty - b.minQty),
+    [product?.priceTiers],
+  );
+
 
   // Payment methods
   const PAYMENT_METHODS: PaymentMethod[] = useMemo(() => [
@@ -370,7 +443,7 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
     },
   ], []);
 
-  const styles = useMemo(() => createStyles(theme, isDark, insets, isRTL), [theme, isDark, insets, isRTL]);
+  const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
 
   // Drop any address state belonging to the previous account the moment the
   // signed-in user changes, so nothing can survive into the next session.
@@ -425,7 +498,7 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
     } else {
       Animated.parallel([
         Animated.timing(slideAnim, {
-          toValue: SHEET_MAX_HEIGHT,
+          toValue: windowHeight,
           duration: 250,
           useNativeDriver: true,
         }),
@@ -436,7 +509,7 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
         }),
       ]).start();
     }
-  }, [visible, slideAnim, fadeAnim]);
+  }, [visible, slideAnim, fadeAnim, windowHeight]);
 
   // Calculate TOTAL stock (main stockQty + all size variations + all color variations)
   const maxStock = useMemo(() => {
@@ -577,6 +650,92 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
 
   if (!product) return null;
 
+  const rowDir = isRTL ? 'row-reverse' : 'row';
+  const textStart = isRTL ? 'right' : 'left';
+  const textEnd = isRTL ? 'left' : 'right';
+  const cardBg = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)';
+  const sheetBg = isDark ? 'rgba(30,30,30,0.95)' : 'rgba(255,255,255,0.97)';
+  const qtyLocked = isProcessing || !qtyEnabled;
+  const totalLabel = isCartMode
+    ? t('cart.total', { defaultValue: 'Total' })
+    : t('startOrder.totalToPay', { defaultValue: 'Total to Pay' });
+
+  // One chip for a size or a colour. These were two copies of the same 60 lines;
+  // a fix to one (the border width that made the row jump) had to be made twice.
+  const renderOptionChip = (
+    v: any,
+    label: string,
+    selected: boolean,
+    onPress: () => void,
+    colorHex?: string,
+  ) => {
+    const soldOut = v.stockQuantity === 0;
+    const was = optionWasPrice(v);
+    return (
+      <TouchableOpacity
+        key={v.variationId}
+        disabled={soldOut || isProcessing}
+        activeOpacity={0.8}
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityState={{ selected, disabled: soldOut }}
+        style={[
+          styles.optionChip,
+          {
+            backgroundColor: selected ? theme.colors.primary + '12' : 'transparent',
+            borderColor: selected ? theme.colors.primary : theme.colors.border,
+            opacity: soldOut ? 0.45 : 1,
+          },
+        ]}
+      >
+        <View style={[styles.optionChipLine, { flexDirection: rowDir }]}>
+          {!!colorHex && (
+            <View
+              style={[
+                styles.colorDot,
+                { backgroundColor: colorHex, borderColor: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.15)' },
+              ]}
+            />
+          )}
+          <AppText
+            numberOfLines={2}
+            style={[
+              styles.optionChipText,
+              {
+                color: selected ? theme.colors.primary : theme.colors.text,
+                textDecorationLine: soldOut ? 'line-through' : 'none',
+              },
+            ]}
+          >
+            {label}
+          </AppText>
+        </View>
+        {hasOwnPrice(v) && (
+          <AppNumber
+            value={formatVariantPrice(v, product, currency, exchangeRateIQD, {}, isVip)}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+            style={[styles.optionChipPrice, { color: selected ? theme.colors.primary : theme.colors.textSecondary }]}
+          />
+        )}
+        {!!was && (
+          <AppNumber
+            value={was}
+            numberOfLines={1}
+            style={[styles.optionChipWas, { color: theme.colors.textSecondary }]}
+          />
+        )}
+        {soldOut && (
+          <AppText numberOfLines={1} style={[styles.optionChipSoldOut, { color: '#F44336' }]}>
+            {t('product.outOfStock', { defaultValue: 'Out of Stock' })}
+          </AppText>
+        )}
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <Modal
       visible={visible}
@@ -585,62 +744,84 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
       onRequestClose={handleDismiss}
       statusBarTranslucent
     >
-      {/* Backdrop */}
-      <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]}>
-        <TouchableOpacity 
-          style={styles.backdropTouchable}
-          activeOpacity={1}
-          onPress={handleDismiss}
-        />
-      </Animated.View>
+      <View style={styles.root}>
+        {/* Backdrop — a tap outside the sheet closes it. */}
+        <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]}>
+          <TouchableOpacity
+            style={styles.backdropTouchable}
+            activeOpacity={1}
+            onPress={handleDismiss}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.close', { defaultValue: 'Close' })}
+          />
+        </Animated.View>
 
-      {/* Sheet */}
-      <Animated.View 
-        style={[
-          styles.sheetContainer,
-          { transform: [{ translateY: slideAnim }] }
-        ]}
-      >
-        {/* Glass Effect Background */}
-        <BlurView intensity={isDark ? 40 : 80} tint={isDark ? 'dark' : 'light'} style={styles.blurView}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={{ flex: 1 }}
+        {/* The keyboard lifts the WHOLE sheet, so the footer (stepper and button)
+            stays above it. box-none so a tap above the sheet still reaches the
+            backdrop. */}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.keyboardLayer}
+          pointerEvents="box-none"
+        >
+          {/* Sized by its content, up to sheetMaxHeight. It used to be a fixed
+              92% of the screen, which left a product with nothing to choose
+              floating above a sea of empty sheet. */}
+          <Animated.View
+            style={[
+              styles.sheet,
+              { maxHeight: sheetMaxHeight, transform: [{ translateY: slideAnim }] },
+            ]}
           >
-          <View style={[styles.sheetContent, { backgroundColor: isDark ? 'rgba(30,30,30,0.92)' : 'rgba(255,255,255,0.95)' }]}>
-            
-            {/* Drag Handle — swipe to dismiss */}
-            <View style={styles.dragHandleContainer} {...panResponder.panHandlers}>
-              <View style={[styles.dragHandle, { backgroundColor: theme.colors.border }]} />
+            {/* Glass and tint are BACKGROUND layers. As wrappers they had to be
+                flex:1 to pass a height down, which is what forced the fixed
+                height in the first place. */}
+            <BlurView intensity={isDark ? 40 : 80} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: sheetBg }]} />
+
+            {/* Handle and header together: drag either to dismiss. The close
+                button still takes its own tap — a touchable claims it first. */}
+            <View {...panResponder.panHandlers}>
+              <View style={styles.dragHandleContainer}>
+                <View style={[styles.dragHandle, { backgroundColor: theme.colors.border }]} />
+              </View>
+              <View style={[styles.header, { flexDirection: rowDir }]}>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.headerTitle, { color: theme.colors.text, textAlign: textStart }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                >
+                  {isCartMode
+                    ? t('cart.addToCart', { defaultValue: 'Add to Cart' })
+                    : t('startOrder.title', { defaultValue: 'Start Order' })}
+                </Text>
+                <TouchableOpacity
+                  onPress={handleDismiss}
+                  style={styles.closeButton}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('common.close', { defaultValue: 'Close' })}
+                  accessibilityState={{ disabled: isProcessing }}
+                >
+                  <Ionicons name="close" size={24} color={theme.colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
             </View>
 
-            {/* Header */}
-            <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <Text allowFontScaling={false} style={[styles.headerTitle, { color: theme.colors.text }]} numberOfLines={1} adjustsFontSizeToFit>
-                {isCartMode
-                  ? t('cart.addToCart', { defaultValue: 'Add to Cart' })
-                  : t('startOrder.title', { defaultValue: 'Start Order' })
-                }
-              </Text>
-              <TouchableOpacity
-                onPress={handleDismiss}
-                style={styles.closeButton}
-                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                accessibilityRole="button"
-                accessibilityLabel={t('common.close', { defaultValue: 'Close' })}
-                accessibilityState={{ disabled: isProcessing }}
-              >
-                <Ionicons name="close" size={24} color={theme.colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView 
-              style={styles.scrollView} 
-              showsVerticalScrollIndicator={false}
+            {/* The ONLY part that shrinks. Long option lists scroll here; nothing
+                below can be covered by the footer, because the footer is in flow. */}
+            <ScrollView
+              ref={scrollRef}
+              testID="order-sheet-scroll"
+              style={styles.scrollView}
               contentContainerStyle={styles.scrollContent}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              showsVerticalScrollIndicator={false}
             >
               {/* ==================== PRODUCT CARD ==================== */}
-              <View style={styles.productCard}>
+              <View style={[styles.productCard, { flexDirection: rowDir }]}>
                 <Image
                   source={{ uri: product.imageUrls?.[0] }}
                   style={styles.productImage}
@@ -648,354 +829,163 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                   transition={200}
                 />
                 <View style={[styles.productInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
-                  <AppText 
-                    style={[styles.productName, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]} 
+                  <AppText
+                    style={[styles.productName, { color: theme.colors.text, textAlign: textStart }]}
                     numberOfLines={2}
                   >
                     {getProductName()}
                   </AppText>
-                  
-                  {/* Selected variations */}
-                  {(variationSelections.length > 0 || colorSelections.length > 0) && (
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
-                      {variationSelections.map((v, i) => (
-                        <View key={i} style={[styles.variationBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#f2f2f2' }]}>
-                          <AppText style={[styles.variationText, { color: theme.colors.textSecondary }]}>
-                            {`${v.name}: ${v.quantity}`}
-                          </AppText>
-                        </View>
-                      ))}
-                      {colorSelections.map((v, i) => (
-                        <View key={`c${i}`} style={[styles.variationBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#f2f2f2' }]}>
-                          <AppText style={[styles.variationText, { color: theme.colors.textSecondary }]}>
-                            {`${v.name}: ${v.quantity}`}
+
+                  {/* What is chosen right now, in this sheet. */}
+                  {selectionLabels.length > 0 && (
+                    <View style={[styles.selectedBadges, { flexDirection: rowDir }]}>
+                      {selectionLabels.map((label) => (
+                        <View
+                          key={label}
+                          style={[styles.variationBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#f2f2f2' }]}
+                        >
+                          <AppText style={[styles.variationText, { color: theme.colors.textSecondary }]} numberOfLines={1}>
+                            {label}
                           </AppText>
                         </View>
                       ))}
                     </View>
                   )}
 
-                  <View style={[styles.priceRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                    <AppNumber 
-                      value={formatPrice(localUnitPrice, currency, exchangeRateIQD)} 
-                      style={[styles.unitPrice, { color: theme.colors.primary }]} 
+                  <AppNumber
+                    value={formatPrice(displayUnitPrice, currency, exchangeRateIQD)}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.7}
+                    containerStyle={styles.unitPriceBox}
+                    style={[styles.unitPrice, { color: theme.colors.primary }]}
+                  />
+
+                  {/* Availability only — never a quantity. */}
+                  <View style={[styles.stockRow, { flexDirection: rowDir }]}>
+                    <View
+                      style={[
+                        styles.stockDot,
+                        { backgroundColor: maxStock > 10 ? '#4CAF50' : maxStock > 0 ? '#FF9800' : '#F44336' },
+                      ]}
                     />
+                    <AppText style={[styles.stockText, { color: maxStock > 0 ? '#4CAF50' : '#F44336' }]}>
+                      {maxStock > 0
+                        ? t('product.inStock', { defaultValue: 'In Stock' })
+                        : t('product.outOfStock', { defaultValue: 'Out of Stock' })}
+                    </AppText>
                   </View>
 
-                  {/* Stock Status */}
-                  <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                    <View style={{ 
-                      flexDirection: isRTL ? 'row-reverse' : 'row',
-                      alignItems: 'center',
-                      gap: 4
-                    }}>
-                      <View style={[styles.stockDot, { 
-                        backgroundColor: maxStock > 10 ? '#4CAF50' : maxStock > 0 ? '#FF9800' : '#F44336' 
-                      }]} />
-                      <AppText style={[styles.stockText, { 
-                        color: maxStock > 0 ? '#4CAF50' : '#F44336' 
-                      }]}>
-                        {/* Availability only — never a quantity. */}
-                        {maxStock > 0
-                          ? t('product.inStock', { defaultValue: 'In Stock' })
-                          : t('product.outOfStock', { defaultValue: 'Out of Stock' })
-                        }
-                      </AppText>
-                    </View>
-                  </View>
-
-                  {/* Bulk Discounts Minimal List */}
-                  {maxStock > 0 && product.priceTiers && product.priceTiers.length > 0 && (
-                    <View style={{ marginTop: 8, width: '100%', alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
-                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+                  {/* Bulk discounts */}
+                  {maxStock > 0 && sortedTiers.length > 0 && (
+                    <View style={[styles.tiersBlock, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
+                      <View style={[styles.tiersTitleRow, { flexDirection: rowDir }]}>
                         <Ionicons name="flash" size={14} color="#FF6B00" />
-                        <AppText style={{ fontSize: 13, fontWeight: '700', color: '#FF6B00' }}>
+                        <AppText style={styles.tiersTitle}>
                           {t('product.bulkDiscount', { defaultValue: 'Bulk Discounts' })}
                         </AppText>
                       </View>
-                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', flexWrap: 'wrap', gap: 6 }}>
-                        {product.priceTiers
-                          .sort((a, b) => a.minQty - b.minQty)
-                          .map((tier, idx) => {
-                            const isActive = localTotalQty >= tier.minQty && (!tier.maxQty || localTotalQty <= tier.maxQty);
-                            return (
-                              <View key={idx} style={{
-                                flexDirection: isRTL ? 'row-reverse' : 'row',
-                                alignItems: 'center',
-                                backgroundColor: isActive ? '#FF6B0015' : 'transparent',
-                                borderRadius: 8,
-                                paddingHorizontal: 6,
-                                paddingVertical: 2,
-                                gap: 4,
-                                borderWidth: 1,
-                                borderColor: isActive ? '#FF6B00' : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'),
-                              }}>
-                                <AppText style={{ fontSize: 11, color: isActive ? '#FF6B00' : theme.colors.textSecondary, fontWeight: '600' }}>
-                                  {`${tier.minQty}+`}
-                                </AppText>
-                                <AppText style={{ fontSize: 11, color: isActive ? '#FF6B00' : theme.colors.text, fontWeight: '800' }}>
-                                  {formatPrice(tier.priceUSD, currency, exchangeRateIQD)}
-                                </AppText>
-                              </View>
-                            );
-                          })}
-                      </View>
-                    </View>
-                  )}
-                </View>
-              </View>
-
-              {/* ==================== QUANTITY & VARIANTS ==================== */}
-              <View style={[styles.sectionCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}>
-                <View style={[styles.sectionHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                  <Ionicons name="cube-outline" size={20} color={theme.colors.primary} />
-                  <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text, marginLeft: isRTL ? 0 : 8, marginRight: isRTL ? 8 : 0 }]} numberOfLines={1} adjustsFontSizeToFit>
-                    {hasAnyVars
-                      ? t('startOrder.selectVariants', { defaultValue: 'Select Items' })
-                      : t('startOrder.quantity', { defaultValue: 'Quantity' })
-                    }
-                  </Text>
-                </View>
-
-                {/* ---- Size: pick one ---- */}
-                {hasSizeVars && product?.variations && (
-                  <View>
-                    <AppText style={[styles.varSectionLabel, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
-                      {t('product.size', { defaultValue: 'Size' })}
-                    </AppText>
-                    <View style={[styles.chipWrap, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                      {product.variations.map((v) => {
-                        const soldOut = v.stockQuantity === 0;
-                        const sel = selectedSizeId === v.variationId;
-                        return (
-                          <TouchableOpacity
-                            key={v.variationId}
-                            disabled={soldOut}
-                            activeOpacity={0.8}
-                            onPress={() => setSelectedSizeId(sel ? null : v.variationId)}
-                            accessibilityRole="button"
-                            accessibilityState={{ selected: sel, disabled: soldOut }}
-                            style={[
-                              styles.optionChip,
-                              {
-                                backgroundColor: sel ? theme.colors.primary + '12' : 'transparent',
-                                borderColor: sel ? theme.colors.primary : theme.colors.border,
-                                borderWidth: sel ? 2 : 1.5,
-                                opacity: soldOut ? 0.45 : 1,
-                              },
-                            ]}
-                          >
-                            <AppText
+                      <View style={[styles.tiersRow, { flexDirection: rowDir }]}>
+                        {sortedTiers.map((tier, idx) => {
+                          const isActive = localTotalQty >= tier.minQty && (!tier.maxQty || localTotalQty <= tier.maxQty);
+                          return (
+                            <View
+                              key={`${tier.minQty}-${idx}`}
                               style={[
-                                styles.optionChipText,
+                                styles.tierChip,
                                 {
-                                  color: sel ? theme.colors.primary : theme.colors.text,
-                                  textDecorationLine: soldOut ? 'line-through' : 'none',
+                                  flexDirection: rowDir,
+                                  backgroundColor: isActive ? '#FF6B0015' : 'transparent',
+                                  borderColor: isActive ? '#FF6B00' : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'),
                                 },
                               ]}
                             >
-                              {String(v.sizeValue ?? '')}
-                            </AppText>
-                            {hasOwnPrice(v) && (
-                              <AppNumber
-                                value={formatVariantPrice(v, product, currency, exchangeRateIQD, {}, isVip)}
-                                style={[styles.optionChipPrice, { color: sel ? theme.colors.primary : theme.colors.textSecondary }]}
-                              />
-                            )}
-                            {optionWasPrice(v) && (
-                              <AppNumber
-                                value={optionWasPrice(v) as string}
-                                style={[styles.optionChipWas, { color: theme.colors.textSecondary }]}
-                              />
-                            )}
-                            {soldOut && (
-                              <AppText style={[styles.optionChipSoldOut, { color: '#F44336' }]}>
-                                {t('product.outOfStock', { defaultValue: 'Out of Stock' })}
+                              <AppText style={[styles.tierQty, { color: isActive ? '#FF6B00' : theme.colors.textSecondary }]}>
+                                {`${tier.minQty}+`}
                               </AppText>
-                            )}
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  </View>
-                )}
-
-                {/* ---- Colour: pick one ---- */}
-                {hasColorVars && product?.colorVariations && (
-                  <View>
-                    <AppText style={[styles.varSectionLabel, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
-                      {t('product.color', { defaultValue: 'Color' })}
-                    </AppText>
-                    <View style={[styles.chipWrap, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                      {product.colorVariations.map((v) => {
-                        const soldOut = v.stockQuantity === 0;
-                        const sel = selectedColorId === v.variationId;
-                        return (
-                          <TouchableOpacity
-                            key={v.variationId}
-                            disabled={soldOut}
-                            activeOpacity={0.8}
-                            onPress={() => setSelectedColorId(sel ? null : v.variationId)}
-                            accessibilityRole="button"
-                            accessibilityState={{ selected: sel, disabled: soldOut }}
-                            style={[
-                              styles.optionChip,
-                              {
-                                backgroundColor: sel ? theme.colors.primary + '12' : 'transparent',
-                                borderColor: sel ? theme.colors.primary : theme.colors.border,
-                                borderWidth: sel ? 2 : 1.5,
-                                opacity: soldOut ? 0.45 : 1,
-                              },
-                            ]}
-                          >
-                            <View style={[styles.optionChipLine, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                              {!!v.colorHex && (
-                                <View
-                                  style={[
-                                    styles.colorDot,
-                                    { backgroundColor: v.colorHex, borderColor: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.15)' },
-                                  ]}
-                                />
-                              )}
-                              <AppText
-                                style={[
-                                  styles.optionChipText,
-                                  {
-                                    color: sel ? theme.colors.primary : theme.colors.text,
-                                    textDecorationLine: soldOut ? 'line-through' : 'none',
-                                  },
-                                ]}
-                              >
-                                {String(v.colorValue ?? '')}
-                              </AppText>
+                              <AppNumber
+                                value={formatPrice(tier.priceUSD, currency, exchangeRateIQD)}
+                                numberOfLines={1}
+                                style={[styles.tierPrice, { color: isActive ? '#FF6B00' : theme.colors.text }]}
+                              />
                             </View>
-                            {hasOwnPrice(v) && (
-                              <AppNumber
-                                value={formatVariantPrice(v, product, currency, exchangeRateIQD, {}, isVip)}
-                                style={[styles.optionChipPrice, { color: sel ? theme.colors.primary : theme.colors.textSecondary }]}
-                              />
-                            )}
-                            {optionWasPrice(v) && (
-                              <AppNumber
-                                value={optionWasPrice(v) as string}
-                                style={[styles.optionChipWas, { color: theme.colors.textSecondary }]}
-                              />
-                            )}
-                            {soldOut && (
-                              <AppText style={[styles.optionChipSoldOut, { color: '#F44336' }]}>
-                                {t('product.outOfStock', { defaultValue: 'Out of Stock' })}
-                              </AppText>
-                            )}
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  </View>
-                )}
-
-                {/* ---- Quantity: one stepper for the whole order ----
-                     There used to be a +/- stepper on every variation row, so the sheet
-                     asked "how many of each?" when the shopper only wanted to pick one.
-                     Worse, a size AND a colour each became their own cart line, and a
-                     shopper who picked "256GB" and "Black" was charged for two phones.
-                     One choice per group, one quantity. */}
-                <View style={{ marginTop: hasAnyVars ? SPACING.md : 0 }}>
-                  {hasAnyVars && (
-                    <AppText style={[styles.varSectionLabel, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
-                      {t('startOrder.quantity', { defaultValue: 'Quantity' })}
-                    </AppText>
-                  )}
-                  <View
-                    style={[styles.quantityRow, { flexDirection: isRTL ? 'row-reverse' : 'row', opacity: qtyEnabled ? 1 : 0.4 }]}
-                    pointerEvents={qtyEnabled ? 'auto' : 'none'}
-                  >
-                    <View style={[styles.quantitySelector, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                      <TouchableOpacity
-                        style={styles.qtyButton}
-                        onPress={() => {
-                          const newQ = Math.max(1, localQty - 1);
-                          setLocalQty(newQ);
-                          setLocalQtyText(String(newQ));
-                        }}
-                      >
-                        <Ionicons name="remove" size={22} color={theme.colors.primary} />
-                      </TouchableOpacity>
-                      <View style={styles.qtyDisplay}>
-                        <TextInput allowFontScaling={false}
-                          value={localQtyText}
-                          onChangeText={(text) => {
-                            const cleaned = text.replace(/[^0-9]/g, '');
-                            setLocalQtyText(cleaned);
-                            if (cleaned.length > 0) {
-                              const num = parseInt(cleaned, 10);
-                              if (num > maxSelectable) {
-                                setLocalQty(maxSelectable);
-                                setLocalQtyText(String(maxSelectable));
-                              } else if (num >= 1) {
-                                setLocalQty(num);
-                              }
-                            }
-                          }}
-                          onBlur={() => {
-                            const num = parseInt(localQtyText, 10);
-                            if (isNaN(num) || num < 1) {
-                              setLocalQty(1);
-                              setLocalQtyText('1');
-                            } else if (num > maxSelectable) {
-                              setLocalQty(maxSelectable);
-                              setLocalQtyText(String(maxSelectable));
-                            } else {
-                              setLocalQty(num);
-                              setLocalQtyText(String(num));
-                            }
-                          }}
-                          keyboardType="number-pad"
-                          selectTextOnFocus
-                          style={[styles.qtyText, {
-                            color: theme.colors.text,
-                            textAlign: 'center',
-                            includeFontPadding: false,
-                            padding: 0,
-                            minWidth: 40,
-                          }]}
-                        />
+                          );
+                        })}
                       </View>
-                      <TouchableOpacity
-                        style={styles.qtyButton}
-                        onPress={() => {
-                          const newQ = Math.min(localQty + 1, maxSelectable);
-                          setLocalQty(newQ);
-                          setLocalQtyText(String(newQ));
-                        }}
-                      >
-                        <Ionicons name="add" size={22} color={theme.colors.primary} />
-                      </TouchableOpacity>
                     </View>
-
-                    <View style={[styles.totalPriceContainer, { alignItems: isRTL ? 'flex-start' : 'flex-end' }]}>
-                      <Text allowFontScaling={false} style={[styles.totalLabel, { color: theme.colors.textSecondary }]} numberOfLines={1} adjustsFontSizeToFit>
-                        {t('startOrder.total', { defaultValue: 'Total' })}
-                      </Text>
-                      <AppNumber
-                        value={formatPrice(localTotalPrice, currency, exchangeRateIQD)}
-                        style={[styles.totalPrice, { color: theme.colors.primary }]}
-                      />
-                    </View>
-                  </View>
-                  {!!selectionHint && (
-                    <AppText style={[styles.selectionHint, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
-                      {selectionHint}
-                    </AppText>
                   )}
                 </View>
               </View>
 
+              {/* ==================== OPTIONS ==================== */}
+              {hasAnyVars && (
+                <View style={[styles.sectionCard, { backgroundColor: cardBg }]}>
+                  <View style={[styles.sectionHeader, { flexDirection: rowDir }]}>
+                    <Ionicons name="cube-outline" size={20} color={theme.colors.primary} />
+                    <Text
+                      allowFontScaling={false}
+                      style={[styles.sectionTitle, { color: theme.colors.text, textAlign: textStart }]}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                    >
+                      {t('startOrder.selectVariants', { defaultValue: 'Select Items' })}
+                    </Text>
+                  </View>
+
+                  {/* Size: pick one */}
+                  {hasSizeVars && product.variations && (
+                    <View>
+                      <AppText style={[styles.varSectionLabel, { color: theme.colors.textSecondary, textAlign: textStart }]}>
+                        {t('product.size', { defaultValue: 'Size' })}
+                      </AppText>
+                      <View style={[styles.chipWrap, { flexDirection: rowDir }]}>
+                        {product.variations.map((v) => {
+                          const sel = selectedSizeId === v.variationId;
+                          return renderOptionChip(
+                            v,
+                            String(v.sizeValue ?? ''),
+                            sel,
+                            () => setSelectedSizeId(sel ? null : v.variationId),
+                          );
+                        })}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Colour: pick one */}
+                  {hasColorVars && product.colorVariations && (
+                    <View>
+                      <AppText style={[styles.varSectionLabel, { color: theme.colors.textSecondary, textAlign: textStart }]}>
+                        {t('product.color', { defaultValue: 'Color' })}
+                      </AppText>
+                      <View style={[styles.chipWrap, { flexDirection: rowDir }]}>
+                        {product.colorVariations.map((v) => {
+                          const sel = selectedColorId === v.variationId;
+                          return renderOptionChip(
+                            v,
+                            String(v.colorValue ?? ''),
+                            sel,
+                            () => setSelectedColorId(sel ? null : v.variationId),
+                            v.colorHex || undefined,
+                          );
+                        })}
+                      </View>
+                    </View>
+                  )}
+                </View>
+              )}
+
               {/* ==================== DELIVERY ADDRESS (order mode only) ==================== */}
               {!isCartMode && user && (
-                <View style={[styles.sectionCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}>
-                  <View style={[styles.sectionHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <View style={[styles.sectionCard, { backgroundColor: cardBg }]}>
+                  <View style={[styles.sectionHeader, { flexDirection: rowDir }]}>
                     <Ionicons name="location-outline" size={20} color={theme.colors.primary} />
-                    <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text, marginLeft: isRTL ? 0 : 8, marginRight: isRTL ? 8 : 0 }]} numberOfLines={1} adjustsFontSizeToFit>
+                    <Text
+                      allowFontScaling={false}
+                      style={[styles.sectionTitle, { color: theme.colors.text, textAlign: textStart }]}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                    >
                       {t('startOrder.deliveryAddress', { defaultValue: 'Delivery Address' })}
                     </Text>
                   </View>
@@ -1005,65 +995,100 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                       <ActivityIndicator size="small" color={theme.colors.primary} />
                     </View>
                   ) : selectedAddress ? (
-                    <TouchableOpacity 
-                      style={[styles.addressCard, { borderColor: theme.colors.primary + '40' }]}
+                    <TouchableOpacity
+                      style={[styles.addressCard, { flexDirection: rowDir, borderColor: theme.colors.primary + '40' }]}
                       onPress={() => setShowAddressSelector(!showAddressSelector)}
+                      accessibilityRole="button"
+                      accessibilityState={{ expanded: showAddressSelector }}
                     >
-                      <View style={{ flex: 1 }}>
-                        <Text allowFontScaling={false} style={[styles.addressTitle, { color: theme.colors.text }]} numberOfLines={1} adjustsFontSizeToFit>
+                      <View style={styles.addressBody}>
+                        <Text
+                          allowFontScaling={false}
+                          style={[styles.addressTitle, { color: theme.colors.text, textAlign: textStart }]}
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                        >
                           {selectedAddress.title || selectedAddress.fullName}
                         </Text>
-                        <Text allowFontScaling={false} style={[styles.addressText, { color: theme.colors.textSecondary }]} numberOfLines={2} adjustsFontSizeToFit>
+                        <Text
+                          allowFontScaling={false}
+                          style={[styles.addressText, { color: theme.colors.textSecondary, textAlign: textStart }]}
+                          numberOfLines={2}
+                        >
                           {selectedAddress.address}, {selectedAddress.city}
                         </Text>
                       </View>
-                      <Ionicons 
-                        name={showAddressSelector ? "chevron-up" : "chevron-down"} 
-                        size={20} 
-                        color={theme.colors.textSecondary} 
-                      />
+                      {addresses.length > 1 && (
+                        <Ionicons
+                          name={showAddressSelector ? 'chevron-up' : 'chevron-down'}
+                          size={20}
+                          color={theme.colors.textSecondary}
+                        />
+                      )}
                     </TouchableOpacity>
                   ) : (
-                    <TouchableOpacity 
-                      style={[styles.addAddressButton, { borderColor: theme.colors.primary }]}
+                    <TouchableOpacity
+                      style={[styles.addAddressButton, { flexDirection: rowDir, borderColor: theme.colors.primary }]}
                       onPress={() => {
                         onClose();
                         navigation.navigate('AddEditAddress');
                       }}
+                      accessibilityRole="button"
                     >
                       <Ionicons name="add-circle-outline" size={24} color={theme.colors.primary} />
-                      <Text allowFontScaling={false} style={[styles.addAddressText, { color: theme.colors.primary }]} numberOfLines={1} adjustsFontSizeToFit>
+                      <Text
+                        allowFontScaling={false}
+                        style={[styles.addAddressText, { color: theme.colors.primary }]}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                      >
                         {t('startOrder.addAddress', { defaultValue: 'Add Delivery Address' })}
                       </Text>
                     </TouchableOpacity>
                   )}
 
-                  {/* Address Selector Dropdown */}
+                  {/* Address picker */}
                   {showAddressSelector && addresses.length > 1 && (
                     <View style={[styles.addressDropdown, { backgroundColor: theme.colors.surface }]}>
-                      {addresses.map((addr) => (
-                        <TouchableOpacity
-                          key={addr.id}
-                          style={[
-                            styles.addressOption,
-                            selectedAddress?.id === addr.id && { backgroundColor: theme.colors.primary + '10' }
-                          ]}
-                          onPress={() => {
-                            setSelectedAddress(addr);
-                            setShowAddressSelector(false);
-                          }}
-                        >
-                          <Text allowFontScaling={false} style={[styles.addressOptionTitle, { color: theme.colors.text }]} numberOfLines={1} adjustsFontSizeToFit>
-                            {addr.title || addr.fullName}
-                          </Text>
-                          <Text allowFontScaling={false} style={[styles.addressOptionText, { color: theme.colors.textSecondary }]} numberOfLines={1} adjustsFontSizeToFit>
-                            {addr.address}
-                          </Text>
-                          {selectedAddress?.id === addr.id && (
-                            <Ionicons name="checkmark-circle" size={20} color={theme.colors.primary} />
-                          )}
-                        </TouchableOpacity>
-                      ))}
+                      {addresses.map((addr) => {
+                        const isSelected = selectedAddress?.id === addr.id;
+                        return (
+                          <TouchableOpacity
+                            key={addr.id}
+                            style={[
+                              styles.addressOption,
+                              { flexDirection: rowDir },
+                              isSelected && { backgroundColor: theme.colors.primary + '10' },
+                            ]}
+                            onPress={() => {
+                              setSelectedAddress(addr);
+                              setShowAddressSelector(false);
+                            }}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: isSelected }}
+                          >
+                            <View style={styles.addressBody}>
+                              <Text
+                                allowFontScaling={false}
+                                style={[styles.addressOptionTitle, { color: theme.colors.text, textAlign: textStart }]}
+                                numberOfLines={1}
+                              >
+                                {addr.title || addr.fullName}
+                              </Text>
+                              <Text
+                                allowFontScaling={false}
+                                style={[styles.addressOptionText, { color: theme.colors.textSecondary, textAlign: textStart }]}
+                                numberOfLines={1}
+                              >
+                                {addr.address}
+                              </Text>
+                            </View>
+                            {isSelected && (
+                              <Ionicons name="checkmark-circle" size={20} color={theme.colors.primary} />
+                            )}
+                          </TouchableOpacity>
+                        );
+                      })}
                     </View>
                   )}
                 </View>
@@ -1071,120 +1096,216 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
 
               {/* ==================== PAYMENT METHODS (order mode only) ==================== */}
               {!isCartMode && (
-              <View style={[styles.sectionCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}>
-                <View style={[styles.sectionHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                  <Ionicons name="wallet-outline" size={20} color={theme.colors.primary} />
-                  <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text, marginLeft: isRTL ? 0 : 8, marginRight: isRTL ? 8 : 0 }]} numberOfLines={1} adjustsFontSizeToFit>
-                    {t('startOrder.paymentMethod', { defaultValue: 'Payment Method' })}
-                  </Text>
-                </View>
+                <View style={[styles.sectionCard, { backgroundColor: cardBg }]}>
+                  <View style={[styles.sectionHeader, { flexDirection: rowDir }]}>
+                    <Ionicons name="wallet-outline" size={20} color={theme.colors.primary} />
+                    <Text
+                      allowFontScaling={false}
+                      style={[styles.sectionTitle, { color: theme.colors.text, textAlign: textStart }]}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                    >
+                      {t('startOrder.paymentMethod', { defaultValue: 'Payment Method' })}
+                    </Text>
+                  </View>
 
-                {PAYMENT_METHODS.map((method) => (
-                  <TouchableOpacity
-                    key={method.id}
-                    style={[
-                      styles.paymentOption,
-                      { 
-                        borderColor: selectedPaymentMethod === method.id ? method.color : theme.colors.border,
-                        backgroundColor: selectedPaymentMethod === method.id ? method.color + '10' : 'transparent',
-                        opacity: method.isAvailable ? 1 : 0.5,
-                        flexDirection: isRTL ? 'row-reverse' : 'row',
-                      }
-                    ]}
-                    onPress={() => method.isAvailable && setSelectedPaymentMethod(method.id)}
-                    disabled={!method.isAvailable}
-                  >
-                    <View style={[styles.paymentIconContainer, { backgroundColor: method.color + '20' }]}>
-                      {method.iconType === 'ionicons' ? (
-                        <Ionicons name={method.icon as any} size={24} color={method.color} />
-                      ) : (
-                        <MaterialCommunityIcons name={method.icon as any} size={24} color={method.color} />
-                      )}
-                    </View>
+                  {PAYMENT_METHODS.map((method) => {
+                    const isSelected = selectedPaymentMethod === method.id;
+                    return (
+                      <TouchableOpacity
+                        key={method.id}
+                        style={[
+                          styles.paymentOption,
+                          {
+                            flexDirection: rowDir,
+                            borderColor: isSelected ? method.color : theme.colors.border,
+                            backgroundColor: isSelected ? method.color + '10' : 'transparent',
+                            opacity: method.isAvailable ? 1 : 0.5,
+                          },
+                        ]}
+                        onPress={() => method.isAvailable && setSelectedPaymentMethod(method.id)}
+                        disabled={!method.isAvailable}
+                        accessibilityRole="radio"
+                        accessibilityState={{ checked: isSelected, disabled: !method.isAvailable }}
+                      >
+                        <View style={[styles.paymentIconContainer, { backgroundColor: method.color + '20' }]}>
+                          {method.iconType === 'ionicons' ? (
+                            <Ionicons name={method.icon as any} size={24} color={method.color} />
+                          ) : (
+                            <MaterialCommunityIcons name={method.icon as any} size={24} color={method.color} />
+                          )}
+                        </View>
 
-                    <View style={[styles.paymentInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
-                      <View style={[styles.paymentNameRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                        <Text allowFontScaling={false} style={[styles.paymentName, { color: theme.colors.text }]} numberOfLines={1} adjustsFontSizeToFit>
-                          {getLocalizedName(method)}
-                        </Text>
-                        {!method.isAvailable && (
-                          <View style={[styles.comingSoonBadge, { backgroundColor: theme.colors.warning + '20' }]}>
-                            <Text allowFontScaling={false} style={[styles.comingSoonText, { color: theme.colors.warning }]} numberOfLines={1} adjustsFontSizeToFit>
-                              {t('common.comingSoon', { defaultValue: 'Soon' })}
+                        <View style={[styles.paymentInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
+                          <View style={[styles.paymentNameRow, { flexDirection: rowDir }]}>
+                            <Text
+                              allowFontScaling={false}
+                              style={[styles.paymentName, { color: theme.colors.text, textAlign: textStart }]}
+                              numberOfLines={1}
+                              adjustsFontSizeToFit
+                            >
+                              {getLocalizedName(method)}
                             </Text>
+                            {!method.isAvailable && (
+                              <View style={[styles.comingSoonBadge, { backgroundColor: theme.colors.warning + '20' }]}>
+                                <Text
+                                  allowFontScaling={false}
+                                  style={[styles.comingSoonText, { color: theme.colors.warning }]}
+                                  numberOfLines={1}
+                                >
+                                  {t('common.comingSoon', { defaultValue: 'Soon' })}
+                                </Text>
+                              </View>
+                            )}
                           </View>
-                        )}
-                      </View>
-                      <Text allowFontScaling={false} style={[styles.paymentDescription, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={2} adjustsFontSizeToFit>
-                        {getLocalizedDescription(method)}
-                      </Text>
-                    </View>
+                          <Text
+                            allowFontScaling={false}
+                            style={[styles.paymentDescription, { color: theme.colors.textSecondary, textAlign: textStart }]}
+                            numberOfLines={2}
+                          >
+                            {getLocalizedDescription(method)}
+                          </Text>
+                        </View>
 
-                    <View style={[
-                      styles.radioOuter,
-                      { borderColor: selectedPaymentMethod === method.id ? method.color : theme.colors.border }
-                    ]}>
-                      {selectedPaymentMethod === method.id && (
-                        <View style={[styles.radioInner, { backgroundColor: method.color }]} />
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </View>
+                        <View style={[styles.radioOuter, { borderColor: isSelected ? method.color : theme.colors.border }]}>
+                          {isSelected && <View style={[styles.radioInner, { backgroundColor: method.color }]} />}
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               )}
 
               {/* ==================== ORDER NOTES (order mode only) ==================== */}
               {!isCartMode && (
-              <View style={[styles.sectionCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}>
-                <View style={[styles.sectionHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                  <Ionicons name="document-text-outline" size={20} color={theme.colors.primary} />
-                  <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text, marginLeft: isRTL ? 0 : 8, marginRight: isRTL ? 8 : 0 }]} numberOfLines={1} adjustsFontSizeToFit>
-                    {t('startOrder.notes', { defaultValue: 'Order Notes' })}
-                  </Text>
-                  <Text allowFontScaling={false} style={[styles.optionalLabel, { color: theme.colors.textSecondary }]} numberOfLines={1} adjustsFontSizeToFit>
-                    ({t('common.optional', { defaultValue: 'Optional' })})
-                  </Text>
+                <View style={[styles.sectionCard, { backgroundColor: cardBg }]}>
+                  <View style={[styles.sectionHeader, { flexDirection: rowDir }]}>
+                    <Ionicons name="document-text-outline" size={20} color={theme.colors.primary} />
+                    <Text
+                      allowFontScaling={false}
+                      style={[styles.sectionTitle, { color: theme.colors.text, textAlign: textStart }]}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                    >
+                      {t('startOrder.notes', { defaultValue: 'Order Notes' })}
+                    </Text>
+                    <Text
+                      allowFontScaling={false}
+                      style={[styles.optionalLabel, { color: theme.colors.textSecondary }]}
+                      numberOfLines={1}
+                    >
+                      ({t('common.optional', { defaultValue: 'Optional' })})
+                    </Text>
+                  </View>
+
+                  <TextInput
+                    allowFontScaling={false}
+                    style={[
+                      styles.notesInput,
+                      {
+                        color: theme.colors.text,
+                        backgroundColor: cardBg,
+                        borderColor: theme.colors.border,
+                        textAlign: textStart,
+                      },
+                    ]}
+                    placeholder={t('startOrder.notesPlaceholder', { defaultValue: 'Add special instructions...' })}
+                    placeholderTextColor={theme.colors.placeholder}
+                    value={orderNotes}
+                    onChangeText={setOrderNotes}
+                    // The notes are the last thing in the list. When the keyboard
+                    // lifts the sheet, the list shrinks and they can end up below
+                    // its fold — bring them back into view.
+                    onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 250)}
+                    multiline
+                    numberOfLines={3}
+                    textAlignVertical="top"
+                  />
                 </View>
-
-                <TextInput allowFontScaling={false}
-                  style={[
-                    styles.notesInput,
-                    { 
-                      color: theme.colors.text,
-                      backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
-                      borderColor: theme.colors.border,
-                      textAlign: isRTL ? 'right' : 'left',
-                    }
-                  ]}
-                  placeholder={t('startOrder.notesPlaceholder', { defaultValue: 'Add special instructions...' })}
-                  placeholderTextColor={theme.colors.placeholder}
-                  value={orderNotes}
-                  onChangeText={setOrderNotes}
-                  multiline
-                  numberOfLines={3}
-                  textAlignVertical="top"
-                />
-              </View>
               )}
-
-              {/* Bottom Padding */}
-              <View style={{ height: 120 }} />
             </ScrollView>
 
-            {/* ==================== CONFIRM BUTTON ==================== */}
-            <View style={[styles.footer, { backgroundColor: isDark ? 'rgba(30,30,30,0.98)' : 'rgba(255,255,255,0.98)' }]}>
-              <View style={[styles.footerContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                <View style={[styles.footerPrice, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
-                  <Text allowFontScaling={false} style={[styles.footerLabel, { color: theme.colors.textSecondary }]} numberOfLines={1} adjustsFontSizeToFit>
-                    {isCartMode
-                      ? t('cart.total', { defaultValue: 'Total' })
-                      : t('startOrder.totalToPay', { defaultValue: 'Total to Pay' })
-                    }
-                  </Text>
-                  <AppNumber 
-                    value={formatPrice(localTotalPrice, currency, exchangeRateIQD)} 
-                    style={styles.footerTotal} 
+            {/* ==================== FOOTER ==================== */}
+            {/* In flow, never over the list. Two rows: what it costs, then how many
+                and go. The stepper sits beside the button so it is always on
+                screen, however many options the list above holds. */}
+            <View
+              style={[
+                styles.footer,
+                { borderTopColor: theme.colors.border + '30', paddingBottom: Math.max(insets.bottom, 12) + 8 },
+              ]}
+            >
+              <View style={[styles.summaryRow, { flexDirection: rowDir }]}>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.footerLabel, { color: theme.colors.textSecondary, textAlign: textStart }]}
+                  numberOfLines={1}
+                >
+                  {totalLabel}
+                </Text>
+                {selectionHint ? (
+                  <AppText
+                    numberOfLines={2}
+                    style={[styles.footerHint, { color: theme.colors.textSecondary, textAlign: textEnd }]}
+                  >
+                    {selectionHint}
+                  </AppText>
+                ) : (
+                  // One line, always. A long dinar total shrinks its font instead
+                  // of wrapping — the wrapping is what used to grow the footer.
+                  <AppNumber
+                    value={formatPrice(localTotalPrice, currency, exchangeRateIQD)}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.5}
+                    containerStyle={[styles.footerTotalBox, { alignItems: isRTL ? 'flex-start' : 'flex-end' }]}
+                    style={[styles.footerTotal, { color: theme.colors.primary }]}
                   />
+                )}
+              </View>
+
+              <View style={[styles.actionRow, { flexDirection: rowDir }]}>
+                <View
+                  style={[styles.quantitySelector, { flexDirection: rowDir, opacity: qtyEnabled ? 1 : 0.4 }]}
+                  pointerEvents={qtyEnabled ? 'auto' : 'none'}
+                >
+                  <TouchableOpacity
+                    testID="order-quantity-decrease"
+                    style={[styles.qtyButton, !canDecrease && styles.qtyButtonDisabled]}
+                    onPress={() => stepQty(-1)}
+                    disabled={qtyLocked || !canDecrease}
+                    hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('startOrder.decreaseQuantity', { defaultValue: 'Decrease quantity' })}
+                    accessibilityState={{ disabled: qtyLocked || !canDecrease }}
+                  >
+                    <Ionicons name="remove" size={20} color={theme.colors.primary} />
+                  </TouchableOpacity>
+                  <TextInput
+                    allowFontScaling={false}
+                    testID="order-quantity-input"
+                    value={localQtyText}
+                    onChangeText={onQtyTextChange}
+                    onBlur={onQtyBlur}
+                    keyboardType="number-pad"
+                    maxLength={qtyMaxLength(maxSelectable)}
+                    editable={!qtyLocked}
+                    selectTextOnFocus
+                    accessibilityLabel={t('startOrder.quantity', { defaultValue: 'Quantity' })}
+                    style={[styles.qtyInput, { color: theme.colors.text }]}
+                  />
+                  <TouchableOpacity
+                    testID="order-quantity-increase"
+                    style={[styles.qtyButton, !canIncrease && styles.qtyButtonDisabled]}
+                    onPress={() => stepQty(1)}
+                    disabled={qtyLocked || !canIncrease}
+                    hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('startOrder.increaseQuantity', { defaultValue: 'Increase quantity' })}
+                    accessibilityState={{ disabled: qtyLocked || !canIncrease }}
+                  >
+                    <Ionicons name="add" size={20} color={theme.colors.primary} />
+                  </TouchableOpacity>
                 </View>
 
                 <TouchableOpacity
@@ -1193,45 +1314,46 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                   // NOT disabled for an empty quantity, deliberately. It used to be,
                   // and the only cue was opacity 0.7 — so a shopper who had not picked
                   // a size tapped Buy and NOTHING happened, with nothing to read. The
-                  // handler already has the right words for this ("Please select
-                  // quantity before ordering", :425) and they were unreachable, because
-                  // a disabled button never calls its handler. Now the tap lands and the
-                  // app says why. Still disabled while a request is in flight and when
+                  // handler has the right words for this ("Please select quantity
+                  // before ordering") and they were unreachable, because a disabled
+                  // button never calls its handler. Now the tap lands and the app
+                  // says why. Still disabled while a request is in flight and when
                   // the product genuinely has no stock — in both cases pressing again
                   // must not do anything.
                   disabled={isProcessing || maxStock === 0}
                   activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: isProcessing || maxStock === 0, busy: isProcessing }}
                 >
                   <LinearGradient
                     colors={['#FF5A00', '#FF8C00']}
                     start={{ x: isRTL ? 1 : 0, y: 0 }}
                     end={{ x: isRTL ? 0 : 1, y: 0 }}
-                    style={styles.confirmGradient}
+                    style={[styles.confirmGradient, { flexDirection: rowDir }]}
                   >
                     {isProcessing ? (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <>
                         <ActivityIndicator size="small" color="#FFFFFF" />
-                        <Text allowFontScaling={false} style={styles.confirmText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+                        <Text allowFontScaling={false} style={styles.confirmText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
                           {t('startOrder.processing', { defaultValue: 'Starting…' })}
                         </Text>
-                      </View>
+                      </>
                     ) : maxStock === 0 ? (
                       <>
                         <Ionicons name="alert-circle" size={20} color="#FFFFFF" />
-                        <Text allowFontScaling={false} style={styles.confirmText} numberOfLines={1} adjustsFontSizeToFit>
+                        <Text allowFontScaling={false} style={styles.confirmText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
                           {t('product.outOfStock', { defaultValue: 'Out of Stock' })}
                         </Text>
                       </>
                     ) : (
                       <>
-                        <Ionicons name={isCartMode ? "cart" : (user ? "cart" : "log-in")} size={20} color="#FFFFFF" />
-                        <Text allowFontScaling={false} style={styles.confirmText} numberOfLines={1} adjustsFontSizeToFit>
+                        <Ionicons name={isCartMode ? 'cart' : (user ? 'cart' : 'log-in')} size={20} color="#FFFFFF" />
+                        <Text allowFontScaling={false} style={styles.confirmText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
                           {isCartMode
                             ? t('cart.addToCart', { defaultValue: 'Add to Cart' })
-                            : user 
+                            : user
                               ? t('startOrder.confirmOrder', { defaultValue: 'Confirm Order' })
-                              : t('startOrder.loginToOrder', { defaultValue: 'Login to Order' })
-                          }
+                              : t('startOrder.loginToOrder', { defaultValue: 'Login to Order' })}
                         </Text>
                       </>
                     )}
@@ -1239,17 +1361,19 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                 </TouchableOpacity>
               </View>
             </View>
-          </View>
-          </KeyboardAvoidingView>
-        </BlurView>
-      </Animated.View>
+          </Animated.View>
+        </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 };
 
-const createStyles = (theme: any, isDark: boolean, insets: any, isRTL: boolean) =>
+const createStyles = (theme: any, isDark: boolean) =>
   StyleSheet.create({
-    // ========== LUXURY SHEET CONTAINER ==========
+    // ========== SHEET ==========
+    root: {
+      flex: 1,
+    },
     backdrop: {
       ...StyleSheet.absoluteFillObject,
       backgroundColor: 'rgba(0,0,0,0.6)',
@@ -1257,55 +1381,49 @@ const createStyles = (theme: any, isDark: boolean, insets: any, isRTL: boolean) 
     backdropTouchable: {
       flex: 1,
     },
-    sheetContainer: {
-      bottom: 0,
-      left: 0,
-      maxHeight: SHEET_MAX_HEIGHT,
-      position: 'absolute',
-      right: 0,
-      // Luxury: wide soft shadow
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: -8 },
-      shadowOpacity: 0.18,
-      shadowRadius: 40,
+    keyboardLayer: {
+      flex: 1,
+      justifyContent: 'flex-end',
+    },
+    sheet: {
+      alignSelf: 'center',
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
       elevation: 24,
-    },
-    blurView: {
-      borderTopLeftRadius: 28,
-      borderTopRightRadius: 28,
+      // Shrinks when the keyboard leaves less room than its content needs; the
+      // ScrollView inside is what actually gives way.
+      flexShrink: 1,
+      maxWidth: 640,
       overflow: 'hidden',
-    },
-    sheetContent: {
-      borderTopLeftRadius: 28,
-      borderTopRightRadius: 28,
+      width: '100%',
     },
 
-    // ========== LUXURY DRAG HANDLE ==========
+    // ========== DRAG HANDLE + HEADER ==========
     dragHandleContainer: {
       alignItems: 'center',
       paddingBottom: 10,
-      paddingTop: 14,
+      paddingTop: 12,
     },
     dragHandle: {
       borderRadius: 999,
       height: 5,
-      opacity: isDark ? 0.1 : 0.06,
+      opacity: 0.8,
       width: 44,
     },
-
-    // ========== LUXURY HEADER ==========
     header: {
       alignItems: 'center',
       borderBottomColor: theme.colors.border + '15',
       borderBottomWidth: StyleSheet.hairlineWidth,
-      justifyContent: 'space-between',
-      paddingBottom: 16,
+      gap: 12,
+      paddingBottom: 14,
       paddingHorizontal: 20,
     },
     headerTitle: {
+      flex: 1,
       fontSize: 20,
       fontWeight: '700',
       letterSpacing: 0.2,
+      minWidth: 0,
     },
     closeButton: {
       alignItems: 'center',
@@ -1315,51 +1433,50 @@ const createStyles = (theme: any, isDark: boolean, insets: any, isRTL: boolean) 
       width: 36,
     },
 
-    // ========== LUXURY SCROLL ==========
+    // ========== SCROLL ==========
     scrollView: {
-      maxHeight: SCREEN_HEIGHT * 0.55,
+      // Content-sized, but the first thing to give way: grow never, shrink first.
+      flexGrow: 0,
+      flexShrink: 1,
     },
     scrollContent: {
       gap: 14,
-      paddingBottom: 8,
+      paddingBottom: 16,
       paddingHorizontal: 20,
       paddingTop: 16,
     },
 
-    // ========== LUXURY PRODUCT CARD ==========
+    // ========== PRODUCT CARD ==========
     productCard: {
-      flexDirection: isRTL ? 'row-reverse' : 'row',
       alignItems: 'flex-start',
-      paddingHorizontal: 0,
+      gap: 14,
       paddingVertical: 4,
-      gap: 16,
     },
     productImage: {
       backgroundColor: theme.colors.background,
-      borderRadius: 14,
-      height: 110,
-      width: 110,
-      borderWidth: 1,
       borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.08,
-      shadowRadius: 12,
-      elevation: 4,
+      borderRadius: 14,
+      borderWidth: 1,
+      height: 96,
+      width: 96,
     },
     productInfo: {
       flex: 1,
-      justifyContent: 'center',
+      minWidth: 0,
     },
     productName: {
-      fontSize: 18,
+      fontSize: 17,
       fontWeight: '600',
-      letterSpacing: 0,
-      lineHeight: 24,
+      lineHeight: 23,
+    },
+    selectedBadges: {
+      flexWrap: 'wrap',
+      gap: 6,
+      marginTop: 6,
     },
     variationBadge: {
-      alignSelf: isRTL ? 'flex-end' : 'flex-start',
       borderRadius: 8,
+      maxWidth: '100%',
       paddingHorizontal: 8,
       paddingVertical: 2,
     },
@@ -1368,29 +1485,19 @@ const createStyles = (theme: any, isDark: boolean, insets: any, isRTL: boolean) 
       fontWeight: '600',
       letterSpacing: 0.2,
     },
-    priceRow: {
-      alignItems: 'baseline',
-      gap: 4,
+    unitPriceBox: {
       marginTop: 6,
+      maxWidth: '100%',
     },
     unitPrice: {
       fontSize: 20,
       fontWeight: '800',
       letterSpacing: -0.3,
     },
-    perUnit: {
-      fontSize: 12,
-      fontWeight: '400',
-      opacity: 0.6,
-    },
-    stockBadge: {
+    stockRow: {
       alignItems: 'center',
-      alignSelf: isRTL ? 'flex-end' : 'flex-start',
-      borderRadius: 10,
       gap: 5,
-      marginTop: 8,
-      paddingHorizontal: 10,
-      paddingVertical: 5,
+      marginTop: 2,
     },
     stockDot: {
       borderRadius: 4,
@@ -1402,8 +1509,43 @@ const createStyles = (theme: any, isDark: boolean, insets: any, isRTL: boolean) 
       fontWeight: '600',
       letterSpacing: 0.2,
     },
+    tiersBlock: {
+      marginTop: 8,
+      width: '100%',
+    },
+    tiersTitleRow: {
+      alignItems: 'center',
+      gap: 4,
+      marginBottom: 4,
+    },
+    tiersTitle: {
+      color: '#FF6B00',
+      fontSize: 13,
+      fontWeight: '700',
+    },
+    tiersRow: {
+      flexWrap: 'wrap',
+      gap: 6,
+    },
+    tierChip: {
+      alignItems: 'center',
+      borderRadius: 8,
+      borderWidth: 1,
+      gap: 4,
+      maxWidth: '100%',
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+    },
+    tierQty: {
+      fontSize: 11,
+      fontWeight: '600',
+    },
+    tierPrice: {
+      fontSize: 11,
+      fontWeight: '800',
+    },
 
-    // ========== LUXURY SECTION CARDS ==========
+    // ========== SECTION CARDS ==========
     sectionCard: {
       borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
       borderRadius: 20,
@@ -1412,7 +1554,7 @@ const createStyles = (theme: any, isDark: boolean, insets: any, isRTL: boolean) 
     },
     sectionHeader: {
       alignItems: 'center',
-      gap: 6,
+      gap: 8,
       marginBottom: 12,
     },
     sectionTitle: {
@@ -1420,6 +1562,7 @@ const createStyles = (theme: any, isDark: boolean, insets: any, isRTL: boolean) 
       fontSize: 16,
       fontWeight: '700',
       letterSpacing: 0.1,
+      minWidth: 0,
     },
     optionalLabel: {
       fontSize: 12,
@@ -1427,67 +1570,67 @@ const createStyles = (theme: any, isDark: boolean, insets: any, isRTL: boolean) 
       opacity: 0.5,
     },
 
-    // ========== LUXURY QUANTITY ==========
-    quantityRow: {
-      alignItems: 'center',
-      justifyContent: 'space-between',
-    },
-    quantitySelector: {
-      alignItems: 'center',
-      backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#f2f2f2',
-      borderRadius: 24,
-      paddingHorizontal: 4,
-      paddingVertical: 4,
-      borderWidth: 1,
-      borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.03)',
-    },
-    qtyButton: {
-      alignItems: 'center',
-      borderRadius: 20,
-      height: 40,
-      justifyContent: 'center',
-      width: 40,
-      backgroundColor: theme.colors.background,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.1,
-      shadowRadius: 2,
-      elevation: 2,
-    },
-    qtyDisplay: {
-      alignItems: 'center',
-      height: 44,
-      justifyContent: 'center',
-      minWidth: 54,
-      paddingHorizontal: 8,
-    },
-    qtyText: {
-      fontSize: 22,
-      fontWeight: '700',
-      letterSpacing: -0.2,
-      height: 44,
-      paddingVertical: 0,
-      textAlignVertical: 'center',
-      includeFontPadding: false,
-    },
-    totalPriceContainer: {
-      gap: 3,
-    },
-    totalLabel: {
+    // ========== OPTION CHIPS ==========
+    varSectionLabel: {
       fontSize: 12,
-      fontWeight: '500',
-      letterSpacing: 0.3,
-      opacity: 0.6,
+      fontWeight: '700',
+      letterSpacing: 1,
+      marginBottom: 8,
+      marginTop: 6,
+      opacity: 0.5,
       textTransform: 'uppercase',
     },
-    totalPrice: {
-      color: '#FF5A00',
-      fontSize: 24,
-      fontWeight: '800',
-      letterSpacing: -0.5,
+    chipWrap: {
+      flexWrap: 'wrap',
+      gap: 8,
+      marginBottom: 4,
+    },
+    optionChip: {
+      alignItems: 'center',
+      borderRadius: 14,
+      // Always 2: a selected chip that grew from 1.5 to 2 nudged the whole row.
+      borderWidth: 2,
+      gap: 2,
+      justifyContent: 'center',
+      maxWidth: '100%',
+      minHeight: 48,
+      minWidth: 72,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+    },
+    optionChipLine: {
+      alignItems: 'center',
+      gap: 8,
+      maxWidth: '100%',
+    },
+    optionChipText: {
+      flexShrink: 1,
+      fontSize: 15,
+      fontWeight: '700',
+      letterSpacing: 0.1,
+      textAlign: 'center',
+    },
+    optionChipPrice: {
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    optionChipWas: {
+      fontSize: 11,
+      marginTop: 1,
+      textDecorationLine: 'line-through',
+    },
+    optionChipSoldOut: {
+      fontSize: 10,
+      fontWeight: '600',
+    },
+    colorDot: {
+      borderRadius: 11,
+      borderWidth: 2,
+      height: 22,
+      width: 22,
     },
 
-    // ========== LUXURY ADDRESS ==========
+    // ========== ADDRESS ==========
     addressLoading: {
       alignItems: 'center',
       padding: 20,
@@ -1496,9 +1639,12 @@ const createStyles = (theme: any, isDark: boolean, insets: any, isRTL: boolean) 
       alignItems: 'center',
       borderRadius: 16,
       borderWidth: 1,
-      flexDirection: isRTL ? 'row-reverse' : 'row',
       gap: SPACING.sm,
       padding: 14,
+    },
+    addressBody: {
+      flex: 1,
+      minWidth: 0,
     },
     addressTitle: {
       fontSize: 15,
@@ -1515,12 +1661,12 @@ const createStyles = (theme: any, isDark: boolean, insets: any, isRTL: boolean) 
       borderRadius: 16,
       borderStyle: 'dashed',
       borderWidth: 1.5,
-      flexDirection: isRTL ? 'row-reverse' : 'row',
       gap: 10,
       justifyContent: 'center',
       padding: 16,
     },
     addAddressText: {
+      flexShrink: 1,
       fontSize: 15,
       fontWeight: '600',
     },
@@ -1535,22 +1681,20 @@ const createStyles = (theme: any, isDark: boolean, insets: any, isRTL: boolean) 
       alignItems: 'center',
       borderBottomColor: theme.colors.border + '15',
       borderBottomWidth: StyleSheet.hairlineWidth,
-      flexDirection: isRTL ? 'row-reverse' : 'row',
+      gap: SPACING.sm,
       padding: 14,
     },
     addressOptionTitle: {
-      flex: 1,
       fontSize: 14,
       fontWeight: '600',
     },
     addressOptionText: {
-      flex: 2,
       fontSize: 13,
-      marginHorizontal: SPACING.sm,
+      marginTop: 2,
       opacity: 0.6,
     },
 
-    // ========== LUXURY PAYMENT METHODS ==========
+    // ========== PAYMENT METHODS ==========
     paymentOption: {
       alignItems: 'center',
       borderRadius: 18,
@@ -1562,18 +1706,21 @@ const createStyles = (theme: any, isDark: boolean, insets: any, isRTL: boolean) 
     paymentIconContainer: {
       alignItems: 'center',
       borderRadius: 16,
-      height: 52,
+      height: 48,
       justifyContent: 'center',
-      width: 52,
+      width: 48,
     },
     paymentInfo: {
       flex: 1,
+      minWidth: 0,
     },
     paymentNameRow: {
       alignItems: 'center',
       gap: 8,
+      maxWidth: '100%',
     },
     paymentName: {
+      flexShrink: 1,
       fontSize: 15,
       fontWeight: '600',
       letterSpacing: 0.1,
@@ -1608,7 +1755,7 @@ const createStyles = (theme: any, isDark: boolean, insets: any, isRTL: boolean) 
       width: 14,
     },
 
-    // ========== LUXURY NOTES ==========
+    // ========== NOTES ==========
     notesInput: {
       borderRadius: 16,
       borderWidth: 1,
@@ -1618,118 +1765,110 @@ const createStyles = (theme: any, isDark: boolean, insets: any, isRTL: boolean) 
       padding: 14,
     },
 
-    // ========== LUXURY VARIATION ROWS ==========
-    varSectionLabel: {
-      fontSize: 12,
-      fontWeight: '700',
-      letterSpacing: 1,
-      marginBottom: 8,
-      marginTop: 6,
-      opacity: 0.5,
-      textTransform: 'uppercase',
-    },
-    chipWrap: {
-      flexWrap: 'wrap',
-      gap: 10,
-      marginBottom: 4,
-    },
-    optionChip: {
-      alignItems: 'center',
-      borderRadius: 14,
-      gap: 3,
-      justifyContent: 'center',
-      minHeight: 52,
-      minWidth: 76,
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-    },
-    optionChipLine: {
-      alignItems: 'center',
-      gap: 8,
-    },
-    optionChipText: {
-      fontSize: 15,
-      fontWeight: '700',
-      letterSpacing: 0.1,
-    },
-    optionChipPrice: {
-      fontSize: 12,
-      fontWeight: '600',
-    },
-  optionChipWas: {
-    fontSize: 11,
-    marginTop: 1,
-    textDecorationLine: 'line-through',
-  },
-    optionChipSoldOut: {
-      fontSize: 10,
-      fontWeight: '600',
-    },
-    selectionHint: {
-      fontSize: 12,
-      marginTop: 8,
-      opacity: 0.8,
-    },
-    colorDot: {
-      borderRadius: 12,
-      borderWidth: 2,
-      height: 24,
-      width: 24,
-    },
-
-    // ========== LUXURY FOOTER ==========
+    // ========== FOOTER ==========
     footer: {
-      borderTopColor: theme.colors.border + '15',
       borderTopWidth: StyleSheet.hairlineWidth,
-      bottom: 0,
-      left: 0,
-      paddingBottom: insets.bottom + 16,
+      gap: 10,
       paddingHorizontal: 20,
-      paddingTop: 14,
-      position: 'absolute',
-      right: 0,
+      paddingTop: 12,
     },
-    footerContent: {
+    summaryRow: {
       alignItems: 'center',
-      gap: 14,
-    },
-    footerPrice: {
-      flex: 1,
+      gap: 12,
+      minHeight: 32,
     },
     footerLabel: {
+      flexShrink: 0,
       fontSize: 12,
-      fontWeight: '500',
+      fontWeight: '600',
       letterSpacing: 0.3,
-      opacity: 0.5,
+      maxWidth: '45%',
+      opacity: 0.7,
       textTransform: 'uppercase',
     },
+    footerHint: {
+      flex: 1,
+      fontSize: 13,
+      fontWeight: '600',
+      minWidth: 0,
+    },
+    footerTotalBox: {
+      flex: 1,
+      minWidth: 0,
+    },
     footerTotal: {
-      color: '#FF5A00',
-      fontSize: 28,
+      fontSize: 24,
       fontWeight: '800',
       letterSpacing: -0.5,
     },
+    actionRow: {
+      alignItems: 'center',
+      gap: 12,
+    },
+
+    // ========== QUANTITY STEPPER ==========
+    // Fixed width and never shrinks: 4 + 40 + 52 + 40 + 4 + borders = ~142pt.
+    // The button beside it takes whatever is left.
+    quantitySelector: {
+      alignItems: 'center',
+      backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#f2f2f2',
+      borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+      borderRadius: 26,
+      borderWidth: 1,
+      flexShrink: 0,
+      padding: 4,
+    },
+    qtyButton: {
+      alignItems: 'center',
+      backgroundColor: theme.colors.background,
+      borderRadius: 20,
+      elevation: 2,
+      height: 40,
+      justifyContent: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+      width: 40,
+    },
+    qtyButtonDisabled: {
+      opacity: 0.35,
+    },
+    qtyInput: {
+      fontSize: 20,
+      fontWeight: '700',
+      height: 40,
+      includeFontPadding: false,
+      padding: 0,
+      textAlign: 'center',
+      textAlignVertical: 'center',
+      width: 52,
+    },
+
+    // ========== CONFIRM BUTTON ==========
     confirmButton: {
-      borderRadius: 18,
-      flex: 1.2,
+      borderRadius: 16,
+      elevation: 6,
+      flex: 1,
+      minWidth: 0,
       overflow: 'hidden',
-      // Luxury shadow on CTA
       shadowColor: '#FF5A00',
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.25,
       shadowRadius: 12,
-      elevation: 8,
     },
     confirmGradient: {
       alignItems: 'center',
-      flexDirection: 'row',
-      gap: 10,
+      gap: 8,
       justifyContent: 'center',
-      paddingVertical: 18,
+      minHeight: 50,
+      paddingHorizontal: 12,
+      paddingVertical: 12,
     },
     confirmText: {
       color: '#FFFFFF',
-      fontSize: 17,
+      flexShrink: 1,
+      fontSize: 16,
       fontWeight: '700',
       letterSpacing: 0.3,
     },

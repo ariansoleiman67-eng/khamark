@@ -925,6 +925,8 @@
     "confirmOrder": "Confirm Order",
     "selectVariants": "Select Items",
     "quantity": "Quantity",
+    "increaseQuantity": "Increase quantity",
+    "decreaseQuantity": "Decrease quantity",
     "processing": "Starting your order...",
     "noAddress": "No Address",
     "addAddressFirst": "Please add a delivery address first.",
