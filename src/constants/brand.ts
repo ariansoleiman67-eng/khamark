@@ -23,8 +23,8 @@ export const brandWhatsAppDigits = (): string =>
  * Legal & Support URLs for Khamark.
  */
 export const LEGAL_URLS = {
-  privacy: 'https://khamark.com/privacy',
-  support: 'https://khamark.com/support',
+  privacy: 'https://ariansoleiman67-eng.github.io/khamark/privacy.html',
+  support: 'https://ariansoleiman67-eng.github.io/khamark/support.html',
 } as const;
 
 /** The value, or null when it is still a placeholder or blank. */
