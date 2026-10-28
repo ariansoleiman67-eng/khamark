@@ -87,7 +87,7 @@ Each provider has a matching `useX()` hook in `src/contexts/` that throws if use
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **Asankary** (5842 symbols, 12656 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **Asankary copy** (6799 symbols, 15055 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
@@ -110,10 +110,10 @@ This project is indexed by GitNexus as **Asankary** (5842 symbols, 12656 relatio
 
 | Resource | Use for |
 |----------|---------|
-| `gitnexus://repo/Asankary/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/Asankary/clusters` | All functional areas |
-| `gitnexus://repo/Asankary/processes` | All execution flows |
-| `gitnexus://repo/Asankary/process/{name}` | Step-by-step execution trace |
+| `gitnexus://repo/Asankary copy/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/Asankary copy/clusters` | All functional areas |
+| `gitnexus://repo/Asankary copy/processes` | All execution flows |
+| `gitnexus://repo/Asankary copy/process/{name}` | Step-by-step execution trace |
 
 ## CLI
 

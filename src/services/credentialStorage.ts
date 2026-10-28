@@ -1,8 +1,8 @@
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const CREDENTIALS_KEY = 'user_credentials';
-const REMEMBER_ME_KEY = '@asankary_remember_me';
+const CREDENTIALS_KEY = '@khamark_user_credentials';
+const REMEMBER_ME_KEY = '@khamark_remember_me';
 
 interface StoredCredentials {
   email: string;
@@ -63,7 +63,7 @@ export class CredentialStorage {
     try {
       await SecureStore.deleteItemAsync(CREDENTIALS_KEY);
       await AsyncStorage.removeItem(REMEMBER_ME_KEY);
-      // Also clear the old email storage for backward compatibility
+      await AsyncStorage.removeItem('@khamark_remember_email');
       await AsyncStorage.removeItem('@asankary_remember_email');
     } catch (error) {
       // Silently fail - credentials clearing is not critical

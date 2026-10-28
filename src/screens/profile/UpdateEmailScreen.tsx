@@ -59,7 +59,7 @@ const UpdateEmailScreen: React.FC = () => {
   const doneInFlight = useRef(false);
 
   const currentEmail = user?.email || '';
-  const isInternalEmail = isSyntheticEmail(currentEmail) || currentEmail.includes('@asankaryapp.');
+  const isInternalEmail = isSyntheticEmail(currentEmail) || currentEmail.includes('@khamarkapp.') || currentEmail.includes('@asankaryapp.');
 
   const [newEmail, setNewEmail] = useState('');
   const [loading, setLoading] = useState(false);
@@ -91,6 +91,7 @@ const UpdateEmailScreen: React.FC = () => {
       const authState = getAuthState();
       const isPhoneUser = !authState.email ||
         isSyntheticEmail(authState.email) ||
+        authState.email.includes('@khamarkapp.') ||
         authState.email.includes('@asankaryapp.');
 
       // Everyone uses verifyBeforeUpdateEmail (requestEmailChange)

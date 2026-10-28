@@ -44,9 +44,10 @@ const CategoryTile: React.FC<CategoryTileProps> = ({
         {
           width,
           backgroundColor: selected
-            ? theme.colors.primary + '14'
-            : isDark ? theme.colors.surface : '#F5F5F7',
-          borderColor: selected ? theme.colors.primary : 'transparent',
+            ? (isDark ? 'rgba(211, 47, 47, 0.16)' : '#FBEFF0')
+            : isDark ? theme.colors.surface : '#FFFFFF',
+          borderColor: selected ? theme.colors.primary : (isDark ? '#2C2C30' : '#E7E7EA'),
+          borderWidth: 1,
           opacity: pressed ? 0.9 : 1,
         },
       ]}
@@ -54,7 +55,7 @@ const CategoryTile: React.FC<CategoryTileProps> = ({
       <View
         style={[
           styles.badge,
-          { backgroundColor: selected ? theme.colors.primary : (isDark ? 'rgba(255,255,255,0.06)' : '#FFFFFF') },
+          { backgroundColor: selected ? theme.colors.primary : (isDark ? 'rgba(255,255,255,0.06)' : '#F7F7F8') },
         ]}
       >
         {showImage ? (
@@ -70,7 +71,7 @@ const CategoryTile: React.FC<CategoryTileProps> = ({
         ) : (
           <Ionicons
             name={icon}
-            size={38}
+            size={34}
             color={selected ? '#FFFFFF' : theme.colors.primary}
           />
         )}
@@ -93,31 +94,27 @@ const CategoryTile: React.FC<CategoryTileProps> = ({
 };
 
 const styles = StyleSheet.create({
-  // Enlarged from 96pt tall with a 46pt badge: at three columns on a 402pt phone
-  // the artwork landed at 46pt square, which the shop could not read at a glance.
-  // minHeight (not height) so a two-line Kurdish label still grows the tile
-  // instead of clipping.
   tile: {
-    borderRadius: 18,
-    borderWidth: 1.5,
-    minHeight: 142,
-    paddingVertical: 14,
+    borderRadius: 14,
+    minHeight: 132,
+    paddingVertical: 12,
     paddingHorizontal: 6,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.02,
+    shadowRadius: 3,
+    elevation: 1,
   },
-  // 76pt, up from 62. The floor is the narrowest phone this ships to: a 320pt
-  // screen gives a 92pt tile, and 76 + the tile's 6pt padding each side is 88,
-  // so the badge still fits without the grid reflowing. Anything larger clips
-  // there while looking fine on the test device.
   badge: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
+    width: 66,
+    height: 66,
+    borderRadius: 33,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   img: { width: '100%', height: '100%' },
   label: {

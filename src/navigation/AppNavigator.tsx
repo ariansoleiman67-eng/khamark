@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import i18n from '../locales';
 import { View, Text, Platform, ActivityIndicator, Alert, Linking, StatusBar as RNStatusBar } from 'react-native';
-import { NavigationContainer, getStateFromPath, DefaultTheme } from '@react-navigation/native';
+import { NavigationContainer, getStateFromPath as defaultGetStateFromPath, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
@@ -249,37 +249,12 @@ const TabNavigator = () => {
           };
         }}
       />
-      {/* GUEST LOGIN SYSTEM: Hide Orders tab for guests */}
-      {!isGuest && (
-        <Tab.Screen
-          name="Orders"
-          component={WrappedOrdersScreen}
-          options={{
-            tabBarLabel: t('nav.orders', 'Orders'),
-            headerTitle: t('orders.title', 'My Orders'),
-            headerTransparent: true,
-            headerStyle: { 
-              backgroundColor: isDark ? 'rgba(18,18,18,0.85)' : 'rgba(255,255,255,0.85)',
-              ...(Platform.OS === 'android' && { height: (RNStatusBar.currentHeight || 34) + 52 }),
-            },
-            headerTitleStyle: { color: theme.colors.text, fontSize: 18, fontWeight: '600' },
-            headerStatusBarHeight: Platform.OS === 'android' ? (RNStatusBar.currentHeight || 34) : undefined,
-          }}
-        />
-      )}
       <Tab.Screen
         name="Profile"
         component={WrappedProfileScreen}
         options={{
           tabBarLabel: t('nav.profile', 'Profile'),
-          headerTitle: t('profile.title', 'My Profile'),
-          headerTransparent: true,
-          headerStyle: { 
-            backgroundColor: isDark ? 'rgba(18,18,18,0.85)' : 'rgba(255,255,255,0.85)',
-            ...(Platform.OS === 'android' && { height: (RNStatusBar.currentHeight || 34) + 56 }),
-          },
-          headerTitleStyle: { color: theme.colors.text, fontSize: 18, fontWeight: '600' },
-          headerStatusBarHeight: Platform.OS === 'android' ? (RNStatusBar.currentHeight || 24) : undefined,
+          headerShown: false,
         }}
       />
     </Tab.Navigator>
@@ -290,7 +265,7 @@ const TabNavigator = () => {
  * Catches the password-recovery link from the reset EMAIL.
  *
  * Supabase mails a link back to whatever redirect the app asked for. Ours is
- * `asankary://reset-password#access_token=...`, which reopens the app here: the
+ * `khamark://reset-password#access_token=...`, which reopens the app here: the
  * token becomes a session and the customer lands on the set-password screen.
  *
  * Before this existed, resetPassword() sent no redirect at all, so Supabase used
@@ -373,7 +348,7 @@ const PasswordRecoveryLinkHandler: React.FC<{ signedInStaff?: boolean }> = ({ si
         //
         // A link that COLD-STARTS the app also arrives before the navigator is
         // ready — the common case, since the customer taps it from their mail app
-        // with Asankary closed. goToSetNewPassword parks it until onReady.
+        // with Khamark closed. goToSetNewPassword parks it until onReady.
         if (signedInStaff) explainRecoveryToSignedInStaff();
         else goToSetNewPassword();
       } catch (err: any) {
@@ -415,27 +390,27 @@ const AppNavigator: React.FC = () => {
   }), [theme]);
 
   const linking = React.useMemo(() => ({
-    // asankare.com is the live storefront. The placeholder host that used to sit
-    // here could never resolve, so a shared link opened nothing.
-    prefixes: ['https://asankare.com', 'https://www.asankare.com', 'asankary://'],
+    prefixes: ['https://khamark.com', 'https://www.khamark.com', 'khamark://'],
     config: {
       screens: {
+        Main: {
+          path: '',
+          screens: {
+            Home: 'home',
+            Categories: 'categories',
+            Cart: 'cart',
+            MessagesTab: 'messages',
+            Profile: 'profile',
+          },
+        },
+        Search: 'search',
         ProductDetails: 'product/:productId',
-        // Linkable so the shop can put it in a push notification or a
-        // WhatsApp message: asankary://offers opens straight onto the offers.
         Offers: 'offers',
       },
     },
-    /**
-     * The website is locale-prefixed — /en/p/<id>, /ar/p/<id>, /ku/p/<id> — while
-     * the app's own scheme uses asankary://product/<id>. React Navigation allows
-     * one path per screen, so the web shape is rewritten to the app's before the
-     * default resolver sees it. Changing ProductDetails' path instead would break
-     * every asankary:// link already in the wild.
-     */
     getStateFromPath: (path: string, options: any) => {
       const web = path.match(/^\/?(?:en|ar|ku)\/p\/([^/?#]+)/);
-      return getStateFromPath(web ? `product/${web[1]}` : path, options);
+      return defaultGetStateFromPath(web ? `product/${web[1]}` : path, options);
     },
   }), []);
 
@@ -463,7 +438,7 @@ const AppNavigator: React.FC = () => {
           adjustsFontSizeToFit
           numberOfLines={1}
         >
-          Asankary
+          Khamark
         </Text>
         <Text allowFontScaling={false} 
           style={{
@@ -535,6 +510,7 @@ const AppNavigator: React.FC = () => {
         <Stack.Screen name="BarcodeScanner" component={BarcodeScannerScreen} />
         <Stack.Screen name="Notifications" component={NotificationsScreen} />
         <Stack.Screen name="Cart" component={CartScreen} />
+        <Stack.Screen name="Orders" component={OrdersScreen} />
         <Stack.Screen name="StoreLocation" component={StoreLocationScreen} />
         <Stack.Screen name="ThemeCustomization" component={ThemeCustomizationScreen} />
         <Stack.Screen name="CategoryProducts" component={CategoryProductsScreen} />

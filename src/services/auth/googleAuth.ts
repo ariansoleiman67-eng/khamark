@@ -66,7 +66,7 @@ const buildProfileFromSession = async (): Promise<User> => {
  * SHA is currently trapped in a suspended Google Cloud project.)
  */
 const signInWithGoogleWeb = async (): Promise<User> => {
-  const redirectTo = makeRedirectUri({ scheme: 'asankary', path: 'auth-callback' });
+  const redirectTo = makeRedirectUri({ scheme: 'khamark', path: 'auth-callback' });
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: { redirectTo, skipBrowserRedirect: true },
@@ -74,7 +74,7 @@ const signInWithGoogleWeb = async (): Promise<User> => {
   if (error) throw error;
   if (!data?.url) throw new Error('Could not start Google sign-in');
 
-  // The redirect to our custom `asankary://` scheme can be delivered to the app's
+  // The redirect to our custom `khamark://` scheme can be delivered to the app's
   // own deep-link handler instead of being returned by the auth session (the
   // scheme is a registered intent filter). Capture it via Linking too, so the
   // session URL is never lost — whichever path Android takes.

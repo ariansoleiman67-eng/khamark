@@ -1317,7 +1317,7 @@ export const StartOrderBottomSheet: React.FC<StartOrderBottomSheetProps> = ({
                   accessibilityState={{ disabled: isProcessing || maxStock === 0, busy: isProcessing }}
                 >
                   <LinearGradient
-                    colors={['#FF5A00', '#FF8C00']}
+                    colors={['#A61920', '#831319']}
                     start={{ x: isRTL ? 1 : 0, y: 0 }}
                     end={{ x: isRTL ? 0 : 1, y: 0 }}
                     style={[styles.confirmGradient, { flexDirection: rowDir }]}
@@ -1776,15 +1776,15 @@ const createStyles = (theme: any, isDark: boolean, compact: boolean) =>
 
     // ========== CONFIRM BUTTON ==========
     confirmButton: {
-      borderRadius: 16,
-      elevation: 6,
+      borderRadius: 14,
+      elevation: 4,
       flex: 1,
       minWidth: 0,
       overflow: 'hidden',
-      shadowColor: '#FF5A00',
+      shadowColor: '#A61920',
       shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.25,
-      shadowRadius: 12,
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
     },
     confirmGradient: {
       alignItems: 'center',

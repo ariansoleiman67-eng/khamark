@@ -50,7 +50,7 @@ supabase.auth.onAuthStateChange((event, session) => {
 });
 
 const isInternalEmail = (email?: string | null): boolean =>
-  !!email && (isSyntheticEmail(email) || email.includes('@asankaryapp.'));
+  !!email && (isSyntheticEmail(email) || email.includes('@khamarkapp.') || email.includes('@asankaryapp.'));
 
 /** Map a Supabase provider name to the legacy Firebase-style id the UI expects. */
 const toLegacyProviderId = (provider: string): string => {

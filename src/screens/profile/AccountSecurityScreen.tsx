@@ -191,13 +191,13 @@ const AccountSecurityScreen: React.FC = () => {
   // ─── Derived State (native Firebase, single source of truth) ──
   const authState = getAuthState(user?.email);
 
-  // Auth email = what Firebase Auth knows (could be internal @asankaryapp.internal for phone signups)
+  // Auth email = what Auth knows (could be internal @khamarkapp.internal for phone signups)
   const authEmail = authState.email || '';
-  const isAuthEmailInternal = isSyntheticEmail(authEmail) || authEmail.includes('@asankaryapp.');
+  const isAuthEmailInternal = isSyntheticEmail(authEmail) || authEmail.includes('@khamarkapp.') || authEmail.includes('@asankaryapp.');
 
   // Firestore email = what the user added as their real email
   const firestoreEmail = user?.email || '';
-  const isFirestoreEmailInternal = isSyntheticEmail(firestoreEmail) || firestoreEmail.includes('@asankaryapp.');
+  const isFirestoreEmailInternal = isSyntheticEmail(firestoreEmail) || firestoreEmail.includes('@khamarkapp.') || firestoreEmail.includes('@asankaryapp.');
 
   // Display the real email (prefer Firestore, fall back to Auth if it's real)
   const displayEmail = !isFirestoreEmailInternal && firestoreEmail

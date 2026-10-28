@@ -19,7 +19,7 @@ import {
 import { FlashList as FlashListBase } from '@shopify/flash-list';
 // Cast to any: this FlashList version's types don't model the `masonry` prop, though it works at runtime.
 const FlashList: any = FlashListBase;
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation } from '@react-navigation/native';
@@ -66,6 +66,7 @@ const SearchScreen: React.FC = () => {
   const { i18n, t } = useTranslation();
   const isRTL = I18nManager.isRTL || i18n?.language === 'ar' || i18n?.language === 'ku';
   const { tenantId } = useTenant();
+  const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
   
   // Get parameters from navigation
@@ -667,9 +668,9 @@ const SearchScreen: React.FC = () => {
     const skeletonColor = theme.colors.text;
     
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: isDark ? theme.colors.background : '#FFF3E0' }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         {/* Header skeleton */}
-        <View style={[styles.header, { backgroundColor: isDark ? theme.colors.background : '#FFF3E0' }]}>
+        <View style={[styles.header, { backgroundColor: theme.colors.background }]}>
           <View style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: skeletonColor, opacity: skeletonOpacity }} />
           <View style={{ width: 100, height: 20, borderRadius: 4, backgroundColor: skeletonColor, opacity: skeletonOpacity, marginLeft: 12 }} />
         </View>
@@ -696,20 +697,24 @@ const SearchScreen: React.FC = () => {
 
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: isDark ? theme.colors.background : '#FFF3E0' }]}
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <StatusBar style="auto" translucent backgroundColor="transparent" />
       {renderFiltersModal()}
       
-      {/* Header - ALIBABA: activeOpacity for feedback */}
-      <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDark ? theme.colors.background : '#FFF3E0' }]}>
+      {/* Header */}
+      <View style={[styles.header, { 
+        paddingTop: insets.top > 0 ? insets.top + 4 : statusBarHeight,
+        flexDirection: isRTL ? 'row-reverse' : 'row', 
+        backgroundColor: theme.colors.background 
+      }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={[styles.backButton, isRTL && { marginRight: 0, marginLeft: 8 }]}
           activeOpacity={0.7}
         >
-          <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={24} color={theme.colors.text} />
+          <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={24} color={theme.colors.text} />
         </TouchableOpacity>
         
         <Text allowFontScaling={false} style={[styles.headerTitle, { color: theme.colors.text }]}>
@@ -723,11 +728,11 @@ const SearchScreen: React.FC = () => {
           styles.searchInputContainer,
           {
             flexDirection: isRTL ? 'row-reverse' : 'row',
-            backgroundColor: isDark ? theme.colors.background : '#f0f2f5',
+            backgroundColor: isDark ? theme.colors.surface : '#FFFFFF',
             // Keep the border ALWAYS present and only change its COLOR on focus. Toggling
             // borderWidth 0→1.5 grew the row by 3px when the field focused, shoving the layout
             // up/down (the "bounce"). A constant width reserves the space so nothing moves.
-            borderColor: isSearchFocused ? theme.colors.primary : 'transparent',
+            borderColor: isSearchFocused ? theme.colors.primary : (isDark ? '#2C2C30' : '#E7E7EA'),
             borderWidth: 1.5,
           }
         ]}
@@ -792,7 +797,7 @@ const SearchScreen: React.FC = () => {
         keyExtractor={(item: Product) => item.id}
         numColumns={numColumns}
         masonry
-        contentContainerStyle={[styles.listContainer, { backgroundColor: isDark ? theme.colors.background : '#FFF3E0' }]}
+        contentContainerStyle={[styles.listContainer, { backgroundColor: theme.colors.background }]}
         showsVerticalScrollIndicator={false}
         // Kill the rubber-band overscroll so dragging with a finger doesn't make the results
         // (or a short/empty list) bounce up and down. bounces→iOS, overScrollMode→Android.
@@ -805,7 +810,7 @@ const SearchScreen: React.FC = () => {
           // ALIBABA: No animations on empty state
           hasError && products.length === 0 ? (
             // Distinct load-error state so a failed fetch isn't mistaken for a genuine zero-result set.
-            <View style={[styles.emptyContainer, { backgroundColor: isDark ? theme.colors.background : '#FFF3E0' }]}>
+            <View style={[styles.emptyContainer, { backgroundColor: theme.colors.background }]}>
               <Ionicons name="cloud-offline-outline" size={64} color={theme.colors.textSecondary} />
               <Text allowFontScaling={false} style={[styles.emptyTitle, { color: theme.colors.text }]}>
                 {t('common.somethingWentWrong')}
@@ -821,7 +826,7 @@ const SearchScreen: React.FC = () => {
               />
             </View>
           ) : (
-            <View style={[styles.emptyContainer, { backgroundColor: isDark ? theme.colors.background : '#FFF3E0' }]}>
+            <View style={[styles.emptyContainer, { backgroundColor: theme.colors.background }]}>
               <Ionicons name="search-outline" size={64} color={theme.colors.textSecondary} />
               <Text allowFontScaling={false} style={[styles.emptyTitle, { color: theme.colors.text }]}>
                 {t('search.noResults')}
@@ -931,7 +936,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: statusBarHeight - 8, // Account for status bar
     paddingBottom: 8,
   },
   headerTitle: {

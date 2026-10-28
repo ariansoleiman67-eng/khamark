@@ -1,6 +1,6 @@
 {
-  "name": "asankary",
-  "version": "1.9.43",
+  "name": "khamark",
+  "version": "1.0.0",
   "main": "index.ts",
   "scripts": {
     "start": "expo start",

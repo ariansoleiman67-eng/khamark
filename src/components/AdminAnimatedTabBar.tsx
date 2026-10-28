@@ -177,11 +177,11 @@ const AnimatedAdminTabButton: React.FC<AnimatedAdminTabButtonProps> = ({
       onLongPress={onLongPress}
       activeOpacity={0.7}
     >
-      {/* Blue dot indicator above icon */}
+      {/* Indicator dot above icon */}
       <Animated.View 
         style={[
           styles.activeIndicatorDot,
-          { backgroundColor: '#FF5000' }, // Alibaba Orange
+          { backgroundColor: theme.colors.primary },
           dotAnimatedStyle,
         ]} 
       />
@@ -190,7 +190,7 @@ const AnimatedAdminTabButton: React.FC<AnimatedAdminTabButtonProps> = ({
         {getAdminTabBarIcon({
           routeName: route.name,
           focused,
-          color: focused ? '#FF5000' : theme.colors.textSecondary, // Alibaba Orange
+          color: focused ? theme.colors.primary : theme.colors.textSecondary,
           size: 24,
           unreadCount,
           pendingOrdersCount,
@@ -201,7 +201,7 @@ const AnimatedAdminTabButton: React.FC<AnimatedAdminTabButtonProps> = ({
         style={[
           styles.tabLabel,
           {
-            color: focused ? '#FF5000' : theme.colors.textSecondary, // Alibaba Orange
+            color: focused ? theme.colors.primary : theme.colors.textSecondary,
             fontWeight: focused ? '600' : '400',
           },
         ]}

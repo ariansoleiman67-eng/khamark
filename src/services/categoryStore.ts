@@ -25,7 +25,7 @@ export interface StoredCategory {
   sortOrder: number;
 }
 
-const STORAGE_KEY = '@asankary_categories_mock_v1';
+const STORAGE_KEY = '@khamark_categories_mock_v1';
 
 // Seed from the demo product categories.
 const SEED: StoredCategory[] = [

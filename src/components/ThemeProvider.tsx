@@ -77,7 +77,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   useEffect(() => {
     if (themeMode === 'system') {
       const preset = systemColorScheme === 'dark' ? 
-        getPresetById('amber-retail-dark') : getPresetById('amber-retail');
+        getPresetById('khamark-luxury-dark') : getPresetById('khamark-luxury');
       if (preset) {
         setCurrentCustomThemeState(preset.theme);
       }
@@ -101,13 +101,12 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
           }
         }
       } else {
-        // Fallback to old theme system
+        // Fallback to legacy theme key or default to Khamark Luxury light
         const savedTheme = await AsyncStorage.getItem(CACHE_KEYS.THEME);
         if (savedTheme && Object.values(THEME_KEYS).includes(savedTheme as any)) {
-          // Route the legacy value through the full setter so currentCustomTheme
-          // is updated in tandem (avoids isDark/theme desync) and the value is
-          // migrated into the new THEME_CUSTOMIZATION storage.
           setThemeMode(savedTheme as ThemeMode);
+        } else {
+          setThemeMode('light');
         }
       }
     } catch (error) {
@@ -128,23 +127,23 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     
     let selectedPresetId: string | undefined;
     if (mode === 'light') {
-      const lightPreset = getPresetById('amber-retail');
+      const lightPreset = getPresetById('khamark-luxury');
       if (lightPreset) {
         setCurrentCustomThemeState(lightPreset.theme);
-        selectedPresetId = 'amber-retail';
+        selectedPresetId = 'khamark-luxury';
       }
     } else if (mode === 'dark') {
-      const darkPreset = getPresetById('amber-retail-dark');
+      const darkPreset = getPresetById('khamark-luxury-dark');
       if (darkPreset) {
         setCurrentCustomThemeState(darkPreset.theme);
-        selectedPresetId = 'amber-retail-dark';
+        selectedPresetId = 'khamark-luxury-dark';
       }
     } else if (mode === 'system') {
       const preset = systemColorScheme === 'dark' ? 
-        getPresetById('amber-retail-dark') : getPresetById('amber-retail');
+        getPresetById('khamark-luxury-dark') : getPresetById('khamark-luxury');
       if (preset) {
         setCurrentCustomThemeState(preset.theme);
-        selectedPresetId = preset.theme.isDark ? 'amber-retail-dark' : 'amber-retail';
+        selectedPresetId = preset.theme.isDark ? 'khamark-luxury-dark' : 'khamark-luxury';
       }
     }
     

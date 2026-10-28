@@ -1,7 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
-  Alert,
   Pressable,
   StyleSheet,
   Dimensions,
@@ -14,7 +13,7 @@ import { Image } from "expo-image";
 import { useTheme } from "./ThemeProvider";
 import { Product } from "../types";
 import { getProductImageUrl, getThumbnailUrl } from "../utils/imageUtils";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import AppText from "./AppText";
 import AppNumber from "./AppNumber";
@@ -22,10 +21,10 @@ import { useCurrency } from "../contexts/CurrencyContext";
 import { useAuth } from "../contexts/AuthContext";
 import { formatCompareAtPrice, formatPrice } from "../utils/currency";
 import {
-  getDisplayUnitPrice,
-  getDiscountPercent,
   getEffectiveStock,
-  hasCompareAtDiscount, formatUnitPrice,
+  hasCompareAtDiscount,
+  getDiscountPercent,
+  formatUnitPrice,
   isVipPriceActive,
 } from "../utils/pricingUtils";
 import Animated, {
@@ -36,66 +35,36 @@ import Animated, {
 
 const { width: screenWidth } = Dimensions.get("window");
 
-// Fixed card size for the 2-column masonry grid + horizontal carousels.
-const CARD_MARGIN = 10;
-const NUM_COLUMNS = 2;
-const AVAILABLE_WIDTH = screenWidth - CARD_MARGIN * (NUM_COLUMNS + 1);
-const CARD_WIDTH = Math.floor(AVAILABLE_WIDTH / NUM_COLUMNS);
-const IMAGE_SIZE = CARD_WIDTH;
+// Grid geometry: 16px horizontal screen padding on each side, 12px gap between cards
+const GRID_PADDING = 16;
+const GRID_GAP = 12;
+const DEFAULT_CARD_WIDTH = Math.floor((screenWidth - (GRID_PADDING * 2) - GRID_GAP) / 2);
 
-// Budget for the text block, derived rather than guessed, so the worst-case card
-// (2-line title + brand + price row + VIP hint + CTA) provably fits:
-//   paddingTop 10 + title 40 + brand 20 + variant row 20 + price row 24
-//   + VIP hint 16 + CTA 44 + CTA gap 10 + paddingBottom 12  =  196
-// 210 leaves ~14px of slack for font-scale and Android line-height variance.
-// The CTA is a flex child now, so if a future row is added the CTA gets pushed and
-// the overflow is visible in review instead of hiding under it.
-const TEXT_CONTAINER_HEIGHT = 210;
-const CARD_HEIGHT = IMAGE_SIZE + TEXT_CONTAINER_HEIGHT;
+// Predictable text container budget:
+// paddingTop (8) + brand (14) + title (34) + variant/placeholder (14) + bottomStrip (48) + paddingBottom (8) = 138
+export const TEXT_CONTAINER_HEIGHT = 138;
 
-// Fixed brand accents: these read as "VIP" and "sale" regardless of theme, and both
-// carry white text, so they must not follow the theme's surface colours.
+// Fixed brand accents
 const MAX_SWATCHES = 4;
-const VIP_PURPLE = "#7C3AED";
-const SALE_RED = "#E53935";
-// Neutral slate, fixed like VIP_PURPLE and SALE_RED above and for the same reason:
-// this badge carries white text, so it cannot follow a theme colour. Against
-// theme.colors.textSecondary it measured 3.44:1 on the default preset and 1.48:1 on
-// Royal Purple — below AA, and near-illegible on the latter. #4B5563 gives 7.56:1
-// against white (computed, not assumed) and reads as informational rather than a warning.
+const VIP_BG_LIGHT = "#FFF1F2";
+const VIP_BG_DARK = "rgba(166, 25, 32, 0.22)";
+const VIP_TEXT = "#A61920";
+const SALE_RED = "#A61920";
 const USED_SLATE = "#4B5563";
 
-// A PLAIN Pressable, not Animated.createAnimatedComponent(Pressable).
-//
-// The press-scale now lives on an inner Animated.View, so this element carries no
-// animated style at all — the Reanimated wrapper was left sitting directly in the
-// touch path for nothing. That matters: under the New Architecture the wrapper
-// forwards props to a host view it also drives, and a press that starts is not
-// reliably released through it. The symptom on a physical iPhone was exact —
-// onPressIn fired every single time, onPress never did.
-//
-// It also explains the heart button, which is a plain Pressable and was failing
-// too: it is nested INSIDE this element, so a parent that mishandles the responder
-// takes its children down with it.
-//
-// If a card-level animated style is ever needed again, add an inner Animated.View
-// rather than animating the touch target.
-
-interface MasonryProductCardProps {
+export interface MasonryProductCardProps {
   product: Product;
   onPress: (productId: string, product: Product) => void;
   onAddToCart?: (productId: string, product: Product) => void;
   /**
    * Called instead of onAddToCart when the product has colour / storage / size
-   * options, so the customer picks them before anything reaches the cart. If a
-   * screen does not supply this, the card falls back to onPress (the detail screen,
-   * which always has the full pickers) rather than silently adding an unspecified
-   * variant.
+   * options, so the customer picks them before anything reaches the cart.
    */
   onSelectOptions?: (productId: string, product: Product) => void;
   isFavorite?: boolean;
   onToggleFavorite?: (productId: string) => void;
   style?: StyleProp<ViewStyle>;
+  cardWidth?: number;
 }
 
 const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
@@ -106,6 +75,7 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
   isFavorite = false,
   onToggleFavorite,
   style,
+  cardWidth,
 }) => {
   const { theme, isDark } = useTheme();
   const { t, i18n } = useTranslation();
@@ -114,11 +84,7 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
   const [imageError, setImageError] = useState(false);
   const [thumbFailed, setThumbFailed] = useState(false);
 
-  // FlashList (SearchScreen) recycles this component instance across products,
-  // so transient per-image failure state must be reset when the card lands on a
-  // new product. `recyclingKey` only resets expo-image's loader, not these flags.
-  // Render-phase reset (vs. useEffect) avoids a one-frame flash of the stale
-  // broken-image placeholder on the new product.
+  // FlashList / recycled list state reset
   const [lastProductId, setLastProductId] = useState(product.id);
   if (lastProductId !== product.id) {
     setLastProductId(product.id);
@@ -178,11 +144,7 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
     }
   };
 
-  // Products with colour / storage / size go through a picker first. Without this the
-  // behaviour was whatever each screen's handler happened to do — HomeScreen opened
-  // the sheet, Favorites routed to the detail screen, and CategoryProducts added the
-  // base product outright, so ordering an iPhone from that grid produced an order
-  // with no colour and no storage selected.
+  // Products with options go to picker/details first
   const handleCtaPress = () => {
     if (!purchasable) return;
     if (hasOptions) {
@@ -208,16 +170,10 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
     }
     return formatUnitPrice(product, isVip, currency, exchangeRateIQD);
   };
+
   const vipActive = isVipPriceActive(product, isVip);
-  // VIP price shown only to VIP users — no locked/teaser hint for normal users.
-  // Saving is measured against what THIS shopper pays, so a VIP sees the badge (they
-  // used to see no discount cue at all) and the figure matches the product page.
   const hasDiscount = hasCompareAtDiscount(product, isVip);
   const savePct = getDiscountPercent(product, isVip);
-
-  // Main + per-size + per-colour stock. The old form ignored colorVariations entirely
-  // and dropped the main stock whenever sizes existed, so a product stocked only in
-  // colours rendered a dead "Out of Stock" CTA the product page contradicted.
   const effectiveStock = getEffectiveStock(product);
 
   const hasValidPrice =
@@ -229,21 +185,16 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
   const inStock = effectiveStock > 0 && (!product.status || product.status === "available");
   const purchasable = inStock && hasValidPrice && !!onAddToCart;
 
-  // Bottom CTA label + enabled state
   let ctaLabel = t("product.addToCart", { defaultValue: "Add to Cart" });
   if (isComingSoon) ctaLabel = t("products.status.comingSoon", { defaultValue: "Coming Soon" });
   else if (isOnTheWay) ctaLabel = t("products.status.onTheWay", { defaultValue: "On the Way" });
   else if (!inStock) ctaLabel = t("product.outOfStock", { defaultValue: "Out of Stock" });
 
-  // ── Variant meta ────────────────────────────────────────────────────────────
+  // Variant metadata
   const colorOptions = (product.colorVariations || []).filter(Boolean);
-  // colorHex is optional in the schema; only swatch the ones that actually carry a
-  // colour, and fall back to a count when none do.
   const swatchable = colorOptions.filter((c) => !!c.colorHex);
   const extraColors = colorOptions.length - Math.min(swatchable.length, MAX_SWATCHES);
 
-  // Sorted by priceDelta rather than array order: priceDelta 0 is the base tier, so
-  // this yields smallest→largest without trusting how the row was authored.
   const storageLabels = [...(product.storageOptions || [])]
     .sort((a, b) => (Number(a?.priceDelta) || 0) - (Number(b?.priceDelta) || 0))
     .map((o) => o?.label)
@@ -254,19 +205,11 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
       : storageLabels[0] || "";
 
   const hasVariantMeta = colorOptions.length > 0 || !!storageRange;
-
-  // Anything that must be chosen before this can go in a cart.
   const hasOptions =
     colorOptions.length > 0 ||
     storageLabels.length > 0 ||
     (product.variations?.length ?? 0) > 0;
 
-  // Brandless products fall back to the category — which has to follow the UI language
-  // the same way the title above it does, or the card reads "هاتف" over "Smartphones".
-  // Admin-entered translation wins; otherwise fall back to the app's own
-  // categories.* strings before showing raw English, so a stock category still
-  // reads Arabic on a card even when nobody typed an Arabic name for it. Same
-  // order of preference as translateCategory on the product page.
   const localizedCategory = (() => {
     if (i18n.language === "ar" && product.categoryAr?.trim()) return product.categoryAr;
     if (i18n.language === "ku" && product.categoryKu?.trim()) return product.categoryKu;
@@ -285,15 +228,35 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
   });
   const displayUri = thumbFailed ? imageUri : getThumbnailUrl(imageUri, 400);
 
+  const finalCardWidth = cardWidth || DEFAULT_CARD_WIDTH;
+  const finalCardHeight = finalCardWidth + TEXT_CONTAINER_HEIGHT;
+
+  // Single restrained badge configuration
+  const badgeConfig = useMemo(() => {
+    if (isComingSoon) {
+      return { text: t("products.status.comingSoon", { defaultValue: "Coming Soon" }), bgColor: "#D97706", icon: "time-outline" };
+    }
+    if (isOnTheWay) {
+      return { text: t("products.status.onTheWay", { defaultValue: "On the Way" }), bgColor: "#2563EB", icon: "car-outline" };
+    }
+    if (!inStock) {
+      return { text: t("product.outOfStock", { defaultValue: "Out of Stock" }), bgColor: "#6B7280" };
+    }
+    if (hasDiscount && savePct > 0) {
+      return { text: `-${savePct}%`, bgColor: SALE_RED };
+    }
+    if (product.condition === "used") {
+      return { text: t("product.conditionUsed", { defaultValue: "Used" }), bgColor: USED_SLATE };
+    }
+    return null;
+  }, [isComingSoon, isOnTheWay, inStock, hasDiscount, savePct, product.condition, t]);
+
   return (
     <Pressable
       onPress={handlePress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       accessibilityRole="button"
-      // One spoken label for the whole card: name, brand and price as a single
-      // phrase, so a screen reader announces the product rather than reading four
-      // disconnected fragments as the user swipes through a grid.
       accessibilityLabel={[
         getDisplayTitle(),
         brandLine,
@@ -305,22 +268,13 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
       ]
         .filter(Boolean)
         .join(", ")}
-      // NO TRANSFORM HERE, DELIBERATELY. The press-scale used to be applied to this
-      // very element, and it was cancelling the taps it was meant to decorate.
-      // Measured on a physical iPhone: 84 touches registered, 2 presses completed.
-      // Pressing shrinks the card to 0.97 under the finger, iOS re-runs hit-testing
-      // against the new frame, decides the finger has left the view, and cancels
-      // the press. Android does not re-hit-test mid-gesture, which is exactly why
-      // the shop never saw this on Android.
-      // The animation now lives on the inner view below, so the touch target keeps
-      // a fixed frame for the whole gesture.
       style={[
         styles.cardWrapper,
-        style,
         {
-          width: CARD_WIDTH,
-          height: CARD_HEIGHT,
+          width: finalCardWidth,
+          height: finalCardHeight,
         },
+        style,
       ]}
     >
       <Animated.View
@@ -328,264 +282,266 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
           scaleAnimatedStyle,
           styles.card,
           {
-            flex: 1,
-            backgroundColor: theme.colors.card,
-            shadowColor: isDark ? "transparent" : "#000",
-            shadowOpacity: isDark ? 0 : 0.08,
-            shadowOffset: { width: 0, height: 8 },
-            shadowRadius: 16,
-            elevation: isDark ? 0 : 4,
+            width: "100%",
+            height: "100%",
+            backgroundColor: isDark ? (theme.colors.card || '#1E1E22') : '#FFFFFF',
+            borderWidth: 1,
+            borderColor: isDark ? '#2C2C30' : '#EAEAEA',
+            shadowColor: "#000",
+            shadowOpacity: isDark ? 0 : 0.03,
+            shadowOffset: { width: 0, height: 1 },
+            shadowRadius: 4,
+            elevation: isDark ? 0 : 1,
           },
         ]}
       >
-      {/* Image */}
-      <View style={[styles.imageContainer, { backgroundColor: "#FFFFFF" }]}>
-        {imageError ? (
-          <View style={[styles.imagePlaceholder, { backgroundColor: theme.colors.background }]}>
-            <MaterialCommunityIcons
-              name="image-off-outline"
-              size={40}
-              color={theme.colors.textSecondary}
-            />
-          </View>
-        ) : (
-          <Image
-            source={{ uri: displayUri }}
-            style={styles.image}
-            contentFit="cover"
-            transition={0}
-            cachePolicy="memory-disk"
-            priority="normal"
-            recyclingKey={product.id}
-            onError={() => {
-              if (!thumbFailed) setThumbFailed(true);
-              else setImageError(true);
-            }}
-          />
-        )}
-
-        {/* Favorite */}
-        <Pressable
-          style={({ pressed }) => [styles.favoriteButton, { opacity: pressed ? 0.85 : 1 }]}
-          onPress={handleFavoritePress}
-          hitSlop={12}
-          accessibilityRole="button"
-          accessibilityState={{ selected: isFavorite }}
-          accessibilityLabel={
-            isFavorite
-              ? t("favorites.remove", { defaultValue: "Remove from favorites" })
-              : t("favorites.add", { defaultValue: "Add to favorites" })
-          }
+        {/* Upper Card Area: Product Image */}
+        <View
+          style={[
+            styles.imageContainer,
+            {
+              width: finalCardWidth,
+              height: finalCardWidth,
+              backgroundColor: isDark ? '#17171A' : '#FAFAFA',
+            },
+          ]}
         >
-          <Animated.View style={favoriteAnimatedStyle}>
-            <Ionicons
-              name={isFavorite ? "heart" : "heart-outline"}
-              size={18}
-              color={theme.colors.primary}
+          {imageError ? (
+            <View style={styles.imagePlaceholder}>
+              <Ionicons
+                name="image-outline"
+                size={36}
+                color={theme.colors.textSecondary}
+              />
+            </View>
+          ) : (
+            <Image
+              source={{ uri: displayUri }}
+              style={styles.image}
+              contentFit="contain"
+              transition={120}
+              cachePolicy="memory-disk"
+              priority="normal"
+              recyclingKey={product.id}
+              onError={() => {
+                if (!thumbFailed) setThumbFailed(true);
+                else setImageError(true);
+              }}
             />
-          </Animated.View>
-        </Pressable>
+          )}
 
-        {/* Status badges (coming soon / on the way) */}
-        {isComingSoon && (
-          <View style={[styles.statusBadge, { backgroundColor: "#FF9800" }]}>
-            <Ionicons name="time-outline" size={10} color="#fff" />
-            <AppText fontSize={11} style={styles.statusText} numberOfLines={1}>
-              {t("products.status.comingSoon").replace(/ /g, " ")}
-            </AppText>
-          </View>
-        )}
-        {isOnTheWay && (
-          <View style={[styles.statusBadge, { backgroundColor: "#2196F3" }]}>
-            <MaterialCommunityIcons name="truck-fast-outline" size={12} color="#fff" style={{ marginRight: 2 }} />
-            <AppText fontSize={11} style={styles.statusText} numberOfLines={1}>
-              {t("products.status.onTheWay").replace(/ /g, " ")}
-            </AppText>
-          </View>
-        )}
-
-        {/* The scarcity cue ("Only N left") was removed: exact quantities are
-            business data and are no longer shown to customers anywhere. The
-            status badges above still cover coming soon / on the way. */}
-
-        {/* Condition cue. Bottom-left of the image — the opposite edge from the
-            top-left status slot above (coming soon / on the way / low stock) and
-            the top-right favorite button — so it never shares a corner with
-            either. Refurbished intentionally gets no card badge: it reads as an
-            inspected/restored unit rather than a buyer-beware cue the way "used"
-            does, it is already disclosed on the product page's condition row, and
-            a third image badge would crowd the two corner slots this card has. */}
-        {product.condition === "used" && (
-          <View style={[styles.conditionBadge, { backgroundColor: USED_SLATE }]}>
-            <AppText fontSize={10} style={styles.conditionBadgeText} numberOfLines={1}>
-              {t("product.conditionUsed")}
-            </AppText>
-          </View>
-        )}
-      </View>
-
-      {/* Text + CTA */}
-      <View style={styles.textContainer}>
-        <AppText
-          fontSize={14}
-          style={[styles.title, { color: theme.colors.text, textAlign }]}
-          numberOfLines={2}
-        >
-          {getDisplayTitle()}
-        </AppText>
-
-        {!!brandLine && (
-          <AppText
-            fontSize={12}
-            style={[styles.brand, { color: theme.colors.textSecondary, textAlign }]}
-            numberOfLines={1}
+          {/* Wishlist action: Top-right (respects RTL), clean without heavy circle */}
+          <Pressable
+            style={({ pressed }) => [
+              styles.favoriteButton,
+              isRTL ? { left: 8 } : { right: 8 },
+              { opacity: pressed ? 0.7 : 1 },
+            ]}
+            onPress={handleFavoritePress}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityState={{ selected: isFavorite }}
+            accessibilityLabel={
+              isFavorite
+                ? t("favorites.remove", { defaultValue: "Remove from favorites" })
+                : t("favorites.add", { defaultValue: "Add to favorites" })
+            }
           >
-            {brandLine}
-          </AppText>
-        )}
+            <Animated.View style={favoriteAnimatedStyle}>
+              <Ionicons
+                name={isFavorite ? "heart" : "heart-outline"}
+                size={20}
+                color={isFavorite ? SALE_RED : (isDark ? "#A1A1AA" : "#9CA3AF")}
+              />
+            </Animated.View>
+          </Pressable>
 
-        {/* Colour swatches + storage span. Sits above the price so the eye lands on
-            what varies before what it costs. Decorative to a screen reader — the same
-            information is already in the card's single spoken label. */}
-        {hasVariantMeta && (
-          <View
-            accessibilityElementsHidden
-            importantForAccessibility="no-hide-descendants"
-            style={[styles.variantRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}
-          >
-            {swatchable.length > 0 ? (
-              <View style={[styles.swatchRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-                {swatchable.slice(0, MAX_SWATCHES).map((c) => (
-                  <View
-                    key={c.variationId}
-                    style={[
-                      styles.swatch,
-                      {
-                        backgroundColor: c.colorHex,
-                        // A hairline ring so white and near-white finishes stay visible
-                        // on the card surface in both themes.
-                        borderColor: isDark ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.18)",
-                      },
-                    ]}
-                  />
-                ))}
-                {extraColors > 0 && (
-                  <AppText fontSize={10} style={[styles.variantText, { color: theme.colors.textSecondary }]}>
-                    +{extraColors}
-                  </AppText>
-                )}
-              </View>
-            ) : colorOptions.length > 0 ? (
-              // Guarded on the count, not just on swatchable: this branch also runs
-              // for a storage-only product, which rendered a literal "0 colors".
-              <AppText
-                fontSize={10}
-                numberOfLines={1}
-                style={[styles.variantText, { color: theme.colors.textSecondary }]}
-              >
-                {t("product.colorCount", {
-                  count: colorOptions.length,
-                  defaultValue: `${colorOptions.length} colors`,
-                })}
+          {/* Restrained single badge at top-left (respects RTL) */}
+          {badgeConfig && (
+            <View
+              style={[
+                styles.restrainedBadge,
+                isRTL ? { right: 8 } : { left: 8 },
+                { backgroundColor: badgeConfig.bgColor },
+              ]}
+            >
+              {badgeConfig.icon ? (
+                <Ionicons name={badgeConfig.icon as any} size={10} color="#fff" style={{ marginEnd: 3 }} />
+              ) : null}
+              <AppText fontSize={10} style={styles.badgeText} numberOfLines={1}>
+                {badgeConfig.text}
               </AppText>
-            ) : null}
-
-            {!!storageRange && (
-              <AppText
-                fontSize={10}
-                numberOfLines={1}
-                style={[styles.storageText, { color: theme.colors.textSecondary }]}
-              >
-                {storageRange}
-              </AppText>
-            )}
-          </View>
-        )}
-
-        {/* Price. At most TWO rows: the hero price (with its comparison inline) and
-            an optional VIP hint. Previously the strikethrough and the discount badge
-            occupied a third row, which is what pushed this block into the CTA — and
-            three competing numbers made it genuinely unclear what the customer pays. */}
-        <View style={styles.priceBlock}>
-          <View style={[styles.priceRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-            {/* containerStyle, not style: AppNumber wraps its Text in a View, and THAT
-                View is the flex item here. Shrink rules passed via `style` land on the
-                inner Text and do nothing, so a long price (a big USD figure, or any
-                IQD amount) took its full intrinsic width and shoved the strikethrough
-                and the badge sideways. React Native defaults flex items to
-                flexShrink: 0, so this has to be explicit. */}
-            <AppNumber
-              value={getPriceDisplay()}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.9}
-              containerStyle={styles.priceShrink}
-              style={[styles.price, { color: vipActive ? VIP_PURPLE : theme.colors.text, textAlign }]}
-            />
-            {vipActive && (
-              <View style={[styles.tag, { backgroundColor: VIP_PURPLE }]}>
-                <AppText fontSize={9} style={styles.tagText}>VIP</AppText>
-              </View>
-            )}
-          </View>
-
-          {/* Second line: a long price (e.g. $1,199.00) used to share one row with the
-              strikethrough + badge, which forced it to auto-shrink and read smaller
-              than cheap products' prices. Giving the comparison its own row keeps the
-              paid price at full size on every card. */}
-          {hasDiscount && (
-            <View style={[styles.compareRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-              <AppText
-                fontSize={11}
-                numberOfLines={1}
-                style={[styles.compareAt, { color: theme.colors.textSecondary }]}
-              >
-                {formatCompareAtPrice(product as any, currency, exchangeRateIQD)}
-              </AppText>
-              <View style={[styles.tag, { backgroundColor: SALE_RED }]}>
-                <AppText fontSize={9} style={styles.tagText}>-{savePct}%</AppText>
-              </View>
             </View>
           )}
         </View>
 
-        {/* CTA sits in normal flow, pinned to the bottom by marginTop:auto. It used to
-            be position:absolute over a paddingBottom reservation, so any content that
-            ran past that reservation was silently covered by it — which is exactly what
-            happened to the discount row. In flow, the CTA can be pushed but never
-            overlapped. */}
-        <View ref={addToCartRef} collapsable={false} style={styles.ctaWrapper}>
-          <Pressable
-            disabled={!purchasable}
-            style={({ pressed }) => [
-              styles.cta,
+        {/* Text + Compact Price/Add Strip */}
+        <View style={[styles.textContainer, { height: TEXT_CONTAINER_HEIGHT }]}>
+          {/* 1. Brand in small muted text */}
+          {brandLine ? (
+            <AppText
+              fontSize={11}
+              style={[styles.brand, { color: isDark ? '#A1A1AA' : '#8E8E93', textAlign }]}
+              numberOfLines={1}
+            >
+              {brandLine}
+            </AppText>
+          ) : (
+            <View style={styles.brandPlaceholder} />
+          )}
+
+          {/* 2. Product name in readable medium weight (up to 2 lines) */}
+          <AppText
+            fontSize={13}
+            style={[styles.title, { color: theme.colors.text, textAlign }]}
+            numberOfLines={2}
+            ellipsizeMode="tail"
+          >
+            {getDisplayTitle()}
+          </AppText>
+
+          {/* 3. Optional swatches / storage meta */}
+          {hasVariantMeta ? (
+            <View
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              style={[styles.variantRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}
+            >
+              {swatchable.length > 0 ? (
+                <View style={[styles.swatchRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+                  {swatchable.slice(0, MAX_SWATCHES).map((c) => (
+                    <View
+                      key={c.variationId}
+                      style={[
+                        styles.swatch,
+                        {
+                          backgroundColor: c.colorHex,
+                          borderColor: isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.15)",
+                        },
+                      ]}
+                    />
+                  ))}
+                  {extraColors > 0 && (
+                    <AppText fontSize={10} style={[styles.variantText, { color: theme.colors.textSecondary }]}>
+                      +{extraColors}
+                    </AppText>
+                  )}
+                </View>
+              ) : colorOptions.length > 0 ? (
+                <AppText
+                  fontSize={10}
+                  numberOfLines={1}
+                  style={[styles.variantText, { color: theme.colors.textSecondary }]}
+                >
+                  {t("product.colorCount", {
+                    count: colorOptions.length,
+                    defaultValue: `${colorOptions.length} colors`,
+                  })}
+                </AppText>
+              ) : null}
+
+              {!!storageRange && (
+                <AppText
+                  fontSize={10}
+                  numberOfLines={1}
+                  style={[styles.storageText, { color: theme.colors.textSecondary }]}
+                >
+                  {storageRange}
+                </AppText>
+              )}
+            </View>
+          ) : (
+            <View style={styles.variantPlaceholder} />
+          )}
+
+          {/* 4. Compact Bottom Strip: Formatted price on the left, circular red "+" button on the right */}
+          <View
+            style={[
+              styles.bottomStrip,
               {
-                backgroundColor: purchasable ? theme.colors.primary : theme.colors.disabled,
-                opacity: pressed && purchasable ? 0.85 : 1,
+                backgroundColor: isDark ? '#26262A' : '#F4F4F6',
+                flexDirection: isRTL ? "row-reverse" : "row",
               },
             ]}
-            onPress={handleCtaPress}
-            accessibilityRole="button"
-            // The visible label already says why it is disabled (Out of Stock /
-            // Coming Soon), so it doubles as the accessible name.
-            accessibilityLabel={ctaLabel}
-            accessibilityState={{ disabled: !purchasable }}
           >
-            <AppText
-              fontSize={13}
-              style={[
-                styles.ctaText,
-                { color: purchasable ? theme.colors.textOnPrimary : theme.colors.textSecondary },
-              ]}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.85}
-            >
-              {ctaLabel}
-            </AppText>
-          </Pressable>
+            {/* Price Details - Flexible Area */}
+            <View style={styles.priceContainer}>
+              {/* VIP Badge: Above the price instead of squeezed between amount and add button */}
+              {vipActive && (
+                <View
+                  style={[
+                    styles.vipTag,
+                    {
+                      backgroundColor: isDark ? VIP_BG_DARK : VIP_BG_LIGHT,
+                      alignSelf: isRTL ? 'flex-end' : 'flex-start',
+                    },
+                  ]}
+                >
+                  <AppText fontSize={8} style={[styles.vipTagText, { color: VIP_TEXT }]}>
+                    VIP
+                  </AppText>
+                </View>
+              )}
+
+              {/* Price Row: Primary price with clear bold font */}
+              <View style={[styles.priceRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+                <AppNumber
+                  value={getPriceDisplay()}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit={false}
+                  style={[
+                    styles.priceText,
+                    { color: theme.colors.text, textAlign },
+                  ]}
+                />
+              </View>
+
+              {/* Compare-at discount or status below current price */}
+              {!purchasable ? (
+                <AppText
+                  fontSize={9.5}
+                  numberOfLines={1}
+                  style={[styles.unavailableText, { color: isDark ? '#A1A1AA' : '#6B7280', textAlign }]}
+                >
+                  {ctaLabel}
+                </AppText>
+              ) : hasDiscount ? (
+                <AppText
+                  fontSize={10}
+                  numberOfLines={1}
+                  style={[styles.compareAtText, { color: theme.colors.textSecondary, textAlign }]}
+                >
+                  {formatCompareAtPrice(product as any, currency, exchangeRateIQD)}
+                </AppText>
+              ) : null}
+            </View>
+
+            {/* Circular Red "+" Add-to-Cart Button - Dedicated Fixed Width Area */}
+            <View ref={addToCartRef} collapsable={false} style={styles.buttonContainer}>
+              <Pressable
+                disabled={!purchasable}
+                onPress={handleCtaPress}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={`${t("product.addToCart", { defaultValue: "Add to cart" })}: ${getDisplayTitle()}`}
+                accessibilityState={{ disabled: !purchasable }}
+                style={({ pressed }) => [
+                  styles.plusButton,
+                  {
+                    backgroundColor: purchasable ? SALE_RED : (isDark ? '#3A3A3E' : '#D1D5DB'),
+                    opacity: pressed && purchasable ? 0.82 : 1,
+                  },
+                ]}
+              >
+                <Ionicons
+                  name={purchasable ? "add" : "close"}
+                  size={18}
+                  color={purchasable ? "#FFFFFF" : (isDark ? '#71717A' : '#9CA3AF')}
+                />
+              </Pressable>
+            </View>
+          </View>
         </View>
-      </View>
       </Animated.View>
     </Pressable>
   );
@@ -595,6 +551,7 @@ const arePropsEqual = (
   prevProps: MasonryProductCardProps,
   nextProps: MasonryProductCardProps,
 ) =>
+  prevProps.cardWidth === nextProps.cardWidth &&
   prevProps.isFavorite === nextProps.isFavorite &&
   prevProps.product.id === nextProps.product.id &&
   prevProps.product.name === nextProps.product.name &&
@@ -606,8 +563,6 @@ const arePropsEqual = (
   prevProps.onPress === nextProps.onPress &&
   prevProps.onAddToCart === nextProps.onAddToCart &&
   prevProps.onSelectOptions === nextProps.onSelectOptions &&
-  // Without these a recycled FlashList row would keep the previous product's
-  // swatches and storage span.
   prevProps.product.colorVariations === nextProps.product.colorVariations &&
   prevProps.product.storageOptions === nextProps.product.storageOptions &&
   prevProps.product.variations === nextProps.product.variations &&
@@ -615,17 +570,18 @@ const arePropsEqual = (
 
 const styles = StyleSheet.create({
   cardWrapper: {
-    margin: CARD_MARGIN / 2,
+    margin: 0,
   },
   card: {
-    borderRadius: 20,
+    borderRadius: 18,
     overflow: "hidden",
   },
   imageContainer: {
     alignSelf: "center",
-    height: IMAGE_SIZE,
     position: "relative",
-    width: "100%",
+    padding: 12,
+    alignItems: "center",
+    justifyContent: "center",
   },
   image: {
     height: "100%",
@@ -639,90 +595,65 @@ const styles = StyleSheet.create({
   },
   favoriteButton: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    height: 32,
     justifyContent: "center",
     position: "absolute",
-    right: 8,
     top: 8,
-    width: 32,
-    shadowColor: "#000",
-    shadowOpacity: 0.12,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
-    elevation: 2,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "rgba(255, 255, 255, 0.82)",
+    zIndex: 10,
   },
-  statusBadge: {
+  restrainedBadge: {
     alignItems: "center",
-    borderRadius: 8,
+    borderRadius: 6,
     flexDirection: "row",
     justifyContent: "center",
-    left: 8,
-    minHeight: 26,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2.5,
     position: "absolute",
     top: 8,
-    zIndex: 1,
-    maxWidth: "85%",
-  },
-  statusText: {
-    color: "#FFFFFF",
-    fontWeight: "600",
-    includeFontPadding: false,
-    marginStart: 4,
-    paddingTop: Platform.OS === "android" ? 1 : 0,
-    textAlign: "center",
-  },
-  // Bottom-left of the image, mirroring statusBadge's top-left slot but pinned to
-  // the opposite edge so a used cue never stacks with coming-soon / on-the-way /
-  // low-stock badges, which all occupy top-left.
-  conditionBadge: {
-    alignItems: "center",
-    borderRadius: 8,
-    bottom: 8,
-    justifyContent: "center",
-    left: 8,
+    zIndex: 10,
     maxWidth: "70%",
-    minHeight: 22,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    position: "absolute",
-    zIndex: 1,
   },
-  conditionBadgeText: {
+  badgeText: {
     color: "#FFFFFF",
     fontWeight: "700",
     includeFontPadding: false,
-    paddingTop: Platform.OS === "android" ? 1 : 0,
+    fontSize: 10,
     textAlign: "center",
   },
   textContainer: {
-    flex: 1,
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    // No paddingBottom reservation for the CTA any more — the CTA is a flex child
-    // and reserves its own space, so the two can no longer collide.
-    paddingBottom: 12,
-  },
-  title: {
-    fontWeight: "700",
-    // Fixed 2-line reservation, not minHeight: it keeps the price rows and CTAs on
-    // the same baseline across a row of cards whether a title wraps to one line or
-    // two. numberOfLines={2} means it can never exceed this.
-    height: 40,
-    lineHeight: 20,
+    paddingHorizontal: 10,
+    paddingTop: 8,
+    paddingBottom: 8,
+    justifyContent: "space-between",
   },
   brand: {
     fontWeight: "500",
-    marginTop: 4,
+    fontSize: 11,
+    height: 14,
+    lineHeight: 14,
+  },
+  brandPlaceholder: {
+    height: 14,
+  },
+  title: {
+    fontWeight: "600",
+    fontSize: 13,
+    height: 34,
+    lineHeight: 17,
+    marginTop: 2,
   },
   variantRow: {
     alignItems: "center",
-    gap: 8,
-    marginTop: 6,
-    minHeight: 14,
+    gap: 6,
+    marginTop: 2,
+    height: 14,
+  },
+  variantPlaceholder: {
+    height: 14,
+    marginTop: 2,
   },
   swatchRow: {
     alignItems: "center",
@@ -730,93 +661,81 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   swatch: {
-    width: 11,
-    height: 11,
-    borderRadius: 6,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     borderWidth: 1,
   },
   variantText: {
     fontWeight: "600",
+    fontSize: 10,
     includeFontPadding: false,
   },
   storageText: {
     fontWeight: "600",
+    fontSize: 10,
     includeFontPadding: false,
-    // Yields to the swatches: colour is the visual differentiator, storage is a spec.
     flexShrink: 1,
     minWidth: 0,
   },
-  priceBlock: {
-    marginTop: "auto",
+  bottomStrip: {
+    borderRadius: 16,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingStart: 10,
+    paddingEnd: 5,
+    paddingVertical: 5,
+    marginTop: 4,
+  },
+  priceContainer: {
+    flex: 1,
+    marginEnd: 8,
+    justifyContent: "center",
+  },
+  buttonContainer: {
+    flexShrink: 0,
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   priceRow: {
     alignItems: "center",
-    gap: 5,
   },
-  // Applied to AppNumber's OUTER View (via containerStyle) — that is the flex item.
-  // minWidth: 0 is required alongside flexShrink: a flex item will not shrink below
-  // its intrinsic text width without it, which is how an IQD price like
-  // "١٬٧٤٩٬٠٠٠ د.ع" would otherwise push everything else out of the row.
-  priceShrink: {
-    flexShrink: 1,
-    minWidth: 0,
+  priceText: {
+    fontWeight: "700",
+    fontSize: 14,
   },
-  price: {
-    fontWeight: "800",
-    fontSize: 16,
-  },
-  compareRow: {
-    alignItems: "center",
-    gap: 5,
-    marginTop: 3,
-  },
-  compareAt: {
+  compareAtText: {
     textDecorationLine: "line-through",
-    // On its own row now, so it only needs to yield to the badge.
-    flexShrink: 1,
-    minWidth: 0,
+    fontSize: 10,
+    marginTop: 1,
   },
-  tag: {
-    borderRadius: 5,
+  unavailableText: {
+    fontSize: 9.5,
+    fontWeight: "600",
+    marginTop: 1,
+  },
+  vipTag: {
+    borderRadius: 4,
     paddingHorizontal: 5,
-    paddingVertical: 1,
-    // Never let a badge be the thing that gets squeezed — it is the smallest and
-    // least legible element, so it holds its size and the prices shrink instead.
+    paddingVertical: 1.5,
+    marginBottom: 2,
     flexShrink: 0,
   },
-  tagText: {
-    color: "#FFFFFF",
+  vipTagText: {
     fontWeight: "800",
-    letterSpacing: 0.3,
+    fontSize: 8,
+    letterSpacing: 0.4,
     includeFontPadding: false,
   },
-  vipHintRow: {
+  plusButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: "center",
-    gap: 3,
-    marginTop: 3,
-  },
-  vipHintText: {
-    fontWeight: "700",
-    flexShrink: 1,
-    minWidth: 0,
-  },
-  ctaWrapper: {
-    // Pinned to the bottom by auto margin rather than absolute positioning.
-    marginTop: 10,
-  },
-  cta: {
-    alignItems: "center",
-    borderRadius: 999,
-    // minHeight, not height: at large system font scales the label grows and a
-    // fixed height would clip it.
-    minHeight: 44,
     justifyContent: "center",
-    paddingHorizontal: 12,
-    width: "100%",
-  },
-  ctaText: {
-    fontWeight: "700",
-    includeFontPadding: false,
   },
 });
 

@@ -1,27 +1,27 @@
 // =============================================================================
-// Cloudflare Worker: QiCard domain proxy
+// Cloudflare Worker: QiCard domain proxy for Khamark
 // =============================================================================
 // QiCard requires the payment URLs to live on the merchant's own domain
-// (ASANKARY_DOMAIN_TBD), not *.supabase.co. This Worker reverse-proxies two
-// branded paths to the Supabase Edge Functions, keeping ASANKARY_DOMAIN_TBD as
+// (khamark.com), not *.supabase.co. This Worker reverse-proxies two
+// branded paths to the Supabase Edge Functions, keeping khamark.com as
 // the host QiCard sees while the real logic still runs on Supabase:
 //
-//   https://ASANKARY_DOMAIN_TBD/qicard-webhook     -> .../functions/v1/qicard-webhook
-//   https://ASANKARY_DOMAIN_TBD/payment-complete   -> .../functions/v1/payment-complete
+//   https://khamark.com/qicard-webhook     -> .../functions/v1/qicard-webhook
+//   https://khamark.com/payment-complete   -> .../functions/v1/payment-complete
 //
 // A reverse proxy (not a redirect) is required: QiCard POSTs to the webhook and
-// must keep seeing ASANKARY_DOMAIN_TBD; a 301/302 would bounce it back to
+// must keep seeing khamark.com; a 301/302 would bounce it back to
 // supabase.co and defeat the requirement.
 //
 // Deploy: Cloudflare dashboard → Workers & Pages → Create Worker → paste this →
-// Deploy. Then add two Routes on the ASANKARY_DOMAIN_TBD zone:
-//   ASANKARY_DOMAIN_TBD/qicard-webhook*     -> this worker
-//   ASANKARY_DOMAIN_TBD/payment-complete*   -> this worker
+// Deploy. Then add two Routes on the khamark.com zone:
+//   khamark.com/qicard-webhook*     -> this worker
+//   khamark.com/payment-complete*   -> this worker
 // (and make sure the apex has a proxied/orange-cloud DNS record so Cloudflare
 // handles the hostname — a dummy A record 192.0.2.1 proxied is fine).
 // =============================================================================
 
-const SUPABASE_ORIGIN = 'https://REPLACE_WITH_ASANKARY_SUPABASE_PROJECT_REF.supabase.co';
+const SUPABASE_ORIGIN = 'https://REPLACE_WITH_KHAMARK_SUPABASE_PROJECT_REF.supabase.co';
 
 const ROUTES = {
   '/qicard-webhook': '/functions/v1/qicard-webhook',

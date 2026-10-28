@@ -6,7 +6,7 @@
  * directly in QiCard's hosted payment page.
  * 
  * After payment completion, QiCard redirects to our finishPaymentUrl
- * (asankary://payment-complete), which the WebView intercepts. We then
+ * (khamark://payment-complete), which the WebView intercepts. We then
  * poll for the payment status and navigate accordingly.
  */
 
@@ -211,7 +211,7 @@ const QiCardPaymentScreen: React.FC = () => {
       // parameter — which unmounts the WebView mid-authentication (isProcessingResult
       // short-circuits the render), so the payment can never complete and the poll
       // spins to a "couldn't confirm" timeout.
-      if (url && url.startsWith('asankary://payment-complete')) {
+      if (url && url.startsWith('khamark://payment-complete')) {
         handlePaymentComplete();
       }
     },
@@ -222,7 +222,7 @@ const QiCardPaymentScreen: React.FC = () => {
   const handleShouldStartLoad = useCallback(
     (request: { url: string }) => {
       // Exact redirect target only — see the note in handleNavigationStateChange.
-      if (request.url.startsWith('asankary://payment-complete')) {
+      if (request.url.startsWith('khamark://payment-complete')) {
         handlePaymentComplete();
         return false; // Prevent WebView from loading this URL
       }
@@ -244,7 +244,7 @@ const QiCardPaymentScreen: React.FC = () => {
           onPress: async () => {
             // Alert is a native dialog: it is not part of the React tree and is NOT
             // dismissed when the payment settles behind it. The WebView keeps running
-            // underneath, so QiCard can redirect to asankary://payment-complete, the
+            // underneath, so QiCard can redirect to khamark://payment-complete, the
             // status poll can return SUCCESS, and the cart can be cleared — all while
             // this confirmation is still on screen. Tapping "Yes" then cancelled an
             // order that had already been charged: the customer's card is debited,
@@ -441,7 +441,7 @@ const QiCardPaymentScreen: React.FC = () => {
           scalesPageToFit={true}
           mixedContentMode="compatibility"
           // Allow QiCard to handle redirects
-          originWhitelist={['https://*', 'asankary://*', 'http://*']}
+          originWhitelist={['https://*', 'khamark://*', 'http://*']}
           onError={(syntheticEvent) => {
             const { nativeEvent } = syntheticEvent;
             console.error('WebView error:', nativeEvent);
@@ -450,7 +450,7 @@ const QiCardPaymentScreen: React.FC = () => {
             // let it override an in-flight or already-decided payment outcome.
             if (paymentCompletedRef.current) return;
             // Only show error if it's not a custom scheme redirect
-            if (!nativeEvent.url?.startsWith('asankary://')) {
+            if (!nativeEvent.url?.startsWith('khamark://')) {
               setError(t('qiCard.webviewError', { defaultValue: 'Failed to load payment form. Please try again.' }));
               setResultStatus('failed');
             }

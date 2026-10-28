@@ -1,14 +1,14 @@
 {
   "expo": {
-    "name": "Asankary",
-    "slug": "Asankary",
-    "scheme": "asankary",
-    "version": "1.9.54",
+    "name": "Khamark",
+    "slug": "khamark",
+    "scheme": "khamark",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "primaryColor": "#1a365d",
-    "description": "Shop consumer electronics and accessories with fast delivery across Iraq. Browse thousands of products in our online store.",
+    "primaryColor": "#A61920",
+    "description": "Shop consumer electronics and mobile accessories with fast delivery across Iraq. Browse thousands of products in our online store.",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -16,7 +16,7 @@
     },
     "notification": {
       "icon": "./assets/notification-icon.png",
-      "color": "#1a365d"
+      "color": "#A61920"
     },
     "assetBundlePatterns": [
       "assets/images/**",
@@ -25,20 +25,18 @@
       "assets/category-icons/**",
       "assets/flags/**",
       "assets/fonts/**",
-      "assets/video/intro.mp4",
-      "assets/video/intro-poster.jpg",
       "assets/*.png",
       "assets/*.jpg"
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.asankary.app",
-      "buildNumber": "85",
+      "bundleIdentifier": "com.khamark.app",
+      "buildNumber": "1",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Asankary uses your location to fill in your delivery address and to show you the nearest shop branch — for example, dropping a pin on your street so a delivery rider can find you.",
-        "NSCameraUsageDescription": "Asankary uses the camera so you can photograph a phone you want to trade in, or take a profile picture — for example, snapping the back of your old handset so the shop can price it.",
-        "NSPhotoLibraryUsageDescription": "Asankary uses your photo library so you can attach existing photos to a trade-in request, a message to the shop, or your profile — for example, choosing a photo of your old phone you already took.",
-        "NSMicrophoneUsageDescription": "Asankary uses the microphone so you can send the shop a voice message in chat instead of typing — for example, asking about a product in Kurdish rather than writing it.",
+        "NSLocationWhenInUseUsageDescription": "Khamark uses your location to fill in your delivery address and to show you the nearest shop branch — for example, dropping a pin on your street so a delivery rider can find you.",
+        "NSCameraUsageDescription": "Khamark uses the camera so you can photograph a phone you want to trade in, or take a profile picture.",
+        "NSPhotoLibraryUsageDescription": "Khamark uses your photo library so you can attach existing photos to a trade-in request, a message to the shop, or your profile.",
+        "NSMicrophoneUsageDescription": "Khamark uses the microphone so you can send the shop a voice message in chat instead of typing.",
         "ITSAppUsesNonExemptEncryption": false
       },
       "config": {
@@ -47,14 +45,14 @@
       "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
-      "package": "com.asankary.app",
-      "versionCode": 146,
+      "package": "com.khamark.app",
+      "versionCode": 1,
       "versionName": "1.0",
       "googleServicesFile": "./google-services.json",
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#000000"
+        "backgroundColor": "#A61920"
       },
       "permissions": [
         "ACCESS_COARSE_LOCATION",
@@ -89,16 +87,16 @@
           "data": [
             {
               "scheme": "https",
-              "host": "ASANKARY_DOMAIN_TBD",
+              "host": "khamark.com",
               "pathPrefix": "/product"
             },
             {
               "scheme": "https",
-              "host": "www.ASANKARY_DOMAIN_TBD",
+              "host": "www.khamark.com",
               "pathPrefix": "/product"
             },
             {
-              "scheme": "asankary"
+              "scheme": "khamark"
             }
           ],
           "category": [
@@ -115,7 +113,7 @@
       [
         "@react-native-google-signin/google-signin",
         {
-          "iosUrlScheme": "com.googleusercontent.apps.22285264318-9ipslo5beas3b4l0a2c969eq1fqnnk2j"
+          "iosUrlScheme": "com.googleusercontent.apps.697952713775-placeholder"
         }
       ],
       "./plugins/withFmtFix.js"

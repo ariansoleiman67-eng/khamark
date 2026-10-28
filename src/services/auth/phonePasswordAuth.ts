@@ -53,7 +53,7 @@ export const registerWithPhone = async (data: RegistrationData): Promise<User> =
       } as unknown as User;
     }
 
-    // Phone users sign in via a deterministic synthetic email ("<digits>@asankaryapp.internal"),
+    // Phone users sign in via a deterministic synthetic email ("<digits>@khamarkapp.internal"),
     // which the login bridge already understands. Create the Supabase account with that.
     const syntheticEmail = phoneToEmail(formattedPhone);
     const password = data.password || `Hy${Math.random().toString(36).slice(2, 12)}!A`;

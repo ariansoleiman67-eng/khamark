@@ -9,6 +9,7 @@ import { SUPABASE_CONFIG } from '../constants/config';
 
 export const USE_MOCK_DATA =
   process.env.EXPO_PUBLIC_USE_MOCK_DATA === 'true' ||
+  SUPABASE_CONFIG.URL.includes('replace-with-khamark') ||
   SUPABASE_CONFIG.URL.includes('replace-with-asankary');
 
 const TS_MS = 1717200000000;
@@ -20,7 +21,7 @@ const ts = (): Timestamp =>
     nanoseconds: 0,
   } as unknown as Timestamp);
 
-const img = (seed: string) => `https://picsum.photos/seed/asankary-${seed}/600/600`;
+const img = (seed: string) => `https://picsum.photos/seed/khamark-${seed}/600/600`;
 
 interface Seed {
   id: string;
@@ -130,7 +131,7 @@ MOCK_PRODUCTS.forEach((p) => {
 
 export const MOCK_BANNERS = [1, 2, 3, 4].map((n) => ({
   id: `b${n}`,
-  imageUrl: `https://picsum.photos/seed/asankary-banner-${n}/1000/420`,
+  imageUrl: `https://picsum.photos/seed/khamark-banner-${n}/1000/420`,
   order: n,
   isActive: true,
   createdAt: new Date(TS_MS),

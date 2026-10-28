@@ -51,7 +51,7 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SPACING = { xs: 8, sm: 12, md: 16, lg: 24, xl: 32 };
 const RADIUS = { input: 14, button: 16, card: 26, back: 22, coin: 30 };
 
-const ASANKARY_LOGO = require('../../../assets/images/asankarylogo.png');
+const KHAMARK_LOGO = require('../../../assets/images/khamark_logo.png');
 
 // ─── Floating Particle (premium hero sparkle) ────────────────
 const FloatingParticle = ({
@@ -416,7 +416,7 @@ const VerifyPhoneScreen: React.FC = () => {
               style={styles.logoArea}
             >
               <View style={styles.logoCircle}>
-                <Image source={ASANKARY_LOGO} style={styles.logoImage} contentFit="contain" />
+                <Image source={KHAMARK_LOGO} style={styles.logoImage} contentFit="contain" />
               </View>
             </Animated.View>
 

@@ -37,33 +37,22 @@ interface CheckForUpdateResult {
 }
 
 const DEFAULT_CONFIG: AppConfig = {
-  minAppVersion: '1.2.2',
-  minVersionCode: 26,
+  minAppVersion: '1.0.0',
+  minVersionCode: 1,
   minBuildNumber: 1,
   forceUpdate: false,
-  updateMessage: 'A critical update is required to continue using Asankary. Please update to the latest version.',
-  updateMessageAr: 'يتطلب الأمر تحديثًا إلزاميًا لمتابعة استخدام تطبيق Asankary. يرجى التحديث إلى أحدث إصدار.',
-  updateMessageKu: 'پێویستە نوێکردنەوەیەکی گرنگ ئەنجام بدەیت بۆ بەردەوامبوون لە بەکارهێنانی Asankary. تکایە بۆ دوا وەشان نوێی بکەرەوە.',
-  androidStoreUrl: 'https://play.google.com/store/apps/details?id=com.asankary.app',
-  // id6794673336 is Asankary. The id here used to be 6759567908, which is
-  // HARYAD AUTOPARTS (bundle com.haryad.autopart) — fork residue that survived
-  // because the slug says "asankary", so it reads correct at a glance. Every iOS
-  // customer who tapped Update was sent to a different company's app.
-  //
-  // Verified against Apple's own lookup API:
-  //   id6794673336 -> Asankary,          com.asankary.app
-  //   id6759567908 -> Haryad Autoparts,  com.haryad.autopart
-  //
-  // This default also SEEDS the app_config row on a fresh install, so a wrong
-  // value here propagates into the database and outlives the code fix.
-  iosStoreUrl: 'https://apps.apple.com/app/asankary/id6794673336',
-  latestVersionCode: 26,
+  updateMessage: 'A critical update is required to continue using Khamark. Please update to the latest version.',
+  updateMessageAr: 'يتطلب الأمر تحديثًا إلزاميًا لمتابعة استخدام تطبيق خامارك. يرجى التحديث إلى أحدث إصدار.',
+  updateMessageKu: 'پێویستە نوێکردنەوەیەکی گرنگ ئەنجام بدەیت بۆ بەردەوامبوون لە بەکارهێنانی خامارک. تکایە بۆ دوا وەشان نوێی بکەرەوە.',
+  androidStoreUrl: 'https://play.google.com/store/apps/details?id=com.khamark.app',
+  iosStoreUrl: 'https://apps.apple.com/app/khamark/id_replace_with_apple_id',
+  latestVersionCode: 1,
   latestBuildNumber: 1,
 };
 
 class AppConfigService {
   private static readonly DOCUMENT = 'app';
-  private static readonly CACHE_KEY = 'app_config_cache_v2';
+  private static readonly CACHE_KEY = '@khamark:app_config_cache_v2';
   private static readonly CACHE_EXPIRY_MS = 60 * 60 * 1000;
 
   private async getCachedConfig(): Promise<AppConfig | null> {

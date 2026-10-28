@@ -11,14 +11,14 @@ interface ScreenWrapperProps {
 const ScreenWrapper: React.FC<ScreenWrapperProps> = ({ 
   children, 
   style, 
-  addTabBarPadding = true 
+  addTabBarPadding = false 
 }) => {
   const { theme } = useTheme();
   
   const wrapperStyle: ViewStyle = {
     flex: 1,
-    backgroundColor: theme.colors.background, // Use theme background instead of hardcoded orange-white
-    paddingBottom: addTabBarPadding ? 110 : 0,
+    backgroundColor: theme.colors.background,
+    ...(addTabBarPadding ? { paddingBottom: 0 } : {}),
     ...style,
   };
   

@@ -30,7 +30,7 @@ export interface Promo {
   sortOrder: number;
 }
 
-const STORAGE_KEY = '@asankary_promos_mock_v1';
+const STORAGE_KEY = '@khamark_promos_mock_v1';
 
 const SEED_PROMOS: Promo[] = [
   { id: 'promo-welcome10', code: 'WELCOME10', type: 'percentage', value: 10, isActive: true, sortOrder: 0 },

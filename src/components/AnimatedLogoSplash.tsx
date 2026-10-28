@@ -82,7 +82,7 @@ const AnimatedLogoSplash: React.FC<Props> = ({ onFinish, onStart }) => {
         <Animated.View style={[styles.ring, ringStyle]} />
         <Animated.View style={logoStyle}>
           <Image
-            source={require('../../assets/images/asankarylogo.png')}
+            source={require('../../assets/images/khamark_logo.png')}
             style={styles.logo}
             contentFit="contain"
             // Decode from the bundle synchronously — no fade-in delay.
@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
     height: LOGO_SIZE * 1.35,
     borderRadius: LOGO_SIZE,
     borderWidth: 2,
-    borderColor: '#F59E0B',
+    borderColor: '#A61920',
   },
   logo: { width: LOGO_SIZE, height: LOGO_SIZE },
 });

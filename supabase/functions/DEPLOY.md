@@ -3,41 +3,21 @@
 These replace the Firebase Cloud Functions. Run all commands with **your** Supabase
 login (use the `!` prefix in Claude Code so they run in your shell):
 
-> **Deploy one function at a time, by name, with `--project-ref ucopzrdubjnyfprbaqus`.**
-> On 2026-09-07 the functions from `HAryad-main` (a different app, different project)
-> were deployed onto this project. As of 2026-10-02 these live functions are HAryad's
-> build, not this folder: askChatbot, login, send-sms-otp, phone-otp-session,
-> resetPassword, payment-complete and the three QiCard functions, plus three that
-> exist only in HAryad (chatAutoReply, huawei-auth, syncStoreVersion). HAryad's
-> askChatbot streams a format older app builds could not read (ISSUE-007), and this
-> folder's login had an account-takeover hole (fixed, ISSUE-008). Diff a function
-> against `supabase functions download <name>` before redeploying it. HAryad's
-> rate limits need a `login_attempts` table and a `check_otp_rate_limit` RPC that do
-> not exist in this database, so they fail open here.
->
-> `supabase login` uses whichever account the browser is signed into. The project
-> belongs to asankarye@gmail.com; any other account gets 403.
+> **Deploy functions with `--project-ref utttnhpdzsdwgkneqrnq` (or after `npx supabase link`).**
+> Ensure your Supabase CLI is logged into the account that owns the Khamark project (`utttnhpdzsdwgkneqrnq`).
 
 ```bash
-# Link the repo to the project once (project-ref = the REPLACE_WITH_ASANKARY_SUPABASE_PROJECT_REF part):
-npx supabase link --project-ref <project-ref>
+# Link the repo to your Khamark Supabase project:
+npx supabase link --project-ref utttnhpdzsdwgkneqrnq
 ```
 
 ## 1. Secrets (one-time)
 
 ```bash
-# OpenAI key for the chatbot
+# Anthropic API key for AI auto-reply / Claude chatbot
+npx supabase secrets set ANTHROPIC_API_KEY="sk-ant-..."
+# Or OpenAI key if using OpenAI fallback
 npx supabase secrets set OPENAI_API_KEY="sk-..."
-# optional model override (defaults to gpt-4.1-mini)
-# npx supabase secrets set OPENAI_MODEL="gpt-4.1-mini"
-
-# Firebase service account for FCM push (Firebase console → Project Settings →
-# Service accounts → Generate new private key → save the JSON, then:)
-npx supabase secrets set FCM_SERVICE_ACCOUNT="$(cat path/to/firebase-service-account.json)"
-
-# Firebase Web API key — for the lazy-migration login bridge (Firebase console →
-# Project Settings → General → Web API Key)
-npx supabase secrets set FIREBASE_WEB_API_KEY="AIza..."
 
 # QiCard Payment Gateway (Sandbox credentials by default)
 npx supabase secrets set QICARD_API_HOST="https://uat-sandbox-3ds-api.qi.iq/api/v1"
@@ -47,9 +27,9 @@ npx supabase secrets set QICARD_TERMINAL_ID="237984"
 
 # QiCard requires the webhook + return URLs on the merchant's OWN domain (not
 # *.supabase.co). A Cloudflare Worker (cloudflare/qicard-proxy-worker.js) proxies
-# ASANKARY_DOMAIN_TBD/qicard-webhook and /payment-complete to these functions.
+# khamark.com/qicard-webhook and /payment-complete to these functions.
 # Point create-qicard-payment at that domain:
-npx supabase secrets set QICARD_PUBLIC_BASE="https://ASANKARY_DOMAIN_TBD"
+npx supabase secrets set QICARD_PUBLIC_BASE="https://khamark.com"
 ```
 
 `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected automatically — do not set them.

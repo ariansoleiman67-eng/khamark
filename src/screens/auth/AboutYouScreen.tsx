@@ -50,7 +50,7 @@ const LUX = {
 const SPACING = { xs: 8, sm: 12, md: 16, lg: 24, xl: 32 };
 const RADIUS = { input: 16, button: 16, card: 24, back: 22 };
 
-const ASANKARY_LOGO = require('../../../assets/images/asankarylogo.png');
+const KHAMARK_LOGO = require('../../../assets/images/khamark_logo.png');
 
 // ─── Floating Particle (matches Register/SignIn hero sparkle) ─────────────────
 const FloatingParticle = ({ delay, x, size, duration }: { delay: number; x: number; size: number; duration: number }) => {
@@ -219,7 +219,7 @@ const AboutYouScreen: React.FC = () => {
             {/* Brand medallion */}
             <Animated.View entering={FadeInDown.duration(600).delay(150)} style={styles.heroContent}>
               <View style={[styles.logoMedallion, { backgroundColor: colors.surface }]}>
-                <Image source={ASANKARY_LOGO} style={styles.logoImage} contentFit="contain" />
+                <Image source={KHAMARK_LOGO} style={styles.logoImage} contentFit="contain" />
               </View>
               <Animated.View entering={SlideInLeft.duration(500).delay(280)}>
               <Animated.Text allowFontScaling={false} style={styles.heroTitle}>

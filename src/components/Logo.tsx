@@ -18,11 +18,11 @@ const Logo: React.FC<LogoProps> = ({
   
   const containerBg = variant === 'white' ? 'rgba(255, 255, 255, 0.2)' : 
                      variant === 'dark' ? 'rgba(0, 0, 0, 0.1)' : 
-                     'rgba(76, 175, 80, 0.1)';
+                     '#A61920';
   
   const fallbackColor = variant === 'white' ? '#ffffff' : 
                        variant === 'dark' ? '#333333' : 
-                       '#4CAF50';
+                       '#ffffff';
 
   // Check if style contains aspectRatio (responsive mode) or use fixed size
   const flatStyle = StyleSheet.flatten(style) || {};
@@ -46,14 +46,14 @@ const Logo: React.FC<LogoProps> = ({
         borderWidth: 2,
         borderColor: variant === 'white' ? 'rgba(255, 255, 255, 0.3)' : 
                     variant === 'dark' ? 'rgba(0, 0, 0, 0.2)' : 
-                    'rgba(76, 175, 80, 0.3)',
+                    '#E7E7EA',
       }, 
       // Apply passed style last (may include maxWidth, aspectRatio, borderRadius)
       style
     ]}>
       {!imageError ? (
         <Image
-          source={require('../../assets/images/asankarylogo.png')}
+          source={require('../../assets/images/khamark_logo.png')}
           style={[
             styles.logo,
             // In responsive mode, use percentage-based sizing
@@ -71,7 +71,7 @@ const Logo: React.FC<LogoProps> = ({
           onError={() => setImageError(true)}
         />
       ) : (
-        // Fallback: Show HA text or car icon
+        // Fallback: Show Khamark K initial
         <View style={styles.fallback}>
           <Text allowFontScaling={false} style={[
             styles.fallbackText, 
@@ -80,7 +80,7 @@ const Logo: React.FC<LogoProps> = ({
               color: fallbackColor,
             }
           ]}>
-            A
+            K
           </Text>
         </View>
       )}

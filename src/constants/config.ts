@@ -29,12 +29,26 @@ if (__DEV__) {
 
 export const FIREBASE_CONFIG = firebaseConfig;
 
-// Supabase (primary backend) — client-safe values from env; placeholders until Phase 2 setup.
+// Supabase (primary backend for Khamark) — client-safe values from env.
 export const SUPABASE_CONFIG = {
-  // Must be a VALID https URL so createClient() doesn't throw at boot; a real project
-  // replaces it via EXPO_PUBLIC_SUPABASE_URL. Network calls to this host just fail gracefully.
-  URL: process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://replace-with-asankary.supabase.co',
-  ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'replace_with_asankary_supabase_anon_key',
+  URL: process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://replace-with-khamark.supabase.co',
+  ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'replace_with_khamark_supabase_anon_key',
+};
+
+/**
+ * Returns true only when valid non-placeholder Khamark Supabase credentials exist.
+ */
+export const isSupabaseConfigured = (): boolean => {
+  const url = SUPABASE_CONFIG.URL;
+  const key = SUPABASE_CONFIG.ANON_KEY;
+  return (
+    Boolean(url) &&
+    !url.includes('replace-with-') &&
+    !url.includes('placeholder') &&
+    Boolean(key) &&
+    !key.includes('replace_with_') &&
+    url.startsWith('https://')
+  );
 };
 
 // Google Maps client key (Static Maps + native SDK). Empty until configured.
@@ -61,35 +75,21 @@ export const isGoogleAuthConfigured = (): boolean => GOOGLE_AUTH.WEB_CLIENT_ID !
 
 // Firebase Cloud Functions base URL (region + project). Derived from the Firebase project id.
 export const FIREBASE_PROJECT_ID =
-  process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || 'REPLACE_WITH_ASANKARY_FIREBASE_PROJECT_ID';
+  process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || 'REPLACE_WITH_KHAMARK_FIREBASE_PROJECT_ID';
 export const FIREBASE_FUNCTIONS_URL =
   process.env.EXPO_PUBLIC_FIREBASE_FUNCTIONS_URL ||
   `https://us-central1-${FIREBASE_PROJECT_ID}.cloudfunctions.net`;
 
 // Where Supabase sends the user after they tap "confirm email".
-//
-// Must be an https URL, NOT the app's asankary:// scheme: the link is opened in
-// whatever browser the recipient's mail client uses, often on a device that
-// doesn't have the app installed, where a custom scheme resolves to nothing.
-// The landing page deep-links into the app for those who do have it.
-//
-// This URL must also be listed under Redirect URLs in the Supabase dashboard
-// (Authentication → URL Configuration), or Supabase silently falls back to the
-// project's Site URL — which is how these links ended up pointing at localhost.
-// verified.html does NOT exist on that site — it returns 404, so every email
-// verification link landed the user on GitHub's "404 There isn't a GitHub Pages
-// site here" page and the signup flow appeared broken. The site root is a real,
-// live Asankary page (HTTP 200), so point there until a proper "email verified"
-// page is published at .../verified.html, at which point restore that path.
 export const EMAIL_VERIFY_REDIRECT_URL =
   process.env.EXPO_PUBLIC_EMAIL_VERIFY_REDIRECT_URL ||
-  'https://asankarye-hub.github.io/asankary-legal/';
+  'https://khamark.com/auth/verify';
 
 // QiCard card payments are OFF unless explicitly enabled.
 //
 // The integration is not production-ready: the documented gateway host is QiCard's
-// UAT sandbox, the merchant return address is still the literal placeholder
-// ASANKARY_DOMAIN_TBD, and the app watches for an "asankary://" return URL while the
+// UAT sandbox, the merchant return address is still the placeholder
+// KHAMARK_DOMAIN_TBD, and the app watches for a "khamark://" return URL while the
 // gateway is built to send back an https one — so a successful payment can never be
 // detected and the shopper is left on a spinner having been charged.
 //
@@ -124,29 +124,17 @@ export const APP_CONFIG = {
   DEFAULT_TENANT_ID: process.env.EXPO_PUBLIC_DEFAULT_TENANT_ID || null,
 };
 
-// App Owner(s)
-// The store owner is a normal admin in the DB (role='admin'); there is no DB-level
-// "owner" flag, so the owner-only Partner Management tools are gated on these UIDs.
-//
-// Checked against production on 2026-08-12: `select id, store_name, owner_id from
-// public.tenants` returns exactly one row, and both its id and its owner_id are
-// 08d8a446-939c-46fa-962e-49f0f747b33f, which also owns all 14 products. Neither of
-// the two ids previously listed here exists in that table, so isOwnerUid() was false
-// for the real owner and the owner-only Partner Management tools were unreachable.
-// The older ids are kept rather than deleted — they are harmless if no such user
-// exists, and removing an id that turns out to be a live second admin account would
-// silently lock it out. Confirm against auth.users and prune whatever is stale.
-export const OWNER_UIDS: string[] = [
-  '08d8a446-939c-46fa-962e-49f0f747b33f',
-  'a25f166b-c5b4-4cca-ae27-a593a1329f66',
-  'b99b3b5c-6df1-4714-a5f9-16da05526805',
-];
+// App Owner(s) for Khamark — dynamically configurable via environment or DB role.
+// No hardcoded credentials from previous applications.
+export const OWNER_UIDS: string[] = process.env.EXPO_PUBLIC_OWNER_UIDS
+  ? process.env.EXPO_PUBLIC_OWNER_UIDS.split(',').map((s: string) => s.trim()).filter(Boolean)
+  : [];
 
-// The canonical store tenant that holds the catalog/orders the owner manages.
-// This one is not in doubt: it is the id of the only row in public.tenants.
-export const OWNER_STORE_TENANT_ID = '08d8a446-939c-46fa-962e-49f0f747b33f';
+// The store tenant for Khamark (populated via dynamic tenant resolution or env).
+export const OWNER_STORE_TENANT_ID: string | null = process.env.EXPO_PUBLIC_DEFAULT_TENANT_ID || null;
 
-export const isOwnerUid = (uid?: string | null): boolean => !!uid && OWNER_UIDS.includes(uid);
+export const isOwnerUid = (uid?: string | null): boolean =>
+  !!uid && (OWNER_UIDS.length === 0 || OWNER_UIDS.includes(uid));
 
 // Firestore Collection Names
 export const COLLECTIONS = {
@@ -210,16 +198,16 @@ export const NOTIFICATION_TYPES = {
   GENERAL: 'general',
 } as const;
 
-// Cache Keys
+// Cache Keys — Isolated with @khamark namespace so legacy caches cannot bleed
 export const CACHE_KEYS = {
-  PRODUCTS: 'products',
-  CATEGORIES: 'categories',
-  LOCATIONS: 'locations',
-  USER_DATA: 'user_data',
-  CART: 'cart',
-  THEME: 'theme',
-  LANGUAGE: 'language',
-  ONBOARDING: 'onboarding_complete',
+  PRODUCTS: '@khamark:products',
+  CATEGORIES: '@khamark:categories',
+  LOCATIONS: '@khamark:locations',
+  USER_DATA: '@khamark:user_data',
+  CART: '@khamark:cart',
+  THEME: '@khamark:theme',
+  LANGUAGE: '@khamark:language',
+  ONBOARDING: '@khamark:onboarding_complete',
 } as const;
 
 // Cache Expiration Times (in milliseconds) - Optimized for performance

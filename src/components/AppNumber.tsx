@@ -31,11 +31,18 @@ export default function AppNumber({
   const flat = (Array.isArray(style) ? Object.assign({}, ...style) : (style || {})) as TextStyle;
   const fontSize = typeof flat.fontSize === "number" ? flat.fontSize : 14;
 
-  // Guarantee roomy lineHeight (bold text increases glyph metrics)
-  const safeLineHeight =
-    typeof flat.lineHeight === "number"
+  // Guarantee roomy lineHeight (bold text increases glyph metrics).
+  // CRITICAL (iOS): When adjustsFontSizeToFit is enabled on iOS, specifying lineHeight
+  // causes RCTText to measure the text as exceeding the vertical boundary, collapsing
+  // font size down to the 4pt minimum. Never apply fixed lineHeight when adjustsFontSizeToFit is active on iOS.
+  const isIosAdjusting = Platform.OS === "ios" && Boolean(adjustsFontSizeToFit);
+  const safeLineHeight = isIosAdjusting
+    ? undefined
+    : typeof flat.lineHeight === "number"
       ? Math.max(flat.lineHeight, Math.ceil(fontSize * 1.25))
       : Math.ceil(fontSize * 1.25);
+
+  const effectiveMinScale = minimumFontScale ?? (adjustsFontSizeToFit ? 0.85 : undefined);
 
   return (
     // @ts-ignore - writingDirection is required by user strictly
@@ -44,15 +51,15 @@ export default function AppNumber({
         allowFontScaling={false}
         numberOfLines={numberOfLines}
         adjustsFontSizeToFit={adjustsFontSizeToFit}
-        minimumFontScale={minimumFontScale}
+        minimumFontScale={effectiveMinScale}
         style={[
           {
             writingDirection: "ltr",
             textAlign: "left",
             // CRITICAL: Samsung bold-text needs the font padding space
             includeFontPadding: Platform.OS === "android",
-            // CRITICAL: avoid tight line height
-            lineHeight: safeLineHeight,
+            // CRITICAL: avoid tight line height, but omit on iOS when adjusting font size
+            ...(safeLineHeight !== undefined ? { lineHeight: safeLineHeight } : null),
             // Helps in tight containers (badges/rows)
             ...(Platform.OS === "android" ? { paddingVertical: 1 } : null),
             // Stable digit widths

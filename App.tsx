@@ -55,6 +55,7 @@ import { NotificationProvider } from './src/contexts/NotificationContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import AnimatedLogoSplash from './src/components/AnimatedLogoSplash';
 import OnboardingScreen from './src/screens/auth/OnboardingScreen';
+import ConfigurationUnavailableNotice from './src/components/ConfigurationUnavailableNotice';
 import { StatusBar } from 'expo-status-bar';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import AppAlertHost from './src/components/AppAlertHost';
@@ -244,6 +245,7 @@ export default function App() {
                       <StatusBar style="auto" />
                       {isReady && (
                         <>
+                          <ConfigurationUnavailableNotice />
                           <ForceUpdateModal />
                           <AppNavigator />
                           <FlyToCartLayer />

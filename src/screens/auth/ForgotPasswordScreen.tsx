@@ -432,7 +432,7 @@ const ForgotPasswordScreen: React.FC = () => {
             >
               <View style={styles.logoCircle}>
                 <Image
-                  source={require('../../../assets/images/asankarylogo.png')}
+                  source={require('../../../assets/images/khamark_logo.png')}
                   style={styles.logoImage}
                   contentFit="contain"
                 />

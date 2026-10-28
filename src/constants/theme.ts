@@ -1,45 +1,49 @@
 import { Theme } from '../types';
 
-// Brand palette — finalized in Phase 3
-const COLORS = {
-  // Primary Colors (Amber Retail)
-  primary: '#F5A00A',
-  primaryDark: '#D6870A',
-  primaryLight: '#FFB840',
+// Khamark Brand Palette — Luxury Red & White Visual Identity
+export const COLORS = {
+  // Primary Luxury Red
+  primary: '#A61920',
+  primaryDark: '#831319',
+  primaryLight: '#C92A32',
+  softRed: '#FBEFF0',
 
-  // Secondary Colors (Neutral gray)
-  secondary: '#718096',
-  secondaryDark: '#4a5568',
-  secondaryLight: '#a0aec0',
+  // Secondary Neutrals
+  secondary: '#666870',
+  secondaryDark: '#45474E',
+  secondaryLight: '#8C8E96',
 
-  // Accent Colors (Amber)
-  accent: '#FF9F0D',
-  accentLight: '#FFB840',
-  
-  // Status Colors
-  success: '#38a169',
-  warning: '#d69e2e',
-  error: '#e53e3e',
-  info: '#3182ce',
-  
-  // Neutral Colors
-  white: '#ffffff',
-  black: '#000000',
+  // Accent Colors
+  accent: '#A61920',
+  accentLight: '#FBEFF0',
+
+  // Status Colors (meaningful, distinct from brand red)
+  success: '#2E7D32',
+  warning: '#ED6C02',
+  error: '#D32F2F',
+  info: '#0288D1',
+
+  // Neutral Surfaces
+  white: '#FFFFFF',
+  black: '#191919',
+  surface: '#F7F7F8',
+  border: '#E7E7EA',
+  borderLight: '#F0F0F3',
   gray: {
-    50: '#f7fafc',
-    100: '#edf2f7',
-    200: '#e2e8f0',
-    300: '#cbd5e0',
-    400: '#a0aec0',
-    500: '#718096',
-    600: '#4a5568',
-    700: '#2d3748',
-    800: '#1a202c',
-    900: '#171923',
+    50: '#F7F7F8',
+    100: '#EFEFF1',
+    200: '#E7E7EA',
+    300: '#D5D5DC',
+    400: '#A1A1A8',
+    500: '#666870',
+    600: '#45474E',
+    700: '#2E2E33',
+    800: '#1F1F23',
+    900: '#191919',
   },
 };
 
-// Light Theme
+// Light Theme — Khamark Luxury White & Red
 export const lightTheme: Theme = {
   dark: false,
   colors: {
@@ -49,18 +53,18 @@ export const lightTheme: Theme = {
     secondary: COLORS.secondary,
     accent: COLORS.accent,
     background: COLORS.white,
-    surface: COLORS.gray[50],
+    surface: COLORS.surface,
     card: COLORS.white,
     error: COLORS.error,
     warning: COLORS.warning,
     success: COLORS.success,
-    text: COLORS.gray[900],
-    textSecondary: COLORS.gray[600],
+    text: COLORS.black,
+    textSecondary: COLORS.secondary,
     textOnPrimary: COLORS.white,
-    border: COLORS.gray[200],
+    border: COLORS.border,
     placeholder: COLORS.gray[400],
-    disabled: COLORS.gray[300],
-    shadow: 'rgba(0, 0, 0, 0.1)',
+    disabled: COLORS.gray[200],
+    shadow: 'rgba(0, 0, 0, 0.04)',
   },
   spacing: {
     xs: 4,
@@ -70,9 +74,9 @@ export const lightTheme: Theme = {
     xl: 32,
   },
   borderRadius: {
-    sm: 4,
-    md: 8,
-    lg: 16,
+    sm: 6,
+    md: 10,
+    lg: 14,
     full: 9999,
   },
   typography: {
@@ -104,28 +108,28 @@ export const lightTheme: Theme = {
   },
 };
 
-// Dark Theme
+// Dark Theme — Khamark Luxury Deep Dark & Crimson
 export const darkTheme: Theme = {
   dark: true,
   colors: {
-    primary: COLORS.primaryLight,
-    primaryDark: COLORS.primary,
-    primaryVariant: COLORS.primary,
-    secondary: COLORS.secondaryLight,
-    accent: COLORS.accentLight,
-    background: COLORS.gray[900],
-    surface: COLORS.gray[800],
-    card: COLORS.gray[800],
+    primary: '#D32F2F',
+    primaryDark: COLORS.primaryDark,
+    primaryVariant: '#E53935',
+    secondary: '#A1A1A6',
+    accent: '#D32F2F',
+    background: '#121214',
+    surface: '#1E1E22',
+    card: '#242428',
     error: COLORS.error,
     warning: COLORS.warning,
-    success: COLORS.success,
-    text: COLORS.white,
-    textSecondary: COLORS.gray[300],
+    success: '#4CAF50',
+    text: '#F5F5F7',
+    textSecondary: '#A1A1A6',
     textOnPrimary: COLORS.white,
-    border: COLORS.gray[700],
-    placeholder: COLORS.gray[500],
-    disabled: COLORS.gray[600],
-    shadow: 'rgba(0, 0, 0, 0.3)',
+    border: '#2C2C30',
+    placeholder: '#666870',
+    disabled: '#333338',
+    shadow: 'rgba(0, 0, 0, 0.4)',
   },
   spacing: lightTheme.spacing,
   borderRadius: lightTheme.borderRadius,
@@ -145,43 +149,65 @@ export const ANIMATION_DURATION = {
   SLOW: 500,
 } as const;
 
+// Restrained luxury shadows: soft, natural diffusion rather than harsh black borders
 export const SHADOW_STYLES = {
-  small: {
+  subtle: {
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 1,
     },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.41,
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  small: {
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
     elevation: 2,
   },
   medium: {
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
   },
   large: {
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 8,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-    elevation: 8,
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 5,
+  },
+  card: {
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
 };
 
 export const BORDER_STYLES = {
+  hairline: 0.5,
   thin: 1,
-  medium: 2,
-  thick: 3,
+  medium: 1.5,
+  thick: 2,
 };
 
 // Responsive breakpoints
@@ -191,13 +217,15 @@ export const BREAKPOINTS = {
   desktop: 1024,
 } as const;
 
-// Spacing constants (for direct use)
+// Spacing scale: 4, 8, 12, 16, 20, 24, 32
 export const SPACING = {
   xs: 4,
   sm: 8,
-  md: 16,
-  lg: 24,
-  xl: 32,
+  md: 12,
+  base: 16,
+  lg: 20,
+  xl: 24,
+  xxl: 32,
 } as const;
 
 export const FONT_SIZE = {
@@ -210,9 +238,11 @@ export const FONT_SIZE = {
 } as const;
 
 export const BORDER_RADIUS = {
-  sm: 4,
-  md: 8,
-  lg: 16,
+  xs: 4,
+  sm: 6,
+  md: 10,
+  lg: 14,
+  xl: 20,
   full: 9999,
 } as const;
 
@@ -221,6 +251,6 @@ export const LAYOUT = {
   HEADER_HEIGHT: 56,
   TAB_BAR_HEIGHT: 60,
   CARD_PADDING: 16,
-  SCREEN_PADDING: 20,
+  SCREEN_PADDING: 16,
   PRODUCT_CARD_ASPECT_RATIO: 1.2,
 } as const;

@@ -8,7 +8,7 @@ import { GOOGLE_AUTH, EMAIL_VERIFY_REDIRECT_URL } from '../constants/config';
 export class AuthService {
   static async signIn(email: string, password: string): Promise<User> {
     try {
-      await AsyncStorage.multiRemove(['user_data', '@asankary_user_profile']);
+      await AsyncStorage.multiRemove(['user_data', '@khamark_user_profile']);
 
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
@@ -139,13 +139,13 @@ export class AuthService {
       throw new Error(result?.error || 'Incorrect password');
     }
 
-    // Prefer email sign-in (synthetic "<digits>@asankaryapp.internal" for phone users).
+    // Prefer email sign-in (synthetic "<digits>@khamarkapp.internal" for phone users).
     if (result.email) {
       return this.signIn(result.email, password);
     }
 
     // Phone-only fallback.
-    await AsyncStorage.multiRemove(['user_data', '@asankary_user_profile']);
+    await AsyncStorage.multiRemove(['user_data', '@khamark_user_profile']);
     const { error } = await supabase.auth.signInWithPassword({ phone: result.phone, password });
     if (error) throw new Error(error.message || 'Incorrect password');
     const user = await this.getCurrentUserFresh();
@@ -189,7 +189,7 @@ export class AuthService {
         'user_data',
         'cart',
         'recent_searches',
-        '@asankary_user_profile',
+        '@khamark_user_profile',
         '@user_theme',
         '@user_language',
       ]);
@@ -244,7 +244,7 @@ export class AuthService {
         'user_data',
         'cart',
         'recent_searches',
-        '@asankary_user_profile',
+        '@khamark_user_profile',
         '@user_theme',
         '@user_language',
       ]);
@@ -292,7 +292,7 @@ export class AuthService {
    * the reset link opened the privacy policy and the customer never got a chance
    * to set a password. It looked like the email was broken; it was the link.
    *
-   * `asankary://reset-password` reopens the app on the set-password screen, where
+   * `khamark://reset-password` reopens the app on the set-password screen, where
    * the recovery token in the URL becomes a session (see handleRecoveryUrl).
    *
    * THIS URL MUST BE ALLOW-LISTED in Supabase: Authentication -> URL
@@ -303,12 +303,12 @@ export class AuthService {
    * The exact string Supabase must have in Authentication -> URL Configuration ->
    * Redirect URLs. Exposed so it can be read off a running build rather than
    * guessed: makeRedirectUri returns an `exp://…` development URL inside the dev
-   * client and `asankary://reset-password` in a real build, and allow-listing the
+   * client and `khamark://reset-password` in a real build, and allow-listing the
    * wrong one is silent — Supabase just falls back to the Site URL and the
    * customer lands on the website instead of the app.
    */
   static recoveryRedirectUri(): string {
-    return makeRedirectUri({ scheme: 'asankary', path: 'reset-password' });
+    return makeRedirectUri({ scheme: 'khamark', path: 'reset-password' });
   }
 
   static async resetPassword(email: string): Promise<void> {

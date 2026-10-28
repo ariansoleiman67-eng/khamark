@@ -23,7 +23,7 @@ export interface Brand {
   sortOrder: number;
 }
 
-const STORAGE_KEY = '@asankary_brands_mock_v5';
+const STORAGE_KEY = '@khamark_brands_mock_v1';
 
 // Seed brands mirror the demo product brands. No default logo image (external
 // logo CDNs are blocked in this env) — BrandTile renders a clean bold wordmark

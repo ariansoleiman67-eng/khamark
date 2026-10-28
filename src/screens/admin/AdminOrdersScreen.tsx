@@ -932,7 +932,7 @@ const AdminOrdersScreen: React.FC = () => {
         // carry a hard-coded Arabic shop name: this line still read 'هرياد أوتو بارت'
         // — the HaryadAutoparts shop this app was forked from — so every Arabic
         // invoice this shop printed was headed with another business's name.
-        // No Arabic/Kurdish spelling of 'Asankary' is invented here; when the shop
+        // No Arabic/Kurdish spelling of 'Khamark' is invented here; when the shop
         // wants one it types it in Invoice Settings.
         companyName: invoiceSettings?.companyNameAr || invoiceSettings?.companyName || BRAND.name,
         orderNumber: 'رقم الطلب:',

@@ -9,7 +9,7 @@ import { AuthService } from '../services/authService';
 import { OrderService } from '../services/OrderService';
 import { USE_MOCK_DATA } from '../services/mockData';
 
-const DEMO_VIP_KEY = '@asankary_demo_vip';
+const DEMO_VIP_KEY = '@khamark_demo_vip';
 
 interface AuthContextValue {
   user: User | null;

@@ -589,7 +589,7 @@ const AdminStoreProfileScreen: React.FC = () => {
               label={t('admin.storeProfile.storeName', { defaultValue: 'Store Name (English)' }) + ' *'}
               value={profile.storeName}
               onChangeText={(text) => handleChange('storeName', text)}
-              placeholder="e.g., Asankary"
+              placeholder="e.g., Khamark"
               containerStyle={styles.input}
             />
             
@@ -597,7 +597,7 @@ const AdminStoreProfileScreen: React.FC = () => {
               label={t('admin.storeProfile.storeNameAr', { defaultValue: 'Store Name (Arabic)' })}
               value={profile.storeNameAr}
               onChangeText={(text) => handleChange('storeNameAr', text)}
-              placeholder="مثال: Asankary"
+              placeholder="مثال: خامارك"
               containerStyle={styles.input}
             />
             
@@ -605,7 +605,7 @@ const AdminStoreProfileScreen: React.FC = () => {
               label={t('admin.storeProfile.storeNameKu', { defaultValue: 'Store Name (Kurdish)' })}
               value={profile.storeNameKu}
               onChangeText={(text) => handleChange('storeNameKu', text)}
-              placeholder="نموونە: Asankary"
+              placeholder="نموونە: خامارک"
               containerStyle={styles.input}
             />
           </View>

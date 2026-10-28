@@ -564,7 +564,7 @@ export class NotificationService {
 
   static async sendTestNotification(): Promise<void> {
     try {
-      await this.scheduleLocalNotification('Test Notification', 'This is a test notification from Asankary app!', { type: 'test' });
+      await this.scheduleLocalNotification('Test Notification', 'This is a test notification from Khamark app!', { type: 'test' });
     } catch (error) {}
   }
 

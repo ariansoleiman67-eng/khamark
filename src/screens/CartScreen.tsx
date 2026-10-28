@@ -46,9 +46,9 @@ import { useAuthGate } from '../hooks/useAuthGate';
 
 type CartScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Cart'>;
 
-// FIGMA: Primary orange color from design
-const FIGMA_ORANGE = '#FFA451';
-const FIGMA_DARK = '#27214D';
+// Khamark Brand Palette
+const FIGMA_ORANGE = '#A61920';
+const FIGMA_DARK = '#191919';
 
 // Summary bar height for padding calculation
 const SUMMARY_BAR_BASE_HEIGHT = 200;
@@ -63,14 +63,12 @@ interface CartItemComponentProps {
   t: (key: string, options?: any) => string;
 }
 
-// Color palette for product thumbnail backgrounds
+// Neutral backdrop palette for accessory product thumbnails
 const PRODUCT_BG_COLORS = [
-  '#FFFAEB', // Warm cream
-  '#FEF0F0', // Soft pink
-  '#F1EFF6', // Lavender
-  '#E8F5E9', // Mint
-  '#FFF3E0', // Peach
-  '#E3F2FD', // Sky blue
+  '#F7F7F8',
+  '#F5F5F7',
+  '#F7F7F8',
+  '#F5F5F7',
 ];
 
 /**
@@ -675,49 +673,72 @@ const CartScreen: React.FC = () => {
   // Render empty state
   const renderEmptyState = useCallback(() => (
     <View style={styles.emptyContainer}>
-      <View style={[styles.emptyIconContainer, { backgroundColor: cartAccent + '20' }]}>
-        <CartIcon size={60} color={cartAccent} />
+      <View style={[
+        styles.emptyIconContainer,
+        {
+          backgroundColor: isDark ? 'rgba(166, 25, 32, 0.10)' : '#FDF2F3',
+          borderColor: isDark ? 'rgba(166, 25, 32, 0.22)' : 'rgba(166, 25, 32, 0.14)',
+        }
+      ]}>
+        <Ionicons name="bag-handle-outline" size={54} color={cartAccent} />
       </View>
       <Text allowFontScaling={false} style={[styles.emptyTitle, { color: theme.colors.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>{t('cart.empty')}</Text>
       <AppText style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
         {t('cart.emptySubtitle')}
       </AppText>
       <TouchableOpacity 
-        style={[styles.shopButton, { backgroundColor: cartAccent }]}
+        style={styles.shopButtonShadow}
+        activeOpacity={0.88}
         onPress={() => navigation.navigate('Main', { screen: 'Categories' })}
       >
-        <AppText style={styles.shopButtonText}>{t('orders.startShopping')}</AppText>
+        <LinearGradient
+          colors={['#A61920', '#831319']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.shopButton}
+        >
+          <AppText style={styles.shopButtonText}>{t('orders.startShopping')}</AppText>
+        </LinearGradient>
       </TouchableOpacity>
     </View>
-    // theme and cartAccent are read in the body above, so they must be dependencies.
-    // The sibling renderCartItem already lists theme; omitting it here meant a theme
-    // change while the Cart tab stayed mounted (it is a tab with freezeOnBlur, not
-    // unmountOnBlur) left the empty state rendering the previous theme's colours.
-  ), [t, navigation, theme, cartAccent]);
+    // theme, isDark, and cartAccent are read in the body above, so they must be dependencies.
+  ), [t, navigation, theme, isDark, cartAccent]);
 
   // Loading skeleton
   if (isLoading && !cart) {
     return (
-      <View style={[styles.container, { backgroundColor: cartAccent }]}>
-        <StatusBar style="light" />
+      <View style={[styles.container, { backgroundColor: isDark ? theme.colors.background : '#F7F7F8' }]}>
+        <StatusBar style={isDark ? 'light' : 'dark'} />
         <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-          {/* Orange header skeleton */}
-          <View style={styles.headerContainer}>
-            <View style={styles.goBackPill}>
-              <View style={[styles.skeletonCircle, { backgroundColor: '#fff', opacity: 0.3 }]} />
-            </View>
-            <View style={[styles.skeletonTitle, { backgroundColor: '#fff', opacity: 0.5 }]} />
+          {/* Header skeleton */}
+          <View style={[
+            styles.headerContainer,
+            {
+              backgroundColor: isDark ? theme.colors.surface : '#FFFFFF',
+              borderBottomColor: isDark ? 'rgba(255,255,255,0.08)' : '#E7E7EA',
+            }
+          ]}>
+            <View style={styles.headerSpacer} />
+            <View style={[styles.skeletonTitle, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#E7E7EA' }]} />
+            <View style={styles.headerSpacer} />
           </View>
           
-          {/* White content area skeleton */}
-          <View style={styles.contentContainer}>
-            <View style={{ padding: 20 }}>
+          {/* Content area skeleton */}
+          <View style={[styles.contentContainer, { backgroundColor: isDark ? theme.colors.background : '#F7F7F8' }]}>
+            <View style={{ padding: 16 }}>
               {[1, 2, 3].map((i) => (
-                <View key={i} style={[styles.cartItem, { marginBottom: 16 }]}>
-                  <View style={[styles.productThumbContainer, { backgroundColor: '#f0f0f0' }]} />
+                <View key={i} style={[
+                  styles.cartItem,
+                  {
+                    marginBottom: 12,
+                    backgroundColor: isDark ? theme.colors.surface : '#FFFFFF',
+                    borderColor: isDark ? 'rgba(255,255,255,0.08)' : '#E7E7EA',
+                  }
+                ]}>
+                  <View style={[styles.productThumbContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F0F0F2' }]} />
                   <View style={styles.productInfo}>
-                    <View style={[styles.skeletonText, { width: '70%', height: 16 }]} />
-                    <View style={[styles.skeletonText, { width: '40%', height: 14, marginTop: 8 }]} />
+                    <View style={[styles.skeletonText, { width: '70%', height: 16, backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#E7E7EA' }]} />
+                    <View style={[styles.skeletonText, { width: '40%', height: 14, marginTop: 8, backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#E7E7EA' }]} />
                   </View>
                 </View>
               ))}
@@ -731,30 +752,63 @@ const CartScreen: React.FC = () => {
   const hasItems = cart?.items && cart.items.length > 0;
 
   return (
-    <View style={[styles.container, { backgroundColor: cartAccent }]}>
-      <StatusBar style="light" />
+    <View style={[styles.container, { backgroundColor: isDark ? theme.colors.background : '#F7F7F8' }]}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-        {/* FIGMA: Orange header */}
-        <View style={[styles.headerContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-          {/* Go back button with pill background */}
-          <TouchableOpacity
-            style={[styles.goBackPill, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={20} color="#000" />
-            <AppText style={[styles.goBackText, isRTL && { marginLeft: 0, marginRight: 4 }]}>{t('common.back', 'Go back')}</AppText>
-          </TouchableOpacity>
+        {/* Luxury Header */}
+        <View style={[
+          styles.headerContainer,
+          {
+            flexDirection: isRTL ? 'row-reverse' : 'row',
+            backgroundColor: isDark ? theme.colors.surface : '#FFFFFF',
+            borderBottomColor: isDark ? 'rgba(255,255,255,0.08)' : '#E7E7EA',
+          }
+        ]}>
+          {navigation.canGoBack() ? (
+            <TouchableOpacity
+              style={[
+                styles.headerIconButton,
+                {
+                  backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#F7F7F8',
+                  borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : '#E7E7EA',
+                }
+              ]}
+              onPress={() => navigation.goBack()}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.back', 'Go back')}
+            >
+              <Ionicons
+                name={isRTL ? 'chevron-forward' : 'chevron-back'}
+                size={20}
+                color={isDark ? '#FFFFFF' : '#191919'}
+              />
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.headerSpacer} />
+          )}
 
-          {/* Title */}
-          <AppText style={styles.headerTitle}>{t('cart.title')}</AppText>
+          {/* Title & Badge */}
+          <View style={[styles.headerTitleWrap, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <AppText style={[styles.headerTitle, { color: theme.colors.text }]}>
+              {t('cart.title')}
+            </AppText>
+            {hasItems && (
+              <View style={styles.headerCountBadge}>
+                <AppText style={styles.headerCountText}>
+                  {cart.items.reduce((sum, item) => sum + item.quantity, 0)}
+                </AppText>
+              </View>
+            )}
+          </View>
 
-          {/* Spacer for centering */}
-          <View style={{ width: 80 }} />
+          {/* Spacer for symmetry */}
+          <View style={styles.headerSpacer} />
         </View>
 
-        {/* FIGMA: White content area with rounded top corners */}
-        <View style={[styles.contentContainer, { backgroundColor: isDark ? theme.colors.background : '#fff' }]}>
+        {/* Content area */}
+        <View style={[styles.contentContainer, { backgroundColor: isDark ? theme.colors.background : '#F7F7F8' }]}>
           <KeyboardAvoidingView
             style={{ flex: 1 }}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -773,8 +827,8 @@ const CartScreen: React.FC = () => {
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={{
                 flexGrow: 1,
-                paddingHorizontal: 20,
-                paddingTop: 24,
+                paddingHorizontal: 16,
+                paddingTop: 16,
                 paddingBottom: hasItems && cartSummary ? SUMMARY_BAR_BASE_HEIGHT + insets.bottom : 40,
               }}
               refreshControl={
@@ -788,11 +842,14 @@ const CartScreen: React.FC = () => {
               ItemSeparatorComponent={() => <View style={styles.separator} />}
             />
 
-            {/* FIGMA: Sticky bottom summary bar */}
             {hasItems && cartSummary && (
               <View style={[
                 styles.summaryContainer,
-                { paddingBottom: insets.bottom + 16, backgroundColor: isDark ? theme.colors.surface : '#FFF8F2' }
+                {
+                  paddingBottom: Math.max(insets.bottom, 16),
+                  backgroundColor: isDark ? theme.colors.surface : '#FFFFFF',
+                  borderTopColor: isDark ? 'rgba(255,255,255,0.08)' : '#E7E7EA',
+                }
               ]}>
                 {/* Discount banner */}
                 {appliedDiscount && (
@@ -871,14 +928,14 @@ const CartScreen: React.FC = () => {
                     </View>
                   </View>
 
-                  {/* Checkout button — gradient; stays solid during qty edits (no loading flash) */}
+                  {/* Checkout button — Khamark Crimson gradient */}
                   <TouchableOpacity
                     onPress={handleCheckout}
                     activeOpacity={0.85}
                     style={styles.checkoutButtonShadow}
                   >
                     <LinearGradient
-                      colors={['#22C55E', '#16A34A']}
+                      colors={['#A61920', '#831319']}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
                       style={styles.checkoutButton}
@@ -907,11 +964,46 @@ const styles = StyleSheet.create({
   // ========== LUXURY HEADER ==========
   headerContainer: {
     alignItems: 'center',
+    borderBottomWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingTop: 14,
-    paddingVertical: 22,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  headerIconButton: {
+    alignItems: 'center',
+    borderRadius: 20,
+    borderWidth: 1,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  headerSpacer: {
+    height: 40,
+    width: 40,
+  },
+  headerTitleWrap: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 19,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+    textAlign: 'center',
+  },
+  headerCountBadge: {
+    backgroundColor: 'rgba(166, 25, 32, 0.08)',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  headerCountText: {
+    color: '#A61920',
+    fontSize: 12,
+    fontWeight: '700',
   },
   goBackPill: {
     alignItems: 'center',
@@ -933,27 +1025,18 @@ const styles = StyleSheet.create({
     letterSpacing: 0.1,
     marginLeft: 4,
   },
-  headerTitle: {
-    color: '#fff',
-    fontSize: 22,
-    fontWeight: '700',
-    letterSpacing: 0.2,
-    textAlign: 'center',
-  },
 
   // ========== LUXURY CONTENT AREA ==========
   contentContainer: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
     flex: 1,
-    marginTop: -8,
   },
 
   // ========== LUXURY CART ITEMS ==========
   cartItem: {
-    backgroundColor: '#FFF5EE', // overridden inline for dark mode
-    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E7E7EA',
+    borderRadius: 14,
     marginBottom: 10,
     overflow: 'hidden',
     paddingHorizontal: 14,
@@ -1114,62 +1197,69 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
-    padding: 40,
+    padding: 36,
   },
   emptyIconContainer: {
     alignItems: 'center',
-    borderRadius: 999,
-    height: 130,
+    borderRadius: 60,
+    borderWidth: 1,
+    height: 110,
     justifyContent: 'center',
-    marginBottom: 28,
-    width: 130,
+    marginBottom: 24,
+    width: 110,
   },
   emptyTitle: {
-    fontSize: 24,
-    fontWeight: '800',
+    fontSize: 22,
+    fontWeight: '700',
     letterSpacing: -0.3,
-    marginBottom: 10,
+    marginBottom: 8,
     textAlign: 'center',
     width: '100%',
   },
   emptySubtitle: {
-    fontSize: 15,
-    lineHeight: 24,
-    marginBottom: 36,
-    opacity: 0.6,
+    fontSize: 14,
+    lineHeight: 22,
+    marginBottom: 28,
+    opacity: 0.7,
     textAlign: 'center',
+    maxWidth: 280,
   },
-  shopButton: {
-    borderRadius: 16,
-    elevation: 4,
-    paddingHorizontal: 36,
-    paddingVertical: 16,
+  shopButtonShadow: {
+    borderRadius: 14,
     shadowColor: FIGMA_ORANGE,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
-    shadowRadius: 8,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  shopButton: {
+    borderRadius: 14,
+    paddingHorizontal: 36,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   shopButtonText: {
     color: '#ffffff',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     letterSpacing: 0.3,
   },
 
   // ========== LUXURY SUMMARY BAR ==========
   summaryContainer: {
-    backgroundColor: '#FFF8F2',
-    borderTopColor: '#FFE8D6',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    elevation: 16,
-    paddingHorizontal: 24,
-    paddingTop: 18,
+    backgroundColor: '#FFFFFF',
+    borderTopColor: '#E7E7EA',
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    borderTopWidth: 1,
+    elevation: 8,
+    paddingHorizontal: 20,
+    paddingTop: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
   },
   discountBanner: {
     alignItems: 'center',
@@ -1209,7 +1299,7 @@ const styles = StyleSheet.create({
   },
   opportunityBanner: {
     alignItems: 'center',
-    backgroundColor: '#FFF3E0',
+    backgroundColor: '#FBEFF0',
     borderRadius: 12,
     flexDirection: 'row',
     marginBottom: 14,
@@ -1224,19 +1314,19 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   opportunityAmount: {
-    color: '#E65100',
+    color: '#A61920',
     fontSize: 13,
     fontWeight: '800',
   },
   opportunityText: {
-    color: '#E65100',
+    color: '#A61920',
     fontSize: 13,
     fontWeight: '600',
     letterSpacing: 0.1,
   },
   subtotalRow: {
     alignItems: 'center',
-    borderBottomColor: '#FFE0C4',
+    borderBottomColor: '#E7E7EA',
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1244,14 +1334,14 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
   },
   itemCountBadge: {
-    backgroundColor: '#0077BE' + '20',
+    backgroundColor: 'rgba(166, 25, 32, 0.08)',
     borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
   },
   itemCountText: {
-    color: '#0077BE',
-    fontSize: 13,
+    color: '#A61920',
+    fontSize: 12,
     fontWeight: '700',
     letterSpacing: 0.2,
   },
@@ -1260,12 +1350,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   subtotalLabel: {
-    color: '#888',
+    color: '#666870',
     fontSize: 13,
     fontWeight: '500',
   },
   subtotalPrice: {
-    color: '#0077BE',
+    color: '#191919',
     fontSize: 14,
     fontWeight: '700',
   },
@@ -1275,9 +1365,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   totalLabel: {
-    color: '#888',
+    color: '#666870',
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '600',
     letterSpacing: 0.3,
     marginBottom: 3,
     textTransform: 'uppercase',
@@ -1287,31 +1377,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   totalPrice: {
-    color: '#0077BE',
-    fontSize: 30,
+    color: '#A61920',
+    fontSize: 26,
     fontWeight: '800',
     letterSpacing: -0.5,
   },
   checkoutButton: {
     alignItems: 'center',
-    backgroundColor: FIGMA_ORANGE,
-    borderRadius: 18,
-    elevation: 8,
+    borderRadius: 14,
     flexDirection: 'row',
-    paddingHorizontal: 36,
-    paddingVertical: 18,
-    shadowColor: FIGMA_ORANGE,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+    paddingVertical: 14,
   },
   checkoutButtonShadow: {
-    borderRadius: 18,
-    elevation: 10,
-    shadowColor: '#16A34A',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 14,
+    borderRadius: 14,
+    elevation: 6,
+    shadowColor: FIGMA_ORANGE,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.28,
+    shadowRadius: 10,
   },
   checkoutButtonDisabled: {
     opacity: 0.6,

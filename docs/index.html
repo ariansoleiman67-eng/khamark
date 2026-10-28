@@ -1,291 +1,243 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Privacy Policy - Asankary</title>
-    <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Khamark — Mobile Accessories &amp; Electronics</title>
+  <meta name="description" content="Official website and portal for Khamark mobile application. Shop premium phone accessories and electronics in Iraq." />
+  <style>
+    :root {
+      --primary: #A61920;
+      --primary-hover: #8B141A;
+      --bg: #FAFAFC;
+      --surface: #FFFFFF;
+      --text: #1C1C1E;
+      --text-muted: #6B7280;
+      --border: #E5E7EB;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0E0F12;
+        --surface: #18191E;
+        --text: #F3F4F6;
+        --text-muted: #9CA3AF;
+        --border: #2A2E39;
       }
-      body {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-          sans-serif;
-        background: #f5f5f5;
-        color: #333;
-        line-height: 1.6;
-      }
-      .header {
-        background: linear-gradient(135deg, #1a365d 0%, #2c5282 100%);
-        color: white;
-        padding: 40px 20px;
-        text-align: center;
-      }
-      .header h1 {
-        font-size: 28px;
-        margin-bottom: 10px;
-      }
-      .header p {
-        opacity: 0.9;
-        font-size: 16px;
-      }
-      .container {
-        max-width: 800px;
-        margin: 0 auto;
-        padding: 20px;
-      }
-      .summary {
-        background: #e8f5e9;
-        border-left: 4px solid #4caf50;
-        padding: 20px;
-        margin: 20px 0;
-        border-radius: 8px;
-      }
-      .summary h2 {
-        color: #2e7d32;
-        margin-bottom: 15px;
-      }
-      .summary li {
-        margin: 8px 0;
-        color: #2e7d32;
-      }
-      .section {
-        background: white;
-        border-radius: 8px;
-        padding: 25px;
-        margin: 15px 0;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        border-left: 4px solid #4caf50;
-      }
-      .section h3 {
-        color: #1a365d;
-        margin-bottom: 15px;
-        font-size: 18px;
-      }
-      .section p,
-      .section li {
-        margin: 8px 0;
-        color: #555;
-      }
-      .contact {
-        background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
-        color: white;
-        padding: 30px;
-        border-radius: 8px;
-        text-align: center;
-        margin: 30px 0;
-      }
-      .contact h3 {
-        margin-bottom: 15px;
-      }
-      .contact a {
-        color: white;
-        font-weight: bold;
-      }
-      .footer {
-        text-align: center;
-        padding: 20px;
-        color: #777;
-        font-size: 14px;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="header">
-      <h1>🛡️ Privacy Policy</h1>
-      <p>Asankary - Your Privacy is Our Priority</p>
-      <p style="margin-top: 10px; font-size: 14px">
-        Effective Date: January 1, 2025 | Version 2.1
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 0 20px 60px;
+    }
+    .container {
+      max-width: 860px;
+      margin: 0 auto;
+    }
+    header {
+      padding: 40px 0 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+    .brand-title {
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--primary);
+      letter-spacing: -0.5px;
+    }
+    .brand-tag {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+    .hero {
+      text-align: center;
+      padding: 60px 0 40px;
+    }
+    .hero h1 {
+      font-size: 36px;
+      font-weight: 800;
+      letter-spacing: -0.8px;
+      margin-bottom: 12px;
+      line-height: 1.25;
+    }
+    .hero p {
+      font-size: 18px;
+      color: var(--text-muted);
+      max-width: 620px;
+      margin: 0 auto 30px;
+    }
+    .badges {
+      display: flex;
+      gap: 14px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--primary);
+      color: #FFFFFF;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 15px;
+      padding: 12px 24px;
+      border-radius: 999px;
+      transition: background 0.2s ease;
+    }
+    .btn:hover {
+      background: var(--primary-hover);
+    }
+    .btn-outline {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-outline:hover {
+      background: var(--surface);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 18px;
+      margin: 40px 0;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      text-decoration: none;
+      color: inherit;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+    }
+    .card-icon {
+      font-size: 28px;
+      margin-bottom: 12px;
+      display: inline-block;
+    }
+    .card h3 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: var(--text);
+    }
+    .card p {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+    .info-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      margin-top: 30px;
+    }
+    .info-section h2 {
+      font-size: 20px;
+      margin-bottom: 12px;
+    }
+    .info-section ul {
+      padding-left: 20px;
+      color: var(--text-muted);
+      font-size: 15px;
+    }
+    .info-section li {
+      margin-bottom: 8px;
+    }
+    footer {
+      text-align: center;
+      padding-top: 50px;
+      font-size: 13px;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border);
+      margin-top: 50px;
+    }
+    footer a {
+      color: var(--primary);
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <div class="brand-title">Khamark</div>
+        <div class="brand-tag">خامارك · Official App Portal</div>
+      </div>
+      <div>
+        <a href="./support.html" class="btn btn-outline" style="padding: 8px 16px; font-size: 13px;">Customer Support</a>
+      </div>
+    </header>
+
+    <section class="hero">
+      <h1>Premium Mobile Accessories &amp; Consumer Electronics</h1>
+      <p>
+        Khamark is your premier mobile shopping destination in Iraq. Discover high-quality chargers, audio gear, phone cases, and verified devices with same-day delivery in Erbil.
       </p>
+      <div class="badges">
+        <a href="#compliance" class="btn">Explore App Documents</a>
+        <a href="./support.html" class="btn btn-outline">Contact Store</a>
+      </div>
+    </section>
+
+    <div class="grid" id="compliance">
+      <a href="./privacy.html" class="card">
+        <span class="card-icon">🛡️</span>
+        <h3>Privacy Policy</h3>
+        <p>Learn how Khamark protects your personal data, encryption practices, and customer rights. (App Store &amp; Google Play compliant).</p>
+      </a>
+
+      <a href="./support.html" class="card">
+        <span class="card-icon">💬</span>
+        <h3>Support &amp; Help</h3>
+        <p>Order tracking, delivery inquiries, payment methods, and contact channels for our Erbil headquarters.</p>
+      </a>
+
+      <a href="./delete-account.html" class="card">
+        <span class="card-icon">🗑️</span>
+        <h3>Account Deletion</h3>
+        <p>Instructions to permanently delete your account and remove personal data, in accordance with Apple Guideline 5.1.1(v).</p>
+      </a>
+
+      <a href="./terms.html" class="card">
+        <span class="card-icon">📜</span>
+        <h3>Terms &amp; Conditions</h3>
+        <p>Purchasing terms, cash on delivery guidelines, warranty conditions, and trade-in inspection rules.</p>
+      </a>
     </div>
 
-    <div class="container">
-      <div class="summary">
-        <h2>✅ Privacy Quick Summary</h2>
-        <ul>
-          <li>
-            We only collect information necessary for providing our services
-          </li>
-          <li>Your data is encrypted and securely stored</li>
-          <li>We never sell your personal information to third parties</li>
-          <li>
-            You have full control over your data and can delete it anytime
-          </li>
-        </ul>
-      </div>
-
-      <div class="section">
-        <h3>1. INFORMATION WE COLLECT</h3>
-        <p><strong>1.1 Personal Information</strong></p>
-        <ul>
-          <li>Full name and contact information</li>
-          <li>Phone numbers and email addresses</li>
-          <li>Delivery addresses and billing information</li>
-          <li>Order and purchase history</li>
-          <li>Payment information (securely processed)</li>
-        </ul>
-        <p><strong>1.2 Automatically Collected Data</strong></p>
-        <ul>
-          <li>Device information (model, operating system, version)</li>
-          <li>App usage analytics and performance metrics</li>
-          <li>Location data (with your permission for delivery)</li>
-          <li>Network information and IP addresses</li>
-        </ul>
-      </div>
-
-      <div class="section">
-        <h3>2. HOW WE USE YOUR INFORMATION</h3>
-        <p><strong>Primary Business Purposes:</strong></p>
-        <ul>
-          <li>Processing and fulfilling your orders</li>
-          <li>Providing customer support and service</li>
-          <li>Sending order confirmations and updates</li>
-          <li>Managing returns, exchanges, and warranties</li>
-          <li>Improving our products and services</li>
-        </ul>
-      </div>
-
-      <div class="section">
-        <h3>3. INFORMATION SHARING</h3>
-        <p>We share information with trusted partners:</p>
-        <ul>
-          <li>Payment processors (QI Card, FIB Bank, etc.)</li>
-          <li>Shipping and delivery companies</li>
-          <li>Cloud storage and hosting providers</li>
-          <li>Analytics and performance monitoring services</li>
-        </ul>
-        <p>
-          We may disclose information when required by law or to protect our
-          rights.
-        </p>
-      </div>
-
-      <div class="section">
-        <h3>4. DATA SECURITY</h3>
-        <ul>
-          <li>End-to-end encryption for sensitive data</li>
-          <li>Secure HTTPS connections for all communications</li>
-          <li>Regular security audits and vulnerability testing</li>
-          <li>PCI DSS compliance for card processing</li>
-          <li>No storage of complete card numbers</li>
-        </ul>
-      </div>
-
-      <div class="section">
-        <h3>5. YOUR PRIVACY RIGHTS</h3>
-        <p>You have the right to:</p>
-        <ul>
-          <li>Access your personal information</li>
-          <li>Update and correct your data</li>
-          <li>Delete your account and data</li>
-          <li>Download your information (data portability)</li>
-          <li>Opt-out of marketing communications</li>
-          <li>Withdraw consent for data processing</li>
-        </ul>
-      </div>
-
-      <div class="section">
-        <h3>6. DATA RETENTION</h3>
-        <ul>
-          <li>Account information: While account is active</li>
-          <li>Order history: 7 years for tax/legal compliance</li>
-          <li>Payment data: As required by financial regulations</li>
-          <li>Support communications: 3 years</li>
-          <li>User-initiated deletion requests processed within 30 days</li>
-        </ul>
-      </div>
-
-      <div class="section">
-        <h3>7. CHILDREN'S PRIVACY</h3>
-        <ul>
-          <li>App intended for users 18 years and older</li>
-          <li>No knowingly collecting data from minors</li>
-          <li>Parental consent required for users under 18</li>
-        </ul>
-      </div>
-
-      <div class="section">
-        <h3>8. UPDATES TO THIS POLICY</h3>
-        <p>
-          We may update this policy periodically. We will notify you of material
-          changes through in-app notifications and email. Continued use of the
-          app constitutes acceptance of the updated policy.
-        </p>
-      </div>
-
-      <div class="contact">
-        <h3>📧 Contact Us</h3>
-        <p><strong>Asankary</strong></p>
-        <p>Address: TODO_CONTACT_ADDRESS</p>
-        <p>Phone: <a href="tel:TODO_CONTACT_PHONE_2">TODO_CONTACT_PHONE_2</a></p>
-        <p>
-          Email:
-          <a href="mailto:TODO_CONTACT_EMAIL">TODO_CONTACT_EMAIL</a>
-        </p>
-        <p>
-          WhatsApp: <a href="https://wa.me/TODO_CONTACT_PHONE_2">TODO_CONTACT_PHONE_2</a>
-        </p>
-        <p style="margin-top: 15px">Response Time: Within 72 hours</p>
-      </div>
-
-      <div class="footer">
-        <p>© 2025 Asankary. All rights reserved.</p>
-        <p>Last Updated: January 2025 | Policy Version: 2.1</p>
-      </div>
+    <div class="info-section">
+      <h2>Store Information</h2>
+      <ul>
+        <li><strong>Store Name:</strong> Khamark (خامارك)</li>
+        <li><strong>Headquarters:</strong> Erbil, Kurdistan Region, Iraq</li>
+        <li><strong>Supported Languages:</strong> English, Arabic (العربية), Kurdish (کوردی)</li>
+        <li><strong>Delivery:</strong> Express same-day courier service across Erbil and regional Iraq</li>
+        <li><strong>Payment:</strong> Cash on Delivery (IQD &amp; USD), Qi Card</li>
+      </ul>
     </div>
-    
-    <script>
-      // Automatically detect if the user opened a Product link (WhatsApp share)
-      window.onload = function() {
-        const path = window.location.pathname;
-        if (path.startsWith('/product/')) {
-          const productId = path.split('/product/')[1];
-          if (productId) {
-            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-            const isAndroid = /Android/.test(navigator.userAgent);
-            const customSchemeUrl = 'asankary://product/' + productId;
-            const universalUrl = 'https://ASANKARY_DOMAIN_TBD/product/' + productId;
-            const appStoreUrl = 'https://apps.apple.com/app/asankary/idASANKARY_APPLE_APP_ID_TBD';
-            const playStoreUrl = 'https://play.google.com/store/apps/details?id=com.asankary.app';
 
-            document.body.innerHTML = '\
-              <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; background: linear-gradient(160deg, #0f1b2d 0%, #1a365d 50%, #2c5282 100%); text-align: center; padding: 20px;">\
-                <div style="background: rgba(255,255,255,0.97); padding: 44px 28px 36px; border-radius: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); max-width: 380px; width: 100%; backdrop-filter: blur(20px);">\
-                  <div style="width: 72px; height: 72px; border-radius: 18px; background: linear-gradient(135deg, #1a365d, #3182ce); margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 24px rgba(26,54,93,0.3);">\
-                    <span style="font-size: 36px;">🛍️</span>\
-                  </div>\
-                  <h1 style="color: #1a365d; margin-bottom: 8px; font-size: 22px; font-weight: 800;">Asankary</h1>\
-                  <p style="color: #64748b; margin-bottom: 28px; font-size: 15px; line-height: 1.6;">Someone shared a product with you.<br>Tap below to view the details, pricing & order.</p>\
-                  \
-                  <a id="openAppBtn" href="' + customSchemeUrl + '" style="background: linear-gradient(135deg, #1a365d, #2c5282); color: white; text-decoration: none; padding: 16px 24px; border-radius: 14px; font-weight: 700; display: block; width: 100%; margin-bottom: 12px; font-size: 17px; box-shadow: 0 4px 16px rgba(26,54,93,0.3); transition: transform 0.2s;">\
-                    Open in App\
-                  </a>\
-                  \
-                  <div style="display: flex; gap: 10px; margin-top: 8px;">\
-                    <a href="' + appStoreUrl + '" style="flex: 1; background: #000; color: white; text-decoration: none; padding: 12px 8px; border-radius: 10px; font-weight: 600; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 6px;">\
-                      <span style="font-size: 18px;"></span> App Store\
-                    </a>\
-                    <a href="' + playStoreUrl + '" style="flex: 1; background: #01875f; color: white; text-decoration: none; padding: 12px 8px; border-radius: 10px; font-weight: 600; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 6px;">\
-                      <span style="font-size: 18px;">▶</span> Google Play\
-                    </a>\
-                  </div>\
-                  \
-                  <p style="color: #94a3b8; font-size: 12px; margin-top: 20px; line-height: 1.5;">Don\'t have the app yet?<br>Download it free from the store above.</p>\
-                </div>\
-              </div>\
-            ';
-
-            // Smart redirect strategy:
-            // 1. Try custom scheme immediately (works if app is installed)
-            // 2. If on iOS/Android and nothing happened after 1.5s, the app isn't installed
-            setTimeout(function() {
-              window.location.href = customSchemeUrl;
-            }, 200);
-          }
-        }
-      };
-    </script>
-  </body>
+    <footer>
+      <p>&copy; 2026 Khamark. All rights reserved.</p>
+      <p style="margin-top: 6px;">
+        <a href="./privacy.html">Privacy</a> · 
+        <a href="./terms.html">Terms</a> · 
+        <a href="./support.html">Support</a> · 
+        <a href="./delete-account.html">Delete Account</a>
+      </p>
+    </footer>
+  </div>
+</body>
 </html>

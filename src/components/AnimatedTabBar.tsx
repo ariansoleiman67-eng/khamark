@@ -1,474 +1,438 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useEffect, useState, useMemo } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+  useWindowDimensions,
+  AccessibilityInfo,
+  LayoutChangeEvent,
+  I18nManager,
+} from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { CartIcon } from './icons/CartIcon';
+import * as Haptics from 'expo-haptics';
+
+import { useTheme } from './ThemeProvider';
 import { useCart } from '../contexts/CartContext';
 import { useAuth } from '../contexts/AuthContext';
-import { useNotification } from '../contexts/NotificationContext';
-import AppNumber from './AppNumber';
-import Animated, {
-  useAnimatedStyle,
-  withSpring,
-  useSharedValue,
-} from 'react-native-reanimated';
-import { useTheme } from './ThemeProvider';
 import { subscribeToUserConversations, getUserUnreadCount } from '../services/chatService';
+import AppNumber from './AppNumber';
+import CurvedTabBarBackground from './CurvedTabBarBackground';
 
+// Design Tokens & Dimensions
+const FIGMA_ORANGE = '#A61920'; // Khamark crimson
+const BAR_HEIGHT = 68;
+const BUTTON_SIZE = 52;
+const HORIZONTAL_MARGIN = 16;
 
-interface TabBarIconProps {
-  routeName: string;
-  focused: boolean;
-  color: string;
+interface TabItemConfig {
+  name: string;
+  activeIcon: keyof typeof Ionicons.glyphMap;
+  inactiveIcon: keyof typeof Ionicons.glyphMap;
   size: number;
+  labelFallback: string;
 }
 
-// ALIBABA: Cart icon with animated badge wrapper
-interface CartIconWithBadgeProps {
-  size: number;
-  color: string;
-  itemCount: number;
-}
+const TAB_CONFIG: TabItemConfig[] = [
+  { name: 'Home', activeIcon: 'home', inactiveIcon: 'home-outline', size: 24, labelFallback: 'Home' },
+  { name: 'Categories', activeIcon: 'grid', inactiveIcon: 'grid-outline', size: 23, labelFallback: 'Categories' },
+  { name: 'Cart', activeIcon: 'bag-handle', inactiveIcon: 'bag-handle-outline', size: 24, labelFallback: 'Cart' },
+  { name: 'MessagesTab', activeIcon: 'chatbubbles', inactiveIcon: 'chatbubbles-outline', size: 23, labelFallback: 'Messages' },
+  { name: 'Profile', activeIcon: 'person', inactiveIcon: 'person-outline', size: 23, labelFallback: 'Profile' },
+];
 
-const CartIconWithBadge = ({ size, color, itemCount }: CartIconWithBadgeProps) => {
-  return (
-    <View style={styles.cartIconWrapper}>
-      <CartIcon size={size} color={color} />
-      {itemCount > 0 && (
-        <View style={styles.cartBadge}>
-          <AppNumber
-            value={itemCount > 99 ? 99 : itemCount}
-            style={styles.cartBadgeText}
-          />
-        </View>
-      )}
-    </View>
-  );
+/**
+ * Calculates symmetric tab centers across bar width W such that the cradle cutout
+ * around Tab 0 and Tab 4 remains safely on the top flat edge with a clean >=4px landing
+ * before the outer rounded corners (R = 20). Tab 2 (Cart) is mathematically placed at W / 2.
+ */
+const getTabCenters = (W: number) => {
+  const minCx0 = 20 + 37.79 + 4.2; // 62.0 px
+  const cx0 = Math.max(minCx0, W * 0.165);
+  const step = (W - 2 * cx0) / 4;
+  return [
+    cx0,
+    cx0 + step,
+    W / 2,
+    cx0 + 3 * step,
+    W - cx0,
+  ];
 };
 
-// Messages icon with badge
-interface MessagesIconWithBadgeProps {
-  size: number;
-  color: string;
-  unreadCount: number;
-  focused: boolean;
-}
-
-const MessagesIconWithBadge = ({ size, color, unreadCount, focused }: MessagesIconWithBadgeProps) => {
-  return (
-    <View style={styles.cartIconWrapper}>
-      <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={size} color={color} />
-      {unreadCount > 0 && (
-        <View style={styles.messageBadge}>
-          <Text allowFontScaling={false} style={styles.messageBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </Text>
-        </View>
-      )}
-    </View>
-  );
-};
-
-// Orders icon with badge
-interface OrdersIconWithBadgeProps {
-  size: number;
-  color: string;
-  badgeCount: number;
-  focused: boolean;
-}
-
-const OrdersIconWithBadge = ({ size, color, badgeCount, focused }: OrdersIconWithBadgeProps) => {
-  return (
-    <View style={styles.cartIconWrapper}>
-      <Ionicons name={focused ? 'receipt' : 'receipt-outline'} size={size} color={color} />
-      {badgeCount > 0 && (
-        <View style={styles.ordersBadge}>
-          <Text allowFontScaling={false} style={styles.ordersBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
-            {badgeCount > 99 ? '99+' : badgeCount}
-          </Text>
-        </View>
-      )}
-    </View>
-  );
-};
-
-interface TabBarIconPropsWithCart extends TabBarIconProps {
-  cartItemCount?: number;
-  messageBadgeCount?: number;
-  ordersBadgeCount?: number;
-}
-
-
-
-const getTabBarIcon = ({ routeName, focused, color, size, cartItemCount, messageBadgeCount, ordersBadgeCount }: TabBarIconPropsWithCart) => {
-
-
-  let iconName: keyof typeof Ionicons.glyphMap;
-
-  switch (routeName) {
-    case 'Home':
-      iconName = focused ? 'home' : 'home-outline';
-      break;
-    case 'Categories':
-      iconName = focused ? 'grid' : 'grid-outline';
-      break;
-    case 'Search':
-      iconName = focused ? 'search' : 'search-outline';
-      break;
-    case 'Cart':
-      // ALIBABA: Cart icon with badge showing item count
-      return <CartIconWithBadge size={size} color={color} itemCount={cartItemCount || 0} />;
-    case 'MessagesTab':
-      // Messages icon with unread badge
-      return <MessagesIconWithBadge size={size} color={color} unreadCount={messageBadgeCount || 0} focused={focused} />;
-    case 'Orders':
-      return <OrdersIconWithBadge size={size} color={color} badgeCount={ordersBadgeCount || 0} focused={focused} />;
-
-    case 'Profile':
-      iconName = focused ? 'person' : 'person-outline';
-      break;
-    default:
-      iconName = 'help-circle-outline';
-  }
-
-  return <Ionicons name={iconName} size={size} color={color} />;
-};
-
-interface AnimatedTabButtonProps {
-  route: any;
-  focused: boolean;
-  onPress: () => void;
-  onLongPress: () => void;
-  label: string;
-  cartItemCount?: number; // ALIBABA: Pass cart count for badge
-  messageBadgeCount?: number; // Unread messages badge count
-  ordersBadgeCount?: number; // Unread orders badge count
-}
-
-const AnimatedTabButton: React.FC<AnimatedTabButtonProps> = ({
-  route,
-  focused,
-  onPress,
-  onLongPress,
-  label,
-  cartItemCount,
-  messageBadgeCount,
-  ordersBadgeCount,
-}) => {
-  const { theme, currentCustomTheme } = useTheme();
-  // aynAlfahad: raised active pill is a pure-white card floating over the bar.
-  // `card` lives on the raw custom theme; fall back to surface when unavailable.
-  const cardColor = currentCustomTheme?.colors.card ?? theme.colors.surface;
-
-  // Animated press/scale value (kept from the original Reanimated behavior)
-  const scale = useSharedValue(1);
-
-  // Gentle bump when a tab becomes focused
-  React.useEffect(() => {
-    scale.value = withSpring(focused ? 1.06 : 1, {
-      damping: 14,
-      stiffness: 180,
-    });
-  }, [focused]);
-
-  // Raised active badge: lift it above the bar (translateY) then apply the scale.
-  const activeAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: -18 }, { scale: scale.value }],
-  }));
-
-  // Inactive icon: just the press/scale feedback.
-  const inactiveAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  const handlePress = () => {
-    // Subtle press feedback, then settle to the focused/unfocused resting scale.
-    scale.value = withSpring(0.92, { damping: 15, stiffness: 300 }, () => {
-      scale.value = withSpring(focused ? 1.06 : 1, {
-        damping: 15,
-        stiffness: 200,
-      });
-    });
-
-    onPress();
-  };
-
-  const iconColor = focused ? theme.colors.primary : theme.colors.textSecondary;
-
-  return (
-    <TouchableOpacity
-      style={styles.tabButton}
-      onPress={handlePress}
-      onLongPress={onLongPress}
-      activeOpacity={0.8}
-    >
-      <View style={styles.iconSlot}>
-        {focused ? (
-          <Animated.View
-            style={[
-              styles.activeBadge,
-              {
-                backgroundColor: cardColor,
-                borderColor: theme.colors.border,
-                shadowColor: '#000',
-              },
-              activeAnimatedStyle,
-            ]}
-          >
-            {getTabBarIcon({
-              routeName: route.name,
-              focused,
-              color: iconColor,
-              size: 24,
-              cartItemCount,
-              messageBadgeCount,
-              ordersBadgeCount,
-            })}
-          </Animated.View>
-        ) : (
-          <Animated.View style={inactiveAnimatedStyle}>
-            {getTabBarIcon({
-              routeName: route.name,
-              focused,
-              color: iconColor,
-              size: 24,
-              cartItemCount,
-              messageBadgeCount,
-              ordersBadgeCount,
-            })}
-          </Animated.View>
-        )}
-      </View>
-
-      <Text
-        allowFontScaling={false}
-        style={[
-          styles.tabLabel,
-          {
-            color: iconColor,
-            fontWeight: focused ? '700' : '500',
-          },
-        ]}
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.85}
-      >
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
-};
-
-const AnimatedTabBar: React.FC<BottomTabBarProps> = ({
+export const AnimatedTabBar: React.FC<BottomTabBarProps> = ({
   state,
   descriptors,
   navigation,
 }) => {
   const { theme, isDark } = useTheme();
-  const { getCartItemCount } = useCart(); // ALIBABA: Get live cart count
+  const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  const { getCartItemCount } = useCart();
   const { user, isGuest } = useAuth();
-  const { ordersBadgeCount } = useNotification();
   const [messageBadgeCount, setMessageBadgeCount] = useState(0);
+  const [measuredWidth, setMeasuredWidth] = useState(0);
+  const [reduceMotion, setReduceMotion] = useState(false);
 
-  // Subscribe to user conversations for unread message count
+  // Check reduced motion setting
   useEffect(() => {
-    // Don't subscribe for guests or if no user ID
+    let isMounted = true;
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((enabled) => {
+        if (isMounted) setReduceMotion(enabled);
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Unread messages count subscription
+  useEffect(() => {
     if (isGuest || !user?.uid) {
       setMessageBadgeCount(0);
       return;
     }
 
-    const unsubscribe = subscribeToUserConversations(
-      user.uid,
-      (conversations) => {
-        const count = getUserUnreadCount(conversations);
-        setMessageBadgeCount(count);
-      }
-    );
+    const unsubscribe = subscribeToUserConversations(user.uid, (conversations) => {
+      const count = getUserUnreadCount(conversations);
+      setMessageBadgeCount(count);
+    });
 
     return () => unsubscribe();
   }, [user?.uid, isGuest]);
 
-  // Get cart item count for badge
   const cartItemCount = getCartItemCount();
 
+  // Dynamic bar width (measured or window-based fallback)
+  const barWidth = measuredWidth > 0 ? measuredWidth : Math.max(280, windowWidth - HORIZONTAL_MARGIN * 2);
+
+  const onBarLayout = (e: LayoutChangeEvent) => {
+    const width = e.nativeEvent.layout.width;
+    if (width > 0 && Math.abs(width - measuredWidth) > 1) {
+      setMeasuredWidth(width);
+    }
+  };
+
+  // Derive active tab directly from React Navigation state (single source of truth)
+  const currentRouteName = state.routes[state.index]?.name;
+  const activeIndex = useMemo(() => {
+    const idx = TAB_CONFIG.findIndex((t) => t.name === currentRouteName);
+    return idx >= 0 ? idx : 0;
+  }, [currentRouteName]);
+
+  const tabCenters = useMemo(() => getTabCenters(barWidth), [barWidth]);
+  const isRTL = I18nManager.isRTL;
+  const visualActiveIndex = isRTL ? 4 - activeIndex : activeIndex;
+  const targetCx = tabCenters[visualActiveIndex] ?? barWidth / 2;
+
+  // Animated horizontal position for the cutout and the raised circle
+  const animatedCx = useSharedValue(targetCx);
+
+  useEffect(() => {
+    if (reduceMotion) {
+      animatedCx.value = targetCx;
+    } else {
+      animatedCx.value = withTiming(targetCx, {
+        duration: 220,
+        easing: Easing.bezier(0.25, 1, 0.5, 1),
+      });
+    }
+  }, [targetCx, reduceMotion]);
+
+  const animatedCircleStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateX: animatedCx.value - BUTTON_SIZE / 2 }],
+    };
+  });
+
+  const handleTabPress = (route: any, isFocused: boolean) => {
+    if (!reduceMotion) {
+      Haptics.selectionAsync().catch(() => {});
+    }
+    const event = navigation.emit({
+      type: 'tabPress',
+      target: route.key,
+      canPreventDefault: true,
+    });
+
+    if (!isFocused && !event.defaultPrevented) {
+      navigation.navigate(route.name, route.params);
+    }
+  };
+
+  const handleTabLongPress = (route: any) => {
+    navigation.emit({
+      type: 'tabLongPress',
+      target: route.key,
+    });
+  };
+
+  // Surface colors
+  const barBg = isDark ? (theme.colors.surface || '#1E1E22') : '#FFFFFF';
+  const shadowColor = isDark ? 'rgba(0, 0, 0, 0.55)' : 'rgba(0, 0, 0, 0.08)';
+  const strokeColor = isDark ? 'rgba(255, 255, 255, 0.08)' : '#E7E7EA';
+  const inactiveIconColor = isDark ? '#7E8088' : '#8E8E93';
+
+  // Active tab details for the raised button
+  const activeConfig = TAB_CONFIG[activeIndex];
+  const activeRoute = state.routes.find((r) => r.name === activeConfig.name);
+  const activeDescriptor = activeRoute ? descriptors[activeRoute.key] : null;
+  const activeLabel = activeDescriptor?.options?.tabBarLabel?.toString() || activeConfig.labelFallback;
+
+  const activeBadgeCount =
+    activeConfig.name === 'Cart'
+      ? cartItemCount
+      : activeConfig.name === 'MessagesTab'
+      ? messageBadgeCount
+      : 0;
+
+  // Compute horizontal padding on tabsRow so flex:1 items align perfectly with tabCenters
+  const step = (barWidth - 2 * tabCenters[0]) / 4;
+  const sidePad = Math.max(0, tabCenters[0] - step / 2);
+
   return (
-    // box-none lets taps in the floating margins fall through to the content below.
-    <View style={styles.root} pointerEvents="box-none">
+    <View
+      style={[
+        styles.outerWrapper,
+        {
+          bottom: Math.max(insets.bottom, 12),
+        },
+      ]}
+      pointerEvents="box-none"
+    >
       <View
         style={[
-          styles.bar,
+          styles.barContainer,
           {
-            backgroundColor: theme.colors.surface,
-            borderColor: theme.colors.border,
-            borderWidth: isDark ? StyleSheet.hairlineWidth : 0,
-            shadowColor: '#000',
-            shadowOpacity: isDark ? 0 : 0.1,
-            elevation: isDark ? 0 : 8,
+            width: barWidth,
+            height: BAR_HEIGHT,
           },
         ]}
+        onLayout={onBarLayout}
       >
-        {state.routes.map((route, index) => {
-          const { options } = descriptors[route.key];
-          const label = options.tabBarLabel?.toString() || route.name;
-          const isFocused = state.index === index;
+        {/* Genuine smooth curved cutout background following animatedCx */}
+        <CurvedTabBarBackground
+          width={barWidth}
+          height={BAR_HEIGHT}
+          cx={animatedCx}
+          color={barBg}
+          shadowColor={shadowColor}
+          strokeColor={strokeColor}
+        />
 
-          const onPress = () => {
-            const event = navigation.emit({
-              type: 'tabPress',
-              target: route.key,
-              canPreventDefault: true,
-            });
+        {/* 5-Column Tab Slots Row */}
+        <View style={[styles.tabsRow, { paddingHorizontal: sidePad }]}>
+          {TAB_CONFIG.map((config, index) => {
+            const route = state.routes.find((r) => r.name === config.name);
+            const isFocused = activeIndex === index;
+            const descriptor = route ? descriptors[route.key] : null;
+            const label = descriptor?.options?.tabBarLabel?.toString() || config.labelFallback;
 
-            if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(route.name, route.params);
-            }
-          };
+            const badgeCount =
+              config.name === 'Cart'
+                ? cartItemCount
+                : config.name === 'MessagesTab'
+                ? messageBadgeCount
+                : 0;
 
-          const onLongPress = () => {
-            navigation.emit({
-              type: 'tabLongPress',
-              target: route.key,
-            });
-          };
+            return (
+              <TouchableOpacity
+                key={config.name}
+                style={styles.tabSlotButton}
+                onPress={() => route && handleTabPress(route, isFocused)}
+                onLongPress={() => route && handleTabLongPress(route)}
+                activeOpacity={0.7}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: isFocused }}
+                accessibilityLabel={label}
+              >
+                <View
+                  style={[
+                    styles.iconContainer,
+                    { opacity: isFocused ? 0 : 1 },
+                  ]}
+                >
+                  <Ionicons
+                    name={config.inactiveIcon}
+                    size={config.size}
+                    color={inactiveIconColor}
+                  />
+                  {badgeCount > 0 && (
+                    <View style={[styles.sideBadge, { backgroundColor: FIGMA_ORANGE }]}>
+                      {config.name === 'Cart' ? (
+                        <AppNumber
+                          value={badgeCount > 99 ? 99 : badgeCount}
+                          style={styles.sideBadgeText}
+                        />
+                      ) : (
+                        <Text
+                          allowFontScaling={false}
+                          style={styles.sideBadgeText}
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.85}
+                        >
+                          {badgeCount > 99 ? '99+' : badgeCount}
+                        </Text>
+                      )}
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
-          return (
-            <AnimatedTabButton
-              key={route.key}
-              route={route}
-              focused={isFocused}
-              onPress={onPress}
-              onLongPress={onLongPress}
-              label={label}
-              cartItemCount={cartItemCount}
-              messageBadgeCount={messageBadgeCount}
-              ordersBadgeCount={ordersBadgeCount}
-            />
-          );
-        })}
+        {/* Single raised red circle following the selected tab */}
+        <Animated.View
+          style={[
+            styles.raisedCircleWrapper,
+            animatedCircleStyle,
+          ]}
+          pointerEvents="box-none"
+        >
+          <TouchableOpacity
+            style={styles.raisedCircleButton}
+            onPress={() => activeRoute && handleTabPress(activeRoute, true)}
+            onLongPress={() => activeRoute && handleTabLongPress(activeRoute)}
+            activeOpacity={0.88}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: true }}
+            accessibilityLabel={activeLabel}
+            hitSlop={{ top: 10, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name={activeConfig.activeIcon} size={activeConfig.size} color="#FFFFFF" />
+            {activeBadgeCount > 0 && (
+              <View style={styles.raisedBadge}>
+                {activeConfig.name === 'Cart' ? (
+                  <AppNumber
+                    value={activeBadgeCount > 99 ? 99 : activeBadgeCount}
+                    style={styles.raisedBadgeText}
+                  />
+                ) : (
+                  <Text
+                    allowFontScaling={false}
+                    style={styles.raisedBadgeText}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.85}
+                  >
+                    {activeBadgeCount > 99 ? '99+' : activeBadgeCount}
+                  </Text>
+                )}
+              </View>
+            )}
+          </TouchableOpacity>
+        </Animated.View>
       </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  // Absolute anchor at the screen bottom; provides the floating margins + safe-area gap.
-  root: {
+  outerWrapper: {
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 0,
-    paddingHorizontal: 16,
-    paddingBottom: 24, // sits above the bottom inset / home indicator
-    paddingTop: 24, // headroom so the raised active badge never clips
-  },
-  // The floating pill bar.
-  bar: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    paddingTop: 14,
-    paddingBottom: 12,
-    paddingHorizontal: 8,
-    shadowOffset: { width: 0, height: 6 },
-    shadowRadius: 16,
-  },
-  tabButton: {
     alignItems: 'center',
-    flex: 1,
-    justifyContent: 'flex-start',
+    zIndex: 9999,
   },
-  // Fixed-height slot keeps every label on the same baseline regardless of the raised badge.
-  iconSlot: {
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // Raised circular badge for the active tab.
-  activeBadge: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    elevation: 8,
-  },
-  tabLabel: {
-    fontSize: 10,
-    letterSpacing: 0.3,
-    marginTop: 3,
-    textAlign: 'center',
-    textTransform: 'uppercase',
-  },
-  // ALIBABA: Cart badge styles
-  cartIconWrapper: {
+  barContainer: {
     position: 'relative',
+    overflow: 'visible',
   },
-  cartBadge: {
+  tabsRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FF3B30',
-    borderRadius: 10,
-    height: 18,
-    justifyContent: 'center',
-    minWidth: 18,
-    paddingHorizontal: 4,
-    position: 'absolute',
-    right: -10,
-    top: -6,
+    width: '100%',
+    height: BAR_HEIGHT,
+    zIndex: 10,
   },
-  cartBadgeText: {
+  tabSlotButton: {
+    flex: 1,
+    height: BAR_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 48,
+    minHeight: 48,
+  },
+  iconContainer: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 32,
+    height: 32,
+  },
+  raisedCircleWrapper: {
+    position: 'absolute',
+    top: -16,
+    left: 0,
+    width: BUTTON_SIZE,
+    height: BUTTON_SIZE,
+    zIndex: 25,
+  },
+  raisedCircleButton: {
+    width: BUTTON_SIZE,
+    height: BUTTON_SIZE,
+    borderRadius: BUTTON_SIZE / 2,
+    backgroundColor: FIGMA_ORANGE,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 5,
+    elevation: 6,
+  },
+  raisedBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#831319',
+    borderRadius: 999,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  raisedBadgeText: {
     color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: 'bold',
+    fontSize: 9,
+    fontWeight: '800',
     includeFontPadding: false,
     textAlignVertical: 'center',
   },
-  // Message badge styles (same as cart badge)
-  messageBadge: {
-    alignItems: 'center',
-    backgroundColor: '#FF3B30',
-    borderRadius: 10,
-    height: 18,
-    justifyContent: 'center',
-    minWidth: 18,
-    paddingHorizontal: 4,
+  sideBadge: {
     position: 'absolute',
-    right: -10,
-    top: -6,
+    top: -3,
+    right: -8,
+    borderRadius: 8,
+    height: 16,
+    minWidth: 16,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
   },
-  messageBadgeText: {
+  sideBadgeText: {
     color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: 'bold',
+    fontSize: 9,
+    fontWeight: '700',
     includeFontPadding: false,
     textAlignVertical: 'center',
-  },
-  // Orders badge styles
-  ordersBadge: {
-    alignItems: 'center' as const,
-    backgroundColor: '#FF3B30',
-    borderRadius: 10,
-    height: 18,
-    justifyContent: 'center' as const,
-    minWidth: 18,
-    paddingHorizontal: 4,
-    position: 'absolute' as const,
-    right: -10,
-    top: -6,
-  },
-  ordersBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: 'bold' as const,
-    includeFontPadding: false,
-    textAlignVertical: 'center' as const,
   },
 });
 

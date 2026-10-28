@@ -11,17 +11,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../components/ThemeProvider';
-
-// NOTE (Asankary clone): the original OnboardingScreen was removed during the
-// Phase 0 purge before the first commit and its content could not be recovered. This is a
-// clean, minimal, branded recreation that preserves the app flow (App.tsx renders it as an
-// overlay and expects `onComplete`). Rebuild the full onboarding UX when the brand assets land.
+import Logo from '../../components/Logo';
 
 interface OnboardingScreenProps {
   onComplete: () => void;
 }
 
-const ACCENT = '#F5A00A'; // Amber Retail accent (Phase 3 palette)
+const ACCENT = '#A61920'; // Khamark Luxury Red
 
 const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   const { t, i18n } = useTranslation();
@@ -54,12 +50,12 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={[styles.logoBadge, { backgroundColor: colors.primary }]}>
-          <Text style={styles.logoText}>A</Text>
+        <View style={styles.logoBadge}>
+          <Logo size={88} />
         </View>
 
         <Text style={[styles.title, { textAlign, color: colors.text }]}>
-          {t('onboarding.welcome', { defaultValue: 'Welcome to Asankary' })}
+          {t('onboarding.welcome', { defaultValue: 'Welcome to Khamark' })}
         </Text>
         <Text style={[styles.subtitle, { textAlign, color: colors.textSecondary }]}>
           {t('onboarding.subtitle', {
@@ -108,10 +104,6 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
   },
   logoBadge: {
-    width: 88,
-    height: 88,
-    borderRadius: 24,
-    backgroundColor: ACCENT,
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'center',

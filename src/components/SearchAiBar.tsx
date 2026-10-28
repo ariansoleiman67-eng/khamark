@@ -51,7 +51,9 @@ const SearchAiBar: React.FC<SearchAiBarProps> = ({ style, preSelectedCategory })
         style={[
           styles.pill,
           {
-            backgroundColor: isDark ? theme.colors.surface : '#F0F0F2',
+            backgroundColor: isDark ? theme.colors.surface : '#FFFFFF',
+            borderColor: isDark ? '#2C2C30' : '#E7E7EA',
+            borderWidth: 1,
             flexDirection: isRTL ? 'row-reverse' : 'row',
           },
         ]}
@@ -59,6 +61,7 @@ const SearchAiBar: React.FC<SearchAiBarProps> = ({ style, preSelectedCategory })
         <Ionicons name="search" size={20} color={theme.colors.textSecondary} />
         <AppText
           numberOfLines={1}
+          adjustsFontSizeToFit={false}
           style={[
             styles.pillText,
             { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' },
@@ -75,7 +78,7 @@ const SearchAiBar: React.FC<SearchAiBarProps> = ({ style, preSelectedCategory })
         accessibilityLabel={t('chatbot.title', { defaultValue: 'AI Assistant' })}
         style={[styles.aiButton, { backgroundColor: theme.colors.primary }]}
       >
-        <Ionicons name="sparkles" size={20} color={theme.colors.textOnPrimary} />
+        <Ionicons name="sparkles" size={19} color={theme.colors.textOnPrimary} />
       </TouchableOpacity>
     </View>
   );
@@ -89,25 +92,33 @@ const styles = StyleSheet.create({
   pill: {
     flex: 1,
     alignItems: 'center',
-    borderRadius: 16,
+    borderRadius: 14,
     paddingHorizontal: 16,
-    // minHeight rather than a fixed height: Arabic and Kurdish glyphs are taller
-    // than Latin ones and clip inside a fixed box on Samsung devices.
-    minHeight: 50,
-    paddingVertical: 12,
+    minHeight: 48,
+    paddingVertical: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 3,
+    elevation: 1,
   },
   pillText: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '500',
     marginHorizontal: 10,
   },
   aiButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 16,
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#A61920',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
   },
 });
 

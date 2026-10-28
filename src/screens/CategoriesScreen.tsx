@@ -528,7 +528,7 @@ const CategoriesScreen: React.FC = () => {
       >
         {/* Gradient ring around logo */}
         <LinearGradient
-          colors={['#FF6A00', '#FF9F43', '#FFCD56']}
+          colors={['#A61920', '#C92A32', '#831319']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.storeLogoRing}
@@ -544,7 +544,7 @@ const CategoriesScreen: React.FC = () => {
                 contentFit="cover"
               />
             ) : (
-              <Ionicons name="storefront" size={28} color="#FF6A00" />
+              <Ionicons name="storefront" size={28} color="#A61920" />
             )}
           </View>
         </LinearGradient>
@@ -567,7 +567,7 @@ const CategoriesScreen: React.FC = () => {
           </View>
         ) : (
           <View style={styles.storeVisitTag}>
-            <Text allowFontScaling={false} style={[styles.storeVisitText, { color: '#FF6A00' }]}>{`${t('store.visit')} ${isRTL ? '←' : '→'}`}</Text>
+            <Text allowFontScaling={false} style={[styles.storeVisitText, { color: '#A61920' }]}>{`${t('store.visit')} ${isRTL ? '←' : '→'}`}</Text>
           </View>
         )}
       </TouchableOpacity>
@@ -624,7 +624,7 @@ const CategoriesScreen: React.FC = () => {
         {/* Content */}
         {loadingStores ? (
           <View style={styles.storesLoadingContainer}>
-            <ActivityIndicator size="large" color="#FF6A00" />
+            <ActivityIndicator size="large" color="#A61920" />
             <Text allowFontScaling={false}
               style={[styles.storesLoadingText, { color: theme.colors.textSecondary }]}
               adjustsFontSizeToFit
@@ -827,7 +827,7 @@ const CategoriesScreen: React.FC = () => {
               style={styles.browseStoresBtn}
             >
               <LinearGradient
-                colors={['#FF6A00', '#FF8F00']}
+                colors={['#A61920', '#831319']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.browseStoresGradient}
@@ -1480,7 +1480,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   storesCountBadge: {
-    backgroundColor: '#FF6A00',
+    backgroundColor: '#A61920',
     borderRadius: 10,
     marginLeft: 8,
     paddingHorizontal: 8,
@@ -1573,7 +1573,7 @@ const styles = StyleSheet.create({
   },
   storeVerifiedTag: {
     alignItems: 'center',
-    backgroundColor: '#FF6A00',
+    backgroundColor: '#A61920',
     borderRadius: 10,
     flexDirection: 'row',
     marginTop: 8,

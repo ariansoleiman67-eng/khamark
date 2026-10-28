@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   I18nManager,
   Linking,
+  useWindowDimensions,
 } from 'react-native';
 
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,9 +22,9 @@ import { changeLanguage } from '../../locales';
 import { getThumbnailUrl } from '../../utils/imageUtils';
 import { useTheme } from '../../components/ThemeProvider';
 import { useTenant } from '../../contexts/TenantContext';
-import MasonryProductCard from '../../components/MasonryProductCard';
+import MasonryProductCard, { TEXT_CONTAINER_HEIGHT } from '../../components/MasonryProductCard';
 import SectionHeader from '../../components/home/SectionHeader';
-import BrandCard from '../../components/home/BrandCard';
+import ShopByBrandSection from '../../components/home/ShopByBrandSection';
 import SearchAiBar from '../../components/SearchAiBar';
 import { getDiscountPercent, hasCompareAtDiscount } from '../../utils/pricingUtils';
 import AutoScrollRail, { type AutoScrollRailHandle } from '../../components/home/AutoScrollRail';
@@ -52,20 +53,6 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BOTTOM_NAV_HEIGHT = 80;
 const PAGE_SIZE = 20;
 
-// "Our Brands" is a horizontal 2-row rail: cards sized so ~2 columns fill the
-// width, brands chunked into columns of 2 (top + bottom), swipe for more.
-const BRAND_GRID_PADDING = 16;
-const BRAND_GRID_GAP = 12;
-const BRAND_TILE_WIDTH = (SCREEN_WIDTH - BRAND_GRID_PADDING * 2 - BRAND_GRID_GAP) / 2;
-// Two stacked cards + the gap. Fixing the column height lets a lone trailing card
-// (odd brand count) stretch to fill it instead of leaving an empty half-column.
-const BRAND_CARD_HEIGHT = 150;
-const BRAND_COL_HEIGHT = BRAND_CARD_HEIGHT * 2 + BRAND_GRID_GAP;
-const chunkPairs = (arr: any[]): any[][] => {
-  const out: any[][] = [];
-  for (let i = 0; i < arr.length; i += 2) out.push(arr.slice(i, i + 2));
-  return out;
-};
 // How many reduced products the Home rail shows before "See All".
 const MAX_OFFER_CARDS = 10;
 
@@ -121,6 +108,7 @@ const HomeScreen: React.FC = () => {
   const { t, i18n } = useTranslation();
   const { theme, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
   const navigation = useNavigation<any>();
   const { addToCart } = useCart();
   const { favoritesCount, isFavorite: isFavorites, toggleFavorite } = useFavorites();
@@ -128,6 +116,12 @@ const HomeScreen: React.FC = () => {
   const { user, isVip } = useAuth();
   // ALIBABA-STYLE: Real-time badge from NotificationContext (no polling)
   const badgeCount = useBadgeCount();
+
+  // Responsive grid parameters: 16px horizontal container padding on each side, 12px column gap
+  const gridPadding = 16;
+  const gridGap = 12;
+  const cardWidth = Math.floor((windowWidth - (gridPadding * 2) - gridGap) / 2);
+  const cardHeight = cardWidth + TEXT_CONTAINER_HEIGHT;
 
   const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const textAlign: 'left' | 'right' = isRTL ? 'right' : 'left';
@@ -456,21 +450,21 @@ const HomeScreen: React.FC = () => {
   const stableIsFavorite = useCallback((id: string) => favActionsRef.current.isFavorite(id), []);
   const stableToggleFavorite = useCallback((id: string) => favActionsRef.current.toggleFavorite(id), []);
 
-  // Brand tiles, paired into the rail's two-row columns. Memoised at component
-  // level rather than built inside renderListHeader: the rail repeats this array
-  // many times over, so a fresh identity on every Home render would rebuild the
-  // whole repeated list and re-render every tile.
-  const brandColumns = useMemo(() => {
-    const tiles = managedBrands.length > 0
-      ? managedBrands.map((b: any) => ({ key: b.id, label: b.name, logoUrl: b.logoUrl }))
-      // Every brand is shown. This used to drop the last brand on an odd count to
-      // avoid a half-empty final column, on the assumption that "See All" listed
-      // the rest — but that link went to Categories and no all-brands screen
-      // exists, so the dropped brand was simply unreachable.
-      : brands.map((b: string) => ({ key: b, label: b, logoUrl: undefined as string | undefined }));
-    const cols = chunkPairs(tiles);
-    return isRTL ? cols.reverse() : cols;
-  }, [managedBrands, brands, isRTL]);
+  // Single-row horizontal brand strip. Preserves official brand order and visibility.
+  const brandTiles = useMemo(() => {
+    if (managedBrands.length > 0) {
+      return managedBrands.map((b: any) => ({
+        key: b.id,
+        label: b.name,
+        logoUrl: b.logoUrl || (b as any).logo_url,
+      }));
+    }
+    return brands.map((b: string) => ({
+      key: b,
+      label: b,
+      logoUrl: undefined as string | undefined,
+    }));
+  }, [managedBrands, brands]);
 
   // Reduced items, biggest saving first. Derived from the products already on
   // screen — no extra fetch — and measured against what THIS shopper pays, so a
@@ -486,22 +480,23 @@ const HomeScreen: React.FC = () => {
     [newArrivals, isVip],
   );
 
-  const headerDataRef = useRef({ brands, brandSpotlights, hasArrivals, managedBrands, featuredProducts, brandColumns, offers });
-  headerDataRef.current = { brands, brandSpotlights, hasArrivals, managedBrands, featuredProducts, brandColumns, offers };
+  const headerDataRef = useRef({ brands, brandSpotlights, hasArrivals, managedBrands, featuredProducts, brandTiles, offers });
+  headerDataRef.current = { brands, brandSpotlights, hasArrivals, managedBrands, featuredProducts, brandTiles, offers };
 
   const renderSpotlightCard = useCallback(({ item }: { item: Product }) => (
     <MasonryProductCard
       product={item}
+      cardWidth={cardWidth}
       onPress={handleProductPress}
       onAddToCart={handleAddToCartPress}
       onSelectOptions={handleAddToCartPress}
       isFavorite={stableIsFavorite(item.id)}
       onToggleFavorite={stableToggleFavorite}
     />
-  ), [handleProductPress, handleAddToCartPress, stableIsFavorite, stableToggleFavorite]);
+  ), [cardWidth, handleProductPress, handleAddToCartPress, stableIsFavorite, stableToggleFavorite]);
 
   const renderListHeader = useCallback(() => {
-    const { brandSpotlights: spotlights, hasArrivals: hasItems, featuredProducts: featured, brandColumns: brandCols, offers: offerCards } = headerDataRef.current;
+    const { brandSpotlights: spotlights, hasArrivals: hasItems, featuredProducts: featured, brandTiles: brandItems, offers: offerCards } = headerDataRef.current;
     return (
       <View>
         {/* a. Hero banner */}
@@ -519,7 +514,17 @@ const HomeScreen: React.FC = () => {
           />
         )}
 
-        {/* a2. Featured — products the admin starred, in the admin's manual
+        {/* b. Shop by brand — floating circles row directly BELOW banner and BEFORE Featured Products */}
+        {brandItems.length > 0 && (
+          <ShopByBrandSection
+            brands={brandItems}
+            onSelectBrand={(brand) =>
+              (navigation as any).navigate('CategoryProducts', { brand, title: brand })
+            }
+          />
+        )}
+
+        {/* c. Featured — products the admin starred, in the admin's manual
             sort_order. Rendered only when something is actually starred so a shop
             that has never used the star never sees an empty row. No "See All":
             there is no featured-only screen to link to. */}
@@ -532,12 +537,13 @@ const HomeScreen: React.FC = () => {
               keyExtractor={(item) => `featured-${item.id}`}
               horizontal
               showsHorizontalScrollIndicator={false}
+              style={{ minHeight: cardHeight + 8 }}
               contentContainerStyle={styles.spotlightList}
             />
           </View>
         )}
 
-        {/* a3. Offers — everything the shop has reduced, biggest saving first, with
+        {/* d. Offers — everything the shop has reduced, biggest saving first, with
             a See All into the dedicated screen. Hidden entirely when nothing is
             reduced, so a shop that never sets a was-price never sees an empty
             row promising a sale. */}
@@ -553,46 +559,13 @@ const HomeScreen: React.FC = () => {
               keyExtractor={(item) => `offer-${item.id}`}
               horizontal
               showsHorizontalScrollIndicator={false}
+              style={{ minHeight: cardHeight + 8 }}
               contentContainerStyle={styles.spotlightList}
             />
           </View>
         )}
 
-        {/* b. Our Brands — horizontal 2-row rail (shows admin logo when uploaded) */}
-        {brandCols.length > 0 && (
-          <View>
-            {/* No onSeeAll: the rail already shows every brand, and there is no
-                all-brands screen to link to. */}
-            <SectionHeader title={t('home.ourBrands')} />
-            {/* Revolves endlessly: drifts slowly on its own, and drags forever in
-                either direction without hitting an end. Pauses while touched and
-                resumes a couple of seconds after release. */}
-            <AutoScrollRail
-              ref={brandRailRef}
-              data={brandCols}
-              keyExtractor={(_, i) => `brand-col-${i}`}
-              itemWidth={BRAND_TILE_WIDTH}
-              gap={BRAND_GRID_GAP}
-              leadingInset={BRAND_GRID_PADDING}
-              contentContainerStyle={styles.brandRow}
-              renderItem={(col: any) => (
-                <View style={[styles.brandCol, { width: BRAND_TILE_WIDTH }]}>
-                  {col.map((b: any) => (
-                    <BrandCard
-                      key={b.key}
-                      label={b.label}
-                      imageUrl={b.logoUrl}
-                      width={BRAND_TILE_WIDTH}
-                      onPress={() => (navigation as any).navigate('CategoryProducts', { brand: b.label, title: b.label })}
-                    />
-                  ))}
-                </View>
-              )}
-            />
-          </View>
-        )}
-
-        {/* c. Brand-spotlight carousels ("Featured <Brand>") */}
+        {/* e. Brand-spotlight carousels ("Featured <Brand>") */}
         {spotlights.map((group) => (
           <View key={group.brand}>
             {/* "See All" on a "Featured <Brand>" row means that brand's products —
@@ -608,6 +581,7 @@ const HomeScreen: React.FC = () => {
               keyExtractor={(item) => `${group.brand}-${item.id}`}
               horizontal
               showsHorizontalScrollIndicator={false}
+              style={{ minHeight: cardHeight + 8 }}
               contentContainerStyle={styles.spotlightList}
             />
           </View>
@@ -621,18 +595,19 @@ const HomeScreen: React.FC = () => {
 
   // Product card renderer — 2 column grid (memoized to prevent re-renders)
   const renderProduct = useCallback(({ item }: { item: Product }) => (
-    <View style={styles.productCardWrapper}>
+    <View style={{ width: cardWidth }}>
       <MasonryProductCard
         product={item}
+        cardWidth={cardWidth}
         onPress={handleProductPress}
         onAddToCart={handleAddToCartPress}
-      onSelectOptions={handleAddToCartPress}
+        onSelectOptions={handleAddToCartPress}
         // GOLDEN ESTIMATION: Pass pure props to avoid internal context hooks in list items
         isFavorite={isFavorites(item.id)}
         onToggleFavorite={toggleFavorite}
       />
     </View>
-  ), [handleProductPress, handleAddToCartPress, isFavorites, toggleFavorite]);
+  ), [cardWidth, handleProductPress, handleAddToCartPress, isFavorites, toggleFavorite]);
 
   // Empty list component — doubles as the error state (with retry) when the fetch failed.
   const renderEmptyProducts = () => (
@@ -683,28 +658,44 @@ const HomeScreen: React.FC = () => {
     const skBg = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
 
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['left', 'right']}>
         <StatusBar style={isDark ? 'light' : 'dark'} translucent backgroundColor="transparent" />
 
         {/* Skeleton Header */}
-        <View style={[styles.header, { backgroundColor: theme.colors.surface, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-          <View style={[styles.headerLeft, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-            <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: skBg }} />
-            <View style={{ marginHorizontal: 10 }}>
-              <View style={{ width: 60, height: 10, borderRadius: 5, backgroundColor: skBg }} />
-              <View style={{ width: 100, height: 14, borderRadius: 7, backgroundColor: skBg, marginTop: 6 }} />
+        <View style={[
+          styles.headerContainer,
+          {
+            paddingTop: Math.max(insets.top, 12) + 6,
+            backgroundColor: isDark ? theme.colors.surface : '#FFFFFF',
+            borderBottomWidth: 1,
+            borderBottomColor: theme.colors.border,
+          },
+        ]}>
+          <View style={[styles.headerRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.headerLeft, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: skBg }} />
+              <View style={{ marginHorizontal: 10 }}>
+                <View style={{ width: 90, height: 14, borderRadius: 7, backgroundColor: skBg }} />
+                <View style={{ width: 60, height: 10, borderRadius: 5, backgroundColor: skBg, marginTop: 4 }} />
+              </View>
+            </View>
+            <View style={[styles.headerRight, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <View style={{ width: 44, height: 24, borderRadius: 12, backgroundColor: skBg }} />
+              {[1, 2, 3].map((i) => (
+                <View key={i} style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: skBg }} />
+              ))}
             </View>
           </View>
-          <View style={[styles.headerRight, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-            {[1, 2, 3, 4].map((i) => (
-              <View key={i} style={{ width: 30, height: 30, borderRadius: 12, backgroundColor: skBg }} />
-            ))}
+          {/* Skeleton Search Bar */}
+          <View style={{ paddingHorizontal: 16, paddingBottom: 10, flexDirection: 'row', gap: 10 }}>
+            <View style={{ flex: 1, height: 48, borderRadius: 14, backgroundColor: skBg }} />
+            <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: skBg }} />
           </View>
         </View>
 
         {/* Skeleton Banner */}
-        <View style={{ paddingHorizontal: 12, marginTop: 12 }}>
-          <View style={{ width: '100%', aspectRatio: 16 / 9, borderRadius: 20, backgroundColor: skBg }} />
+        <View style={{ paddingHorizontal: 16, marginTop: 10 }}>
+          <View style={{ width: '100%', aspectRatio: 16 / 9, borderRadius: 16, backgroundColor: skBg }} />
         </View>
 
         {/* Skeleton Section Label */}
@@ -714,9 +705,9 @@ const HomeScreen: React.FC = () => {
         </View>
 
         {/* Skeleton Products */}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 3, marginTop: 12 }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, gap: 12, marginTop: 12 }}>
           {[1, 2, 3, 4].map((i) => (
-            <View key={i} style={{ width: '50%', paddingHorizontal: 3, marginBottom: 12 }}>
+            <View key={i} style={{ width: cardWidth, marginBottom: 12 }}>
               <View style={{
                 backgroundColor: theme.colors.surface,
                 borderRadius: 20, overflow: 'hidden',
@@ -737,66 +728,82 @@ const HomeScreen: React.FC = () => {
   }
 
   return (
-    // GOLDEN TEMPLATE: SafeAreaView with edges (NO bottom - handled by padding)
+    // Single safe-area top inset applied on header; edges left and right for landscape
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.colors.background }]}
-      edges={['top', 'left', 'right']}
+      edges={['left', 'right']}
     >
       <StatusBar style={isDark ? 'light' : 'dark'} translucent backgroundColor="transparent" />
 
-      {/* ---- Fixed header (menu + greeting | cart · favorites · notifications · language) ---- */}
+      {/* ---- Fixed header with Khamark Brand Identity, Actions & Search ---- */}
       <View style={[
-        styles.header,
-        { backgroundColor: theme.colors.surface, flexDirection: isRTL ? 'row-reverse' : 'row' },
+        styles.headerContainer,
+        {
+          paddingTop: Math.max(insets.top, 12) + 6,
+          backgroundColor: isDark ? theme.colors.surface : '#FFFFFF',
+          borderBottomWidth: 1,
+          borderBottomColor: theme.colors.border,
+        },
       ]}>
-        {/* Left: two-line greeting */}
-        <View style={[styles.headerLeft, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-          <View style={styles.greeting}>
-            <Text allowFontScaling={false} numberOfLines={1} style={{ fontSize: 12, color: theme.colors.textSecondary, textAlign }}>
-              {t('home.hello')}
-            </Text>
-            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center' }}>
-              <Text allowFontScaling={false} numberOfLines={1} style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text, textAlign }}>
-                {user?.name || t('home.guest')}
+        {/* Brand row: Left logo/title, Right actions */}
+        <View style={[styles.headerRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+          {/* Left: Khamark Official Logo Wordmark */}
+          <View style={[styles.headerLeft, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <Image
+              source={isDark ? require('../../../assets/images/khamark_logo_white.png') : require('../../../assets/images/khamark_logo_crimson.png')}
+              style={styles.brandWordmark}
+              contentFit="contain"
+            />
+            {user?.name ? (
+              <View style={[styles.brandTextWrapper, { alignItems: isRTL ? 'flex-end' : 'flex-start', marginStart: 8 }]}>
+                <Text allowFontScaling={false} numberOfLines={1} style={[styles.brandSubtitle, { color: theme.colors.textSecondary }]}>
+                  {`${t('home.hello')}, ${user.name}`}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+
+          {/* Right: Language Pill + Favorites + Notifications + Cart */}
+          <View style={[styles.headerRight, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <TouchableOpacity
+              onPress={() => setLanguagePickerVisible(true)}
+              hitSlop={6}
+              style={[styles.langPill, { borderColor: theme.colors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F7F7F8' }]}
+              accessibilityRole="button"
+            >
+              <Ionicons name="globe-outline" size={13} color={theme.colors.textSecondary} />
+              <Text allowFontScaling={false} style={[styles.langText, { color: theme.colors.text }]}>
+                {i18n.language === 'ar' ? 'عربي' : i18n.language === 'ku' ? 'کوردی' : 'EN'}
               </Text>
-              {isVip && (
-                <MaterialCommunityIcons name="crown" size={16} color="#FFD700" style={{ marginHorizontal: 4 }} />
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={handleFavoritesPress} hitSlop={8} style={styles.iconBtn} accessibilityRole="button">
+              <Ionicons name="heart-outline" size={22} color={theme.colors.text} />
+              {favoritesCount > 0 && (
+                <View style={[styles.badge, { backgroundColor: theme.colors.primary }]}>
+                  <AppNumber value={favoritesCount > 99 ? 99 : favoritesCount} style={styles.badgeText} />
+                </View>
               )}
-            </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={handleNotificationPress} hitSlop={8} style={styles.iconBtn} accessibilityRole="button">
+              <Ionicons name="notifications-outline" size={22} color={theme.colors.text} />
+              {badgeCount > 0 && (
+                <View style={[styles.badge, { backgroundColor: theme.colors.primary }]}>
+                  <AppNumber value={badgeCount > 99 ? 99 : badgeCount} style={styles.badgeText} />
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={handleCartPress} hitSlop={8} style={styles.iconBtn} accessibilityRole="button">
+              <Ionicons name="cart-outline" size={23} color={theme.colors.primary} />
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Right: cart (orange) + favorites + notifications + language */}
-        <View style={[styles.headerRight, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-          <TouchableOpacity onPress={handleCartPress} hitSlop={8} style={styles.iconBtn} accessibilityRole="button">
-            <Ionicons name="cart-outline" size={26} color={theme.colors.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleFavoritesPress} hitSlop={8} style={styles.iconBtn} accessibilityRole="button">
-            <Ionicons name="heart-outline" size={24} color={theme.colors.text} />
-            {favoritesCount > 0 && (
-              <View style={styles.badge}>
-                <AppNumber value={favoritesCount > 99 ? 99 : favoritesCount} style={styles.badgeText} />
-              </View>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleNotificationPress} hitSlop={8} style={styles.iconBtn} accessibilityRole="button">
-            <Ionicons name="notifications-outline" size={24} color={theme.colors.text} />
-            {badgeCount > 0 && (
-              <View style={styles.badge}>
-                <AppNumber value={badgeCount > 99 ? 99 : badgeCount} style={styles.badgeText} />
-              </View>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setLanguagePickerVisible(true)} hitSlop={8} style={styles.iconBtn} accessibilityRole="button">
-            <Ionicons name="language-outline" size={24} color={theme.colors.text} />
-          </TouchableOpacity>
-        </View>
+        {/* Search + AI bar: Fixed inside header, fully visible and tappable */}
+        <SearchAiBar style={styles.searchBar} />
       </View>
-
-      {/* Search + AI. Fixed under the header rather than inside the list header,
-          so it survives a scroll: Home had no search at all and the assistant was
-          unreachable from anywhere in the app. */}
-      <SearchAiBar style={styles.searchBar} />
 
       {/* GOLDEN TEMPLATE: KeyboardAvoidingView same as Login */}
       <KeyboardAvoidingView
@@ -841,8 +848,8 @@ const HomeScreen: React.FC = () => {
           windowSize={7}
           updateCellsBatchingPeriod={50}
           contentContainerStyle={{
-            // GOLDEN TEMPLATE: Bottom padding for nav bar
-            paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom,
+            // Clean bottom spacing that respects safe area and tab bar without giant empty gap
+            paddingBottom: Math.max(insets.bottom, 16) + 90,
           }}
           onEndReached={loadMoreProducts}
           onEndReachedThreshold={0.5}
@@ -865,17 +872,23 @@ const HomeScreen: React.FC = () => {
           onPress={() => flatListRef.current?.scrollToOffset?.({ offset: 0, animated: true })}
           style={{
             position: 'absolute',
-            bottom: BOTTOM_NAV_HEIGHT + insets.bottom + 20,
-            right: 20,
+            bottom: Math.max(insets.bottom, 16) + 84,
+            right: 16,
             backgroundColor: theme.colors.primary,
-            width: 48, height: 48, borderRadius: 24, // PERFECT CIRCLE
-            alignItems: 'center', justifyContent: 'center',
-            shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: isDark ? 0 : 0.15, shadowRadius: 10,
+            width: 42,
+            height: 42,
+            borderRadius: 21,
+            alignItems: 'center',
+            justifyContent: 'center',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 3 },
+            shadowOpacity: isDark ? 0 : 0.18,
+            shadowRadius: 6,
             elevation: 5,
+            zIndex: 99,
           }}
         >
-          <Ionicons name="chevron-up" size={24} color="#fff" />
+          <Ionicons name="chevron-up" size={22} color="#fff" />
         </TouchableOpacity>
       )}
 
@@ -911,54 +924,80 @@ const styles = StyleSheet.create({
   keyboardAvoid: {
     flex: 1,
   },
-  // Fixed header — airy, no elevation (surface tone), tokens only.
-  header: {
+  // Fixed header container with clean opaque boundary
+  headerContainer: {
+    zIndex: 10,
+  },
+  headerRow: {
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingBottom: 8,
   },
   searchBar: {
     paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 6,
+    paddingBottom: 10,
+    paddingTop: 0,
   },
   headerLeft: {
     alignItems: 'center',
     flex: 1,
   },
+  brandWordmark: {
+    width: 116,
+    height: 34,
+  },
+  brandTextWrapper: {
+    flexShrink: 1,
+  },
+  brandTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  brandSubtitle: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 1,
+  },
   greeting: {
-    // Only a trailing gap now that the hamburger is gone — the greeting hugs the
-    // header's own 16px padding instead of being indented behind an icon.
     marginEnd: 10,
     flexShrink: 1,
   },
   headerRight: {
     alignItems: 'center',
     flexShrink: 0,
-    gap: 14,
+    gap: 12,
+  },
+  langPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 4,
+  },
+  langText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   iconBtn: {
     position: 'relative',
     padding: 2,
   },
-  /**
-   * SAMSUNG ARABIC FIX (LOCKED - ALIBABA/AMAZON PATTERN):
-   * - minHeight + alignItems + justifyContent for proper centering
-   * - flexShrink: 0 prevents Samsung from shrinking
-   */
   badge: {
     alignItems: 'center',
-    backgroundColor: '#FF3B30',
-    borderRadius: 10,
-    flexShrink: 0, // SAMSUNG FIX: never shrink
+    backgroundColor: '#A61920',
+    borderRadius: 9,
+    flexShrink: 0,
     justifyContent: 'center',
-    minHeight: 18,
-    minWidth: 18,
-    paddingHorizontal: 4,
+    minHeight: 16,
+    minWidth: 16,
+    paddingHorizontal: 3,
     position: 'absolute',
     right: -6,
-    top: -6,
+    top: -5,
   },
   /**
    * SAMSUNG ARABIC FIX (LOCKED):
@@ -973,24 +1012,17 @@ const styles = StyleSheet.create({
     textAlign: 'right', // RTL-safe (Samsung fix)
     textAlignVertical: 'center',
   },
-  // "Our Brands" horizontal 2-row rail.
-  brandRow: {
-    paddingHorizontal: BRAND_GRID_PADDING,
-  },
-  brandCol: {
-    gap: BRAND_GRID_GAP,
-    justifyContent: 'flex-start',
-    height: BRAND_COL_HEIGHT,
-  },
   // Brand-spotlight horizontal carousel padding (aligns first card to the grid).
   spotlightList: {
     paddingHorizontal: 16,
-    paddingVertical: 2,
+    paddingVertical: 4,
+    gap: 12,
   },
   // Product grid styles
   columnWrapper: {
-    justifyContent: 'space-between',
-    paddingHorizontal: 6,
+    paddingHorizontal: 16,
+    gap: 12,
+    justifyContent: 'flex-start',
   },
   productCardWrapper: {
     marginBottom: 6,

@@ -62,7 +62,7 @@ const AssistantMessage: React.FC<Props> = ({
       }}
     >
       <Image
-        source={require('../../../assets/images/asankarylogo.png')}
+        source={require('../../../assets/images/khamark_logo.png')}
         style={{
           width: 28,
           height: 28,

@@ -28,7 +28,7 @@ const HTML = `<!doctype html>
 <body><div class="c">
   <div class="m">&#9989;</div>
   <div class="t">Payment complete</div>
-  <div class="s">You can return to the Asankary app.</div>
+  <div class="s">You can return to the Khamark app.</div>
 </div></body></html>`;
 
 Deno.serve(() =>

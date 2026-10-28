@@ -60,16 +60,14 @@ type CheckoutScreenRouteProp = RouteProp<RootStackParamList, 'Checkout'>;
 // GOLDEN TEMPLATE: CTA height for padding calculation
 const CTA_BAR_HEIGHT = 80;
 
-// ALIBABA DESIGN: Orange accent color for buttons and highlights
-const FIGMA_ORANGE = '#FFA451';
+// Khamark Brand Palette
+const FIGMA_ORANGE = '#A61920';
 
 const PRODUCT_BG_COLORS = [
-  '#FFFAEB', // Warm cream
-  '#FEF0F0', // Soft pink
-  '#F1EFF6', // Lavender
-  '#E8F5E9', // Mint
-  '#FFF3E0', // Peach
-  '#E3F2FD', // Sky blue
+  '#F7F7F8',
+  '#F5F5F7',
+  '#F7F7F8',
+  '#F5F5F7',
 ];
 
 interface PaymentMethodOption {
@@ -2115,7 +2113,7 @@ const CheckoutScreen: React.FC = () => {
             activeOpacity={0.85}
           >
             <LinearGradient
-              colors={isProcessing ? ['#C0C0C0', '#A0A0A0'] : ['#FF5A00', '#FF8C00']}
+              colors={isProcessing ? ['#C0C0C0', '#A0A0A0'] : ['#A61920', '#831319']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.placeOrderGradient}

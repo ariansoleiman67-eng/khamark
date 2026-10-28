@@ -96,7 +96,7 @@ Deno.serve(async (req: Request) => {
 
     // ── Build the webhook + return URLs on the merchant's OWN domain ──
     // QiCard rejects *.supabase.co and requires both URLs under the company
-    // domain. QICARD_PUBLIC_BASE (e.g. https://ASANKARY_DOMAIN_TBD) fronts the
+    // domain. QICARD_PUBLIC_BASE (e.g. https://KHAMARK_DOMAIN_TBD) fronts the
     // Supabase functions through a Cloudflare Worker proxy
     // (cloudflare/qicard-proxy-worker.js):
     //   {base}/qicard-webhook    -> functions/v1/qicard-webhook

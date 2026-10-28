@@ -110,8 +110,8 @@ const ChangePasswordScreen = () => {
 
   const authEmailStr = authState.email || '';
   const fsEmailStr = user?.email || '';
-  const authIsInternal = isSyntheticEmail(authEmailStr) || authEmailStr.includes('@asankaryapp.');
-  const fsIsInternal = isSyntheticEmail(fsEmailStr) || fsEmailStr.includes('@asankaryapp.');
+  const authIsInternal = isSyntheticEmail(authEmailStr) || authEmailStr.includes('@khamarkapp.') || authEmailStr.includes('@asankaryapp.');
+  const fsIsInternal = isSyntheticEmail(fsEmailStr) || fsEmailStr.includes('@khamarkapp.') || fsEmailStr.includes('@asankaryapp.');
 
   // Prefer Auth email if real, otherwise Firestore email if real.
   const userEmail = (!authIsInternal && authEmailStr) 
@@ -119,7 +119,7 @@ const ChangePasswordScreen = () => {
     : (!fsIsInternal && fsEmailStr) ? fsEmailStr : authEmailStr || fsEmailStr;
 
   const userPhone = user?.phone || authState.phone || '';
-  const isInternalEmail = isSyntheticEmail(userEmail) || userEmail.includes('@asankaryapp.');
+  const isInternalEmail = isSyntheticEmail(userEmail) || userEmail.includes('@khamarkapp.') || userEmail.includes('@asankaryapp.');
   const hasRealEmail = !!userEmail && !isInternalEmail;
   const hasPhone = !!userPhone;
 

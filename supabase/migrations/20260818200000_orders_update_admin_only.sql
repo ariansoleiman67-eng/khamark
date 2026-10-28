@@ -24,9 +24,21 @@
 --     using ((user_id = auth.uid()) or (tenant_id = auth.uid()));
 -- =============================================================================
 
-alter policy orders_update on public.orders
-  using (tenant_id = auth.uid())
-  with check (tenant_id = auth.uid());
+do $$
+begin
+  if exists (
+    select 1 from pg_policies where schemaname = 'public' and tablename = 'orders' and policyname = 'orders_update'
+  ) then
+    alter policy orders_update on public.orders
+      using (tenant_id = auth.uid())
+      with check (tenant_id = auth.uid());
+  else
+    create policy orders_update on public.orders
+      for update
+      using (tenant_id = auth.uid())
+      with check (tenant_id = auth.uid());
+  end if;
+end $$;
 
 -- Verify --------------------------------------------------------------------
 select policyname, cmd, qual, with_check

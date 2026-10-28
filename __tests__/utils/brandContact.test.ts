@@ -74,8 +74,8 @@ describe('the shipped BRAND block', () => {
   it('has a real domain, so the share sheet can send a link that resolves', () => {
     // This assertion used to be the opposite: the shop had no domain, and the
     // share sheet deliberately omitted the link rather than send a dead one.
-    // asankare.com is live now and serves /<lang>/p/<product id>.
-    expect(brandContact(BRAND.domain)).toBe('asankare.com');
+    // khamark.com is live now and serves /<lang>/p/<product id>.
+    expect(brandContact(BRAND.domain)).toBe('khamark.com');
   });
 
   it('keeps the domain free of a scheme or a trailing slash, since callers add both', () => {

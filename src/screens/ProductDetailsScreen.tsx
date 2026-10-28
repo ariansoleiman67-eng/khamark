@@ -4,6 +4,7 @@ import {
   View,
   Text,
   ScrollView,
+  FlatList,
   TouchableOpacity,
   Dimensions,
   Share,
@@ -55,10 +56,12 @@ import { getTenantContactInfo, getTenantPrimaryLocation } from '../services/tena
 import { getDirection } from '../locales';
 import { SPACING } from '../constants/theme';
 import GoldenCarousel from '../components/GoldenCarousel';
+import ProductCard from '../components/ProductCard';
 import { getOrCreateConversation, findConversationByTenant } from '../services/chatService';
 import StartOrderBottomSheet from '../components/StartOrderBottomSheet';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const GALLERY_STAGE_HEIGHT = Math.min(Math.round(SCREEN_WIDTH * 0.78), 300);
 
 // Matches the low-stock cue used on the product cards, so "only a few left" means
 // the same thing everywhere in the app.
@@ -281,6 +284,9 @@ export const ProductDetailsScreen: React.FC = () => {
   const [colorVariationQuantities, setColorVariationQuantities] = useState<Record<string, number>>({});
   const [colorVariationQtyTexts, setColorVariationQtyTexts] = useState<Record<string, string>>({});
   const [ready, setReady] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const galleryFlatListRef = useRef<FlatList>(null);
+  const thumbnailFlatListRef = useRef<FlatList>(null);
 
   // Logo for this product's brand, when the admin uploaded one in Brand Manager.
   // undefined = no logo (card draws the wordmark instead).
@@ -797,7 +803,7 @@ export const ProductDetailsScreen: React.FC = () => {
 
     try {
       // The storefront's product page, in the language the shopper is using.
-      // asankare.com serves /<lang>/p/<product id> with the SAME uuids the app
+      // khamark.com serves /<lang>/p/<product id> with the SAME uuids the app
       // uses, so no mapping is needed. brandContact still guards it: if the
       // domain is ever cleared back to a placeholder, the share degrades to text
       // instead of sending a dead link.
@@ -1312,6 +1318,37 @@ export const ProductDetailsScreen: React.FC = () => {
     ? [selectedColorImg, ...baseGallery.filter((u) => u !== selectedColorImg)]
     : baseGallery;
 
+  const scrollToImage = (index: number) => {
+    if (index < 0 || index >= galleryImages.length) return;
+    setSelectedImageIndex(index);
+    try {
+      galleryFlatListRef.current?.scrollToIndex({ index, animated: true });
+    } catch {
+      // ignore
+    }
+    try {
+      thumbnailFlatListRef.current?.scrollToIndex({
+        index,
+        animated: true,
+        viewPosition: 0.5,
+      });
+    } catch {
+      // ignore
+    }
+  };
+
+  const handlePrevImage = () => {
+    if (selectedImageIndex > 0) {
+      scrollToImage(selectedImageIndex - 1);
+    }
+  };
+
+  const handleNextImage = () => {
+    if (selectedImageIndex < galleryImages.length - 1) {
+      scrollToImage(selectedImageIndex + 1);
+    }
+  };
+
   // Calculate total price:
   // - For simple products: tieredUnitPrice × quantity
   // - For variation products: sum of (variation price × qty) for each selected variation,
@@ -1618,11 +1655,148 @@ export const ProductDetailsScreen: React.FC = () => {
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.colors.background }]}
-      edges={['top', 'left', 'right']}
+      edges={['left', 'right']}
     >
       <StatusBar style={theme.dark ? 'light' : 'dark'} />
 
       <View style={{ flex: 1 }}>
+        {/* Fixed / Floating Top Header */}
+        <View
+          style={[
+            styles.topHeader,
+            {
+              paddingTop: insets.top,
+              height: insets.top + 48,
+              backgroundColor: isScrolled
+                ? (isDark ? theme.colors.surface : '#FFFFFF')
+                : 'transparent',
+              borderBottomColor: isScrolled
+                ? (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)')
+                : 'transparent',
+              borderBottomWidth: isScrolled ? StyleSheet.hairlineWidth : 0,
+            },
+          ]}
+          pointerEvents="box-none"
+        >
+          <View style={[styles.topHeaderContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <TouchableOpacity
+              onPress={() => {
+                requestAnimationFrame(() => {
+                  if (navigation.canGoBack()) {
+                    navigation.goBack();
+                  } else {
+                    navigation.navigate('Home' as never);
+                  }
+                });
+              }}
+              style={[
+                styles.headerIconButton,
+                isScrolled
+                  ? (isDark ? styles.headerBtnScrolledDark : styles.headerBtnScrolledLight)
+                  : (isDark ? styles.headerBtnFloatingDark : styles.headerBtnFloatingLight),
+              ]}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.back', { defaultValue: 'Back' })}
+            >
+              <Ionicons
+                name={isRTL ? 'chevron-forward' : 'chevron-back'}
+                size={20}
+                color={isDark ? '#FFFFFF' : '#1D1D1F'}
+              />
+            </TouchableOpacity>
+
+            {/* Compact product title in header when scrolled */}
+            <View style={styles.headerTitleContainer}>
+              {isScrolled && (
+                <Text
+                  allowFontScaling={false}
+                  numberOfLines={1}
+                  style={[
+                    styles.headerTitleText,
+                    { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' },
+                  ]}
+                >
+                  {i18n.language === 'ar' && product?.nameAr
+                    ? product.nameAr
+                    : i18n.language === 'ku' && product?.nameKu
+                    ? product.nameKu
+                    : product?.name}
+                </Text>
+              )}
+            </View>
+
+            <View style={[styles.headerRightActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <TouchableOpacity
+                onPress={handleFavorite}
+                style={[
+                  styles.headerIconButton,
+                  isScrolled
+                    ? (isDark ? styles.headerBtnScrolledDark : styles.headerBtnScrolledLight)
+                    : (isDark ? styles.headerBtnFloatingDark : styles.headerBtnFloatingLight),
+                  { marginHorizontal: 2 },
+                ]}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={t('product.favorite', { defaultValue: 'Favorite' })}
+              >
+                <Ionicons
+                  name={isProductFavorite ? 'heart' : 'heart-outline'}
+                  size={19}
+                  color={isProductFavorite ? '#A61920' : isDark ? '#FFFFFF' : '#1D1D1F'}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleShare}
+                style={[
+                  styles.headerIconButton,
+                  isScrolled
+                    ? (isDark ? styles.headerBtnScrolledDark : styles.headerBtnScrolledLight)
+                    : (isDark ? styles.headerBtnFloatingDark : styles.headerBtnFloatingLight),
+                  { marginHorizontal: 2 },
+                ]}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={t('product.share', { defaultValue: 'Share' })}
+              >
+                <Ionicons name="share-outline" size={19} color={isDark ? '#FFFFFF' : '#1D1D1F'} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={goToCart}
+                style={[
+                  styles.headerIconButton,
+                  isScrolled
+                    ? (isDark ? styles.headerBtnScrolledDark : styles.headerBtnScrolledLight)
+                    : (isDark ? styles.headerBtnFloatingDark : styles.headerBtnFloatingLight),
+                  { marginHorizontal: 2 },
+                ]}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={t('cart.title', { defaultValue: 'Cart' })}
+              >
+                <Ionicons name="bag-handle-outline" size={19} color={isDark ? '#FFFFFF' : '#1D1D1F'} />
+                {getCartItemCount() > 0 && (
+                  <Badge
+                    size={16}
+                    style={[
+                      styles.cartBadge,
+                      { backgroundColor: '#A61920' },
+                    ]}
+                  >
+                    {getCartItemCount() > 99 ? '99+' : getCartItemCount()}
+                  </Badge>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
         {/* Scroll area (Keyboard avoiding only for scroll content) */}
         <KeyboardAvoidingView
           style={styles.keyboardAvoid}
@@ -1632,130 +1806,215 @@ export const ProductDetailsScreen: React.FC = () => {
           <ScrollView
             ref={scrollViewRef}
             showsVerticalScrollIndicator={false}
+            scrollEventThrottle={16}
+            onScroll={(e) => {
+              const y = e.nativeEvent.contentOffset.y;
+              setIsScrolled(y > 20);
+            }}
             contentContainerStyle={{
-              paddingBottom: CTA_BAR_HEIGHT + insets.bottom,
+              paddingBottom: 72 + insets.bottom + 16,
             }}
           >
-            {/* Image Gallery - GOLDEN CAROUSEL: Alibaba-style auto-advancing */}
+            {/* Seamless Light-Neutral Image Gallery */}
             <View
               ref={imageRef}
               collapsable={false}
-              style={[styles.imageGallery, { backgroundColor: theme.colors.surface }]}
+              style={[
+                styles.galleryContainer,
+                {
+                  backgroundColor: isDark ? '#18181B' : '#F5F5F7',
+                  paddingTop: insets.top + 48,
+                },
+              ]}
             >
-              <GoldenCarousel
-                images={galleryImages}
-                videoUrl={(product as any).videoUrl || null}
-                onImagePress={() => setImageModalVisible(true)}
-                onIndexChange={setSelectedImageIndex}
-              />
-
-              {/* Navigation Buttons */}
-              <View style={[styles.fabContainer, { top: SPACING.md, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                <TouchableOpacity
-                  onPress={() => {
-                    // Debounce back press to preventing spamming and crashes
-                    requestAnimationFrame(() => {
-                        if (navigation.canGoBack()) {
-                            navigation.goBack();
-                        } else {
-                            navigation.navigate('Home' as never);
+              {/* Main Image Stage */}
+              <View style={styles.galleryStage}>
+                {galleryImages.length > 0 ? (
+                  <FlatList
+                    ref={galleryFlatListRef}
+                    data={galleryImages}
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    keyExtractor={(_, index) => index.toString()}
+                    onScrollToIndexFailed={(info) => {
+                      setTimeout(() => {
+                        galleryFlatListRef.current?.scrollToIndex({ index: info.index, animated: true });
+                      }, 100);
+                    }}
+                    onMomentumScrollEnd={(e) => {
+                      const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+                      if (idx !== selectedImageIndex && idx >= 0 && idx < galleryImages.length) {
+                        setSelectedImageIndex(idx);
+                        try {
+                          thumbnailFlatListRef.current?.scrollToIndex({
+                            index: idx,
+                            animated: true,
+                            viewPosition: 0.5,
+                          });
+                        } catch {
+                          // ignore
                         }
-                    });
-                  }}
-                  style={[styles.fabButton, { backgroundColor: 'rgba(0,0,0,0.35)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.15)' }]}
-                >
-                  <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={24} color="white" />
-                </TouchableOpacity>
-
-                <View style={styles.fabRight}>
-                  <TouchableOpacity
-                    onPress={handleFavorite}
-                    style={[
-                      styles.fabButton,
-                      { backgroundColor: 'rgba(0,0,0,0.35)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.15)', marginRight: SPACING.sm },
-                    ]}
-                  >
-                    <Ionicons
-                      name={isProductFavorite ? 'heart' : 'heart-outline'}
-                      size={24}
-                      color={isProductFavorite ? theme.colors.error : 'white'}
-                    />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={handleShare}
-                    style={[styles.fabButton, { backgroundColor: 'rgba(0,0,0,0.35)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.15)', marginRight: SPACING.sm }]}
-                  >
-                    <Ionicons name="share-outline" size={24} color="white" />
-                  </TouchableOpacity>
-
-                  {/* Cart Icon with Badge */}
-                  <TouchableOpacity
-                    onPress={goToCart}
-                    style={[styles.fabButton, { backgroundColor: 'rgba(0,0,0,0.35)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.15)' }]}
-                  >
-                    <Image 
-                      source={require('../../assets/icons/order.png')} 
-                      style={{ width: 22, height: 22 }}
-                      contentFit="contain"
-                    />
-                    {getCartItemCount() > 0 && (
-                      <Badge
-                        size={18}
-                        style={[
-                          styles.cartBadge,
-                          { backgroundColor: theme.colors.error }
-                        ]}
+                      }
+                    }}
+                    renderItem={({ item }) => (
+                      <TouchableOpacity
+                        activeOpacity={0.9}
+                        onPress={() => setImageModalVisible(true)}
+                        style={styles.gallerySlideItem}
                       >
-                        {getCartItemCount() > 99 ? '99+' : getCartItemCount()}
-                      </Badge>
+                        <Image
+                          source={{ uri: item }}
+                          style={styles.galleryMainImage}
+                          contentFit="contain"
+                          transition={0}
+                          cachePolicy="memory-disk"
+                          priority="high"
+                        />
+                      </TouchableOpacity>
                     )}
-                  </TouchableOpacity>
-                </View>
+                  />
+                ) : (
+                  <View style={styles.galleryEmptyContainer}>
+                    <Ionicons name="image-outline" size={56} color={theme.colors.textSecondary} />
+                  </View>
+                )}
+
+                {/* Subtle Navigation Chevrons */}
+                {galleryImages.length > 1 && (
+                  <>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={handlePrevImage}
+                      disabled={selectedImageIndex === 0}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('common.previous', { defaultValue: 'Previous image' })}
+                      style={[
+                        styles.galleryNavButton,
+                        styles.galleryNavLeft,
+                        {
+                          opacity: selectedImageIndex === 0 ? 0.25 : 1,
+                          backgroundColor: isDark ? 'rgba(30, 30, 34, 0.65)' : 'rgba(255, 255, 255, 0.75)',
+                          borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.06)',
+                        },
+                      ]}
+                    >
+                      <Ionicons
+                        name="chevron-back"
+                        size={18}
+                        color={isDark ? '#FFFFFF' : '#1D1D1F'}
+                      />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={handleNextImage}
+                      disabled={selectedImageIndex === galleryImages.length - 1}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('common.next', { defaultValue: 'Next image' })}
+                      style={[
+                        styles.galleryNavButton,
+                        styles.galleryNavRight,
+                        {
+                          opacity: selectedImageIndex === galleryImages.length - 1 ? 0.25 : 1,
+                          backgroundColor: isDark ? 'rgba(30, 30, 34, 0.65)' : 'rgba(255, 255, 255, 0.75)',
+                          borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.06)',
+                        },
+                      ]}
+                    >
+                      <Ionicons
+                        name="chevron-forward"
+                        size={18}
+                        color={isDark ? '#FFFFFF' : '#1D1D1F'}
+                      />
+                    </TouchableOpacity>
+                  </>
+                )}
+
+                {/* Subtle Image Counter Badge (1 / N) */}
+                {galleryImages.length > 1 && (
+                  <View style={styles.galleryCounter} pointerEvents="none">
+                    <Text allowFontScaling={false} style={styles.galleryCounterText}>
+                      {selectedImageIndex + 1} / {galleryImages.length}
+                    </Text>
+                  </View>
+                )}
               </View>
 
-              {/* Add to Cart Button - Bottom of Image */}
-              <TouchableOpacity
-                onPress={() => setAddToCartSheetVisible(true)}
-                disabled={!inStock || addingToCart || (product.status && product.status !== 'available')}
-                style={[
-                  styles.fabButton, 
-                  { 
-                    position: 'absolute',
-                    // Clear the sheet overlap, then the normal inset on top of it.
-                    bottom: SHEET_OVERLAP + SPACING.md,
-                    left: SPACING.md,
-                    backgroundColor: inStock && (!product.status || product.status === 'available') ? theme.colors.primary : 'rgba(0,0,0,0.5)', 
-                    opacity: !inStock || addingToCart || (product.status && product.status !== 'available') ? 0.6 : 1,
-                    width: 48,
-                    height: 48,
-                    borderRadius: 24,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                  }
-                ]}
-              >
-                {addingToCart ? (
-                  <ActivityIndicator size="small" color="white" />
-                ) : (
-                  <Ionicons name="cart" size={24} color="white" />
-                )}
-              </TouchableOpacity>
+              {/* Neat Thumbnail Strip Below Main Image */}
+              {galleryImages.length > 1 && (
+                <View style={styles.thumbnailStripWrapper}>
+                  <FlatList
+                    ref={thumbnailFlatListRef}
+                    data={galleryImages}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    keyExtractor={(uri, index) => `${uri}-${index}`}
+                    onScrollToIndexFailed={(info) => {
+                      setTimeout(() => {
+                        thumbnailFlatListRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.5 });
+                      }, 100);
+                    }}
+                    contentContainerStyle={[
+                      styles.thumbnailStripContent,
+                      galleryImages.length * 58 < SCREEN_WIDTH - 32 && { justifyContent: 'center', flexGrow: 1 },
+                    ]}
+                    renderItem={({ item, index }) => {
+                      const isSelected = index === selectedImageIndex;
+                      return (
+                        <TouchableOpacity
+                          key={index}
+                          activeOpacity={0.75}
+                          onPress={() => scrollToImage(index)}
+                          style={[
+                            styles.thumbItem,
+                            {
+                              borderColor: isSelected ? '#A61920' : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)'),
+                              borderWidth: isSelected ? 1.5 : 1,
+                              backgroundColor: isDark ? '#232326' : '#FFFFFF',
+                            },
+                          ]}
+                        >
+                          <Image
+                            source={{ uri: item }}
+                            style={styles.thumbImage}
+                            contentFit="contain"
+                            transition={0}
+                            cachePolicy="memory-disk"
+                          />
+                        </TouchableOpacity>
+                      );
+                    }}
+                  />
+                </View>
+              )}
             </View>
 
             {/* Product Information */}
             <View style={[styles.infoContainer, { backgroundColor: theme.colors.card }]}>
               {/* Header Info */}
               <View style={styles.headerInfo}>
+                {/* 1. Small Brand Eyebrow */}
                 {!!product.brand && (
-                  <Text
-                    allowFontScaling={false}
-                    style={[styles.brandEyebrow, { color: theme.colors.primary, textAlign: isRTL ? 'right' : 'left' }]}
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => navigation.navigate('CategoryProducts', { brand: product.brand, title: product.brand })}
+                    style={{ alignSelf: isRTL ? 'flex-end' : 'flex-start', marginBottom: 4 }}
                   >
-                    {product.brand}
-                  </Text>
+                    <Text
+                      allowFontScaling={false}
+                      style={[styles.brandEyebrow, { color: '#A61920', textAlign: isRTL ? 'right' : 'left' }]}
+                    >
+                      {product.brand.toUpperCase()}
+                    </Text>
+                  </TouchableOpacity>
                 )}
-                <Text allowFontScaling={false}
+
+                {/* 2. Full Product Title (Readable heading, natural wrapping, no truncation) */}
+                <Text
+                  allowFontScaling={false}
                   style={[
                     styles.productName,
                     { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' },
@@ -1768,34 +2027,45 @@ export const ProductDetailsScreen: React.FC = () => {
                     : product.name}
                 </Text>
 
-                {/* Hidden when unset — this rendered "Item Code: " with nothing after it
-                    for every product the admin left blank. */}
-                {!!String(product.partNumber ?? '').trim() && (
-                  <Text allowFontScaling={false}
+                {/* 3. Muted Item Code / SKU */}
+                {!!String(product.partNumber ?? product.sku ?? '').trim() && (
+                  <Text
+                    allowFontScaling={false}
                     style={[
                       styles.partNumber,
                       { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' },
                     ]}
                   >
-                    {t('product.partNumber')}: {product.partNumber}
+                    {t('product.partNumber', { defaultValue: 'Item Code' })}: {String(product.partNumber || product.sku).trim()}
                   </Text>
                 )}
 
+                {/* 4. Price & Availability Row */}
                 <View style={[styles.priceRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                   <View style={{ flexShrink: 1 }}>
-                    <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                    <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 6 }}>
                       <AppNumber
                         value={formatUnitPrice(product, isVip, currentCurrency as any, exchangeRateIQD, {}, 1, storageDelta)}
-                        style={[styles.price, { color: vipActive ? '#7C3AED' : theme.colors.primary }]}
+                        style={[styles.price, { color: vipActive ? '#7C3AED' : '#A61920' }]}
                       />
+                      {currentCurrency === 'IQD' && !!product.priceUSD && (
+                        <Text
+                          allowFontScaling={false}
+                          style={{
+                            fontSize: 14,
+                            fontWeight: '600',
+                            color: theme.colors.textSecondary,
+                            marginHorizontal: 2,
+                          }}
+                        >
+                          (≈ {formatPrice(product.priceUSD + (storageDelta || 0), 'USD', exchangeRateIQD)})
+                        </Text>
+                      )}
                       {vipActive && (
-                        <View style={{ backgroundColor: '#7C3AED', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, marginHorizontal: 8, marginBottom: 4 }}>
+                        <View style={{ backgroundColor: '#7C3AED', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, marginHorizontal: 4 }}>
                           <Text allowFontScaling={false} style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 11, letterSpacing: 0.5 }}>VIP</Text>
                         </View>
                       )}
-                      {/* Gated and computed through pricingUtils, same as the grid
-                          cards. The old inline formula divided by priceUSD, so a VIP
-                          saw one Save% on the card and a different one here. */}
                       {hasCompareAtDiscount(product, isVip) && (
                         <AppNumber
                           value={formatCompareAtPrice(product as any, currentCurrency as any, exchangeRateIQD)}
@@ -1818,12 +2088,12 @@ export const ProductDetailsScreen: React.FC = () => {
                       {
                         backgroundColor:
                           product.status === 'on_the_way'
-                            ? '#2196F320'
+                            ? '#2196F315'
                             : product.status === 'coming_soon'
-                            ? '#FF980020'
+                            ? '#FF980015'
                             : inStock
-                            ? theme.colors.success + '20'
-                            : theme.colors.error + '20',
+                            ? '#16A34A15'
+                            : '#DC262615',
                         flexDirection: isRTL ? 'row-reverse' : 'row',
                       },
                     ]}
@@ -1838,14 +2108,14 @@ export const ProductDetailsScreen: React.FC = () => {
                               : product.status === 'coming_soon'
                               ? '#FF9800'
                               : inStock
-                              ? theme.colors.success
-                              : theme.colors.error,
+                              ? '#16A34A'
+                              : '#DC2626',
                         },
                       ]}
                     />
 
                     <AppText
-                      fontSize={14}
+                      fontSize={13}
                       numberOfLines={1}
                       adjustsFontSizeToFit={false}
                       style={[
@@ -1857,145 +2127,76 @@ export const ProductDetailsScreen: React.FC = () => {
                               : product.status === 'coming_soon'
                               ? '#FF9800'
                               : inStock
-                              ? theme.colors.success
-                              : theme.colors.error,
+                              ? '#16A34A'
+                              : '#DC2626',
                         },
                       ]}
                     >
                       {product.status === 'on_the_way'
-                        ? t('products.status.onTheWay', { defaultValue: 'On The Way' }).replace(/ /g, '\u00A0')
+                        ? t('products.status.onTheWay', { defaultValue: 'On The Way' })
                         : product.status === 'coming_soon'
-                        ? t('products.status.comingSoon', { defaultValue: 'Coming Soon' }).replace(/ /g, '\u00A0')
+                        ? t('products.status.comingSoon', { defaultValue: 'Coming Soon' })
                         : inStock
-                        ? t('product.inStock')
-                        : t('product.outOfStock').replace(/ /g, '\u00A0')}
+                        ? t('product.inStock', { defaultValue: 'In Stock' })
+                        : t('product.outOfStock', { defaultValue: 'Out of Stock' })}
                     </AppText>
                   </View>
                 </View>
-              </View>
 
-              {/* Brand + Category chips */}
-              <View style={[styles.chipsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                {!!product.brand && (
-                  <View style={[styles.chipDark, { backgroundColor: theme.colors.text }]}>
-                    <Text allowFontScaling={false} style={[styles.chipText, { color: theme.colors.card }]}>{product.brand}</Text>
-                  </View>
-                )}
-                {!!product.category && (
-                  <View style={[styles.chipAccent, { backgroundColor: theme.colors.primary }]}>
-                    <Text allowFontScaling={false} style={[styles.chipText, { color: theme.colors.textOnPrimary }]}>{translateCategory(product)}</Text>
-                  </View>
-                )}
-              </View>
-
-              {/* Sku / Manufacturer / Barcode card.
-                  Hidden entirely when the product carries none of the three. Most of
-                  the catalogue has no SKU or manufacturer code, so this card used to
-                  render "Sku: Not Available" beside "Manufacturer Code: Not Available"
-                  on the main product page — two empty fields side by side, which reads
-                  as an unfinished app rather than as a product without a code. */}
-              {(!!product.sku?.trim() ||
-                !!(product.specifications?.['Manufacturer Code'] || product.specifications?.['Manufacturer']) ||
-                !!product.barcode?.trim()) && (
-              <View style={[styles.skuCard, { borderColor: theme.colors.border }]}>
-                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                  <View style={styles.skuCell}>
-                    <Text allowFontScaling={false} style={[styles.skuLabel, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>{t('product.sku', { defaultValue: 'Sku' })}</Text>
-                    {/* The admin types SKU and Part Number into separate fields; showing
-                        partNumber here made the real SKU unreachable from the app.
-                        No fallback to partNumber either — with SKU and Manufacturer
-                        Code both falling back to it, one part number printed three
-                        times on this screen under three different labels. */}
-                    <Text allowFontScaling={false} style={[styles.skuValue, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{product.sku?.trim() || t('product.notAvailable', { defaultValue: 'Not Available' })}</Text>
-                  </View>
-                  <View style={[styles.skuDivider, { backgroundColor: theme.colors.border }]} />
-                  <View style={styles.skuCell}>
-                    <Text allowFontScaling={false} style={[styles.skuLabel, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>{t('product.manufacturerCode', { defaultValue: 'Manufacturer Code' })}</Text>
-                    <Text allowFontScaling={false} style={[styles.skuValue, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{product.specifications?.['Manufacturer Code'] || product.specifications?.['Manufacturer'] || t('product.notAvailable', { defaultValue: 'Not Available' })}</Text>
-                  </View>
-                </View>
-                {/* Full-width row rather than a third column: "Manufacturer Code" already
-                    wraps at one third of a small phone's width. */}
-                {!!product.barcode?.trim() && (
-                  <>
-                    <View style={[styles.skuRowDivider, { backgroundColor: theme.colors.border }]} />
-                    <View style={styles.skuCell}>
-                      <Text allowFontScaling={false} style={[styles.skuLabel, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>{t('product.barcode', { defaultValue: 'Barcode' })}</Text>
-                      <AppNumber
-                        value={product.barcode.trim()}
-                        style={[styles.skuValue, { color: theme.colors.text }]}
-                        containerStyle={{ alignItems: isRTL ? 'flex-end' : 'flex-start' }}
-                        numberOfLines={1}
-                      />
-                    </View>
-                  </>
-                )}
-              </View>
-              )}
-
-              {/* Brand card — logo (or wordmark) + name, opens every product of that brand */}
-              {!!product.brand && (
-                <TouchableOpacity
-                  activeOpacity={0.75}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('product.viewAllBrand', { brand: product.brand, defaultValue: `View all ${product.brand} products` })}
-                  onPress={() => navigation.navigate('CategoryProducts', { brand: product.brand, title: product.brand })}
-                  style={[
-                    styles.brandCard,
-                    {
-                      borderColor: theme.colors.border,
-                      flexDirection: isRTL ? 'row-reverse' : 'row',
-                    },
-                  ]}
-                >
-                  <View style={[styles.brandLogoBox, { backgroundColor: isDark ? theme.colors.surface : '#F1F2F4' }]}>
-                    {brandLogoUrl ? (
-                      <Image
-                        source={{ uri: brandLogoUrl }}
-                        style={styles.brandLogo}
-                        contentFit="contain"
-                        transition={0}
-                        cachePolicy="memory-disk"
-                        recyclingKey={brandLogoUrl}
-                      />
-                    ) : (
-                      <Text
-                        allowFontScaling={false}
-                        numberOfLines={1}
-                        style={[
-                          styles.brandWordmark,
-                          { color: theme.colors.text, fontSize: brandWordmarkFontSize(product.brand) },
-                        ]}
-                      >
-                        {product.brand.toUpperCase()}
+                {/* Category & Brand Browse Row */}
+                <View style={[styles.categoryBrandRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                  {!!product.category && (
+                    <TouchableOpacity
+                      onPress={() => navigation.navigate('Categories', { category: product.category })}
+                      style={[styles.categoryPill, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F2F2F5' }]}
+                      activeOpacity={0.7}
+                    >
+                      <Text allowFontScaling={false} style={[styles.categoryPillText, { color: theme.colors.textSecondary }]}>
+                        {translateCategory(product)}
                       </Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {!!product.brand && (
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => navigation.navigate('CategoryProducts', { brand: product.brand, title: product.brand })}
+                      style={[styles.brandBrowseRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                    >
+                      <Text allowFontScaling={false} style={styles.brandBrowseText}>
+                        {t('product.viewAllBrand', { brand: product.brand, defaultValue: `Browse all ${product.brand} products` })}
+                      </Text>
+                      <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={14} color="#A61920" style={{ marginHorizontal: 2 }} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* SKU / Barcode compact box if available */}
+                {(!!product.sku?.trim() || !!product.barcode?.trim()) && (
+                  <View style={[styles.skuCompactBox, { borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+                    {!!product.sku?.trim() && (
+                      <View style={[styles.skuCompactItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                        <Text allowFontScaling={false} style={[styles.skuCompactLabel, { color: theme.colors.textSecondary }]}>
+                          {t('product.sku', { defaultValue: 'SKU' })}:
+                        </Text>
+                        <Text allowFontScaling={false} style={[styles.skuCompactVal, { color: theme.colors.text }]}>
+                          {product.sku.trim()}
+                        </Text>
+                      </View>
+                    )}
+                    {!!product.barcode?.trim() && (
+                      <View style={[styles.skuCompactItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                        <Text allowFontScaling={false} style={[styles.skuCompactLabel, { color: theme.colors.textSecondary }]}>
+                          {t('product.barcode', { defaultValue: 'Barcode' })}:
+                        </Text>
+                        <Text allowFontScaling={false} style={[styles.skuCompactVal, { color: theme.colors.text }]}>
+                          {product.barcode.trim()}
+                        </Text>
+                      </View>
                     )}
                   </View>
-
-                  <View style={styles.brandCardText}>
-                    <Text
-                      allowFontScaling={false}
-                      numberOfLines={1}
-                      style={[styles.brandCardName, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}
-                    >
-                      {product.brand}
-                    </Text>
-                    <Text
-                      allowFontScaling={false}
-                      numberOfLines={1}
-                      style={[styles.brandCardHint, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}
-                    >
-                      {t('product.viewAllBrand', { brand: product.brand, defaultValue: `View all ${product.brand} products` })}
-                    </Text>
-                  </View>
-
-                  <Ionicons
-                    name={isRTL ? 'chevron-back' : 'chevron-forward'}
-                    size={20}
-                    color={theme.colors.textSecondary}
-                  />
-                </TouchableOpacity>
-              )}
+                )}
+              </View>
 
               {/* Wholesale Pricing Tiers */}
               {product.priceTiers && product.priceTiers.length > 0 && (
@@ -2306,17 +2507,16 @@ export const ProductDetailsScreen: React.FC = () => {
                 )
               )}
 
-              {/* Quantity Selector - Moved ABOVE variations per Alibaba pattern */}
-              {/* Quantity Selector - Show ONLY if NO size/color variations exist */}
+              {/* Compact Quantity Selector - Show ONLY if NO size/color variations exist */}
               {inStock && !hasSizeVariations && !hasColorVariations && (
-                <View style={styles.section}>
-                  <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
-                    {t('product.quantity')}
+                <View style={[styles.quantityRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                  <Text allowFontScaling={false} style={[styles.quantityLabel, { color: theme.colors.text }]}>
+                    {t('product.quantity', { defaultValue: 'Quantity' })}
                   </Text>
 
-                  <View style={[styles.quantityContainer, {
-                    backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#f2f2f2',
-                    borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.03)',
+                  <View style={[styles.compactStepper, {
+                    backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F5F5F7',
+                    borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
                     flexDirection: isRTL ? 'row-reverse' : 'row',
                   }]}>
                     <TouchableOpacity
@@ -2324,17 +2524,15 @@ export const ProductDetailsScreen: React.FC = () => {
                       disabled={quantity <= 1}
                       activeOpacity={0.7}
                       style={[
-                        styles.quantityButton,
-                        {
-                          backgroundColor: theme.colors.background,
-                          opacity: quantity <= 1 ? 0.4 : 1,
-                        },
+                        styles.compactStepperBtn,
+                        { opacity: quantity <= 1 ? 0.35 : 1 },
                       ]}
                     >
-                      <Ionicons name="remove" size={20} color={quantity <= 1 ? theme.colors.textSecondary : theme.colors.primary} />
+                      <Ionicons name="remove" size={16} color={theme.colors.text} />
                     </TouchableOpacity>
 
-                    <TextInput allowFontScaling={false}
+                    <TextInput
+                      allowFontScaling={false}
                       value={qtyText}
                       onChangeText={(text) => {
                         const cleaned = text.replace(/[^0-9]/g, '');
@@ -2364,16 +2562,7 @@ export const ProductDetailsScreen: React.FC = () => {
                       }}
                       keyboardType="number-pad"
                       selectTextOnFocus
-                      style={[styles.quantityText, {
-                        color: theme.colors.text,
-                        textAlign: 'center',
-                        textAlignVertical: 'center',
-                        includeFontPadding: false,
-                        padding: 0,
-                        height: 40,
-                        minWidth: 40,
-                        paddingVertical: 0,
-                      }]}
+                      style={[styles.compactStepperText, { color: theme.colors.text }]}
                     />
 
                     <TouchableOpacity
@@ -2381,14 +2570,11 @@ export const ProductDetailsScreen: React.FC = () => {
                       disabled={quantity >= maxStock}
                       activeOpacity={0.7}
                       style={[
-                        styles.quantityButton,
-                        {
-                          backgroundColor: theme.colors.background,
-                          opacity: quantity >= maxStock ? 0.4 : 1,
-                        },
+                        styles.compactStepperBtn,
+                        { opacity: quantity >= maxStock ? 0.35 : 1 },
                       ]}
                     >
-                      <Ionicons name="add" size={20} color={quantity >= maxStock ? theme.colors.textSecondary : theme.colors.primary} />
+                      <Ionicons name="add" size={16} color={theme.colors.text} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -2744,120 +2930,121 @@ export const ProductDetailsScreen: React.FC = () => {
 
               {/* Description */}
               {!!localizedDescription && (
-                <View style={styles.section}>
-                  <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
-                    {t('product.description')}
+                <View style={styles.sectionBlock}>
+                  <Text allowFontScaling={false} style={[styles.sectionHeading, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+                    {t('product.description', { defaultValue: 'Description' })}
                   </Text>
-                  <Text allowFontScaling={false} style={[styles.descriptionText, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
+                  <Text allowFontScaling={false} style={[styles.bodyDescription, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
                     {localizedDescription}
                   </Text>
                 </View>
               )}
 
-              <Divider style={{ marginVertical: 4 }} />
+              {/* Specifications: compact label/value list with hairline dividers */}
+              {(() => {
+                const specRows: Array<{ label: string; value: string }> = [];
+                const seenKeys = new Set<string>();
 
-              {/* Specifications */}
-              <View style={styles.section}>
-                <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
-                  {t('product.specifications')}
-                </Text>
-
-                <View style={[styles.infoCardsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                  <View style={[styles.infoCard, { backgroundColor: isDark ? theme.colors.surface : '#F0F0F2' }]}>
-                    <Text allowFontScaling={false} style={[styles.infoCardTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{t('product.authentic', { defaultValue: 'Authentic' })}</Text>
-                    <Text allowFontScaling={false} style={[styles.infoCardValue, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>{t('product.authenticValue', { defaultValue: '100% Authentic' })}</Text>
-                  </View>
-                  <View style={[styles.infoCard, { backgroundColor: isDark ? theme.colors.surface : '#F0F0F2' }]}>
-                    <Text allowFontScaling={false} style={[styles.infoCardTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{t('product.warranty', { defaultValue: 'Warranty' })}</Text>
-                    <Text allowFontScaling={false} style={[styles.infoCardValue, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>{product.warranty || t('product.notAvailable', { defaultValue: 'Not Available' })}</Text>
-                  </View>
-                </View>
-                <View style={[styles.infoCardsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                  <View style={[styles.infoCard, { backgroundColor: isDark ? theme.colors.surface : '#F0F0F2' }]}>
-                    <Text allowFontScaling={false} style={[styles.infoCardTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{t('product.availability', { defaultValue: 'Availability' })}</Text>
-                    <Text allowFontScaling={false} style={[styles.infoCardValue, { color: inStock ? theme.colors.success : theme.colors.error, textAlign: isRTL ? 'right' : 'left' }]}>{inStock ? t('product.available') : t('product.unavailable')}</Text>
-                  </View>
-                  <View style={[styles.infoCard, { backgroundColor: isDark ? theme.colors.surface : '#F0F0F2' }]}>
-                    <Text allowFontScaling={false} style={[styles.infoCardTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{t('product.condition')}</Text>
-                    <Text allowFontScaling={false} style={[styles.infoCardValue, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>{t(`product.condition${(product.condition || 'new').charAt(0).toUpperCase()}${(product.condition || 'new').slice(1)}`)}</Text>
-                  </View>
-                </View>
-
-                {/* Full technical spec sheet (admin-entered specs + weight + dimensions) */}
-                {(() => {
-                  const specRows: Array<{ k: string; v: string }> = [];
-                  const specs = (product as any).specifications || {};
-                  Object.keys(specs).forEach((k) => {
-                    const v = specs[k];
-                    if (v != null && String(v).trim() !== '') specRows.push({ k, v: String(v) });
+                if (product.condition && product.condition !== 'new') {
+                  specRows.push({
+                    label: t('product.condition', { defaultValue: 'Condition' }),
+                    value: t(`product.condition${product.condition.charAt(0).toUpperCase()}${product.condition.slice(1)}`, { defaultValue: product.condition }),
                   });
-                  const w = (product as any).weight;
-                  if (w != null && w !== '') specRows.push({ k: t('product.weight', { defaultValue: 'Weight' }), v: `${w} kg` });
-                  const d = (product as any).dimensions;
-                  if (d && (d.length || d.width || d.height)) {
-                    specRows.push({ k: t('product.dimensions', { defaultValue: 'Dimensions' }), v: `${d.length || 0} × ${d.width || 0} × ${d.height || 0} cm` });
+                  seenKeys.add('condition');
+                }
+                if (product.warranty?.trim()) {
+                  specRows.push({
+                    label: t('product.warranty', { defaultValue: 'Warranty' }),
+                    value: product.warranty.trim(),
+                  });
+                  seenKeys.add('warranty');
+                }
+                const specs = (product as any).specifications || {};
+                Object.keys(specs).forEach((k) => {
+                  const keyLower = k.toLowerCase().trim();
+                  if (keyLower === 'brand' || keyLower === 'category' || seenKeys.has(keyLower)) return;
+                  const v = specs[k];
+                  if (v != null && String(v).trim() !== '') {
+                    specRows.push({ label: k, value: String(v).trim() });
+                    seenKeys.add(keyLower);
                   }
-                  if (specRows.length === 0) return null;
-                  return (
-                    <View style={{ marginTop: 12, borderRadius: 14, overflow: 'hidden', backgroundColor: isDark ? theme.colors.surface : '#F0F0F2' }}>
-                      {specRows.map((row, i) => (
+                });
+                const w = (product as any).weight;
+                if (w != null && String(w).trim() !== '' && !seenKeys.has('weight')) {
+                  specRows.push({ label: t('product.weight', { defaultValue: 'Weight' }), value: `${w} kg` });
+                  seenKeys.add('weight');
+                }
+                const d = (product as any).dimensions;
+                if (d && (d.length || d.width || d.height) && !seenKeys.has('dimensions')) {
+                  specRows.push({
+                    label: t('product.dimensions', { defaultValue: 'Dimensions' }),
+                    value: `${d.length || 0} × ${d.width || 0} × ${d.height || 0} cm`,
+                  });
+                  seenKeys.add('dimensions');
+                }
+
+                if (specRows.length === 0) return null;
+
+                return (
+                  <View style={styles.sectionBlock}>
+                    <Text allowFontScaling={false} style={[styles.sectionHeading, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+                      {t('product.specifications', { defaultValue: 'Specifications' })}
+                    </Text>
+                    <View style={[styles.specsListContainer, { borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+                      {specRows.map((row, idx) => (
                         <View
-                          key={`${row.k}-${i}`}
-                          style={{
-                            flexDirection: isRTL ? 'row-reverse' : 'row',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            paddingVertical: 12,
-                            paddingHorizontal: 14,
-                            borderTopWidth: i === 0 ? 0 : StyleSheet.hairlineWidth,
-                            borderTopColor: theme.colors.border,
-                          }}
+                          key={`${row.label}-${idx}`}
+                          style={[
+                            styles.specRowItem,
+                            {
+                              flexDirection: isRTL ? 'row-reverse' : 'row',
+                              borderTopWidth: idx === 0 ? 0 : StyleSheet.hairlineWidth,
+                              borderTopColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                            },
+                          ]}
                         >
-                          <Text allowFontScaling={false} style={{ color: theme.colors.textSecondary, fontSize: 13.5, flex: 1, textAlign: isRTL ? 'right' : 'left' }} numberOfLines={2}>{row.k}</Text>
-                          <Text allowFontScaling={false} style={{ color: theme.colors.text, fontSize: 13.5, fontWeight: '600', flex: 1, textAlign: isRTL ? 'left' : 'right' }} numberOfLines={2}>{row.v}</Text>
+                          <Text allowFontScaling={false} style={[styles.specItemLabel, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
+                            {row.label}
+                          </Text>
+                          <Text allowFontScaling={false} style={[styles.specItemValue, { color: theme.colors.text, textAlign: isRTL ? 'left' : 'right' }]}>
+                            {row.value}
+                          </Text>
                         </View>
                       ))}
                     </View>
-                  );
-                })()}
-              </View>
+                  </View>
+                );
+              })()}
 
-              {/* Product Overview (collapsible) */}
-              <View style={styles.section}>
-                <TouchableOpacity
-                  style={[styles.overviewBar, { backgroundColor: isDark ? theme.colors.surface : '#F0F0F2', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
-                  onPress={() => setOverviewExpanded(v => !v)}
-                  activeOpacity={0.7}
-                >
-                  <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text, marginBottom: 0 }]}>
-                    {t('product.overview', { defaultValue: 'Product Overview' })}
-                  </Text>
-                  <Ionicons name={overviewExpanded ? 'chevron-up' : 'chevron-down'} size={20} color={theme.colors.textSecondary} />
-                </TouchableOpacity>
-                {overviewExpanded && (
-                  <Text allowFontScaling={false} style={[styles.descriptionText, { color: theme.colors.textSecondary, marginTop: 12, textAlign: isRTL ? 'right' : 'left' }]}>
-                    {localizedDescription || t('product.noOverview', { defaultValue: 'No additional details available.' })}
-                  </Text>
-                )}
-              </View>
-
-              {/* Payment Methods */}
-              <View style={styles.section}>
-                <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+              {/* Compact Payment Information */}
+              <View style={styles.sectionBlock}>
+                <Text allowFontScaling={false} style={[styles.sectionHeading, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
                   {t('product.paymentMethods', { defaultValue: 'Payment Methods' })}
                 </Text>
-                <View style={[styles.paymentRow, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDark ? theme.colors.surface : '#F0F0F2' }]}>
-                  <Ionicons name="cash-outline" size={22} color={theme.colors.primary} />
-                  <Text allowFontScaling={false} style={[styles.paymentText, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
-                    {t('product.cashOnDelivery', { defaultValue: 'Cash on Delivery' })}
-                  </Text>
+                <View style={[styles.paymentCompactRow, {
+                  flexDirection: isRTL ? 'row-reverse' : 'row',
+                  backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#F9F9FB',
+                  borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                }]}>
+                  <View style={[styles.paymentIconBox, { backgroundColor: '#A6192015' }]}>
+                    <Ionicons name="cash-outline" size={18} color="#A61920" />
+                  </View>
+                  <View style={{ flex: 1, marginHorizontal: 10 }}>
+                    <Text allowFontScaling={false} style={[styles.paymentCompactTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+                      {t('product.cashOnDelivery', { defaultValue: 'Cash on Delivery' })}
+                    </Text>
+                    <Text allowFontScaling={false} style={[styles.paymentCompactSubtitle, { color: theme.colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
+                      {t('product.payUponReceipt', { defaultValue: 'Pay in cash upon receiving your order' })}
+                    </Text>
+                  </View>
+                  <Ionicons name="shield-checkmark-outline" size={18} color="#16A34A" />
                 </View>
               </View>
 
-              {/* Seller store card. Everything here was loaded but never rendered. */}
+              {/* Seller store card */}
               {hasStoreCard && (
-                <View style={styles.section}>
-                  <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+                <View style={styles.sectionBlock}>
+                  <Text allowFontScaling={false} style={[styles.sectionHeading, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
                     {t('product.storeInfo')}
                   </Text>
 
@@ -2903,8 +3090,6 @@ export const ProductDetailsScreen: React.FC = () => {
                           )}
                         </View>
 
-                        {/* Address is NOT gated on coordinates — a branch saved without
-                            a pin still has a real address customers need to see. */}
                         {!!storeAddressLine && (
                           <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'flex-start', marginTop: 2 }}>
                             <Ionicons name="location-outline" size={14} color={theme.colors.textSecondary} style={{ marginTop: 2 }} />
@@ -2926,7 +3111,7 @@ export const ProductDetailsScreen: React.FC = () => {
                       <View style={[styles.storeActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                         {!!storeInfo?.phone && (
                           <TouchableOpacity
-                            style={[styles.storeActionButton, { backgroundColor: theme.colors.primary, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                            style={[styles.storeActionButton, { backgroundColor: '#A61920', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                             activeOpacity={0.85}
                             accessibilityRole="button"
                             onPress={() => callSeller(storeInfo.phone)}
@@ -2965,15 +3150,14 @@ export const ProductDetailsScreen: React.FC = () => {
                       activeOpacity={0.75}
                       accessibilityRole="button"
                       onPress={() => navigation.navigate('StoreLocation', {
-                        // Without this the branches screen lists every seller's shops.
                         tenantId: storeInfo?.tenantId || product?.tenantId || tenantId || undefined,
                       })}
                     >
-                      <Ionicons name="map-outline" size={15} color={theme.colors.primary} />
+                      <Ionicons name="map-outline" size={15} color="#A61920" />
                       <Text
                         allowFontScaling={false}
                         numberOfLines={1}
-                        style={[styles.viewStoreButtonText, { color: theme.colors.primary, marginHorizontal: 6 }]}
+                        style={[styles.viewStoreButtonText, { color: '#A61920', marginHorizontal: 6 }]}
                       >
                         {t('product.viewAllBranches', { defaultValue: 'View all branches' })}
                       </Text>
@@ -2984,156 +3168,52 @@ export const ProductDetailsScreen: React.FC = () => {
 
             </View>
 
-            {/* GOLDEN PERFORMANCE: Defer Related Products - luxury vertical cards */}
+            {/* Related Products - Horizontal List with Redesigned ProductCard */}
             {ready && relatedProducts.length > 0 && (
-              <View style={[styles.section, { marginTop: SPACING.lg, paddingHorizontal: SPACING.md }]}>
-                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                  <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left', marginBottom: 0 }]}>
-                    {t('product.relatedProducts')}
+              <View style={styles.relatedSection}>
+                <View style={[styles.relatedHeaderRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                  <Text allowFontScaling={false} style={[styles.sectionHeading, { color: theme.colors.text, textAlign: isRTL ? 'right' : 'left', marginBottom: 0 }]}>
+                    {t('product.relatedProducts', { defaultValue: 'Related Products' })}
                   </Text>
-                  <View style={{ backgroundColor: theme.colors.primary + '15', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
-                    <Text allowFontScaling={false} style={{ color: theme.colors.primary, fontSize: 12, fontWeight: '700' }}>{relatedProducts.slice(0, 10).length} {t('product.items', { defaultValue: 'items' })}</Text>
-                  </View>
                 </View>
 
-                {relatedProducts.slice(0, 10).map((item) => {
-                  const itemImage = item.imageUrls?.[0];
-                  const itemName = i18n.language === 'ar' && (item as any).nameAr
-                    ? (item as any).nameAr
-                    : i18n.language === 'ku' && (item as any).nameKu
-                    ? (item as any).nameKu
-                    : item.name;
-
-                  return (
-                    <TouchableOpacity
-                      key={item.id}
-                      style={{
-                        flexDirection: isRTL ? 'row-reverse' : 'row',
-                        backgroundColor: theme.colors.surface,
-                        borderRadius: 16,
-                        marginBottom: 12,
-                        overflow: 'hidden',
-                        borderWidth: 1,
-                        borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-                        shadowColor: '#000',
-                        shadowOffset: { width: 0, height: 2 },
-                        shadowOpacity: isDark ? 0.3 : 0.06,
-                        shadowRadius: 8,
-                        elevation: 2,
-                      }}
+                <FlatList
+                  horizontal
+                  data={relatedProducts.slice(0, 10)}
+                  keyExtractor={(item) => item.id}
+                  showsHorizontalScrollIndicator={false}
+                  inverted={isRTL}
+                  contentContainerStyle={styles.relatedListContent}
+                  renderItem={({ item }) => (
+                    <ProductCard
+                      product={item}
+                      cardWidth={160}
                       onPress={() => handleRelatedProductPress(item.id)}
-                      activeOpacity={0.7}
-                    >
-                      <Image
-                        source={{ uri: itemImage }}
-                        style={{
-                          width: 110,
-                          height: 110,
-                          backgroundColor: isDark ? '#1a1a1a' : '#f5f5f5',
-                        }}
-                        contentFit="cover"
-                        transition={0}
-                        cachePolicy="memory-disk"
-                        recyclingKey={item.id}
-                      />
-
-                      <View style={{ flex: 1, padding: 12, justifyContent: 'center' }}>
-                        <AppText
-                          fontSize={14}
-                          style={{ color: theme.colors.text, fontWeight: '700', lineHeight: 20 }}
-                          numberOfLines={2}
-                        >
-                          {itemName}
-                        </AppText>
-
-                        {item.partNumber ? (
-                          <AppText
-                            fontSize={11}
-                            style={{ color: theme.colors.textSecondary, marginTop: 4, fontWeight: '500' }}
-                            numberOfLines={1}
-                          >
-                            {item.partNumber}
-                          </AppText>
-                        ) : null}
-
-                        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', marginTop: 8 }}>
-                          <View style={{ backgroundColor: theme.colors.primary + '12', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
-                            <AppNumber
-                              value={formatUnitPrice(item, isVip, currentCurrency as any, exchangeRateIQD)}
-                              style={[
-                                styles.relatedPrice,
-                                { color: theme.colors.primary }
-                              ]}
-                              numberOfLines={1}
-                              adjustsFontSizeToFit
-                              minimumFontScale={0.85}
-                            />
-                          </View>
-
-                          {/* Availability, same rules as the grid cards. Without this a
-                              coming-soon or sold-out product sat in the strip looking
-                              exactly like a stocked one. Stock is the shared effective
-                              figure, so a colour-only product is not called sold out. */}
-                          {(() => {
-                            const relStock = getEffectiveStock(item);
-                            const label =
-                              item.status === 'coming_soon'
-                                ? t('products.status.comingSoon', { defaultValue: 'Coming Soon' })
-                                : item.status === 'on_the_way'
-                                ? t('products.status.onTheWay', { defaultValue: 'On The Way' })
-                                : relStock <= 0
-                                ? t('product.outOfStock')
-                                : null;
-                            if (!label) return null;
-                            return (
-                              <View
-                                style={{
-                                  marginLeft: isRTL ? 0 : 8,
-                                  marginRight: isRTL ? 8 : 0,
-                                  backgroundColor: theme.colors.textSecondary + '1A',
-                                  paddingHorizontal: 8,
-                                  paddingVertical: 3,
-                                  borderRadius: 6,
-                                }}
-                              >
-                                <AppText fontSize={10} numberOfLines={1} style={{ color: theme.colors.textSecondary, fontWeight: '700' }}>
-                                  {label}
-                                </AppText>
-                              </View>
-                            );
-                          })()}
-                        </View>
-                      </View>
-
-                      <View style={{ justifyContent: 'center', paddingRight: isRTL ? 0 : 12, paddingLeft: isRTL ? 12 : 0 }}>
-                        <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={18} color={theme.colors.textSecondary} style={{ opacity: 0.4 }} />
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
+                      style={styles.relatedCardItem}
+                    />
+                  )}
+                />
               </View>
             )}
 
           </ScrollView>
         </KeyboardAvoidingView>
 
-        {/* ===========================
-            Alibaba-style Sticky Bottom Bar
-            =========================== */}
+        {/* Refined Fixed Purchase Bar */}
         <View
           style={[
-            styles.alibabaBar,
+            styles.purchaseBar,
             {
-              borderTopColor: '#E0E0E0',
-              backgroundColor: isDark ? theme.colors.background : '#FAFAFA',
-              paddingBottom: insets.bottom + 10,
+              borderTopColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+              backgroundColor: isDark ? theme.colors.surface : '#FFFFFF',
+              paddingBottom: Math.max(insets.bottom, 12),
             },
           ]}
         >
-          <View style={[styles.alibabaBarRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-            {/* Left: Store Button - Navigate to Store Profile */}
+          <View style={[styles.purchaseBarRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            {/* Store Button */}
             <TouchableOpacity
-              style={styles.alibabaIconAction}
+              style={styles.secondaryBarAction}
               onPress={() => {
                 if (storeInfo?.tenantId) {
                   navigation.navigate('StoreProducts', { tenantId: storeInfo.tenantId });
@@ -3141,49 +3221,38 @@ export const ProductDetailsScreen: React.FC = () => {
                   navigation.navigate('StoreProducts', { tenantId });
                 }
               }}
-              activeOpacity={0.85}
+              activeOpacity={0.75}
+              accessibilityRole="button"
+              accessibilityLabel={t('product.store', { defaultValue: 'Store' })}
             >
-              <Ionicons name="storefront-outline" size={22} color={theme.colors.text} />
+              <Ionicons name="storefront-outline" size={20} color={theme.colors.text} />
               <AppText
-                fontSize={10}
-                style={[styles.alibabaIconLabel, { color: theme.colors.text }]}
-                numberOfLines={2}
+                fontSize={11}
+                style={[styles.secondaryActionText, { color: theme.colors.textSecondary }]}
+                numberOfLines={1}
                 adjustsFontSizeToFit
               >
                 {t('product.store', { defaultValue: 'Store' })}
               </AppText>
             </TouchableOpacity>
 
-            {/* Middle: Chat now (outlined pill) */}
+            {/* Chat button */}
             <TouchableOpacity
-              style={[
-                styles.alibabaChatPill,
-                {
-                  borderColor: '#CCCCCC',
-                  backgroundColor: isDark ? theme.colors.surface : '#FFFFFF',
-                },
-              ]}
+              style={styles.secondaryBarAction}
               onPress={async () => {
                 if (startingChat) return;
 
-                // AUTH CHECK: User must be logged in to chat
                 if (!user) {
                   setLoginModalVisible(true);
                   return;
                 }
 
                 setStartingChat(true);
-                setStartingChat(true);
                 try {
                   let conversation;
-                  
-                  // GROUPING FIX: Check if we already have a chat with this store (Tenant)
-                  // If we do, use that conversation instead of creating a new one for this product.
                   if (storeInfo?.tenantId) {
                     conversation = await findConversationByTenant(storeInfo.tenantId, user.uid);
                   }
-                  
-                  // Fallback: If no existing chat (or no tenantId), create/get via product
                   if (!conversation) {
                     conversation = await getOrCreateConversation(product.id);
                   }
@@ -3209,78 +3278,60 @@ export const ProductDetailsScreen: React.FC = () => {
                 }
               }}
               disabled={startingChat}
-              activeOpacity={0.85}
+              activeOpacity={0.75}
+              accessibilityRole="button"
+              accessibilityLabel={t('product.chat', { defaultValue: 'Chat' })}
             >
               {startingChat ? (
                 <ActivityIndicator color={theme.colors.textSecondary} size="small" />
               ) : (
                 <>
-                  <Ionicons name="chatbubble-ellipses-outline" size={18} color={theme.colors.text} />
+                  <Ionicons name="chatbubble-ellipses-outline" size={20} color={theme.colors.text} />
                   <AppText
-                    fontSize={13}
-                    style={[styles.alibabaChatText, { color: theme.colors.text }]}
+                    fontSize={11}
+                    style={[styles.secondaryActionText, { color: theme.colors.textSecondary }]}
                     numberOfLines={1}
                     adjustsFontSizeToFit
                   >
-                    {t('product.chat')}
+                    {t('product.chat', { defaultValue: 'Chat' })}
                   </AppText>
                 </>
               )}
             </TouchableOpacity>
 
-            {/* Right: Orange button shows Total Price */}
+            {/* Dominant Red Add to Cart Button */}
             <TouchableOpacity
-              style={[styles.alibabaTotalButton, { opacity: !inStock || addingToCart || (product.status && product.status !== 'available') ? 0.6 : 1 }]}
+              style={[
+                styles.primaryPurchaseButton,
+                {
+                  backgroundColor: '#A61920',
+                  opacity: !inStock || addingToCart || (product.status && product.status !== 'available') ? 0.5 : 1,
+                },
+              ]}
               onPress={() => {
                 void handleTotalButtonPress();
               }}
               disabled={!inStock || addingToCart || (product.status !== undefined && product.status !== 'available')}
-              activeOpacity={0.9}
+              activeOpacity={0.88}
+              accessibilityRole="button"
             >
               {addingToCart ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
-                <>
-                  <View style={{ alignItems: 'center' }}>
-                    {product.status === 'coming_soon' ? (
-                      <AppText fontSize={13} style={styles.alibabaTotalLabel} numberOfLines={1} adjustsFontSizeToFit>
-                        {t('products.status.comingSoon', { defaultValue: 'Coming Soon' })}
-                      </AppText>
-                    ) : product.status === 'on_the_way' ? (
-                      <AppText fontSize={13} style={styles.alibabaTotalLabel} numberOfLines={1} adjustsFontSizeToFit>
-                        {t('products.status.onTheWay', { defaultValue: 'On The Way' })}
-                      </AppText>
-                    ) : (
-                      <>
-                        <AppText fontSize={10} style={styles.alibabaTotalLabel} numberOfLines={1} adjustsFontSizeToFit>
-                          {hasSizeVariations
-                            ? t('product.startOrder', { defaultValue: 'Start Order' })
-                            : t('product.addToCart', { defaultValue: 'Add to Cart' })}
-                        </AppText>
-
-                        <AppNumber value={buttonPriceText} style={styles.alibabaTotalValue} />
-                       
-                        {showSavings && (
-                          <View style={{ 
-                            backgroundColor: 'rgba(255,255,255,0.25)', 
-                            borderRadius: 4, 
-                            paddingHorizontal: 6, 
-                            marginTop: 2
-                          }}>
-                            <AppText 
-                              fontSize={11} 
-                              style={{ color: '#FFFFFF', fontWeight: '700' }}
-                              numberOfLines={1}
-                              adjustsFontSizeToFit
-                            >
-                              -{formatPrice(savingsAmount, currentCurrency, exchangeRateIQD)}
-                            </AppText>
-                          </View>
-                        )}
-                      </>
-                    )}
-                  </View>
-                </>
+                <View style={[styles.purchaseBtnContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                  <Ionicons name="bag-handle" size={18} color="#FFFFFF" style={{ marginHorizontal: 4 }} />
+                  <Text allowFontScaling={false} numberOfLines={1} style={styles.purchaseBtnLabel}>
+                    {product.status === 'coming_soon'
+                      ? t('products.status.comingSoon', { defaultValue: 'Coming Soon' })
+                      : product.status === 'on_the_way'
+                      ? t('products.status.onTheWay', { defaultValue: 'On The Way' })
+                      : hasSizeVariations
+                      ? t('product.startOrder', { defaultValue: 'Start Order' })
+                      : t('product.addToCart', { defaultValue: 'Add to Cart' })}
+                  </Text>
+                  <View style={{ flex: 1 }} />
+                  <AppNumber value={buttonPriceText} style={styles.purchaseBtnPrice} />
+                </View>
               )}
             </TouchableOpacity>
           </View>
@@ -3603,26 +3654,42 @@ const styles = StyleSheet.create({
     left: SPACING.md,
     position: 'absolute',
     right: SPACING.md,
+    zIndex: 10,
   },
   fabButton: {
     alignItems: 'center',
-    borderRadius: 24,
-    elevation: 0,
-    height: 48,
+    borderRadius: 22,
+    height: 44,
     justifyContent: 'center',
+    width: 44,
+  },
+  fabLight: {
+    backgroundColor: 'rgba(255, 255, 255, 0.94)',
+    borderColor: '#E7E7EA',
+    borderWidth: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    width: 48,
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  fabDark: {
+    backgroundColor: 'rgba(30, 30, 34, 0.85)',
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 3,
   },
   fabRight: {
     flexDirection: 'row',
   },
   cartBadge: {
     alignItems: 'center',
-    backgroundColor: '#FF5A00',
-    borderRadius: 10,
+    backgroundColor: '#A61920',
+    borderRadius: 9,
     justifyContent: 'center',
     minHeight: 18,
     minWidth: 18,
@@ -3639,44 +3706,43 @@ const styles = StyleSheet.create({
 
   // Product Info
   infoContainer: {
-    marginTop: -SHEET_OVERLAP,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SHEET_OVERLAP,
-    paddingBottom: SPACING.md,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 16,
   },
   headerInfo: {
-    marginBottom: SPACING.lg,
+    marginBottom: 12,
   },
   brandEyebrow: {
     fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 1.6,
-    marginBottom: 6,
+    letterSpacing: 1.2,
+    marginBottom: 4,
     textTransform: 'uppercase',
   },
   productName: {
-    fontSize: 27,
-    fontWeight: '800',
-    letterSpacing: -0.4,
-    lineHeight: 34,
-    marginBottom: SPACING.xs,
+    fontSize: 19,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+    lineHeight: 25,
+    marginBottom: 4,
   },
   partNumber: {
-    fontSize: 14,
-    letterSpacing: 0.3,
-    marginBottom: SPACING.sm,
+    fontSize: 13,
+    letterSpacing: 0.2,
+    marginBottom: 6,
   },
   priceRow: {
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: SPACING.sm,
+    marginTop: 6,
   },
   price: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: '800',
-    letterSpacing: -0.5,
+    letterSpacing: -0.4,
   },
   // Referenced by the related-products strip. It was missing from the sheet, and
   // because this file is @ts-nocheck nothing flagged it — RN silently skips an
@@ -3718,11 +3784,11 @@ const styles = StyleSheet.create({
     marginBottom: 3,
   },
   saveBadge: {
-    backgroundColor: '#E53935',
-    borderRadius: 8,
-    paddingHorizontal: 10,
+    backgroundColor: '#A61920',
+    borderRadius: 6,
+    paddingHorizontal: 8,
     paddingVertical: 3,
-    marginTop: 8,
+    marginTop: 6,
   },
   saveBadgeText: {
     color: '#FFFFFF',
@@ -4092,6 +4158,11 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     paddingHorizontal: 16,
     paddingTop: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 8,
   },
   alibabaBarRow: {
     alignItems: 'center',
@@ -4100,8 +4171,8 @@ const styles = StyleSheet.create({
   alibabaIconAction: {
     alignItems: 'center',
     justifyContent: 'center',
-    maxWidth: 70,
-    minWidth: 55,
+    maxWidth: 60,
+    minWidth: 48,
     paddingVertical: 4,
   },
   alibabaIconLabel: {
@@ -4112,12 +4183,12 @@ const styles = StyleSheet.create({
   },
   alibabaChatPill: {
     alignItems: 'center',
-    borderRadius: 999,
+    borderRadius: 14,
     borderWidth: 1,
     flexDirection: 'row',
-    height: 46,
+    height: 48,
     justifyContent: 'center',
-    marginHorizontal: 12,
+    marginHorizontal: 10,
     paddingHorizontal: 16,
   },
   alibabaChatText: {
@@ -4127,15 +4198,20 @@ const styles = StyleSheet.create({
   },
   alibabaTotalButton: {
     alignItems: 'center',
-    backgroundColor: '#FF5A00',
-    borderRadius: 999,
+    backgroundColor: '#A61920',
+    borderRadius: 14,
     flex: 1,
     flexDirection: 'column',
     justifyContent: 'center',
-    minHeight: 46,
+    minHeight: 48,
     minWidth: 160,
     paddingHorizontal: 14,
     paddingVertical: 4,
+    shadowColor: '#A61920',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
   },
   alibabaTotalLabel: {
     color: '#FFFFFF',
@@ -4291,6 +4367,359 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: Platform.OS === 'android' ? 'normal' : '600',
     textAlign: 'center',
+  },
+
+  // Fixed / Floating Top Header
+  topHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
+    justifyContent: 'flex-end',
+  },
+  topHeaderContent: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    height: 48,
+  },
+  headerIconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerBtnFloatingLight: {
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(0, 0, 0, 0.06)',
+  },
+  headerBtnFloatingDark: {
+    backgroundColor: 'rgba(30, 30, 34, 0.65)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  headerBtnScrolledLight: {
+    backgroundColor: 'rgba(0, 0, 0, 0.04)',
+  },
+  headerBtnScrolledDark: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  headerTitleContainer: {
+    flex: 1,
+    marginHorizontal: 10,
+    justifyContent: 'center',
+  },
+  headerTitleText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  headerRightActions: {
+    alignItems: 'center',
+  },
+
+  // Gallery
+  galleryContainer: {
+    width: '100%',
+    paddingBottom: 14,
+  },
+  galleryStage: {
+    width: SCREEN_WIDTH,
+    height: GALLERY_STAGE_HEIGHT,
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  gallerySlideItem: {
+    width: SCREEN_WIDTH,
+    height: GALLERY_STAGE_HEIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  galleryMainImage: {
+    width: '90%',
+    height: '90%',
+  },
+  galleryEmptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  galleryNavButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    position: 'absolute',
+    top: '50%',
+    marginTop: -16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    zIndex: 10,
+  },
+  galleryNavLeft: {
+    left: 12,
+  },
+  galleryNavRight: {
+    right: 12,
+  },
+  galleryCounter: {
+    position: 'absolute',
+    bottom: 8,
+    right: 14,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+    zIndex: 5,
+  },
+  galleryCounterText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '500',
+    letterSpacing: 0.3,
+  },
+  thumbnailStripWrapper: {
+    marginTop: 8,
+  },
+  thumbnailStripContent: {
+    paddingHorizontal: 16,
+    gap: 8,
+    alignItems: 'center',
+  },
+  thumbItem: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
+    overflow: 'hidden',
+    padding: 3,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  thumbImage: {
+    width: '100%',
+    height: '100%',
+  },
+
+  // Category & Brand Row
+  categoryBrandRow: {
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 12,
+  },
+  categoryPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
+  },
+  categoryPillText: {
+    fontSize: 12.5,
+    fontWeight: '600',
+  },
+  brandBrowseRow: {
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  brandBrowseText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#A61920',
+  },
+
+  // SKU / Barcode compact box
+  skuCompactBox: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 14,
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  skuCompactItem: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  skuCompactLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  skuCompactVal: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+
+  // Compact Quantity Row
+  quantityRow: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    marginTop: 6,
+    marginBottom: 6,
+  },
+  quantityLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  compactStepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  compactStepperBtn: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  compactStepperText: {
+    fontSize: 15,
+    fontWeight: '700',
+    minWidth: 32,
+    textAlign: 'center',
+    paddingHorizontal: 4,
+  },
+
+  // Sections
+  sectionBlock: {
+    marginTop: 18,
+  },
+  sectionHeading: {
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+    marginBottom: 10,
+  },
+  bodyDescription: {
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: '400',
+  },
+
+  // Specs List
+  specsListContainer: {
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  specRowItem: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+  },
+  specItemLabel: {
+    fontSize: 13.5,
+    fontWeight: '500',
+    flex: 1,
+  },
+  specItemValue: {
+    fontSize: 13.5,
+    fontWeight: '600',
+    flex: 1,
+  },
+
+  // Payment compact row
+  paymentCompactRow: {
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  paymentIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  paymentCompactTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  paymentCompactSubtitle: {
+    fontSize: 11.5,
+    marginTop: 2,
+  },
+
+  // Related products
+  relatedSection: {
+    marginTop: 20,
+    marginBottom: 12,
+  },
+  relatedHeaderRow: {
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  relatedListContent: {
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  relatedCardItem: {
+    marginRight: 0,
+  },
+
+  // Fixed Purchase Bar
+  purchaseBar: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 8,
+  },
+  purchaseBarRow: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  secondaryBarAction: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    minWidth: 46,
+  },
+  secondaryActionText: {
+    fontWeight: '500',
+    marginTop: 3,
+    textAlign: 'center',
+  },
+  primaryPurchaseButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 14,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    shadowColor: '#A61920',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+  purchaseBtnContent: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  purchaseBtnLabel: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  purchaseBtnPrice: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
   },
 });
 

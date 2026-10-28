@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Asankary"
+    "name": "Khamark"
   },
   "nav": {
     "home": "Home",
@@ -96,7 +96,7 @@
     "later": "Later",
     "available": "Update Available",
     "softTitle": "Update Available",
-    "softMessage": "A new version of Asankary is available with improvements and fixes."
+    "softMessage": "A new version of Khamark is available with improvements and fixes."
   },
   "common": {
     "showPassword": "Show password",
@@ -108,7 +108,7 @@
     "directions": "Directions",
     "location": "Location",
     "openInMaps": "Open in Maps",
-    "appName": "Asankary",
+    "appName": "Khamark",
     "loading": "Loading...",
     "error": "Error",
     "success": "Success",
@@ -260,7 +260,7 @@
     "colorCount_one": "{{count}} color",
     "colorCount_other": "{{count}} colors",
     "imageNOfM": "Image {{current}} of {{total}}",
-    "shareText": "Check out this product on Asankary!"
+    "shareText": "Check out this product on Khamark!"
   },
   "tradeIn": {
     "title": "Sell or trade your phone",
@@ -345,7 +345,7 @@
     "forgotPasswordLabel": "Forgot Password?",
     "resetPasswordLabel": "Reset Password",
     "welcomeBack": "Please sign in to your existing account",
-    "joinUs": "Join Asankary and shop quality products at great prices.",
+    "joinUs": "Join Khamark and shop quality products at great prices.",
     "email": "Email Address",
     "password": "Password",
     "confirmPassword": "Confirm Password",
@@ -569,7 +569,7 @@
     "alreadySignedInBody": "Change your password from Settings → Change Password. You do not need the emailed link."
   },
   "home": {
-    "welcome": "Welcome to Asankary",
+    "welcome": "Welcome to Khamark",
     "subtitle": "Find quality products at great prices",
     "location": "Erbil, Iraq",
     "categories": "Categories",
@@ -597,6 +597,8 @@
     "hello": "Hello",
     "guest": "Guest",
     "ourBrands": "Our Brands",
+    "shopByBrand": "Shop by brand",
+    "shopBrandA11y": "Shop {{brand}} products",
     "featured": "Featured"
   },
   "store": {
@@ -1024,7 +1026,7 @@
     "noTrackingMessage": "Tracking information is not available yet.",
     "cannotCancel": "Cannot Cancel",
     "cannotCancelMessage": "This order cannot be cancelled at this stage.",
-    "shareText": "Check out my order from Asankary:",
+    "shareText": "Check out my order from Khamark:",
     "dateRange": "Date Range",
     "cancelledOn": "Cancelled on {{date}}",
     "messageSeller": "Message Seller",
@@ -1202,11 +1204,15 @@
       "orderUpdates": "Order Updates",
       "promotions": "Promotions & Offers",
       "newProducts": "New Products",
-      "priceDrops": "Price Drops"
+      "priceDrops": "Price Drops",
+      "signInRequiredTitle": "Sign In Required",
+      "orderUpdatesGuestMsg": "Please sign in to receive real-time order status and tracking updates.",
+      "permissionRequiredTitle": "Notifications Disabled",
+      "permissionRequiredMsg": "Please enable notifications in your device settings to receive updates."
     },
     "guest": {
-      "welcome": "Welcome, Guest!",
-      "subtitle": "Sign in to access your profile and orders",
+      "welcome": "Welcome to Khamark",
+      "subtitle": "Sign in to access your account and orders",
       "signInButton": "Sign In to Your Account"
     },
     "changePasswordNote": "Your password must be at least 6 characters long. We recommend using a mix of letters, numbers, and symbols.",
@@ -1274,7 +1280,7 @@
       }
     },
     "termsAndConditions": "Terms & Conditions",
-    "termsSubtitle": "Asankary - Terms & Conditions",
+    "termsSubtitle": "Khamark - Terms & Conditions",
     "termsEffectiveDate": "Effective Date: January 1, 2025",
     "fullName": "Full Name",
     "enterFullName": "Enter your full name",
@@ -1973,7 +1979,7 @@
   "chatbot": {
     "title": "AI Assistant",
     "subtitle": "Online - Ready to help",
-    "welcomeMessage": "Hello! 👋 I'm your Asankary shopping assistant. I can help you with questions about our products, orders, delivery, and more. How can I help you today?",
+    "welcomeMessage": "Hello! 👋 I'm your Khamark shopping assistant. I can help you with questions about our products, orders, delivery, and more. How can I help you today?",
     "inputPlaceholder": "Type your message...",
     "typing": "Typing",
     "errorMessage": "Sorry, I couldn't process your message. Please try again.",
@@ -2397,7 +2403,7 @@
       "administrator": "Administrator",
       "setupYourStore": "Setup Your Store",
       "setupYourStoreSubtitle": "Enter your store name to complete setup:",
-      "storeNamePlaceholder": "e.g., Asankary",
+      "storeNamePlaceholder": "e.g., Khamark",
       "setupStore": "Setup Store",
       "customers": "Customer Management",
       "customersSubtitle": "View users, set VIP roles, and manage access",
@@ -3537,7 +3543,7 @@
     "chooseRegionSub": "Select your country for shipping & delivery",
     "chooseCity": "Choose Your City",
     "subtitle": "Your online store for the products you love.",
-    "welcome": "Welcome to Asankary",
+    "welcome": "Welcome to Khamark",
     "point1": "Browse the latest phones and accessories.",
     "point2": "Add to cart and check out securely.",
     "point3": "Fast delivery across Iraq."

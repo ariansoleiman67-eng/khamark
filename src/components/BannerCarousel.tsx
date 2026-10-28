@@ -6,7 +6,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { useIsFocused } from '@react-navigation/native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const BANNER_PADDING = 24; // 12px on each side
+const BANNER_PADDING = 32; // 16px on each side (aligned with search & grid)
 const BANNER_WIDTH = SCREEN_WIDTH - BANNER_PADDING;
 const BANNER_AUTO_SCROLL_INTERVAL = 4000;
 
@@ -90,7 +90,8 @@ const BannerCarousel: React.FC<BannerCarouselProps> = memo(({
     const w = e?.source?.width;
     const h = e?.source?.height;
     if (w > 0 && h > 0) {
-      const r = Math.min(Math.max(h / w, 0.3), 0.8);
+      // Moderately wide aspect ratio: clamped to ~2:1 to 2.5:1 (0.40 to 0.50)
+      const r = Math.min(Math.max(h / w, 0.40), 0.50);
       bannerRatioCache.set(ratioKey, r);
       setImageRatio((prev) => prev ?? r);
     }
@@ -264,8 +265,8 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   bannerSection: {
-    marginTop: 12,
-    paddingHorizontal: 12,
+    marginTop: 10,
+    paddingHorizontal: 16,
   },
   bannerTitle: {
     color: '#ffffff',
@@ -277,17 +278,16 @@ const styles = StyleSheet.create({
     textShadowRadius: 3,
   },
   bannerWrapper: {
-    borderRadius: 20,
-    height: SCREEN_WIDTH * 0.45,
+    borderRadius: 16,
     overflow: 'hidden',
     width: '100%',
     // Shadow: iOS only — Android elevation creates harsh box shadow
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
       },
       android: {
         elevation: 0,
@@ -295,11 +295,11 @@ const styles = StyleSheet.create({
     }),
   },
   overlayLabelContainer: {
-    backgroundColor: '#FF6A00',
-    borderBottomLeftRadius: 14,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    backgroundColor: '#A61920',
+    borderBottomLeftRadius: 10,
+    borderTopRightRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     position: 'absolute',
     right: 0,
     top: 0,
@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
   },
   overlayLabelText: {
     color: '#ffffff',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.5,
   },
@@ -315,19 +315,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 14,
+    marginTop: 8,
   },
   paginationDot: {
-    backgroundColor: 'rgba(0, 0, 0, 0.12)',
-    borderRadius: 5,
-    height: 6,
-    marginHorizontal: 3,
-    width: 6,
+    backgroundColor: 'rgba(0, 0, 0, 0.14)',
+    borderRadius: 2,
+    height: 4,
+    marginHorizontal: 2.5,
+    width: 4,
   },
   paginationDotActive: {
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: 3,
-    width: 22,
+    backgroundColor: '#A61920',
+    borderRadius: 2,
+    width: 14,
   },
 });
 

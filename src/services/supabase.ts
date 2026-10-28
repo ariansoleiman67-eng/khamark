@@ -29,7 +29,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     // the official Supabase React Native fix for "logged out after reopening".
     lock: processLock,
     // PKCE returns the auth code as a `?code=` query param, which Android
-    // preserves on the `asankary://` redirect. The default `implicit` flow returns
+    // preserves on the `khamark://` redirect. The default `implicit` flow returns
     // tokens in the URL `#hash`, which Android strips from custom-scheme links.
     flowType: 'pkce',
   },

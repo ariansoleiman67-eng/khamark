@@ -696,6 +696,7 @@ export type RootStackParamList = {
   OrderConfirmation: { orderId: string; orderNumber: string };
   QiCardPayment: { formUrl: string; paymentId: string; orderId: string; orderNumber: string };
   OrderDetail: { orderId: string };
+  Orders: undefined;
   Profile: { screen?: string; params?: any } | undefined;
   Settings: undefined;
   Notifications: undefined;

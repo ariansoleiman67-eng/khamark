@@ -44,6 +44,12 @@ export default function AppText({ style, fontSize, allowFontScaling = false, ...
       ? String(props.children)
       : undefined;
 
+  // CRITICAL (iOS): When adjustsFontSizeToFit is enabled on iOS, specifying lineHeight
+  // causes RCTText to measure the text as exceeding the vertical boundary, collapsing
+  // font size down to the 4pt minimum. Never apply fixed lineHeight when adjustsFontSizeToFit is active on iOS.
+  const isIosAdjusting = Platform.OS === 'ios' && Boolean(shouldAdjust);
+  const safeLineHeight = isIosAdjusting ? undefined : lh;
+
   return (
     <Text
       {...props}
@@ -55,8 +61,9 @@ export default function AppText({ style, fontSize, allowFontScaling = false, ...
         Platform.OS === 'android' ? { includeFontPadding: true } : null,
         // Add safe padding for bold text to prevent clipping on Android
         Platform.OS === 'android' && bold ? { paddingHorizontal: 4, paddingVertical: 2 } : null,
-        { lineHeight: lh },
+        safeLineHeight !== undefined ? { lineHeight: safeLineHeight } : null,
         style,
+        isIosAdjusting ? { lineHeight: undefined } : null,
       ]}
     />
   );

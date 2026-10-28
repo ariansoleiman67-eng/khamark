@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from './AuthContext';
 
-const FAVORITES_STORAGE_KEY = '@asankary_favorites';
+const FAVORITES_STORAGE_KEY = '@khamark_favorites';
 
 interface FavoritesContextType {
   favorites: string[];

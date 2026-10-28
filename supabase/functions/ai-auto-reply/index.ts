@@ -30,7 +30,7 @@ const QUIET_MS = Number(Deno.env.get('AI_QUIET_MS') ?? 30_000);
 // expensive part of the prompt and history past this rarely changes an answer.
 const HISTORY_LIMIT = 12;
 const MODEL = Deno.env.get('ANTHROPIC_MODEL') || 'claude-haiku-4-5';
-const ASSISTANT_NAME = Deno.env.get('AI_ASSISTANT_NAME') || 'Asankary Assistant';
+const ASSISTANT_NAME = Deno.env.get('AI_ASSISTANT_NAME') || 'Khamark Assistant';
 
 interface WebhookPayload {
   type: string;
@@ -147,7 +147,7 @@ Deno.serve(async (req: Request) => {
         .join('\n');
 
       const system = [
-        `You are ${ASSISTANT_NAME}, answering for Asankary, a phone and accessories shop in Erbil, Iraq.`,
+        `You are ${ASSISTANT_NAME}, answering for Khamark, a luxury phone and accessories shop in Iraq.`,
         'The shop owner has not replied yet, so you are answering on their behalf.',
         '',
         'Rules:',
