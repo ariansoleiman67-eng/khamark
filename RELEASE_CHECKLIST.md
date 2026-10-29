@@ -1,6 +1,20 @@
 # Khamark — Pre-Release Operational Checklist
 
 This checklist tracks actionable requirements before submitting **Khamark v1.0.0** to the Apple App Store and Google Play Console.
+For technical audit verification, schema history, and repro harness outputs, refer to [REVIEW_START_HERE.md](REVIEW_START_HERE.md).
+
+---
+
+## 0. Technical Audit Remediation (KHM-001 – KHM-027)
+
+- [x] **KHM-001 & KHM-010**: Consolidated authoritative database schema deployed in `supabase/khamark_schema.sql` with generated TypeScript types in `src/types/database.types.ts`.
+- [x] **KHM-002, KHM-003, KHM-013, KHM-014**: Server-enforced stock movements, order total recalculation triggers, and blocked customer checks.
+- [x] **KHM-004, KHM-005, KHM-006**: Storage RLS object ownership, token policy lockdown, and parts view masking `purchase_price` to `NULL`.
+- [x] **KHM-007, KHM-008, KHM-009**: Read-only partner exclusions from staff actions, Firebase rules default deny, and independent `.firebaserc` project binding.
+- [x] **KHM-011, KHM-012, KHM-027**: Explicit `USE_MOCK_DATA` flag, session-bound profile cache, and fail-closed phone lookups.
+- [x] **KHM-016, KHM-017, KHM-018**: Cart stock pool validation across options/batches, storage write error propagation, and authentic uploaded packshot precedence.
+- [x] **KHM-020, KHM-021, KHM-024, KHM-025**: RTL tab bar alignment, multi-page catalog pagination, `country-state-city` bundle pruning (-8.6MB), and EN/AR/KU dictionary parity.
+- [x] **Harness Verification**: 15/15 SQL repro checks passed, 8/8 client repro checks passed, 24/24 Jest test suites (297 tests) passed, 0 TypeScript errors.
 
 ---
 
