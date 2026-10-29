@@ -181,7 +181,9 @@
     "somethingWentWrong": "حدث خطأ ما",
     "loadError": "تعذر تحميل المنتجات. تحقق من اتصالك.",
     "all": "الكل",
-    "tapToOpenInMaps": "اضغط للفتح في الخرائط"
+    "tapToOpenInMaps": "اضغط للفتح في الخرائط",
+    "previous": "السابق",
+    "notice": "تنبيه"
   },
   "product": {
     "partNumber": "رمز المنتج",
@@ -264,7 +266,11 @@
     "colorCount_many": "{{count}} لوناً",
     "colorCount_other": "{{count}} لون",
     "imageNOfM": "صورة {{current}} من {{total}}",
-    "shareText": "شاهد هذا المنتج على أسنكري!"
+    "shareText": "شاهد هذا المنتج على أسنكري!",
+    "favorite": "المفضلة",
+    "share": "مشاركة",
+    "payUponReceipt": "الدفع عند الاستلام",
+    "colorCount": "{{count}} ألوان"
   },
   "tradeIn": {
     "title": "بيع أو استبدال هاتفك",
@@ -704,7 +710,10 @@
     "updateError": "تعذّر تحديث الكمية",
     "moreToUnlock": "إضافية للحصول على {{name}}",
     "moreItemsToUnlock": "منتجات إضافية للحصول على {{name}}",
-    "restartFailed": "تم تفريغ سلتك لكن تعذّرت إضافة المنتج. حاول مرة أخرى."
+    "restartFailed": "تم تفريغ سلتك لكن تعذّرت إضافة المنتج. حاول مرة أخرى.",
+    "maxStockReached": "تم الوصول إلى الحد الأقصى للمخزون",
+    "decrease": "تقليل الكمية",
+    "increase": "زيادة الكمية"
   },
   "checkout": {
     "title": "إتمام الطلب",

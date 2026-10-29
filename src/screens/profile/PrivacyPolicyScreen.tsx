@@ -145,27 +145,17 @@ Under applicable privacy laws:
 • Right to object to processing`
     },
     {
-      title: "6. DATA RETENTION",
-      content: `6.1 RETENTION PERIODS
-• Account information: While account is active
-• Order history: 7 years for tax/legal compliance
-• Payment data: As required by financial regulations
-• Support communications: 3 years
-• Marketing data: Until consent is withdrawn
+      title: "6. DATA RETENTION & ACCOUNT DELETION",
+      content: `6.1 RETENTION & CLEANUP CONTRACT
+• Account & Profile: Permanently deleted upon user account deletion request.
+• Device & Push Tokens: Immediately purged upon account deletion.
+• Private Media & Storage: Uploaded profile photos and attachments are automatically deleted.
+• Chat & Messages: Deleted from active conversation records.
+• Order Records: In accordance with commercial tax and accounting regulations, order transactions are unlinked from your identity, with customer name, phone number, and shipping addresses permanently redacted and anonymized.
 
 6.2 DELETION PROCEDURES
-• Automatic deletion after retention periods
-• Secure deletion using industry standards
-• Anonymization of data where legally required
-• Regular purging of unnecessary data
-• User-initiated deletion requests processed within 30 days
-
-6.3 LEGAL HOLDS
-Data may be retained longer if:
-• Subject to legal proceedings
-• Required for regulatory compliance
-• Needed for fraud prevention
-• Part of ongoing investigations`
+• In-app self-service account deletion triggers the automated cleanup process immediately.
+• User sessions, access tokens, and credentials are permanently revoked.`
     },
     {
       title: "7. INTERNATIONAL TRANSFERS",

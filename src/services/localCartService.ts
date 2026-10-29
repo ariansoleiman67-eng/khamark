@@ -102,6 +102,7 @@ export class LocalCartService {
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Error saving local cart:', error);
+      throw error;
     }
   }
 
@@ -157,9 +158,15 @@ export class LocalCartService {
         // Update existing item (same product + same options)
         const existingItem = cart.items[existingItemIndex];
         const newQuantity = existingItem.quantity + quantity;
-        
-        const maxStock = this.maxStockFor(product, (existingItem as any).variationId);
-        if (newQuantity > maxStock) {
+        const poolVariationId = (existingItem as any).variationId;
+        const maxStock = this.maxStockFor(product, poolVariationId);
+
+        // Count what is already in cart for this stock pool across all sibling lines
+        const siblingQtyInPool = cart.items
+          .filter((item, idx) => idx !== existingItemIndex && item.productId === productId && (item as any).variationId === poolVariationId)
+          .reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+
+        if (siblingQtyInPool + newQuantity > maxStock) {
           throw new Error(`Cannot add more than ${maxStock} items`);
         }
 
@@ -263,8 +270,9 @@ export class LocalCartService {
         }
       }
 
-      // Validate stock for each selection before adding
-      for (const selection of validSelections) {
+      // Validate stock for each selection before adding (including intra-batch quantities)
+      for (let i = 0; i < validSelections.length; i++) {
+        const selection = validSelections[i];
         // Check variations (size) first, then colorVariations
         let variation = product.variations?.find(v => v.variationId === selection.variationId);
         if (!variation) {
@@ -277,15 +285,19 @@ export class LocalCartService {
 
         // A size can now appear on more than one line (256GB/Black and 256GB/White are
         // separate lines), and every one of them draws on the same size stock. Sum them
-        // all — reading only the first match let the same size be oversold colour by colour.
+        // all across existing cart lines AND earlier selections in this same batch.
         const existingQty = cart.items
           .filter(item => item.productId === product.id && item.variationId === selection.variationId)
           .reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
-        const totalQty = existingQty + selection.quantity;
+        const batchPriorQty = validSelections
+          .slice(0, i)
+          .filter(s => s.variationId === selection.variationId)
+          .reduce((sum, s) => sum + (Number(s.quantity) || 0), 0);
+        const totalQty = existingQty + batchPriorQty + selection.quantity;
 
         if (totalQty > variation.stockQuantity) {
           const varName = selection.colorValue || `${selection.sizeValue} ${selection.sizeUnit || ''}`.trim();
-          throw new Error(`Only ${variation.stockQuantity - existingQty} more "${varName}" available`);
+          throw new Error(`Only ${Math.max(0, variation.stockQuantity - existingQty - batchPriorQty)} more "${varName}" available`);
         }
 
         // The colour riding along on a size line has its own stock to answer to.
@@ -295,9 +307,13 @@ export class LocalCartService {
             const existingColorQty = cart.items
               .filter(item => item.productId === product.id && item.colorVariationId === selection.colorVariationId)
               .reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
-            if (existingColorQty + selection.quantity > colorVariation.stockQuantity) {
+            const batchPriorColorQty = validSelections
+              .slice(0, i)
+              .filter(s => s.colorVariationId === selection.colorVariationId)
+              .reduce((sum, s) => sum + (Number(s.quantity) || 0), 0);
+            if (existingColorQty + batchPriorColorQty + selection.quantity > colorVariation.stockQuantity) {
               throw new Error(
-                `Only ${colorVariation.stockQuantity - existingColorQty} more "${selection.colorValue || colorVariation.colorValue}" available`
+                `Only ${Math.max(0, colorVariation.stockQuantity - existingColorQty - batchPriorColorQty)} more "${selection.colorValue || colorVariation.colorValue}" available`
               );
             }
           }
@@ -432,11 +448,17 @@ export class LocalCartService {
         return await this.removeFromCartImpl(userId, productId, selectedOptions);
       }
 
-      // Check stock limit
+      // Check stock limit across the shared stock pool
       const item = cart.items[itemIndex];
-      const maxStock = this.maxStockFor(item.product, (item as any).variationId);
-      if (quantity > maxStock) {
-        throw new Error(`Only ${maxStock} items available in stock`);
+      const poolVariationId = (item as any).variationId;
+      const maxStock = this.maxStockFor(item.product, poolVariationId);
+
+      const siblingQtyInPool = cart.items
+        .filter((other, idx) => idx !== itemIndex && other.productId === productId && (other as any).variationId === poolVariationId)
+        .reduce((sum, other) => sum + (Number(other.quantity) || 0), 0);
+
+      if (siblingQtyInPool + quantity > maxStock) {
+        throw new Error(`Only ${Math.max(0, maxStock - siblingQtyInPool)} items available in stock`);
       }
 
       // Update quantity

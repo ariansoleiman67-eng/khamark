@@ -34,12 +34,9 @@ if (Platform.OS === 'android') {
       const patchedProps = {
         ...props,
         style: patchedStyle,
-        scrollEnabled: props.scrollEnabled ?? false,
-        // TextInput.defaultProps is ignored under the New Architecture (Fabric),
-        // so the global allowFontScaling=false never applied on some Androids and
-        // the placeholder scaled up with the device font-size setting. Enforce it
-        // here in the render patch, which Fabric does honor. Components can opt in.
-        allowFontScaling: props.allowFontScaling ?? false,
+        scrollEnabled: props.scrollEnabled ?? (props.multiline ? true : false),
+        allowFontScaling: props.allowFontScaling ?? true,
+        maxFontSizeMultiplier: props.maxFontSizeMultiplier ?? 1.35,
       };
 
       return originalRender.call(this, patchedProps, ref);
@@ -55,8 +52,9 @@ if (Platform.OS === 'android') {
           this.props = {
             ...this.props,
             style: StyleSheet.flatten([androidInputFixStyle, originalStyle]),
-            scrollEnabled: this.props.scrollEnabled ?? false,
-            allowFontScaling: this.props.allowFontScaling ?? false,
+            scrollEnabled: this.props.scrollEnabled ?? (this.props.multiline ? true : false),
+            allowFontScaling: this.props.allowFontScaling ?? true,
+            maxFontSizeMultiplier: this.props.maxFontSizeMultiplier ?? 1.35,
           };
         }
         return protoRender.apply(this, args);

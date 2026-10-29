@@ -281,7 +281,7 @@ export const ProfileScreen: React.FC = () => {
           onPress: () => {
             Alert.alert(
               t('profile.deleteAccount.finalTitle', { defaultValue: 'Are you absolutely sure?' }),
-              t('profile.deleteAccount.finalWarning', { defaultValue: 'All your orders, messages, and profile data will be permanently deleted.' }),
+              t('profile.deleteAccount.finalWarning', { defaultValue: 'Your profile, cart, devices, and messages will be permanently deleted. Past order records will be unlinked and fully anonymized for tax compliance.' }),
               [
                 { text: t('common.cancel'), style: 'cancel' },
                 {
@@ -765,8 +765,8 @@ export const ProfileScreen: React.FC = () => {
               </View>
             </Animated.View>
 
-            {/* ---- Demo Tools (offline mock mode only) ---- */}
-            {USE_MOCK_DATA && (
+            {/* ---- Demo Tools (offline mock mode only, excluded in release builds) ---- */}
+            {__DEV__ && USE_MOCK_DATA && (
               <Animated.View entering={enterAnim(340)} style={{ marginBottom: 18 }}>
                 <SectionTitle title={t('profile.sections.demoTools', { defaultValue: 'Demo Tools' })} labelColor={labelColor} />
                 <View style={cardStyle}>

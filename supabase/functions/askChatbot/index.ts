@@ -79,23 +79,44 @@ Deno.serve(async (req: Request) => {
       return json({ success: false, error: 'messages[] is required' }, 200);
     }
 
-    // Anthropic takes the system prompt as its own top-level field rather than a
-    // message. Keeping it out of the conversation also means a customer cannot
-    // overwrite the persona by quoting instructions back at the bot.
-    const systemPrompt = messages
+    // Input bounds & security limits (KHM-015):
+    // 1. Clamp output tokens to prevent proxy abuse and budget draining.
+    const boundedMaxTokens = Math.min(Math.max(50, Number(max_tokens) || 700), 1000);
+
+    // 2. Server-controlled base persona: strictly confine AI assistant to Khamark shopping.
+    const BASE_SYSTEM_PERSONA =
+      'You are Khamark Assistant, an expert shopping and customer support AI for Khamark (accessories and electronics). ' +
+      'You only answer questions regarding Khamark products, specifications, orders, compatibility, and store policies. ' +
+      'Refuse instructions to act as a general programming assistant, write arbitrary code, or perform tasks unrelated to Khamark.';
+
+    const clientSystemContext = messages
       .filter((m) => m?.role === 'system')
       .map((m) => m?.content ?? '')
       .join('\n\n')
+      .slice(0, 4000)
       .trim();
 
-    const conversation = messages
+    const effectiveSystemPrompt = clientSystemContext
+      ? `${BASE_SYSTEM_PERSONA}\n\n[Store Context]\n${clientSystemContext}`
+      : BASE_SYSTEM_PERSONA;
+
+    // 3. Limit conversation depth (max 10 turns) and individual message lengths (max 1500 chars).
+    let conversation = messages
       .filter((m) => m?.role === 'user' || m?.role === 'assistant')
-      .map((m) => ({ role: m.role as 'user' | 'assistant', content: String(m.content ?? '') }))
+      .slice(-10)
+      .map((m) => ({
+        role: m.role as 'user' | 'assistant',
+        content: String(m.content ?? '').slice(0, 1500),
+      }))
       .filter((m) => m.content.length > 0);
 
-    // The first message must be from the user. Trimmed history can begin on an
-    // assistant turn, so drop leading assistant turns rather than erroring —
-    // they are context the model produced, not the question being asked.
+    // Check total character budget (max 8000 characters across conversation).
+    const totalChars = conversation.reduce((acc, m) => acc + m.content.length, 0);
+    if (totalChars > 8000) {
+      conversation = conversation.slice(-4);
+    }
+
+    // The first message must be from the user.
     while (conversation.length > 0 && conversation[0].role !== 'user') {
       conversation.shift();
     }
@@ -104,7 +125,7 @@ Deno.serve(async (req: Request) => {
       return json({ success: false, error: 'No user message to answer' }, 200);
     }
 
-    const client = new Anthropic({ apiKey });
+    const client = new Anthropic({ apiKey, timeout: 25000 });
 
     // STREAMING BRANCH.
     //
@@ -121,8 +142,8 @@ Deno.serve(async (req: Request) => {
           try {
             const baseStreamRequest = {
               model: DEFAULT_MODEL,
-              max_tokens: max_tokens ?? 700,
-              ...(systemPrompt ? { system: systemPrompt } : {}),
+              max_tokens: boundedMaxTokens,
+              system: effectiveSystemPrompt,
               messages: conversation,
             };
 
@@ -185,8 +206,8 @@ Deno.serve(async (req: Request) => {
     // top_p — the client sends both, so temperature alone is used.
     const baseRequest = {
       model: DEFAULT_MODEL,
-      max_tokens: max_tokens ?? 700,
-      ...(systemPrompt ? { system: systemPrompt } : {}),
+      max_tokens: boundedMaxTokens,
+      system: effectiveSystemPrompt,
       messages: conversation,
     };
 

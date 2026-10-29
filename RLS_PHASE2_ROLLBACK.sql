@@ -1,3 +1,9 @@
+-- =============================================================================
+-- [DEPRECATED / ARCHIVED SCRIPT - DO NOT EXECUTE FOR PRODUCTION OR SETUP]
+-- The canonical, fully hardened schema for Khamark is in: supabase/khamark_schema.sql
+-- This legacy file is retained for historical diagnostic reference only.
+-- =============================================================================
+
 -- ============================================================================
 -- ASANKARY — ROLLBACK for RLS_PHASE2_HARDENING.sql
 -- ============================================================================

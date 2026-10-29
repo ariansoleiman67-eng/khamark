@@ -23,7 +23,6 @@ import { createTenantAdminService, TenantProduct } from '../../services/tenantAd
 import { calculateTieredPrice, getEffectiveUnitPrice, vipDinarUnit } from '../../utils/pricingUtils';
 import PhoneInput from '../../components/PhoneInput';
 import { CountryInfo, getAllCountries } from '../../utils/phoneUtils';
-import { City } from 'country-state-city';
 
 // `manual` = admin typed a custom price; we then stop auto-recomputing it on
 // VIP/qty changes. Otherwise price follows the tiered/VIP pricing for the qty.
@@ -408,13 +407,12 @@ const AdminCreateOrderScreen: React.FC = () => {
   const [citySearch, setCitySearch] = useState('');
   const cityList = useMemo(() => {
     const lang = i18n.language;
-    // Prefer the curated, localized city list for any country we have data for
-    // (Iraq, Syria, Iran, Turkey, the Gulf, …) so admins see cities in their
-    // language; fall back to the English-only library for the rest.
+    // Curated, localized city list for all supported delivery territories
+    // (Iraq, Kurdistan Region, Syria, Turkey, Gulf, etc.)
     const curated = COUNTRIES.find((c) => c.code === country.code);
     const base: string[] = curated?.cities?.length
       ? curated.cities.map((c) => (lang === 'ar' ? c.nameAr : lang === 'ku' ? c.nameKu : c.name) || c.name)
-      : (City.getCitiesOfCountry(country.code) || []).map((c) => c.name);
+      : [];
     const seen = new Set<string>();
     const out: string[] = [];
     for (const name of base) {

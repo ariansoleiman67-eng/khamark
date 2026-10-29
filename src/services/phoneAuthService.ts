@@ -17,19 +17,14 @@ export const PhoneAuthService = {
   normalizePhoneToE164,
 
   checkPhoneExists: async (phoneNumber: string): Promise<string | null> => {
-    try {
-      const phoneE164 = normalizePhoneToE164(phoneNumber);
-      // Resolve via a SECURITY DEFINER RPC: the locked-down RLS blocks a direct
-      // pre-auth read of `users` (which made sign-in say "Account Not Found"),
-      // and this also matches phone-derived login emails (e.g. the admin, whose
-      // users.phone is null but whose email is {digits}@khamark.admin).
-      const { data, error } = await supabase.rpc('account_id_for_phone', { p_phone: phoneE164 });
-      if (error || !data) return null;
-      return data as string;
-    } catch (error) {
+    const phoneE164 = normalizePhoneToE164(phoneNumber);
+    // Resolve via a SECURITY DEFINER RPC: locked-down RLS blocks direct pre-auth read.
+    const { data, error } = await supabase.rpc('account_id_for_phone', { p_phone: phoneE164 });
+    if (error) {
       console.error('Error checking phone existence:', error);
-      return null;
+      throw new Error(error.message || 'Failed to verify phone number');
     }
+    return (data as string) || null;
   },
 
   linkPhoneToUser: async (uid: string, phoneNumber: string): Promise<void> => {

@@ -75,15 +75,14 @@ Deno.serve(async (req: Request) => {
       .eq('id', caller.id)
       .maybeSingle();
 
-    const callerIsStaff =
-      callerRow?.is_admin === true ||
-      callerRow?.role === 'admin' ||
-      callerRow?.is_partner === true;
-    if (!callerIsStaff) return json({ error: 'Not authorized' }, 403);
+    const callerIsAdmin =
+      (callerRow?.is_admin === true || callerRow?.role === 'admin') &&
+      callerRow?.is_partner !== true;
+    if (!callerIsAdmin) return json({ error: 'Not authorized: administrator privileges required' }, 403);
 
     // -- 2. THE ACTION PASSWORD ----------------------------------------------
-    // A second factor, not the first. Shared across the shop and defaulting to
-    // '1990', so it is only meaningful behind the caller check above.
+    // A second factor for destructive admin changes. Requires an explicit secret configured
+    // on the server or in secure global settings (no hardcoded fallback).
     if (!password || !action) return json({ error: 'Missing required fields' }, 400);
 
     const { data: sec } = await supabase
@@ -92,7 +91,10 @@ Deno.serve(async (req: Request) => {
       .eq('id', 'security')
       .maybeSingle();
     const validPassword =
-      sec?.data?.adminActionPassword || Deno.env.get('ADMIN_ACTION_PASSWORD') || '1990';
+      Deno.env.get('ADMIN_ACTION_PASSWORD') || sec?.data?.adminActionPassword;
+    if (!validPassword) {
+      return json({ error: 'Admin action password is not configured on the server' }, 500);
+    }
     if (String(password) !== String(validPassword)) {
       return json({ error: 'Invalid authorization password' }, 403);
     }

@@ -14,7 +14,7 @@ interface Props {
  */
 export const ConfigurationUnavailableNotice: React.FC<Props> = ({ onDismiss }) => {
   const insets = useSafeAreaInsets();
-  const [dismissed, setDismissed] = React.useState(true);
+  const [dismissed, setDismissed] = React.useState(false);
 
   if (dismissed || isSupabaseConfigured()) {
     return null;

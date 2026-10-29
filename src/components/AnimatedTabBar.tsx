@@ -20,6 +20,7 @@ import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from './ThemeProvider';
 import { useCart } from '../contexts/CartContext';
@@ -129,8 +130,9 @@ export const AnimatedTabBar: React.FC<BottomTabBarProps> = ({
     return idx >= 0 ? idx : 0;
   }, [currentRouteName]);
 
+  const { i18n } = useTranslation();
   const tabCenters = useMemo(() => getTabCenters(barWidth), [barWidth]);
-  const isRTL = I18nManager.isRTL;
+  const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const visualActiveIndex = isRTL ? 4 - activeIndex : activeIndex;
   const targetCx = tabCenters[visualActiveIndex] ?? barWidth / 2;
 

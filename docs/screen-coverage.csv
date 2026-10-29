@@ -1,0 +1,95 @@
+source_file,area,lines,review_depth,symbol_referenced_in_navigation_text,theme_hook_or_provider_reference,loading_state_tokens,error_state_tokens,rtl_tokens,ios_device_test,android_device_test,light_dark_visual_test,en_ar_ku_visual_test,empty_error_slow_network_test
+src/screens/BarcodeScannerScreen.tsx,Shopper,430,"inventory, compiler/linter, shared-path scan only",True,True,True,True,False,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/CartScreen.tsx,Shopper,1428,targeted source trace (not a complete line-by-line review),True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/CategoriesScreen.tsx,Shopper,1608,targeted source trace (not a complete line-by-line review),True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/CategoryProductsScreen.tsx,Shopper,388,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/ChatScreen.tsx,Shopper,3077,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/ChatbotScreen.tsx,Shopper,995,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/CheckoutScreen.tsx,Shopper,3069,targeted source trace (not a complete line-by-line review),True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/FavoritesScreen.tsx,Shopper,423,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/MyTradeInsScreen.tsx,Shopper,402,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/NotificationsScreen.tsx,Shopper,782,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/OffersScreen.tsx,Shopper,243,targeted source trace (not a complete line-by-line review),True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/OrderConfirmationScreen.tsx,Shopper,454,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/OrderDetailScreen.tsx,Shopper,1620,targeted source trace (not a complete line-by-line review),True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/OrdersScreen.tsx,Shopper,1434,targeted source trace (not a complete line-by-line review),True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/ProductDetailsScreen.tsx,Shopper,4726,targeted source trace (not a complete line-by-line review),True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/ProfileScreen.tsx,Shopper,1050,targeted source trace (not a complete line-by-line review),True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/QiCardPaymentScreen.tsx,Shopper,606,targeted source trace (not a complete line-by-line review),True,True,True,True,False,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/SearchScreen.tsx,Shopper,1119,targeted source trace (not a complete line-by-line review),True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/StoreLocationScreen.tsx,Shopper,830,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/StoreProductsScreen.tsx,Shopper,187,"inventory, compiler/linter, shared-path scan only",True,True,True,True,False,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/ThemeCustomizationScreen.tsx,Shopper,648,"inventory, compiler/linter, shared-path scan only",True,True,False,False,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/TradeInRequestScreen.tsx,Shopper,572,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminAccountSecurityScreen.tsx,Admin/merchant,402,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminAnalyticsScreen.tsx,Admin/merchant,446,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminBannerScreen.tsx,Admin/merchant,745,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminBrandManagerScreen.tsx,Admin/merchant,271,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminBusinessInfoScreen.tsx,Admin/merchant,458,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminCategoriesScreen.tsx,Admin/merchant,254,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminCategoryManagerScreen.tsx,Admin/merchant,391,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminChangePasswordScreen.tsx,Admin/merchant,269,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminChatScreen.tsx,Admin/merchant,8,"inventory, compiler/linter, shared-path scan only",True,False,False,False,False,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminConversationsListScreen.tsx,Admin/merchant,685,"inventory, compiler/linter, shared-path scan only",True,True,True,False,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminCreateOrderScreen.tsx,Admin/merchant,1575,targeted source trace (not a complete line-by-line review),True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminCurrencySettingsScreen.tsx,Admin/merchant,232,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminCustomersScreen.tsx,Admin/merchant,1224,targeted source trace (not a complete line-by-line review),True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminDashboardScreen.tsx,Admin/merchant,1134,targeted source trace (not a complete line-by-line review),True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminDetailsScreen.tsx,Admin/merchant,245,"inventory, compiler/linter, shared-path scan only",True,True,False,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminDiscountsScreen.tsx,Admin/merchant,517,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminEditDiscountScreen.tsx,Admin/merchant,1129,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminEditStoreLocationScreen.tsx,Admin/merchant,966,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminInboxScreen.tsx,Admin/merchant,726,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminInvoiceSettingsScreen.tsx,Admin/merchant,642,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminOperatingHoursScreen.tsx,Admin/merchant,440,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminOrdersScreen.tsx,Admin/merchant,3726,targeted source trace (not a complete line-by-line review),True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminPartnerAssignmentScreen.tsx,Admin/merchant,367,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminPartnerDashboardScreen.tsx,Admin/merchant,936,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminPartnerManagementScreen.tsx,Admin/merchant,589,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminProductsScreen.tsx,Admin/merchant,4862,targeted source trace (not a complete line-by-line review),True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminPromoManagerScreen.tsx,Admin/merchant,331,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminSecurityScreen.tsx,Admin/merchant,342,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminSendNotificationScreen.tsx,Admin/merchant,560,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminSettingsScreen.tsx,Admin/merchant,955,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminSignupScreen.tsx,Admin/merchant,405,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminStockReportScreen.tsx,Admin/merchant,1621,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminStoreLocationsScreen.tsx,Admin/merchant,377,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminStoreNameScreen.tsx,Admin/merchant,267,"inventory, compiler/linter, shared-path scan only",True,True,False,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminStoreProfileScreen.tsx,Admin/merchant,1607,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminSuccessScreen.tsx,Admin/merchant,177,"inventory, compiler/linter, shared-path scan only",True,True,False,False,False,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminTradeInDetailScreen.tsx,Admin/merchant,732,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminTradeInsScreen.tsx,Admin/merchant,379,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/AdminVerifyEmailScreen.tsx,Admin/merchant,410,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/admin/ReportsGenerator.tsx,Admin/merchant,1209,"inventory, compiler/linter, shared-path scan only",False,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/auth/AboutYouScreen.tsx,Auth,484,"inventory, compiler/linter, shared-path scan only",True,True,False,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/auth/ForgotPasswordScreen.tsx,Auth,706,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/auth/LegacyEmailLoginScreen.tsx,Auth,278,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/auth/LoginGateScreen.tsx,Auth,355,"inventory, compiler/linter, shared-path scan only",True,True,False,False,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/auth/OnboardingScreen.tsx,Auth,147,"inventory, compiler/linter, shared-path scan only",False,True,False,False,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/auth/PartnerSignupScreen.tsx,Auth,160,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/auth/PasswordScreen.tsx,Auth,852,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/auth/PhoneLoginScreen.tsx,Auth,801,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/auth/RegisterScreen.tsx,Auth,780,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/auth/RegisterSuccessScreen.tsx,Auth,197,"inventory, compiler/linter, shared-path scan only",True,True,False,False,False,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/auth/SetNewPasswordScreen.tsx,Auth,638,targeted source trace (not a complete line-by-line review),True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/auth/SignInScreen.tsx,Auth,1162,targeted source trace (not a complete line-by-line review),True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/auth/VerifyPhoneScreen.tsx,Auth,743,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/main/HomeScreen.tsx,Shopper,1040,targeted source trace (not a complete line-by-line review),True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/messenger/ChatThreadScreen.tsx,Messenger,428,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/messenger/ConversationsScreen.tsx,Messenger,1429,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/profile/AccountSecurityScreen.tsx,Profile/account,647,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/profile/AddEditAddressScreen.tsx,Profile/account,1354,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/profile/ChangePasswordScreen.tsx,Profile/account,911,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/profile/ConfirmIdentityScreen.tsx,Profile/account,262,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/profile/EditProfileScreen.tsx,Profile/account,486,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/profile/HelpSupportScreen.tsx,Profile/account,362,"inventory, compiler/linter, shared-path scan only",True,True,False,False,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/profile/MyAddressScreen.tsx,Profile/account,698,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/profile/PaymentMethodsScreen.tsx,Profile/account,904,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/profile/PrivacyPolicyScreen.tsx,Profile/account,517,targeted source trace (not a complete line-by-line review),True,True,False,False,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/profile/ShippingInfoScreen.tsx,Profile/account,519,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/profile/TermsAndConditionsScreen.tsx,Profile/account,377,targeted source trace (not a complete line-by-line review),True,True,False,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/profile/UpdateEmailScreen.tsx,Profile/account,336,"inventory, compiler/linter, shared-path scan only",True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/profile/UpdatePhoneScreen.tsx,Profile/account,537,targeted source trace (not a complete line-by-line review),True,True,True,True,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/store/StoreCompanyTab.tsx,Store tabs,641,"inventory, compiler/linter, shared-path scan only",False,True,False,False,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/store/StoreHomeTab.tsx,Store tabs,443,"inventory, compiler/linter, shared-path scan only",False,True,False,False,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN
+src/screens/store/StoreProductsTab.tsx,Store tabs,493,"inventory, compiler/linter, shared-path scan only",False,True,False,False,True,NOT RUN,NOT RUN,NOT RUN,NOT RUN,NOT RUN

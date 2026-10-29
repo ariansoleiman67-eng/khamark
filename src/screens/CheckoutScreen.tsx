@@ -807,22 +807,6 @@ const CheckoutScreen: React.FC = () => {
       const finalCountry = selectedAddress?.countryCode || '';
       const finalSummary = await CartService.getCartSummaryAsync(effectiveCart, finalRegion, finalCountry, isVip);
 
-      // Capture each product's cost (purchasePrice) into the order so the admin
-      // can see profit on it. Items added from product lists don't carry the cost
-      // (it's excluded from the light list query), so batch-fetch it here.
-      const purchasePriceById: Record<string, number> = {};
-      try {
-        const productIds = Array.from(new Set(effectiveCart.items.map(i => i.productId).filter(Boolean)));
-        if (productIds.length) {
-          const { data: costRows } = await supabase.from('parts').select('id, purchase_price').in('id', productIds);
-          (costRows || []).forEach((r: any) => {
-            if (r.purchase_price != null) purchasePriceById[r.id] = Number(r.purchase_price);
-          });
-        }
-      } catch {
-        // Non-fatal: the order still places, profit just won't show for it.
-      }
-
       const orderItems = effectiveCart.items.map(cartItem => {
         let tieredPrice: number;
         
@@ -882,8 +866,6 @@ const CheckoutScreen: React.FC = () => {
           // costed at the product's price instead.
           ...(cartItem.variationId ? { variationId: cartItem.variationId } : {}),
           ...((cartItem as any).colorVariationId ? { colorVariationId: (cartItem as any).colorVariationId } : {}),
-          // Per-unit cost, so the admin can compute profit on this order.
-          purchasePrice: purchasePriceById[cartItem.productId] ?? cartItem.product.purchasePrice ?? null,
           shippingCost: cartItem.product.shippingCost || 0,
           imageUrl: cartItem.product.imageUrls?.[0] || '',
           // Snapshot the dinar price only when a dinar figure is what is actually

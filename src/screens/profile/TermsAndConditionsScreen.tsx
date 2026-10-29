@@ -65,11 +65,9 @@ We are a registered online retailer offering a wide range of consumer electronic
 • Bulk orders may require additional verification
 
 4.2 PAYMENT METHODS
-• Cash on Delivery (COD) - Available for all orders
-• QI Card - Electronic payment system
-• FIB Bank Cards - Visa/Mastercard accepted
-• Bank Transfer - Direct bank transfer with receipt
-• Mobile Wallets - As available in Kurdistan Region
+• Cash on Delivery (COD) - Available for all supported regional orders
+• Authorized Money Exchanger / Office Transfer - Confirmed upon order review
+• Electronic and card payments (QI Card, FIB, Visa/Mastercard) are undergoing banking certification and are inactive in this release
 
 4.3 PRICING
 • All prices are in Iraqi Dinars (IQD)
@@ -113,10 +111,8 @@ We deliver throughout the Kurdistan Region of Iraq:
 • Damage after delivery: Not eligible for return
 
 6.3 REFUND PROCESS
-• Refunds processed within 5-7 business days
-• COD orders: Cash refund or bank transfer
-• Card payments: Refund to original payment method
-• Bank transfers: Direct account credit`
+• Refunds processed within 3-5 business days following product inspection
+• COD orders: Cash reimbursement or authorized bank/exchanger credit`
     },
     {
       title: "7. WARRANTIES",

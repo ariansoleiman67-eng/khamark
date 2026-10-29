@@ -130,14 +130,26 @@ const SearchScreen: React.FC = () => {
     sortOrder: 'asc',
   });
 
-  // Load real products from Supabase
+  // Load real products from Supabase with full catalog pagination (KHM-021)
   const loadProducts = useCallback(async () => {
     setIsLoading(true);
     setHasError(false);
     try {
-      const productsList = tenantId
-        ? await ProductService.getProductsByTenantId(tenantId)
-        : (await ProductService.getProducts({}, { page: 1, limit: 1000, total: 0, hasMore: true })).products;
+      let productsList: Product[] = [];
+      if (tenantId) {
+        productsList = await ProductService.getProductsByTenantId(tenantId);
+      } else {
+        let page = 1;
+        let hasMore = true;
+        while (hasMore && page <= 5) {
+          const res = await ProductService.getProducts({}, { page, limit: 100, total: 0, hasMore: true });
+          if (res.products?.length > 0) {
+            productsList = [...productsList, ...res.products];
+          }
+          hasMore = Boolean(res.pagination?.hasMore && res.products?.length >= 100);
+          page++;
+        }
+      }
 
       const categoriesSet = new Set<string>();
       productsList.forEach((product) => {
@@ -153,7 +165,7 @@ const SearchScreen: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [tenantId]);
+  }, [tenantId, t]);
 
   // Initialize with pre-selected category
   useEffect(() => {

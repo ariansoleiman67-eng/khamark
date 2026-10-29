@@ -181,7 +181,9 @@
     "somethingWentWrong": "Something went wrong",
     "loadError": "Could not load products. Check your connection.",
     "all": "All",
-    "tapToOpenInMaps": "Tap to open in Maps"
+    "tapToOpenInMaps": "Tap to open in Maps",
+    "previous": "Previous",
+    "notice": "Notice"
   },
   "product": {
     "partNumber": "Item Code",
@@ -260,7 +262,11 @@
     "colorCount_one": "{{count}} color",
     "colorCount_other": "{{count}} colors",
     "imageNOfM": "Image {{current}} of {{total}}",
-    "shareText": "Check out this product on Khamark!"
+    "shareText": "Check out this product on Khamark!",
+    "favorite": "Favorite",
+    "share": "Share",
+    "payUponReceipt": "Cash on Delivery",
+    "colorCount": "{{count}} colors"
   },
   "tradeIn": {
     "title": "Sell or trade your phone",
@@ -738,7 +744,10 @@
     "updateError": "Failed to update quantity",
     "moreToUnlock": "more to unlock {{name}}",
     "moreItemsToUnlock": "more items to unlock {{name}}",
-    "restartFailed": "Your cart was cleared but the item could not be added. Please try again."
+    "restartFailed": "Your cart was cleared but the item could not be added. Please try again.",
+    "maxStockReached": "Maximum stock limit reached",
+    "decrease": "Decrease quantity",
+    "increase": "Increase quantity"
   },
   "checkout": {
     "title": "Checkout",

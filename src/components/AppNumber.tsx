@@ -48,7 +48,8 @@ export default function AppNumber({
     // @ts-ignore - writingDirection is required by user strictly
     <View style={[{ writingDirection: "ltr", alignItems: "flex-start", minWidth: 0 }, containerStyle]}>
       <Text
-        allowFontScaling={false}
+        allowFontScaling={true}
+        maxFontSizeMultiplier={1.3}
         numberOfLines={numberOfLines}
         adjustsFontSizeToFit={adjustsFontSizeToFit}
         minimumFontScale={effectiveMinScale}

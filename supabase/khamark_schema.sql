@@ -18,7 +18,7 @@ create extension if not exists "pg_trgm";     -- Fast ILIKE and fuzzy product se
 create extension if not exists "pg_net";      -- Webhooks and network requests
 
 -- ---------------------------------------------------------------------------
--- 2. Timestamp update trigger function
+-- 2. Core Early Helper Functions
 -- ---------------------------------------------------------------------------
 create or replace function public.set_updated_at()
 returns trigger
@@ -27,6 +27,19 @@ as $$
 begin
   new.updated_at = now();
   return new;
+end;
+$$;
+
+-- Helper: Is caller an administrator?
+create or replace function public.is_admin() returns boolean
+language plpgsql stable security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_admin boolean;
+begin
+  select is_admin into v_admin from public.users where id = auth.uid();
+  return coalesce(v_admin, false);
 end;
 $$;
 
@@ -73,16 +86,24 @@ create table if not exists public.tenants (
   id                     uuid primary key references public.users(id) on delete cascade,
   owner_id               uuid references public.users(id) on delete cascade,
   store_name             text not null default 'Khamark',
-  store_name_ar          text,
-  store_name_ku          text,
+  store_name_ar          text default 'خامارك',
+  store_name_ku          text default 'خامارک',
   logo_url               text,
+  cover_url              text,
+  description            text,
+  contact_email          text,
+  contact_phone          text,
+  contact_whatsapp       text,
+  address                text,
+  city                   text,
   is_active              boolean default true,
+  settings               jsonb default '{}'::jsonb,
   created_at             timestamptz default now(),
   updated_at             timestamptz default now()
 );
 
--- Parts (Products)
-create table if not exists public.parts (
+-- Physical Base Parts Table (Secure Storage for Catalogue & Purchase Costs)
+create table if not exists public.parts_base (
   id                     uuid primary key default gen_random_uuid(),
   tenant_id              uuid references public.tenants(id) on delete cascade,
   name                   text not null,
@@ -102,7 +123,11 @@ create table if not exists public.parts (
   compare_at_price_iqd   numeric(12,2),
   vip_price              numeric(10,2),
   vip_price_iqd          numeric(12,2),
+  vip_price_usd          numeric(10,2),
+  compare_at_price_usd   numeric(10,2),
   stock_qty              integer not null default 0,
+  initial_stock          integer default 0,
+  historical_stock_qty   integer default 0,
   status                 text not null default 'available', -- 'available' | 'coming_soon' | 'on_the_way'
   description            text,
   description_ar         text,
@@ -117,11 +142,187 @@ create table if not exists public.parts (
   is_featured            boolean default false,
   is_hot                 boolean default false,
   is_new                 boolean default false,
+  is_active              boolean default true,
+  price_tiers            jsonb default '[]'::jsonb,
+  sort_order             integer default 0,
+  shipping_cost          numeric(10,2) default 0,
+  shipping_rates         jsonb,
+  compatible_models      text[],
+  dimensions             text,
+  weight                 text,
+  warranty               text,
+  video_url              text,
+  sku                    text,
   condition              text default 'new', -- 'new' | 'used'
   extra_data             jsonb default '{}'::jsonb,
   created_at             timestamptz default now(),
   updated_at             timestamptz default now()
 );
+
+-- Parts View (Masks internal purchase_price for non-admin callers)
+create or replace view public.parts as
+select
+  id,
+  tenant_id,
+  name,
+  name_ar,
+  name_ku,
+  part_number,
+  barcode,
+  category,
+  category_ar,
+  category_ku,
+  brand,
+  price_usd,
+  price_iqd,
+  case
+    when auth.role() = 'service_role' or public.is_admin() then purchase_price
+    else null
+  end as purchase_price,
+  case
+    when auth.role() = 'service_role' or public.is_admin() then purchase_price_iqd
+    else null
+  end as purchase_price_iqd,
+  compare_at_price,
+  compare_at_price_iqd,
+  vip_price,
+  vip_price_iqd,
+  coalesce(vip_price_usd, vip_price) as vip_price_usd,
+  coalesce(compare_at_price_usd, compare_at_price) as compare_at_price_usd,
+  stock_qty,
+  initial_stock,
+  historical_stock_qty,
+  status,
+  description,
+  description_ar,
+  description_ku,
+  specifications,
+  features,
+  image_urls,
+  variations,
+  color_variations,
+  storage_options,
+  tags,
+  is_featured,
+  is_hot,
+  is_new,
+  is_active,
+  price_tiers,
+  sort_order,
+  shipping_cost,
+  shipping_rates,
+  compatible_models,
+  dimensions,
+  weight,
+  warranty,
+  video_url,
+  sku,
+  condition,
+  extra_data,
+  created_at,
+  updated_at
+from public.parts_base;
+
+-- Updatable Trigger for parts view
+create or replace function public.trg_parts_io()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if tg_op = 'INSERT' then
+    insert into public.parts_base (
+      id, tenant_id, name, name_ar, name_ku, part_number, barcode, category, category_ar, category_ku,
+      brand, price_usd, price_iqd, purchase_price, purchase_price_iqd, compare_at_price, compare_at_price_iqd,
+      vip_price, vip_price_iqd, vip_price_usd, compare_at_price_usd, stock_qty, initial_stock, historical_stock_qty,
+      status, description, description_ar, description_ku, specifications, features, image_urls, variations,
+      color_variations, storage_options, tags, is_featured, is_hot, is_new, is_active, price_tiers, sort_order,
+      shipping_cost, shipping_rates, compatible_models, dimensions, weight, warranty, video_url, sku, condition,
+      extra_data, created_at, updated_at
+    ) values (
+      coalesce(new.id, gen_random_uuid()), new.tenant_id, new.name, new.name_ar, new.name_ku, new.part_number,
+      new.barcode, new.category, new.category_ar, new.category_ku, new.brand, coalesce(new.price_usd, 0),
+      new.price_iqd, new.purchase_price, new.purchase_price_iqd, new.compare_at_price, new.compare_at_price_iqd,
+      new.vip_price, new.vip_price_iqd, coalesce(new.vip_price_usd, new.vip_price),
+      coalesce(new.compare_at_price_usd, new.compare_at_price), coalesce(new.stock_qty, 0),
+      coalesce(new.initial_stock, 0), coalesce(new.historical_stock_qty, 0), coalesce(new.status, 'available'),
+      new.description, new.description_ar, new.description_ku, new.specifications, new.features, new.image_urls,
+      new.variations, new.color_variations, new.storage_options, new.tags, coalesce(new.is_featured, false),
+      coalesce(new.is_hot, false), coalesce(new.is_new, false), coalesce(new.is_active, true),
+      coalesce(new.price_tiers, '[]'::jsonb), coalesce(new.sort_order, 0), coalesce(new.shipping_cost, 0),
+      new.shipping_rates, new.compatible_models, new.dimensions, new.weight, new.warranty, new.video_url,
+      new.sku, coalesce(new.condition, 'new'), coalesce(new.extra_data, '{}'::jsonb),
+      coalesce(new.created_at, now()), coalesce(new.updated_at, now())
+    );
+    return new;
+  elsif tg_op = 'UPDATE' then
+    update public.parts_base set
+      tenant_id = coalesce(new.tenant_id, parts_base.tenant_id),
+      name = coalesce(new.name, parts_base.name),
+      name_ar = coalesce(new.name_ar, parts_base.name_ar),
+      name_ku = coalesce(new.name_ku, parts_base.name_ku),
+      part_number = coalesce(new.part_number, parts_base.part_number),
+      barcode = coalesce(new.barcode, parts_base.barcode),
+      category = coalesce(new.category, parts_base.category),
+      category_ar = coalesce(new.category_ar, parts_base.category_ar),
+      category_ku = coalesce(new.category_ku, parts_base.category_ku),
+      brand = coalesce(new.brand, parts_base.brand),
+      price_usd = coalesce(new.price_usd, parts_base.price_usd),
+      price_iqd = coalesce(new.price_iqd, parts_base.price_iqd),
+      purchase_price = case when new.purchase_price is not null then new.purchase_price else parts_base.purchase_price end,
+      purchase_price_iqd = case when new.purchase_price_iqd is not null then new.purchase_price_iqd else parts_base.purchase_price_iqd end,
+      compare_at_price = coalesce(new.compare_at_price, parts_base.compare_at_price),
+      compare_at_price_iqd = coalesce(new.compare_at_price_iqd, parts_base.compare_at_price_iqd),
+      vip_price = coalesce(new.vip_price, parts_base.vip_price),
+      vip_price_iqd = coalesce(new.vip_price_iqd, parts_base.vip_price_iqd),
+      vip_price_usd = coalesce(new.vip_price_usd, parts_base.vip_price_usd),
+      compare_at_price_usd = coalesce(new.compare_at_price_usd, parts_base.compare_at_price_usd),
+      stock_qty = coalesce(new.stock_qty, parts_base.stock_qty),
+      initial_stock = coalesce(new.initial_stock, parts_base.initial_stock),
+      historical_stock_qty = coalesce(new.historical_stock_qty, parts_base.historical_stock_qty),
+      status = coalesce(new.status, parts_base.status),
+      description = coalesce(new.description, parts_base.description),
+      description_ar = coalesce(new.description_ar, parts_base.description_ar),
+      description_ku = coalesce(new.description_ku, parts_base.description_ku),
+      specifications = coalesce(new.specifications, parts_base.specifications),
+      features = coalesce(new.features, parts_base.features),
+      image_urls = coalesce(new.image_urls, parts_base.image_urls),
+      variations = coalesce(new.variations, parts_base.variations),
+      color_variations = coalesce(new.color_variations, parts_base.color_variations),
+      storage_options = coalesce(new.storage_options, parts_base.storage_options),
+      tags = coalesce(new.tags, parts_base.tags),
+      is_featured = coalesce(new.is_featured, parts_base.is_featured),
+      is_hot = coalesce(new.is_hot, parts_base.is_hot),
+      is_new = coalesce(new.is_new, parts_base.is_new),
+      is_active = coalesce(new.is_active, parts_base.is_active),
+      price_tiers = coalesce(new.price_tiers, parts_base.price_tiers),
+      sort_order = coalesce(new.sort_order, parts_base.sort_order),
+      shipping_cost = coalesce(new.shipping_cost, parts_base.shipping_cost),
+      shipping_rates = coalesce(new.shipping_rates, parts_base.shipping_rates),
+      compatible_models = coalesce(new.compatible_models, parts_base.compatible_models),
+      dimensions = coalesce(new.dimensions, parts_base.dimensions),
+      weight = coalesce(new.weight, parts_base.weight),
+      warranty = coalesce(new.warranty, parts_base.warranty),
+      video_url = coalesce(new.video_url, parts_base.video_url),
+      sku = coalesce(new.sku, parts_base.sku),
+      condition = coalesce(new.condition, parts_base.condition),
+      extra_data = coalesce(new.extra_data, parts_base.extra_data),
+      updated_at = now()
+    where id = old.id;
+    return new;
+  elsif tg_op = 'DELETE' then
+    delete from public.parts_base where id = old.id;
+    return old;
+  end if;
+  return null;
+end;
+$$;
+
+drop trigger if exists trg_parts_io on public.parts;
+create trigger trg_parts_io
+  instead of insert or update or delete on public.parts
+  for each row execute function public.trg_parts_io();
 
 -- Categories
 create table if not exists public.categories (
@@ -172,6 +373,7 @@ create table if not exists public.banners (
 create table if not exists public.orders (
   id                     uuid primary key default gen_random_uuid(),
   order_number           text unique,
+  idempotency_key        text unique,
   tenant_id              uuid references public.tenants(id) on delete cascade,
   user_id                uuid references public.users(id) on delete set null,
   status                 text default 'pending', -- 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'cancelled_by_user' | 'cancelled_by_store'
@@ -180,7 +382,9 @@ create table if not exists public.orders (
   payment_method         text default 'cash_on_delivery', -- 'cash_on_delivery' | 'money_exchanger' | 'qicard'
   items                  jsonb not null default '[]'::jsonb,
   subtotal_usd           numeric(10,2) default 0,
+  shipping_usd           numeric(10,2) default 0,
   shipping_cost_usd      numeric(10,2) default 0,
+  tax_usd                numeric(10,2) default 0,
   discount_usd           numeric(10,2) default 0,
   total_usd              numeric(10,2) not null default 0,
   total_iqd              numeric(12,2),
@@ -193,9 +397,81 @@ create table if not exists public.orders (
   customer_phone         text,
   notes                  text,
   qicard_payment_id      text,
+  extra_data             jsonb default '{}'::jsonb,
   created_at             timestamptz default now(),
   updated_at             timestamptz default now()
 );
+
+-- Order Integrity Trigger
+create or replace function public.enforce_order_integrity()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, auth, pg_temp
+as $$
+begin
+  -- 1. Blocked user check: suppress order insertion
+  if exists (select 1 from public.users where id = new.user_id and is_blocked = true) then
+    return null;
+  end if;
+
+  -- 2. Synchronize shipping fields
+  if new.shipping_usd is not null and (new.shipping_cost_usd is null or new.shipping_cost_usd = 0) then
+    new.shipping_cost_usd := new.shipping_usd;
+  elsif new.shipping_cost_usd is not null and (new.shipping_usd is null or new.shipping_usd = 0) then
+    new.shipping_usd := new.shipping_cost_usd;
+  end if;
+
+  -- 3. Non-admin customer insertions cannot forge final states or arbitrary total prices
+  if not public.is_admin() then
+    new.status := 'pending';
+    new.payment_status := 'unpaid';
+    new.stock_status := 'pending';
+
+    -- Recalculate authoritative total_usd from parts_base table
+    if new.items is not null and jsonb_typeof(new.items) = 'array' and jsonb_array_length(new.items) > 0 then
+      declare
+        v_item jsonb;
+        v_calculated_subtotal numeric(10,2) := 0;
+        v_part_id text;
+        v_qty numeric;
+        v_unit_price numeric(10,2);
+      begin
+        for v_item in select * from jsonb_array_elements(new.items)
+        loop
+          v_part_id := coalesce(v_item->>'id', v_item->>'productId');
+          v_qty := coalesce(nullif(v_item->>'quantity', '')::numeric, 1);
+          if v_qty <= 0 then v_qty := 1; end if;
+
+          select price_usd into v_unit_price
+          from public.parts_base
+          where id::text = v_part_id
+          limit 1;
+
+          if v_unit_price is not null then
+            v_calculated_subtotal := v_calculated_subtotal + (v_unit_price * v_qty);
+          else
+            v_calculated_subtotal := v_calculated_subtotal + (coalesce(nullif(v_item->>'price', '')::numeric, 0) * v_qty);
+          end if;
+        end loop;
+
+        if v_calculated_subtotal > 0 then
+          new.subtotal_usd := v_calculated_subtotal;
+          new.total_usd := v_calculated_subtotal + coalesce(new.shipping_usd, new.shipping_cost_usd, 0) + coalesce(new.tax_usd, 0) - coalesce(new.discount_usd, 0);
+          new.total_iqd := round(new.total_usd * coalesce(new.exchange_rate, 1500), -2);
+        end if;
+      end;
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_orders_enforce on public.orders;
+create trigger trg_orders_enforce
+  before insert on public.orders
+  for each row execute function public.enforce_order_integrity();
 
 -- Discounts & Promo Codes
 create table if not exists public.discounts (
@@ -232,52 +508,75 @@ create table if not exists public.promo_codes (
   updated_at             timestamptz default now()
 );
 
--- Addresses
+-- Customer Addresses
 create table if not exists public.addresses (
   id                     uuid primary key default gen_random_uuid(),
   user_id                uuid not null references public.users(id) on delete cascade,
-  title                  text,
-  address_line           text not null,
+  title                  text default 'Home',
+  recipient_name         text not null,
+  phone                  text not null,
   city                   text not null,
   region                 text,
-  postal_code            text,
+  street                 text not null,
+  building               text,
+  notes                  text,
   is_default             boolean default false,
   created_at             timestamptz default now(),
   updated_at             timestamptz default now()
 );
 
--- Carts
+-- Shopping Carts
 create table if not exists public.carts (
   id                     uuid primary key references public.users(id) on delete cascade,
   items                  jsonb not null default '[]'::jsonb,
+  created_at             timestamptz default now(),
   updated_at             timestamptz default now()
 );
 
--- Customer Chat Conversations & Messages
-create table if not exists public.conversations (
+-- Favorites / Wishlist
+create table if not exists public.favorites (
   id                     uuid primary key default gen_random_uuid(),
   user_id                uuid not null references public.users(id) on delete cascade,
+  part_id                uuid not null references public.parts_base(id) on delete cascade,
+  created_at             timestamptz default now(),
+  unique (user_id, part_id)
+);
+
+-- Reviews & Ratings
+create table if not exists public.reviews (
+  id                     uuid primary key default gen_random_uuid(),
+  user_id                uuid not null references public.users(id) on delete cascade,
+  part_id                uuid not null references public.parts_base(id) on delete cascade,
+  rating                 integer not null check (rating between 1 and 5),
+  title                  text,
+  comment                text,
+  is_verified_purchase   boolean default false,
+  is_approved            boolean default true,
+  created_at             timestamptz default now(),
+  updated_at             timestamptz default now()
+);
+
+-- Chat Conversations & Messages
+create table if not exists public.conversations (
+  id                     uuid primary key default gen_random_uuid(),
   tenant_id              uuid references public.tenants(id) on delete cascade,
-  user_name              text,
-  user_avatar            text,
+  user_id                uuid references public.users(id) on delete cascade,
+  unread_user            integer default 0,
+  unread_tenant          integer default 0,
   last_message           text,
   last_message_at        timestamptz default now(),
-  unread_count_user      integer default 0,
-  unread_count_admin     integer default 0,
-  is_archived            boolean default false,
-  labels                 text[] default '{}',
   created_at             timestamptz default now(),
   updated_at             timestamptz default now()
 );
 
 create table if not exists public.messages (
   id                     uuid primary key default gen_random_uuid(),
-  conversation_id        uuid not null references public.conversations(id) on delete cascade,
-  sender_id              uuid not null references public.users(id) on delete cascade,
-  sender_role            text not null default 'customer', -- 'customer' | 'admin' | 'bot'
-  text                   text not null,
+  conversation_id        uuid references public.conversations(id) on delete cascade,
+  sender_id              uuid references public.users(id) on delete set null,
+  sender_type            text not null default 'user', -- 'user' | 'store' | 'system'
+  text                   text,
   image_url              text,
-  is_read                boolean default false,
+  read                   boolean default false,
   created_at             timestamptz default now()
 );
 
@@ -287,24 +586,27 @@ create table if not exists public.notifications (
   user_id                uuid not null references public.users(id) on delete cascade,
   title                  text not null,
   body                   text not null,
-  type                   text default 'info',
-  data                   jsonb,
-  is_read                boolean default false,
+  type                   text default 'general', -- 'order' | 'promo' | 'general'
+  data                   jsonb default '{}'::jsonb,
+  read                   boolean default false,
   created_at             timestamptz default now()
 );
 
--- Saved Payment Cards
+-- Saved Cards (Tokens only, PCI compliant)
 create table if not exists public.saved_cards (
   id                     uuid primary key default gen_random_uuid(),
-  user_id                uuid not null references auth.users(id) on delete cascade,
-  payment_token          text not null unique,
-  card_mask              text not null,
-  payment_system         text default 'Unknown',
+  user_id                uuid not null references public.users(id) on delete cascade,
+  card_type              text not null, -- 'qicard' | 'fib' | 'visa' | 'mastercard'
+  masked_number          text not null, -- '**** **** **** 1234'
+  cardholder_name        text,
+  expiry                 text,
+  token                  text not null,
+  is_default             boolean default false,
   created_at             timestamptz default now(),
   updated_at             timestamptz default now()
 );
 
--- Second-hand Phone Trade-In Requests
+-- Trade-In Requests
 create table if not exists public.trade_in_requests (
   id                     uuid primary key default gen_random_uuid(),
   tenant_id              uuid not null references public.users(id) on delete cascade,
@@ -378,6 +680,7 @@ create table if not exists public.push_tokens (
   user_id                uuid references public.users(id) on delete cascade,
   token                  text not null unique,
   platform               text,
+  is_active              boolean default true,
   created_at             timestamptz default now(),
   updated_at             timestamptz default now()
 );
@@ -387,6 +690,10 @@ create table if not exists public.devices (
   uid                    uuid references public.users(id) on delete cascade,
   device_name            text,
   platform               text,
+  fcm_token              text,
+  notifications_enabled  boolean default true,
+  is_active              boolean default true,
+  preferences            jsonb default '{}'::jsonb,
   last_active_at         timestamptz default now()
 );
 
@@ -401,17 +708,17 @@ create table if not exists public.live_tracking (
 );
 
 -- ---------------------------------------------------------------------------
--- 4. Triggers for updated_at
+-- 4. Triggers (updated_at)
 -- ---------------------------------------------------------------------------
 do $$
-declare
-  t text;
+declare t text;
 begin
   foreach t in array array[
-    'users', 'tenants', 'parts', 'categories', 'brands', 'banners',
-    'orders', 'discounts', 'promo_codes', 'addresses', 'conversations',
-    'saved_cards', 'trade_in_requests', 'store_locations', 'app_config',
-    'tenant_settings', 'global_settings', 'push_tokens', 'live_tracking'
+    'users', 'tenants', 'parts_base', 'categories', 'brands', 'banners',
+    'orders', 'discounts', 'promo_codes', 'addresses', 'carts',
+    'conversations', 'reviews', 'saved_cards', 'trade_in_requests',
+    'store_locations', 'app_config', 'tenant_settings', 'global_settings',
+    'push_tokens', 'live_tracking'
   ] loop
     execute format('drop trigger if exists set_updated_at on public.%I', t);
     execute format('create trigger set_updated_at before update on public.%I for each row execute function public.set_updated_at()', t);
@@ -422,14 +729,6 @@ $$;
 -- ---------------------------------------------------------------------------
 -- 5. Business Logic RPCs & Functions
 -- ---------------------------------------------------------------------------
-
--- Helper: Is caller an administrator?
-create or replace function public.is_admin() returns boolean
-language sql stable security definer
-set search_path = public
-as $$
-  select coalesce((select is_admin from public.users where id = auth.uid()), false);
-$$;
 
 -- Prevent client-side privilege escalation on public.users
 create or replace function public.prevent_privilege_escalation() returns trigger
@@ -505,7 +804,7 @@ as $$
 $$;
 
 revoke all on function public.email_exists(text) from public;
-grant execute on function public.email_exists(text) to anon, authenticated;
+grant execute on function public.email_exists(text) to anon, authenticated, service_role;
 
 -- Phone account lookup (SECURITY DEFINER for pre-auth sign-in)
 create or replace function public.account_id_for_phone(p_phone text)
@@ -534,14 +833,302 @@ end;
 $$;
 
 revoke all on function public.account_id_for_phone(text) from public;
-grant execute on function public.account_id_for_phone(text) to anon, authenticated;
+grant execute on function public.account_id_for_phone(text) to anon, authenticated, service_role;
+
+-- Phone to Login Email Resolution RPC
+create or replace function public.lookup_login_email(p_phone text)
+returns text
+language plpgsql
+security definer
+stable
+set search_path = public, auth, pg_temp
+as $$
+declare
+  v_digits text;
+  v_email text;
+begin
+  if p_phone is null or length(trim(p_phone)) = 0 then
+    return null;
+  end if;
+
+  v_digits := regexp_replace(p_phone, '[^0-9]', '', 'g');
+
+  -- 1. Check public.users
+  select email into v_email
+  from public.users
+  where regexp_replace(coalesce(phone, ''), '[^0-9]', '', 'g') = v_digits
+    and email is not null
+  limit 1;
+
+  if v_email is not null then
+    return v_email;
+  end if;
+
+  -- 2. Check auth.users
+  select email into v_email
+  from auth.users
+  where regexp_replace(coalesce(phone, ''), '[^0-9]', '', 'g') = v_digits
+    and email is not null
+  limit 1;
+
+  return v_email;
+end;
+$$;
+
+revoke all on function public.lookup_login_email(text) from public;
+grant execute on function public.lookup_login_email(text) to anon, authenticated, service_role;
+
+-- Admin Onboarding RPC
+create or replace function public.create_admin_account(
+  p_display_name text default null,
+  p_store_name text default null,
+  p_phone text default null,
+  p_whatsapp text default null,
+  p_invite_code text default null
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public, auth, pg_temp
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_existing_admins integer;
+  v_tenant_id uuid;
+begin
+  if v_uid is null then
+    raise exception 'Authentication required' using errcode = '28000';
+  end if;
+
+  select count(*) into v_existing_admins from public.users where is_admin = true or role = 'admin';
+
+  -- Only permitted if initial system bootstrap OR caller is already an admin OR valid invite
+  if v_existing_admins > 0 and not public.is_admin() then
+    if p_invite_code is null or p_invite_code <> 'KHAMARK_OWNER_PROVISION_2026' then
+      raise exception 'Unauthorized: admin onboarding requires owner invitation or existing admin privilege';
+    end if;
+  end if;
+
+  update public.users
+  set is_admin = true,
+      role = 'admin',
+      name = coalesce(p_display_name, name),
+      full_name = coalesce(p_display_name, full_name),
+      phone = coalesce(p_phone, phone),
+      updated_at = now()
+  where id = v_uid;
+
+  v_tenant_id := v_uid;
+
+  insert into public.tenants (
+    id, owner_id, store_name, is_active, contact_phone, contact_whatsapp
+  ) values (
+    v_tenant_id, v_uid, coalesce(nullif(p_store_name, ''), 'Khamark Store'), true, p_phone, p_whatsapp
+  )
+  on conflict (id) do update set
+    store_name = excluded.store_name,
+    contact_phone = coalesce(excluded.contact_phone, public.tenants.contact_phone),
+    contact_whatsapp = coalesce(excluded.contact_whatsapp, public.tenants.contact_whatsapp),
+    updated_at = now();
+
+  return jsonb_build_object('success', true, 'tenant_id', v_tenant_id);
+end;
+$$;
+
+revoke all on function public.create_admin_account(text, text, text, text, text) from public;
+grant execute on function public.create_admin_account(text, text, text, text, text) to authenticated, service_role;
+
+-- Partner Onboarding RPC (Read-Only Partner)
+create or replace function public.create_partner_account(
+  p_display_name text default null,
+  p_phone text default null
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public, auth, pg_temp
+as $$
+declare
+  v_uid uuid := auth.uid();
+begin
+  if v_uid is null then
+    raise exception 'Authentication required' using errcode = '28000';
+  end if;
+
+  -- View-only partner: role stays 'customer', is_admin stays FALSE
+  update public.users
+  set is_partner = true,
+      role = 'customer',
+      is_admin = false,
+      name = coalesce(p_display_name, name),
+      full_name = coalesce(p_display_name, full_name),
+      phone = coalesce(p_phone, phone),
+      updated_at = now()
+  where id = v_uid;
+
+  return jsonb_build_object('success', true, 'is_partner', true);
+end;
+$$;
+
+revoke all on function public.create_partner_account(text, text) from public;
+grant execute on function public.create_partner_account(text, text) to authenticated, service_role;
+
+-- Server-Authoritative Order Creation RPC
+create or replace function public.create_customer_order(
+  p_items jsonb,
+  p_shipping_address jsonb default null,
+  p_shipping_office_info jsonb default null,
+  p_payment_method text default 'cash_on_delivery',
+  p_promo_code text default null,
+  p_notes text default null,
+  p_idempotency_key text default null
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public, auth, pg_temp
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_tenant_id uuid;
+  v_order_id uuid;
+  v_order_number text;
+  v_item jsonb;
+  v_part_id text;
+  v_qty integer;
+  v_unit_price numeric(10,2);
+  v_vip_price numeric(10,2);
+  v_subtotal numeric(10,2) := 0;
+  v_discount numeric(10,2) := 0;
+  v_total_usd numeric(10,2);
+  v_total_iqd numeric(12,2);
+  v_rate numeric(10,2) := 1500;
+  v_is_vip boolean := false;
+  v_validated_items jsonb := '[]'::jsonb;
+  v_existing_order jsonb;
+begin
+  if v_uid is null then
+    raise exception 'Authentication required' using errcode = '28000';
+  end if;
+
+  if exists (select 1 from public.users where id = v_uid and is_blocked = true) then
+    raise exception 'Account is blocked' using errcode = '42501';
+  end if;
+
+  if p_idempotency_key is not null and length(trim(p_idempotency_key)) > 0 then
+    select jsonb_build_object(
+      'order_id', id,
+      'order_number', order_number,
+      'total_usd', total_usd,
+      'total_iqd', total_iqd,
+      'status', status,
+      'payment_status', payment_status,
+      'idempotent_replayed', true
+    ) into v_existing_order
+    from public.orders
+    where user_id = v_uid and idempotency_key = p_idempotency_key;
+
+    if v_existing_order is not null then
+      return v_existing_order;
+    end if;
+  end if;
+
+  select coalesce(role = 'vip', false) into v_is_vip from public.users where id = v_uid;
+
+  if p_items is null or jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then
+    raise exception 'Order must contain at least one item' using errcode = '22000';
+  end if;
+
+  for v_item in select * from jsonb_array_elements(p_items)
+  loop
+    v_part_id := coalesce(v_item->>'id', v_item->>'productId');
+    v_qty := coalesce(nullif(v_item->>'quantity', '')::integer, 0);
+
+    if v_qty <= 0 or v_qty > 1000 then
+      raise exception 'Quantity must be a positive integer' using errcode = '22003';
+    end if;
+
+    select tenant_id, price_usd, vip_price
+    into v_tenant_id, v_unit_price, v_vip_price
+    from public.parts_base
+    where id::text = v_part_id;
+
+    if v_unit_price is null then
+      raise exception 'Product % not found', v_part_id using errcode = '02000';
+    end if;
+
+    if v_is_vip and v_vip_price is not null and v_vip_price > 0 then
+      v_unit_price := v_vip_price;
+    end if;
+
+    v_subtotal := v_subtotal + (v_unit_price * v_qty);
+
+    v_validated_items := v_validated_items || jsonb_build_array(
+      jsonb_build_object(
+        'id', v_part_id,
+        'productId', v_part_id,
+        'quantity', v_qty,
+        'price', v_unit_price,
+        'priceUSD', v_unit_price
+      )
+    );
+  end loop;
+
+  if p_promo_code is not null and length(trim(p_promo_code)) > 0 then
+    declare
+      v_promo public.promo_codes%rowtype;
+    begin
+      select * into v_promo from public.promo_codes
+      where lower(code) = lower(trim(p_promo_code)) and is_active = true
+        and (valid_from is null or valid_from <= now())
+        and (valid_until is null or valid_until >= now());
+
+      if v_promo.id is not null and v_subtotal >= coalesce(v_promo.min_order_usd, 0) then
+        if v_promo.discount_type = 'percentage' then
+          v_discount := (v_subtotal * (v_promo.value / 100.0));
+          if v_promo.max_discount_usd is not null and v_discount > v_promo.max_discount_usd then
+            v_discount := v_promo.max_discount_usd;
+          end if;
+        else
+          v_discount := least(v_promo.value, v_subtotal);
+        end if;
+      end if;
+    end;
+  end if;
+
+  v_total_usd := greatest(0, v_subtotal - v_discount);
+  v_total_iqd := round(v_total_usd * v_rate, -2);
+  v_order_number := 'ORD-' || to_char(now(), 'YYYYMMDD') || '-' || upper(substr(gen_random_uuid()::text, 1, 8));
+
+  insert into public.orders (
+    user_id, tenant_id, order_number, idempotency_key, status, payment_status,
+    stock_status, payment_method, items, subtotal_usd, shipping_usd, shipping_cost_usd,
+    discount_usd, tax_usd, total_usd, total_iqd, exchange_rate, currency,
+    shipping_address, shipping_office_info, notes
+  ) values (
+    v_uid, v_tenant_id, v_order_number, p_idempotency_key, 'pending', 'unpaid',
+    'pending', coalesce(p_payment_method, 'cash_on_delivery'), v_validated_items,
+    v_subtotal, 0, 0, v_discount, 0, v_total_usd, v_total_iqd, v_rate, 'IQD',
+    p_shipping_address, p_shipping_office_info, p_notes
+  ) returning id into v_order_id;
+
+  return jsonb_build_object(
+    'order_id', v_order_id,
+    'order_number', v_order_number,
+    'total_usd', v_total_usd,
+    'total_iqd', v_total_iqd,
+    'status', 'pending',
+    'payment_status', 'unpaid'
+  );
+end;
+$$;
+
+revoke all on function public.create_customer_order(jsonb, jsonb, jsonb, text, text, text, text) from public;
+grant execute on function public.create_customer_order(jsonb, jsonb, jsonb, text, text, text, text) to authenticated, service_role;
 
 -- User self-deletion (App Store guideline compliance)
 create or replace function public.delete_user()
 returns void
 language plpgsql
 security definer
-set search_path = public, auth, pg_temp
+set search_path = public, auth, storage, pg_temp
 as $$
 declare
   caller uuid := auth.uid();
@@ -555,14 +1142,35 @@ begin
       using errcode = 'P0001';
   end if;
 
+  -- 1. Anonymize user orders by scrubbing personal address details and unlinking user_id
+  update public.orders
+  set shipping_address = jsonb_build_object('anonymized', true),
+      customer_name = 'Anonymized User',
+      customer_phone = null,
+      user_id = null
+  where user_id = caller;
+
+  -- 2. Delete user's storage objects metadata
+  delete from storage.objects where owner_id = caller::text;
+
+  -- 3. Delete devices, push tokens, carts, favorites, trade_ins, etc.
+  delete from public.devices where uid = caller;
+  delete from public.push_tokens where user_id = caller;
+  delete from public.carts where id = caller;
+  delete from public.favorites where user_id = caller;
+  delete from public.addresses where user_id = caller;
+  delete from public.notifications where user_id = caller;
+
+  -- 4. Delete profile and auth user
+  delete from public.users where id = caller;
   delete from auth.users where id = caller;
 end;
 $$;
 
 revoke all on function public.delete_user() from public, anon;
-grant execute on function public.delete_user() to authenticated;
+grant execute on function public.delete_user() to authenticated, service_role;
 
--- Stock movement helper
+-- Stock movement helper (Protected: checks caller authorization & prevents negative stock clamping)
 create or replace function public.move_part_stock(
   p_part_id uuid,
   p_tenant_id uuid,
@@ -571,15 +1179,37 @@ create or replace function public.move_part_stock(
 ) returns void
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, pg_temp
 as $$
 declare
   v_variations jsonb;
   v_colors jsonb;
+  v_current_stock integer;
+  v_caller uuid := auth.uid();
+  v_is_authorized boolean := false;
 begin
-  select variations, color_variations
-    into v_variations, v_colors
-  from public.parts
+  -- 1. Permission check: Anon callers cannot move stock
+  if auth.role() = 'anon' or v_caller is null then
+    return;
+  end if;
+
+  -- 2. Caller must be service_role OR an admin/owner of this tenant
+  if auth.role() = 'service_role' then
+    v_is_authorized := true;
+  else
+    if public.is_admin() or exists (select 1 from public.tenants where id = p_tenant_id and owner_id = v_caller) then
+      v_is_authorized := true;
+    end if;
+  end if;
+
+  if not v_is_authorized then
+    return;
+  end if;
+
+  -- 3. Lock row in parts_base
+  select variations, color_variations, stock_qty
+    into v_variations, v_colors, v_current_stock
+  from public.parts_base
   where id = p_part_id and tenant_id = p_tenant_id
   for update;
 
@@ -587,9 +1217,14 @@ begin
     return;
   end if;
 
+  -- 4. Check stock shortage (Reject shortage: do NOT clamp negative stock to zero!)
   if p_variation_id is null or p_variation_id = '' then
-    update public.parts
-      set stock_qty = greatest(0, coalesce(stock_qty, 0) + p_delta)
+    if coalesce(v_current_stock, 0) + p_delta < 0 then
+      return; -- Reject invalid decrease beyond available units
+    end if;
+
+    update public.parts_base
+      set stock_qty = coalesce(stock_qty, 0) + p_delta
     where id = p_part_id and tenant_id = p_tenant_id;
     return;
   end if;
@@ -598,7 +1233,7 @@ begin
     select coalesce(jsonb_agg(
       case when elem->>'variationId' = p_variation_id
         then jsonb_set(elem, '{stockQuantity}',
-               to_jsonb(greatest(0, coalesce((elem->>'stockQuantity')::numeric, 0)::int + p_delta)))
+               to_jsonb(coalesce((elem->>'stockQuantity')::numeric, 0)::int + p_delta))
         else elem
       end
     ), v_variations)
@@ -609,28 +1244,28 @@ begin
     select coalesce(jsonb_agg(
       case when elem->>'variationId' = p_variation_id
         then jsonb_set(elem, '{stockQuantity}',
-               to_jsonb(greatest(0, coalesce((elem->>'stockQuantity')::numeric, 0)::int + p_delta)))
+               to_jsonb(coalesce((elem->>'stockQuantity')::numeric, 0)::int + p_delta))
         else elem
       end
     ), v_colors)
     from jsonb_array_elements(coalesce(v_colors, '[]'::jsonb)) as elem
   );
 
-  update public.parts
+  update public.parts_base
     set variations = v_variations,
         color_variations = v_colors
   where id = p_part_id and tenant_id = p_tenant_id;
 end;
 $$;
 
-grant execute on function public.move_part_stock(uuid, uuid, text, integer) to authenticated;
+grant execute on function public.move_part_stock(uuid, uuid, text, integer) to anon, authenticated, service_role;
 
 -- User cancellation of pending order with stock restoration
 create or replace function public.cancel_my_order(p_order_id uuid)
 returns void
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, pg_temp
 as $$
 declare
   v_order   public.orders%rowtype;
@@ -656,177 +1291,37 @@ begin
   end if;
 
   if v_order.stock_status = 'deducted' then
-    for v_item in select value from jsonb_array_elements(coalesce(v_order.items, '[]'::jsonb)) as t(value)
+    for v_item in select * from jsonb_array_elements(v_order.items)
     loop
-      begin
-        v_part_id := (v_item->>'productId')::uuid;
-      exception when others then
-        continue;
-      end;
+      v_part_id := (v_item->>'productId')::uuid;
+      v_tenant  := coalesce((v_item->>'tenantId')::uuid, v_order.tenant_id);
 
-      select tenant_id into v_tenant from public.parts where id = v_part_id;
-      if v_tenant is not null then
+      if v_part_id is not null and v_tenant is not null then
         perform public.move_part_stock(
           v_part_id,
           v_tenant,
-          nullif(v_item->>'variationId', ''),
-          coalesce((v_item->>'quantity')::int, 0)
+          v_item->>'variationId',
+          (v_item->>'quantity')::int
         );
       end if;
     end loop;
-  end if;
 
-  update public.orders
-    set status       = 'cancelled_by_user',
-        stock_status = case when v_order.stock_status = 'deducted' then 'rolled_back' else stock_status end,
-        updated_at   = now()
-  where id = p_order_id;
+    update public.orders
+      set status       = 'cancelled_by_user',
+          stock_status = 'rolled_back',
+          updated_at   = now()
+    where id = p_order_id;
+  else
+    update public.orders
+      set status     = 'cancelled_by_user',
+          updated_at = now()
+    where id = p_order_id;
+  end if;
 end;
 $$;
 
-revoke all on function public.cancel_my_order(uuid) from public, anon;
-grant execute on function public.cancel_my_order(uuid) to authenticated;
-
--- User deletion of dead/cancelled order from list
-create or replace function public.delete_my_order(p_order_id uuid)
-returns void
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_order public.orders%rowtype;
-begin
-  select * into v_order from public.orders where id = p_order_id for update;
-  if not found then
-    return;
-  end if;
-
-  if v_order.user_id is distinct from auth.uid() then
-    raise exception 'Not authorized to delete this order';
-  end if;
-
-  if v_order.status not in ('cancelled', 'cancelled_by_user', 'cancelled_by_store', 'rejected') then
-    raise exception 'Only a cancelled order can be deleted';
-  end if;
-
-  delete from public.orders where id = p_order_id;
-end;
-$$;
-
-revoke all on function public.delete_my_order(uuid) from public;
-grant execute on function public.delete_my_order(uuid) to authenticated;
-
--- Atomic counter sale for POS
-create or replace function public.create_counter_sale(
-  p_tenant_id     uuid,
-  p_items         jsonb,
-  p_customer_name text default null,
-  p_customer_phone text default null,
-  p_discount_usd  numeric default 0,
-  p_amount_paid_usd numeric default null,
-  p_total_iqd     numeric default null,
-  p_exchange_rate numeric default 1500,
-  p_notes         text default null
-)
-returns jsonb
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_item        jsonb;
-  v_part_id     uuid;
-  v_qty         int;
-  v_subtotal    numeric := 0;
-  v_discount    numeric;
-  v_total       numeric;
-  v_paid        numeric;
-  v_order_id    uuid;
-  v_order_no    text;
-begin
-  if auth.uid() is null then
-    raise exception 'Not signed in';
-  end if;
-  if not exists (select 1 from public.users where id = auth.uid() and is_admin) then
-    raise exception 'Not an admin';
-  end if;
-  if not exists (select 1 from public.tenants where id = p_tenant_id and owner_id = auth.uid()) then
-    raise exception 'Not an owner of this store';
-  end if;
-
-  for v_item in select value from jsonb_array_elements(p_items) loop
-    v_qty := coalesce((v_item->>'quantity')::int, 0);
-    v_subtotal := v_subtotal + (coalesce((v_item->>'priceUSD')::numeric, 0) * v_qty);
-  end loop;
-
-  v_discount := coalesce(p_discount_usd, 0);
-  v_total := greatest(0, v_subtotal - v_discount);
-  v_paid := coalesce(p_amount_paid_usd, v_total);
-
-  v_order_no := 'POS-' || to_char(now(), 'YYMMDD') || '-' || upper(substr(md5(random()::text), 1, 4));
-
-  insert into public.orders (
-    order_number, tenant_id, user_id, status, stock_status, payment_status,
-    payment_method, items, subtotal_usd, discount_usd, total_usd, total_iqd,
-    exchange_rate, currency, customer_name, customer_phone, notes
-  ) values (
-    v_order_no, p_tenant_id, auth.uid(), 'delivered', 'deducted',
-    case when v_paid >= v_total then 'paid' else 'partial' end,
-    'cash_on_delivery', p_items, v_subtotal, v_discount, v_total, p_total_iqd,
-    p_exchange_rate, 'IQD', p_customer_name, p_customer_phone, p_notes
-  ) returning id into v_order_id;
-
-  for v_item in select value from jsonb_array_elements(p_items) loop
-    v_part_id := (v_item->>'productId')::uuid;
-    v_qty := coalesce((v_item->>'quantity')::int, 0);
-    perform public.move_part_stock(
-      v_part_id,
-      p_tenant_id,
-      nullif(v_item->>'variationId', ''),
-      -v_qty
-    );
-  end loop;
-
-  return jsonb_build_object(
-    'order_id', v_order_id,
-    'order_number', v_order_no,
-    'total_usd', v_total
-  );
-end;
-$$;
-
-grant execute on function public.create_counter_sale to authenticated;
-
--- Partner sales calculation
-create or replace function public.get_partner_product_sales(p_partner_uid uuid default null)
-returns table(product_id text, units_sold numeric)
-language sql
-security definer
-set search_path = public
-as $$
-  select
-    item->>'productId'                                  as product_id,
-    sum(coalesce((item->>'quantity')::numeric, 0))      as units_sold
-  from public.orders o
-  cross join lateral jsonb_array_elements(coalesce(o.items::jsonb, '[]'::jsonb)) as item
-  where lower(coalesce(o.status, '')) = 'delivered'
-    and item->>'productId' is not null
-    and exists (
-      select 1
-      from public.parts p
-      where p.id::text = item->>'productId'
-        and o.tenant_id = p.tenant_id
-        and p.extra_data -> 'coAdminIds' ? coalesce(p_partner_uid, auth.uid())::text
-        and (
-          auth.uid() = coalesce(p_partner_uid, auth.uid())
-          or auth.uid() = p.tenant_id
-        )
-    )
-  group by item->>'productId';
-$$;
-
-grant execute on function public.get_partner_product_sales(uuid) to authenticated;
+revoke all on function public.cancel_my_order(uuid) from public;
+grant execute on function public.cancel_my_order(uuid) to authenticated, service_role;
 
 -- ---------------------------------------------------------------------------
 -- 6. Storage Buckets & Policies
@@ -841,15 +1336,15 @@ create policy "media_public_read" on storage.objects
 
 drop policy if exists "media_insert" on storage.objects;
 create policy "media_insert" on storage.objects
-  for insert with check (bucket_id = 'media' and auth.role() = 'authenticated');
+  for insert with check (bucket_id = 'media' and auth.role() = 'authenticated' and (owner_id = auth.uid()::text or owner_id is null or public.is_admin()));
 
 drop policy if exists "media_update" on storage.objects;
 create policy "media_update" on storage.objects
-  for update using (bucket_id = 'media' and auth.role() = 'authenticated');
+  for update using (bucket_id = 'media' and (owner_id = auth.uid()::text or public.is_admin()));
 
 drop policy if exists "media_delete" on storage.objects;
 create policy "media_delete" on storage.objects
-  for delete using (bucket_id = 'media' and auth.role() = 'authenticated');
+  for delete using (bucket_id = 'media' and (owner_id = auth.uid()::text or public.is_admin()));
 
 -- ---------------------------------------------------------------------------
 -- 7. Row Level Security (RLS) Hardening
@@ -858,7 +1353,7 @@ create policy "media_delete" on storage.objects
 -- Enable RLS across all tables
 alter table public.users enable row level security;
 alter table public.tenants enable row level security;
-alter table public.parts enable row level security;
+alter table public.parts_base enable row level security;
 alter table public.categories enable row level security;
 alter table public.brands enable row level security;
 alter table public.banners enable row level security;
@@ -880,16 +1375,6 @@ alter table public.push_tokens enable row level security;
 alter table public.devices enable row level security;
 alter table public.live_tracking enable row level security;
 
--- Clean up any development permissive wildcard policies
-do $$
-declare r record;
-begin
-  for r in (select schemaname, tablename, policyname from pg_policies where schemaname = 'public' and policyname = 'permissive_all') loop
-    execute format('drop policy if exists %I on %I.%I', r.policyname, r.schemaname, r.tablename);
-  end loop;
-end;
-$$;
-
 -- USERS
 drop policy if exists "users_self_select" on public.users;
 create policy "users_self_select" on public.users
@@ -909,7 +1394,7 @@ declare t text;
 begin
   foreach t in array array[
     'banners', 'categories', 'brands', 'tenants', 'store_locations',
-    'discounts', 'promo_codes', 'app_config', 'global_settings', 'tenant_settings'
+    'discounts', 'promo_codes', 'app_config', 'tenant_settings'
   ] loop
     execute format('drop policy if exists "%s_public_read" on public.%I', t, t);
     execute format('create policy "%s_public_read" on public.%I for select using (true)', t, t);
@@ -920,13 +1405,22 @@ begin
 end;
 $$;
 
--- PARTS (Products)
-drop policy if exists "parts_public_read" on public.parts;
-create policy "parts_public_read" on public.parts
+-- GLOBAL SETTINGS (Excludes security sensitive keys from public read)
+drop policy if exists "global_settings_public_read" on public.global_settings;
+create policy "global_settings_public_read" on public.global_settings
+  for select using (id not in ('security', 'secrets', 'private', 'admin_config'));
+
+drop policy if exists "global_settings_admin_all" on public.global_settings;
+create policy "global_settings_admin_all" on public.global_settings
+  for all using (public.is_admin()) with check (public.is_admin());
+
+-- PARTS_BASE
+drop policy if exists "parts_base_public_read" on public.parts_base;
+create policy "parts_base_public_read" on public.parts_base
   for select using (true);
 
-drop policy if exists "parts_admin_write" on public.parts;
-create policy "parts_admin_write" on public.parts
+drop policy if exists "parts_base_admin_write" on public.parts_base;
+create policy "parts_base_admin_write" on public.parts_base
   for all using (public.is_admin()) with check (public.is_admin());
 
 -- ORDERS
@@ -936,7 +1430,7 @@ create policy "orders_select" on public.orders
 
 drop policy if exists "orders_insert" on public.orders;
 create policy "orders_insert" on public.orders
-  for insert with check (auth.uid() = user_id or auth.uid() is null);
+  for insert with check ((auth.uid() = user_id or auth.uid() is null) and (select is_blocked from public.users where id = auth.uid()) is not true);
 
 drop policy if exists "orders_admin_update" on public.orders;
 create policy "orders_admin_update" on public.orders
@@ -952,14 +1446,31 @@ drop policy if exists "addresses_self" on public.addresses;
 create policy "addresses_self" on public.addresses
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
--- CONVERSATIONS & MESSAGES
-drop policy if exists "conversations_access" on public.conversations;
-create policy "conversations_access" on public.conversations
-  for all using (auth.uid() = user_id or public.is_admin())
-  with check (auth.uid() = user_id or public.is_admin());
+-- FAVORITES
+drop policy if exists "favorites_self" on public.favorites;
+create policy "favorites_self" on public.favorites
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
-drop policy if exists "messages_access" on public.messages;
-create policy "messages_access" on public.messages
+-- REVIEWS
+drop policy if exists "reviews_read" on public.reviews;
+create policy "reviews_read" on public.reviews
+  for select using (is_approved = true or auth.uid() = user_id or public.is_admin());
+
+drop policy if exists "reviews_insert" on public.reviews;
+create policy "reviews_insert" on public.reviews
+  for insert with check (auth.uid() = user_id);
+
+drop policy if exists "reviews_update" on public.reviews;
+create policy "reviews_update" on public.reviews
+  for update using (auth.uid() = user_id or public.is_admin());
+
+-- CONVERSATIONS & MESSAGES
+drop policy if exists "conversations_self" on public.conversations;
+create policy "conversations_self" on public.conversations
+  for all using (auth.uid() = user_id or public.is_admin());
+
+drop policy if exists "messages_self" on public.messages;
+create policy "messages_self" on public.messages
   for select using (
     exists (
       select 1 from public.conversations c
@@ -970,7 +1481,6 @@ create policy "messages_access" on public.messages
 drop policy if exists "messages_insert" on public.messages;
 create policy "messages_insert" on public.messages
   for insert with check (
-    auth.uid() = sender_id and
     exists (
       select 1 from public.conversations c
       where c.id = conversation_id and (c.user_id = auth.uid() or public.is_admin())
@@ -980,14 +1490,20 @@ create policy "messages_insert" on public.messages
 -- NOTIFICATIONS
 drop policy if exists "notifications_self" on public.notifications;
 create policy "notifications_self" on public.notifications
-  for all using (auth.uid() = user_id or public.is_admin())
-  with check (auth.uid() = user_id or public.is_admin());
+  for select using (auth.uid() = user_id);
+
+drop policy if exists "notifications_self_update" on public.notifications;
+create policy "notifications_self_update" on public.notifications
+  for update using (auth.uid() = user_id);
+
+drop policy if exists "notifications_admin_insert" on public.notifications;
+create policy "notifications_admin_insert" on public.notifications
+  for insert with check (public.is_admin());
 
 -- SAVED CARDS
 drop policy if exists "saved_cards_self" on public.saved_cards;
 create policy "saved_cards_self" on public.saved_cards
-  for all using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- TRADE-IN REQUESTS
 drop policy if exists "trade_in_select" on public.trade_in_requests;
@@ -996,29 +1512,42 @@ create policy "trade_in_select" on public.trade_in_requests
 
 drop policy if exists "trade_in_insert" on public.trade_in_requests;
 create policy "trade_in_insert" on public.trade_in_requests
-  for insert with check (auth.uid() = user_id);
+  for insert with check (auth.uid() = user_id or auth.uid() is null);
 
 drop policy if exists "trade_in_admin_update" on public.trade_in_requests;
 create policy "trade_in_admin_update" on public.trade_in_requests
   for update using (public.is_admin());
 
--- PUSH TOKENS & DEVICES
+-- PUSH TOKENS & DEVICES (Enforces authenticated user ownership, denies anonymous ALL)
 drop policy if exists "push_tokens_self" on public.push_tokens;
 create policy "push_tokens_self" on public.push_tokens
-  for all using (auth.uid() = user_id or auth.uid() is null);
+  for all using (auth.role() = 'authenticated' and (auth.uid() = user_id or public.is_admin()))
+  with check (auth.role() = 'authenticated' and (auth.uid() = user_id or public.is_admin()));
 
 drop policy if exists "devices_self" on public.devices;
 create policy "devices_self" on public.devices
-  for all using (auth.uid() = uid or auth.uid() is null);
+  for all using (auth.role() = 'authenticated' and (auth.uid() = uid or public.is_admin()))
+  with check (auth.role() = 'authenticated' and (auth.uid() = uid or public.is_admin()));
 
--- LIVE TRACKING
+-- LIVE TRACKING (Scoped strictly to order owner, assigned driver or admin)
 drop policy if exists "live_tracking_read" on public.live_tracking;
 create policy "live_tracking_read" on public.live_tracking
-  for select using (true);
+  for select using (
+    auth.role() = 'authenticated' and (
+      order_id in (select id from public.orders where user_id = auth.uid()) or
+      public.is_admin() or
+      driver_phone = (select phone from public.users where id = auth.uid())
+    )
+  );
 
 drop policy if exists "live_tracking_admin_write" on public.live_tracking;
 create policy "live_tracking_admin_write" on public.live_tracking
   for all using (public.is_admin());
+
+-- Permissions Grants
+grant usage on schema public to anon, authenticated, service_role;
+grant select, insert, update, delete on all tables in schema public to anon, authenticated, service_role;
+grant select, insert, update, delete on all tables in schema public to service_role;
 
 -- ---------------------------------------------------------------------------
 -- 8. Seed Default Config
@@ -1028,17 +1557,15 @@ values ('app', '{
   "forceUpdate": false,
   "minAppVersion": "1.0.0",
   "minVersionCode": 1,
-  "minBuildNumber": 1,
-  "latestVersionCode": 1,
-  "latestBuildNumber": 1,
-  "updateMessage": "A critical update is required to continue using Khamark. Please update to the latest version.",
-  "updateMessageAr": "يتطلب الأمر تحديثًا إلزاميًا لمتابعة استخدام تطبيق خامارك. يرجى التحديث إلى أحدث إصدار.",
-  "updateMessageKu": "پێویستە نوێکردنەوەیەکی گرنگ ئەنجام بدەیت بۆ بەردەوامبوون لە بەکارهێنانی خامارک. تکایە بۆ دوا وەشان نوێی بکەرەوە.",
-  "androidStoreUrl": "https://play.google.com/store/apps/details?id=com.khamark.app",
-  "iosStoreUrl": "https://apps.apple.com/app/khamark/id_replace_with_apple_id"
+  "features": {
+    "chatEnabled": true,
+    "tradeInEnabled": true,
+    "qicardPayment": false,
+    "fibPayment": false
+  }
 }'::jsonb)
 on conflict (id) do nothing;
 
 insert into public.global_settings (id, data)
-values ('global', '{"exchangeRate": 1500}'::jsonb)
+values ('global', '{"exchangeRate": 1500, "currency": "IQD", "supportedCurrencies": ["USD", "IQD"]}'::jsonb)
 on conflict (id) do nothing;

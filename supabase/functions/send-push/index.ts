@@ -141,7 +141,7 @@ async function callerMaySend(req: Request, supabase: SupabaseClient): Promise<bo
     .select('is_admin, role, is_partner')
     .eq('id', caller.id)
     .maybeSingle();
-  return row?.is_admin === true || row?.role === 'admin' || row?.is_partner === true;
+  return (row?.is_admin === true || row?.role === 'admin') && row?.is_partner !== true;
 }
 
 Deno.serve(async (req: Request) => {

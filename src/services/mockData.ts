@@ -8,9 +8,7 @@ import { Product, Timestamp, SearchFilters, PaginationInfo, ProductStatus } from
 import { SUPABASE_CONFIG } from '../constants/config';
 
 export const USE_MOCK_DATA =
-  process.env.EXPO_PUBLIC_USE_MOCK_DATA === 'true' ||
-  SUPABASE_CONFIG.URL.includes('replace-with-khamark') ||
-  SUPABASE_CONFIG.URL.includes('replace-with-asankary');
+  __DEV__ && process.env.EXPO_PUBLIC_USE_MOCK_DATA === 'true';
 
 const TS_MS = 1717200000000;
 const ts = (): Timestamp =>

@@ -69,11 +69,6 @@ export const VERIFIED_ACCESSORY_IMAGES: Record<string, string[]> = {
 export const sanitizeProductImageUrl = (url?: string | null, productId?: string): string => {
   if (!url || typeof url !== 'string' || url.trim() === '') return '';
 
-  // Direct product ID override check
-  if (productId && VERIFIED_ACCESSORY_IMAGES[productId]?.[0]) {
-    return VERIFIED_ACCESSORY_IMAGES[productId][0];
-  }
-
   // Intercept legacy picsum photos which served random landscape images
   if (url.includes('picsum.photos')) {
     // Exact seed token matching with word boundary: matches p1, p4, p5, p6, p7, p8, p19 specifically
@@ -84,10 +79,14 @@ export const sanitizeProductImageUrl = (url?: string | null, productId?: string)
         return VERIFIED_ACCESSORY_IMAGES[seedKey][0];
       }
     }
+    if (productId && VERIFIED_ACCESSORY_IMAGES[productId]?.[0]) {
+      return VERIFIED_ACCESSORY_IMAGES[productId][0];
+    }
     // Non-verified seed: return empty string so callers cleanly fall back to honest neutral placeholders
     return '';
   }
 
+  // Authentic uploaded image URL is preserved
   return url;
 };
 
@@ -104,12 +103,7 @@ export const getCategoryPlaceholderImage = (category: string): string => {
  * Get the primary image URL from various possible sources with fallback
  */
 export const getProductImageUrl = (source: ImageSource): string => {
-  // If product ID has a verified image override, prioritize it
-  if (source.productId && VERIFIED_ACCESSORY_IMAGES[source.productId]?.[0]) {
-    return VERIFIED_ACCESSORY_IMAGES[source.productId][0];
-  }
-
-  // Try imageUrls array first (preferred)
+  // 1. Try imageUrls array first (preferred real uploaded images)
   if (source.imageUrls && source.imageUrls.length > 0) {
     const url = source.imageUrls[0];
     if (url && url.trim() !== '') {
@@ -118,7 +112,7 @@ export const getProductImageUrl = (source: ImageSource): string => {
     }
   }
   
-  // Try images array (legacy)
+  // 2. Try images array (legacy)
   if (source.images && source.images.length > 0) {
     const url = source.images[0];
     if (url && url.trim() !== '') {
@@ -127,13 +121,18 @@ export const getProductImageUrl = (source: ImageSource): string => {
     }
   }
   
-  // Try single imageUrl field (for order items)
+  // 3. Try single imageUrl field (for order items)
   if (source.imageUrl && source.imageUrl.trim() !== '') {
     const sanitized = sanitizeProductImageUrl(source.imageUrl, source.productId);
     if (sanitized) return sanitized;
   }
+
+  // 4. If product has no valid image, check verified accessory reference catalogue
+  if (source.productId && VERIFIED_ACCESSORY_IMAGES[source.productId]?.[0]) {
+    return VERIFIED_ACCESSORY_IMAGES[source.productId][0];
+  }
   
-  // Return category-specific placeholder (or honest neutral fallback)
+  // 5. Return category-specific placeholder (or honest neutral fallback)
   return getCategoryPlaceholderImage(source.category || '');
 };
 
@@ -147,37 +146,40 @@ export const getThumbnailUrl = (url?: string | null, width = 400): string => {
   if (!url || typeof url !== 'string') return url || '';
   if (!/^https?:\/\//i.test(url) || url.includes('wsrv.nl')) return url;
   const stripped = url.replace(/^https?:\/\//i, '');
-  return `https://wsrv.nl/?url=${stripped}&w=${width}&output=webp&q=72&we`;
+  return `https://wsrv.nl/?url=${encodeURIComponent(stripped)}&w=${width}&output=webp&q=72&we`;
 };
 
 /**
  * Get all image URLs from various sources with fallbacks
  */
 export const getProductImageUrls = (source: ImageSource): string[] => {
-  // If product ID has a verified image override, prioritize it
-  if (source.productId && VERIFIED_ACCESSORY_IMAGES[source.productId]) {
-    return VERIFIED_ACCESSORY_IMAGES[source.productId];
-  }
-
   let images: string[] = [];
   
   // Try imageUrls array first
   if (source.imageUrls && source.imageUrls.length > 0) {
     images = source.imageUrls
       .filter(url => url && url.trim() !== '')
-      .map(url => sanitizeProductImageUrl(url, source.productId));
+      .map(url => sanitizeProductImageUrl(url, source.productId))
+      .filter(Boolean);
   }
   
   // Try images array if no imageUrls
   if (images.length === 0 && source.images && source.images.length > 0) {
     images = source.images
       .filter(url => url && url.trim() !== '')
-      .map(url => sanitizeProductImageUrl(url, source.productId));
+      .map(url => sanitizeProductImageUrl(url, source.productId))
+      .filter(Boolean);
+  }
+
+  // If no uploaded images found, fallback to verified catalogue
+  if (images.length === 0 && source.productId && VERIFIED_ACCESSORY_IMAGES[source.productId]) {
+    return VERIFIED_ACCESSORY_IMAGES[source.productId];
   }
   
   // If no images found, return placeholder
   if (images.length === 0) {
-    images = [getCategoryPlaceholderImage(source.category || '')];
+    const placeholder = getCategoryPlaceholderImage(source.category || '');
+    images = placeholder ? [placeholder] : [];
   }
   
   return images;

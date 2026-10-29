@@ -67,15 +67,23 @@ const OffersScreen: React.FC = () => {
   const load = useCallback(async () => {
     try {
       setError(false);
-      // One broad fetch rather than a filtered query: "is this discounted" is a
-      // comparison against the price THIS shopper pays (VIP price, wholesale
-      // tier), which the database cannot answer.
-      const res = await ProductService.getProducts(
-        {},
-        { page: 1, limit: 500, total: 0, hasMore: true },
-        tenantId || undefined,
-      );
-      setProducts(res.products);
+      // Enumerate catalog pages so offers outside the first slice are discovered (KHM-021)
+      let allProducts: Product[] = [];
+      let page = 1;
+      let hasMore = true;
+      while (hasMore && page <= 5) {
+        const res = await ProductService.getProducts(
+          {},
+          { page, limit: 100, total: 0, hasMore: true },
+          tenantId || undefined,
+        );
+        if (res.products?.length > 0) {
+          allProducts = [...allProducts, ...res.products];
+        }
+        hasMore = Boolean(res.pagination?.hasMore && res.products?.length >= 100);
+        page++;
+      }
+      setProducts(allProducts);
     } catch {
       setProducts([]);
       setError(true);

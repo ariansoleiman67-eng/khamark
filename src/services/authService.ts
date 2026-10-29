@@ -400,11 +400,20 @@ export class AuthService {
   static async getCurrentUser(): Promise<User | null> {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return null;
+      if (!session?.user?.id) return null;
 
       const cachedData = await AsyncStorage.getItem('user_data');
       if (cachedData) {
-        return JSON.parse(cachedData) as User;
+        try {
+          const parsed = JSON.parse(cachedData) as User;
+          if (parsed && parsed.uid === session.user.id) {
+            return parsed;
+          }
+          // Identity mismatch: purge stale cached user to prevent privilege leakage (KHM-012)
+          await AsyncStorage.removeItem('user_data');
+        } catch {
+          await AsyncStorage.removeItem('user_data');
+        }
       }
 
       return await this.getCurrentUserFresh();
@@ -416,7 +425,7 @@ export class AuthService {
   static async getCurrentUserFresh(): Promise<User | null> {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return null;
+      if (!session?.user?.id) return null;
 
       let { data: userData, error } = await supabase
         .from('users')
@@ -445,15 +454,40 @@ export class AuthService {
       if (error || !userData) {
         // Couldn't load the profile (refresh failed / network blip). Returning null would kick a
         // logged-in user to the login screen on every reopen ("it doesn't save my account"). Fall
-        // back to the last cached profile — but ONLY if a session still exists, so a genuinely
-        // signed-out user (session cleared by a failed refresh) is NOT shown via stale cache.
+        // back to the last cached profile — but ONLY if bound to the active session identity (KHM-012).
         try {
           const { data: still } = await supabase.auth.getSession();
-          if (still.session) {
+          const activeUid = still?.session?.user?.id || session.user.id;
+          if (activeUid) {
             const cached = await AsyncStorage.getItem('user_data');
-            if (cached) return JSON.parse(cached) as User;
+            if (cached) {
+              const parsed = JSON.parse(cached) as User;
+              if (parsed && parsed.uid === activeUid) {
+                return parsed;
+              }
+              await AsyncStorage.removeItem('user_data');
+            }
           }
         } catch { /* no usable cache / no session */ }
+
+        // Construct safe baseline profile bound strictly to the active session user (never elevated)
+        if (session.user) {
+          const fallbackUser: User = {
+            uid: session.user.id,
+            name: (session.user as any).user_metadata?.full_name || (session.user as any).user_metadata?.name || 'User',
+            fullName: (session.user as any).user_metadata?.full_name || (session.user as any).user_metadata?.name || 'User',
+            email: session.user.email || '',
+            phone: session.user.phone || '',
+            role: 'customer',
+            isAdmin: false,
+            isPartner: false,
+            addresses: [],
+            language: 'en',
+            createdAt: new Date().toISOString() as any,
+            updatedAt: new Date().toISOString() as any,
+          };
+          return fallbackUser;
+        }
         return null;
       }
 

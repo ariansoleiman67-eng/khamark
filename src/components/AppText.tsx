@@ -22,7 +22,7 @@ function defaultLineHeight(fontSize: number, bold: boolean) {
   return Math.ceil(fontSize * mult);
 }
 
-export default function AppText({ style, fontSize, allowFontScaling = false, ...props }: Props) {
+export default function AppText({ style, fontSize, allowFontScaling = true, maxFontSizeMultiplier = 1.35, ...props }: Props) {
   const flat = StyleSheet.flatten(style) as TextStyle | undefined;
   const bold = isBold(flat?.fontWeight);
   const fs = fontSize ?? flat?.fontSize ?? 14;
@@ -55,6 +55,7 @@ export default function AppText({ style, fontSize, allowFontScaling = false, ...
       {...props}
       key={contentKey}
       allowFontScaling={allowFontScaling}
+      maxFontSizeMultiplier={maxFontSizeMultiplier}
       adjustsFontSizeToFit={shouldAdjust}
       minimumFontScale={minScale}
       style={[
