@@ -191,3 +191,4 @@ console.log('Regenerating splash assets to guarantee 100% synchronization...');
 require('./generate_splash_assets.js');
 
 console.log('All app icons and splash assets successfully generated with Khamark Global branding!');
+

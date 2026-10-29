@@ -68,8 +68,8 @@ npm audit fix
 ```json
 {
   "expo": {
-    "name": "Asankary",
-    "slug": "Asankary", 
+    "name": "Khamark",
+    "slug": "khamark", 
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -78,18 +78,18 @@ npm audit fix
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#A61920"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.asankary.app"
+      "bundleIdentifier": "com.khamark.app"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#A61920"
       },
-      "package": "com.asankary.app",
+      "package": "com.khamark.app",
       "edgeToEdgeEnabled": true
     },
     "web": {

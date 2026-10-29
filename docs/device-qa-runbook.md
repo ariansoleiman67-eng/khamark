@@ -2,7 +2,7 @@
 
 Status at handoff: **NOT RUN** for all native screen, real-service and store-console checks below. The CSV is a source inventory, not a completed native test run.
 
-Use a disposable Khamark staging project and synthetic accounts/catalogue. Provide a custom development build and a release-like preview build for both iOS and Android. Native Firebase is outside Expo Go. Do not use or reset Asankary production.
+Use a disposable Khamark staging project and synthetic accounts/catalogue. Provide a custom development build and a release-like preview build for both iOS and Android. Native Firebase is outside Expo Go. Do not use or reset legacy production environments.
 
 ## Test fixtures
 

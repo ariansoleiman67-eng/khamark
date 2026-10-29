@@ -1,4 +1,4 @@
-# 📱 Manual Testing Checklist - Asankary App
+# 📱 Manual Testing Checklist - Khamark App
 
 ## 🎯 **USABILITY/UX TESTING**
 

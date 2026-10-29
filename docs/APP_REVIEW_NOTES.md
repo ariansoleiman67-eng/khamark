@@ -1,4 +1,4 @@
-# App Review Information — Asankary
+# App Review Information — Khamark
 
 Paste sections 2–7 into **App Store Connect → App Review Information → Notes**.
 Anything in **[BRACKETS]** only you can fill in.
@@ -18,15 +18,15 @@ actually tested on, e.g.:]**
 
 ## 3. What the app does, and who it is for
 
-Asankary is the mobile storefront and back office for Asankary, a phone and
-accessories shop in Erbil, Iraq. Customers browse the shop's real stock, see each
+Khamark is the mobile storefront and back office for Khamark, a mobile accessories
+and electronics brand in Erbil, Iraq. Customers browse the shop's real stock, see each
 item's price in US dollars or Iraqi dinars, place an order for delivery or
 collection, and message the shop directly about a product. The shop's own staff
 use the same app to run the business: stock, orders, pricing and customer messages.
 
-The problem it solves: buying a phone in Iraq usually means visiting shops in
+The problem it solves: buying accessories and electronics in Iraq usually means visiting shops in
 person to ask what is in stock and what it costs, with no written record of the
-price, the warranty or whether a handset is official or imported. Asankary puts
+price, the warranty or whether an item is genuine. Khamark puts
 that in writing — every listing states its origin, its condition and its warranty,
 prices are shown in both currencies at the shop's own exchange rate, and the order
 is tracked in the app.
@@ -106,7 +106,7 @@ Iraq sees exactly what a customer in Erbil sees.
 
 ## 7. Regulated industry / third-party material
 
-Asankary is an ordinary retail shop selling consumer electronics. It is not in a
+Khamark is an ordinary retail shop selling consumer electronics. It is not in a
 regulated industry.
 
 Product names, images and specifications are manufacturer material for the

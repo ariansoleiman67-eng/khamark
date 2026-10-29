@@ -1,4 +1,4 @@
-# 🚀 Asankary - App Store & Marketing Preparation Checklist
+# 🚀 Khamark - App Store & Marketing Preparation Checklist
 
 ## 📱 App Store Submission Checklist
 
@@ -21,7 +21,7 @@
 - [ ] In-app purchases properly implemented
 
 #### ✅ **Store Listing**
-- [ ] App title (max 50 characters): "Asankary - Online Store"
+- [ ] App title (max 50 characters): "Khamark - Mobile Accessories & Electronics"
 - [ ] Short description (max 80 characters): "Shop electronics and accessories with fast delivery across Iraq"
 - [ ] Full description (max 4000 characters) - detailed, keyword-rich
 - [ ] App icon (512x512 px, PNG)
@@ -77,7 +77,7 @@
 ### App Description Template
 
 ```
-🛍️ ASANKARY - Your Online Store for Electronics & Accessories
+🛍️ KHAMARK - Your Store for Mobile Accessories & Electronics
 
 Shop consumer electronics and everyday accessories in Kurdistan and Iraq. Browse thousands of products with fast delivery.
 
@@ -101,7 +101,7 @@ Shop consumer electronics and everyday accessories in Kurdistan and Iraq. Browse
 📍 SERVING:
 Kurdistan Region, Iraq - Erbil, Sulaymaniyah, Dohuk, and surrounding areas
 
-⭐ WHY CHOOSE ASANKARY?
+⭐ WHY CHOOSE KHAMARK?
 We focus on quality and reliability, making it easy to find the right products with a smooth, trustworthy shopping experience.
 
 📞 CUSTOMER SUPPORT:
