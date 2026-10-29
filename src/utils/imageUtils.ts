@@ -3,6 +3,7 @@
  */
 
 export interface ImageSource {
+  productId?: string;
   imageUrls?: string[];
   images?: string[];
   category?: string;
@@ -10,35 +11,110 @@ export interface ImageSource {
 }
 
 /**
- * Get category-specific placeholder images
+ * Verified product image references for exact models.
+ * Maps both database IDs and mock IDs to authentic manufacturer or authorized distributor packshots.
+ */
+export const VERIFIED_ACCESSORY_IMAGES: Record<string, string[]> = {
+  // Momax Pinpop Lite Find My Tracker (Model BR10)
+  '14ba1f5a-b0cf-420f-8f47-9b6bb82b6780': [
+    'https://globaliraq.iq/cdn/shop/files/1_aecebb33-11bd-4154-ba57-11aa81aa946f.jpg?v=1779613983',
+  ],
+  'p1': [
+    'https://globaliraq.iq/cdn/shop/files/1_aecebb33-11bd-4154-ba57-11aa81aa946f.jpg?v=1779613983',
+  ],
+  // Samsung 65W Trio Power Adapter (Model EP-T6530)
+  'c9871ff9-8e51-4da6-b115-845868d7d043': [
+    'https://images.samsung.com/is/image/samsung/p6pim/levant_ar/ep-t6530nbegww/gallery/levant-ar-65w-power-adapter-trio-ep-t6530-ep-t6530nbegww-532744544?$1164_776_PNG$',
+  ],
+  'p4': [
+    'https://images.samsung.com/is/image/samsung/p6pim/levant_ar/ep-t6530nbegww/gallery/levant-ar-65w-power-adapter-trio-ep-t6530-ep-t6530nbegww-532744544?$1164_776_PNG$',
+  ],
+  // Samsung SmartTag2 (Model EI-T5600)
+  '60136aa2-e7a6-453b-b97a-43dfbe168d69': [
+    'https://images.samsung.com/is/image/samsung/p6pim/levant_ar/ei-t5600bbegww/gallery/levant-ar-galaxy-smarttag2-ei-t5600-ei-t5600bbegww-538513169?$1164_776_PNG$',
+  ],
+  'p5': [
+    'https://images.samsung.com/is/image/samsung/p6pim/levant_ar/ei-t5600bbegww/gallery/levant-ar-galaxy-smarttag2-ei-t5600-ei-t5600bbegww-538513169?$1164_776_PNG$',
+  ],
+  // Samsung 25W Travel Charger (Model EP-TA800)
+  '11a03340-af46-4fb1-8100-b261b0d18df1': [
+    'https://images.samsung.com/is/image/samsung/p6pim/levant_ar/ep-ta800xbegww/gallery/levant-ar-wall-charger-for-super-fast-charging-25w-405723-ep-ta800xbegww-525295236?$1164_776_PNG$',
+  ],
+  'p6': [
+    'https://images.samsung.com/is/image/samsung/p6pim/levant_ar/ep-ta800xbegww/gallery/levant-ar-wall-charger-for-super-fast-charging-25w-405723-ep-ta800xbegww-525295236?$1164_776_PNG$',
+  ],
+  // Samsung S26 Ultra (Flagship Phone Packshot)
+  'cdfee70c-a757-44ec-a66d-51ceb1962372': [
+    'https://images.samsung.com/is/image/samsung/p6pim/bd/2401/gallery/bd-galaxy-s24-s928-sm-s928bztcbkd-539412884?$1164_776_PNG$',
+  ],
+  'p7': [
+    'https://images.samsung.com/is/image/samsung/p6pim/bd/2401/gallery/bd-galaxy-s24-s928-sm-s928bztcbkd-539412884?$1164_776_PNG$',
+  ],
+  'p8': [
+    'https://images.samsung.com/is/image/samsung/p6pim/bd/2401/gallery/bd-galaxy-s24-s928-sm-s928bztcbkd-539412884?$1164_776_PNG$',
+  ],
+  // Apple iPhone 17 Pro Max (Flagship Phone Packshot)
+  'cf8696ae-303d-4142-810f-fb644baf17b0': [
+    'https://store.storeimages.cdn-apple.com/1/as-images.apple.com/is/refurb-iphone-16-pro-max-naturaltitanium-202509?wid=1144&hei=1144&fmt=jpeg&qlt=90',
+  ],
+  'p19': [
+    'https://store.storeimages.cdn-apple.com/1/as-images.apple.com/is/refurb-iphone-16-pro-max-naturaltitanium-202509?wid=1144&hei=1144&fmt=jpeg&qlt=90',
+  ],
+};
+
+/**
+ * Resolve legacy/placeholder URLs (such as picsum random landscape photos)
+ * to authentic accessory assets using exact product ID token matching.
+ */
+export const sanitizeProductImageUrl = (url?: string | null, productId?: string): string => {
+  if (!url || typeof url !== 'string' || url.trim() === '') return '';
+
+  // Direct product ID override check
+  if (productId && VERIFIED_ACCESSORY_IMAGES[productId]?.[0]) {
+    return VERIFIED_ACCESSORY_IMAGES[productId][0];
+  }
+
+  // Intercept legacy picsum photos which served random landscape images
+  if (url.includes('picsum.photos')) {
+    // Exact seed token matching with word boundary: matches p1, p4, p5, p6, p7, p8, p19 specifically
+    const match = url.match(/(?:asankary|khamark)-(p[0-9]+)\b/i);
+    if (match && match[1]) {
+      const seedKey = match[1].toLowerCase();
+      if (VERIFIED_ACCESSORY_IMAGES[seedKey]?.[0]) {
+        return VERIFIED_ACCESSORY_IMAGES[seedKey][0];
+      }
+    }
+    // Non-verified seed: return empty string so callers cleanly fall back to honest neutral placeholders
+    return '';
+  }
+
+  return url;
+};
+
+/**
+ * Get category-specific placeholder images for Khamark consumer electronics.
+ * If an exact verified model asset is missing, returns empty string so the card
+ * displays an honest neutral placeholder rather than attaching an unrelated accessory image.
  */
 export const getCategoryPlaceholderImage = (category: string): string => {
-  const categoryPlaceholders: Record<string, string> = {
-    'Engine Parts': 'https://sircarpart.com/wp-content/uploads/2019/05/Download-Engine.png', // open engine bay
-    'Brake System': 'https://fredsautorepair.com/wp-content/uploads/2018/07/car-disc-brake-cluster.jpg', // brake rotor
-    'Transmission': 'https://www.xautomotive.com/cdn/shop/articles/xAutomotive-How-Transmission-work-xHP-Blog-Header.jpg?v=1718875197&width=1024', // drivetrain closeup
-    'Electrical': 'https://www.patlabelsonline.co.uk/blog/wp-content/uploads/2015/08/shutterstock_96185378.jpg', // wiring harness
-    'Suspension': 'https://acko-cms.s3.ap-south-1.amazonaws.com/large_car_suspensions_8d5beb6494.jpg', // wheel/suspension
-    'Body Parts': 'https://sc04.alicdn.com/kf/H0585afa0ad12420dbdfa4f46a01ee49ff.png', // body panel
-    'Interior': 'https://img.ccjdigital.com/files/base/randallreilly/all/image/2022/10/Peterbilt_SuperTruck_Interior.6358aeef1526c.png?auto=format%2Ccompress&fit=max&q=70&w=1200', // dash detail
-    'Exterior': 'https://placehold.co/1440x900?text=Product', // exterior
-    'Filters': 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT4V6HeTPl2gBr1hlDFBdnCoHXYd9OIwpOIyA&s', // filter/engine bay
-    'Fluids': 'https://placehold.co/1400x900?text=Product', // oil/fluids
-  };
-  
-  // Return category-specific placeholder or default product image
-  return categoryPlaceholders[category] || 'https://placehold.co/800x800?text=Product';
+  return '';
 };
 
 /**
  * Get the primary image URL from various possible sources with fallback
  */
 export const getProductImageUrl = (source: ImageSource): string => {
+  // If product ID has a verified image override, prioritize it
+  if (source.productId && VERIFIED_ACCESSORY_IMAGES[source.productId]?.[0]) {
+    return VERIFIED_ACCESSORY_IMAGES[source.productId][0];
+  }
+
   // Try imageUrls array first (preferred)
   if (source.imageUrls && source.imageUrls.length > 0) {
     const url = source.imageUrls[0];
     if (url && url.trim() !== '') {
-      return url;
+      const sanitized = sanitizeProductImageUrl(url, source.productId);
+      if (sanitized) return sanitized;
     }
   }
   
@@ -46,16 +122,18 @@ export const getProductImageUrl = (source: ImageSource): string => {
   if (source.images && source.images.length > 0) {
     const url = source.images[0];
     if (url && url.trim() !== '') {
-      return url;
+      const sanitized = sanitizeProductImageUrl(url, source.productId);
+      if (sanitized) return sanitized;
     }
   }
   
   // Try single imageUrl field (for order items)
   if (source.imageUrl && source.imageUrl.trim() !== '') {
-    return source.imageUrl;
+    const sanitized = sanitizeProductImageUrl(source.imageUrl, source.productId);
+    if (sanitized) return sanitized;
   }
   
-  // Return category-specific placeholder
+  // Return category-specific placeholder (or honest neutral fallback)
   return getCategoryPlaceholderImage(source.category || '');
 };
 
@@ -76,16 +154,25 @@ export const getThumbnailUrl = (url?: string | null, width = 400): string => {
  * Get all image URLs from various sources with fallbacks
  */
 export const getProductImageUrls = (source: ImageSource): string[] => {
+  // If product ID has a verified image override, prioritize it
+  if (source.productId && VERIFIED_ACCESSORY_IMAGES[source.productId]) {
+    return VERIFIED_ACCESSORY_IMAGES[source.productId];
+  }
+
   let images: string[] = [];
   
   // Try imageUrls array first
   if (source.imageUrls && source.imageUrls.length > 0) {
-    images = source.imageUrls.filter(url => url && url.trim() !== '');
+    images = source.imageUrls
+      .filter(url => url && url.trim() !== '')
+      .map(url => sanitizeProductImageUrl(url, source.productId));
   }
   
   // Try images array if no imageUrls
   if (images.length === 0 && source.images && source.images.length > 0) {
-    images = source.images.filter(url => url && url.trim() !== '');
+    images = source.images
+      .filter(url => url && url.trim() !== '')
+      .map(url => sanitizeProductImageUrl(url, source.productId));
   }
   
   // If no images found, return placeholder

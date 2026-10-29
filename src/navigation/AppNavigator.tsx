@@ -406,6 +406,7 @@ const AppNavigator: React.FC = () => {
         Search: 'search',
         ProductDetails: 'product/:productId',
         Offers: 'offers',
+        SignIn: 'signin',
       },
     },
     getStateFromPath: (path: string, options: any) => {

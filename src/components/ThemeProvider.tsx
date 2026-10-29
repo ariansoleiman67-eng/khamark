@@ -31,10 +31,11 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [themeMode, setThemeModeState] = useState<ThemeMode>('custom');
   const [currentCustomTheme, setCurrentCustomThemeState] = useState<CustomTheme | null>(DEFAULT_THEME.theme);
 
-  // Determine if dark mode should be active
-  const isDark = currentCustomTheme?.isDark || 
+  // Determine if dark mode should be active based on current active theme
+  const isDark = currentCustomTheme ? currentCustomTheme.isDark : (
     themeMode === 'dark' || 
-    (themeMode === 'system' && systemColorScheme === 'dark');
+    (themeMode === 'system' && systemColorScheme === 'dark')
+  );
 
   // Convert CustomTheme to Theme format for backward compatibility
   const theme: Theme = useMemo<Theme>(() => ((currentCustomTheme &&

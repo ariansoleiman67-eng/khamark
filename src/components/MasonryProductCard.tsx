@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useCallback } from "react";
 import {
   View,
   Pressable,
@@ -8,6 +8,8 @@ import {
   Platform,
   ViewStyle,
   StyleProp,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { Image } from "expo-image";
 import { useTheme } from "./ThemeProvider";
@@ -19,6 +21,7 @@ import AppText from "./AppText";
 import AppNumber from "./AppNumber";
 import { useCurrency } from "../contexts/CurrencyContext";
 import { useAuth } from "../contexts/AuthContext";
+import { useCartSafe } from "../contexts/CartContext";
 import { formatCompareAtPrice, formatPrice } from "../utils/currency";
 import {
   getEffectiveStock,
@@ -41,8 +44,8 @@ const GRID_GAP = 12;
 const DEFAULT_CARD_WIDTH = Math.floor((screenWidth - (GRID_PADDING * 2) - GRID_GAP) / 2);
 
 // Predictable text container budget:
-// paddingTop (8) + brand (14) + title (34) + variant/placeholder (14) + bottomStrip (48) + paddingBottom (8) = 138
-export const TEXT_CONTAINER_HEIGHT = 138;
+// brand (14) + title (34) + variant/placeholder (14) + priceBlock (34) + stepper (36) + padding (16) + gaps (18) = 166
+export const TEXT_CONTAINER_HEIGHT = 166;
 
 // Fixed brand accents
 const MAX_SWATCHES = 4;
@@ -81,8 +84,16 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
   const { t, i18n } = useTranslation();
   const { currency, exchangeRateIQD } = useCurrency();
   const { isVip } = useAuth();
+  const cartContext = useCartSafe();
+  const cart = cartContext?.cart ?? null;
+  const cartAddToCart = cartContext?.addToCart;
+  const cartUpdateQuantity = cartContext?.updateQuantity;
+  const cartRemoveFromCart = cartContext?.removeFromCart;
+
   const [imageError, setImageError] = useState(false);
   const [thumbFailed, setThumbFailed] = useState(false);
+  const [isPending, setIsPending] = useState(false);
+  const isUpdatingRef = useRef(false);
 
   // FlashList / recycled list state reset
   const [lastProductId, setLastProductId] = useState(product.id);
@@ -90,6 +101,8 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
     setLastProductId(product.id);
     setImageError(false);
     setThumbFailed(false);
+    setIsPending(false);
+    isUpdatingRef.current = false;
   }
 
   const isRTL =
@@ -115,80 +128,13 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
   };
   const handlePress = () => onPress(product.id, product);
 
-  const handleFavoritePress = () => {
+  const handleFavoritePress = (e?: any) => {
+    e?.stopPropagation?.();
     favoriteScale.value = withSpring(0.8, {}, () => {
       favoriteScale.value = withSpring(1);
     });
     onToggleFavorite?.(product.id);
   };
-
-  const addToCartRef = React.useRef<View>(null);
-
-  const handleAddToCart = () => {
-    const imageUrl = product.imageUrls?.[0];
-    if (imageUrl) {
-      addToCartRef.current?.measureInWindow((x, y, width, height) => {
-        try {
-          const { flyToCart } = require("../ui/FlyToCartLayer");
-          flyToCart(imageUrl, x + width / 2 - 20, y + height / 2 - 20);
-        } catch (e) {
-          console.warn("FlyToCartLayer not found or error", e);
-        }
-      });
-    }
-    scale.value = withSpring(1.02, {}, () => {
-      scale.value = withSpring(1, { damping: 12, stiffness: 200 });
-    });
-    if (onAddToCart && purchasable) {
-      onAddToCart(product.id, product);
-    }
-  };
-
-  // Products with options go to picker/details first
-  const handleCtaPress = () => {
-    if (!purchasable) return;
-    if (hasOptions) {
-      if (onSelectOptions) onSelectOptions(product.id, product);
-      else onPress(product.id, product);
-      return;
-    }
-    handleAddToCart();
-  };
-
-  const getDisplayTitle = () => {
-    if (i18n.language === "ar" && product.nameAr) return product.nameAr;
-    if (i18n.language === "ku" && product.nameKu) return product.nameKu;
-    return product.name;
-  };
-
-  const getPriceDisplay = () => {
-    if (product.priceTiers && product.priceTiers.length > 0) {
-      const minPrice = Math.min(...product.priceTiers.map((tier) => tier.priceUSD));
-      const minFormatted = formatPrice(minPrice, currency, exchangeRateIQD);
-      const maxFormatted = formatUnitPrice(product, isVip, currency, exchangeRateIQD, { symbol: false });
-      return `${minFormatted} - ${maxFormatted}`;
-    }
-    return formatUnitPrice(product, isVip, currency, exchangeRateIQD);
-  };
-
-  const vipActive = isVipPriceActive(product, isVip);
-  const hasDiscount = hasCompareAtDiscount(product, isVip);
-  const savePct = getDiscountPercent(product, isVip);
-  const effectiveStock = getEffectiveStock(product);
-
-  const hasValidPrice =
-    (product.priceUSD || 0) > 0 ||
-    (product.priceTiers?.some((tier) => (tier.priceUSD || 0) > 0) ?? false);
-
-  const isComingSoon = product.status === "coming_soon";
-  const isOnTheWay = product.status === "on_the_way";
-  const inStock = effectiveStock > 0 && (!product.status || product.status === "available");
-  const purchasable = inStock && hasValidPrice && !!onAddToCart;
-
-  let ctaLabel = t("product.addToCart", { defaultValue: "Add to Cart" });
-  if (isComingSoon) ctaLabel = t("products.status.comingSoon", { defaultValue: "Coming Soon" });
-  else if (isOnTheWay) ctaLabel = t("products.status.onTheWay", { defaultValue: "On the Way" });
-  else if (!inStock) ctaLabel = t("product.outOfStock", { defaultValue: "Out of Stock" });
 
   // Variant metadata
   const colorOptions = (product.colorVariations || []).filter(Boolean);
@@ -210,6 +156,151 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
     storageLabels.length > 0 ||
     (product.variations?.length ?? 0) > 0;
 
+  // Cart item synchronization
+  const matchingLines = useMemo(() => {
+    if (!cart?.items) return [];
+    return cart.items.filter((item) => item.productId === product.id);
+  }, [cart?.items, product.id]);
+
+  const currentQuantity = useMemo(() => {
+    return matchingLines.reduce((sum, item) => sum + (item.quantity || 0), 0);
+  }, [matchingLines]);
+
+  const effectiveStock = getEffectiveStock(product);
+  const hasValidPrice =
+    (product.priceUSD || 0) > 0 ||
+    (product.priceTiers?.some((tier) => (tier.priceUSD || 0) > 0) ?? false);
+
+  const isComingSoon = product.status === "coming_soon";
+  const isOnTheWay = product.status === "on_the_way";
+  const inStock = effectiveStock > 0 && (!product.status || product.status === "available");
+  const purchasable = inStock && hasValidPrice;
+
+  // Quantity Stepper Handlers
+  const handleIncrement = async (e?: any) => {
+    e?.stopPropagation?.();
+    if (!purchasable || isPending || isUpdatingRef.current) return;
+
+    // At 0 items in cart:
+    if (currentQuantity === 0) {
+      if (hasOptions) {
+        if (onSelectOptions) onSelectOptions(product.id, product);
+        else onPress(product.id, product);
+        return;
+      }
+
+      if (effectiveStock <= 0) return;
+
+      try {
+        isUpdatingRef.current = true;
+        setIsPending(true);
+        if (onAddToCart) {
+          await onAddToCart(product.id, product);
+        } else if (cartAddToCart) {
+          await cartAddToCart(product.id, 1, product);
+        }
+      } catch (err) {
+        console.warn("Cart increment error:", err);
+      } finally {
+        isUpdatingRef.current = false;
+        setIsPending(false);
+      }
+      return;
+    }
+
+    // When product has multiple variant lines in cart:
+    if (matchingLines.length > 1) {
+      if (onSelectOptions) onSelectOptions(product.id, product);
+      else onPress(product.id, product);
+      return;
+    }
+
+    // Single line in cart:
+    if (matchingLines.length === 1) {
+      const line = matchingLines[0];
+      if (line.quantity >= effectiveStock) {
+        Alert.alert(
+          t("common.notice", { defaultValue: "Stock Limit" }),
+          t("cart.maxStockReached", { defaultValue: "Maximum available stock reached" })
+        );
+        return;
+      }
+
+      try {
+        isUpdatingRef.current = true;
+        setIsPending(true);
+        if (cartUpdateQuantity) {
+          await cartUpdateQuantity(product.id, line.quantity + 1, line.selectedOptions);
+        }
+      } catch (err) {
+        console.warn("Cart updateQuantity error:", err);
+      } finally {
+        isUpdatingRef.current = false;
+        setIsPending(false);
+      }
+    }
+  };
+
+  const handleDecrement = async (e?: any) => {
+    e?.stopPropagation?.();
+    if (currentQuantity <= 0 || isPending || isUpdatingRef.current) return;
+
+    // When product has multiple variant lines in cart:
+    if (matchingLines.length > 1) {
+      if (onSelectOptions) onSelectOptions(product.id, product);
+      else onPress(product.id, product);
+      return;
+    }
+
+    // Single line in cart:
+    if (matchingLines.length === 1) {
+      const line = matchingLines[0];
+      try {
+        isUpdatingRef.current = true;
+        setIsPending(true);
+        if (line.quantity > 1) {
+          if (cartUpdateQuantity) {
+            await cartUpdateQuantity(product.id, line.quantity - 1, line.selectedOptions);
+          }
+        } else {
+          if (cartRemoveFromCart) {
+            await cartRemoveFromCart(product.id, line.selectedOptions);
+          }
+        }
+      } catch (err) {
+        console.warn("Cart decrement error:", err);
+      } finally {
+        isUpdatingRef.current = false;
+        setIsPending(false);
+      }
+    }
+  };
+
+  const getDisplayTitle = () => {
+    if (i18n.language === "ar" && product.nameAr) return product.nameAr;
+    if (i18n.language === "ku" && product.nameKu) return product.nameKu;
+    return product.name;
+  };
+
+  const getPriceDisplay = () => {
+    if (product.priceTiers && product.priceTiers.length > 0) {
+      const minPrice = Math.min(...product.priceTiers.map((tier) => tier.priceUSD));
+      const minFormatted = formatPrice(minPrice, currency, exchangeRateIQD);
+      const maxFormatted = formatUnitPrice(product, isVip, currency, exchangeRateIQD, { symbol: false });
+      return `${minFormatted} - ${maxFormatted}`;
+    }
+    return formatUnitPrice(product, isVip, currency, exchangeRateIQD);
+  };
+
+  const vipActive = isVipPriceActive(product, isVip);
+  const hasDiscount = hasCompareAtDiscount(product, isVip);
+  const savePct = getDiscountPercent(product, isVip);
+
+  let ctaLabel = t("product.addToCart", { defaultValue: "Add to Cart" });
+  if (isComingSoon) ctaLabel = t("products.status.comingSoon", { defaultValue: "Coming Soon" });
+  else if (isOnTheWay) ctaLabel = t("products.status.onTheWay", { defaultValue: "On the Way" });
+  else if (!inStock) ctaLabel = t("product.outOfStock", { defaultValue: "Out of Stock" });
+
   const localizedCategory = (() => {
     if (i18n.language === "ar" && product.categoryAr?.trim()) return product.categoryAr;
     if (i18n.language === "ku" && product.categoryKu?.trim()) return product.categoryKu;
@@ -222,6 +313,7 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
   const brandLine = product.brand || localizedCategory || "";
 
   const imageUri = getProductImageUrl({
+    productId: product.id,
     imageUrls: product.imageUrls,
     images: product.images || product.imageUrls,
     category: product.category,
@@ -272,7 +364,7 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
         styles.cardWrapper,
         {
           width: finalCardWidth,
-          height: finalCardHeight,
+          minHeight: finalCardHeight,
         },
         style,
       ]}
@@ -283,7 +375,6 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
           styles.card,
           {
             width: "100%",
-            height: "100%",
             backgroundColor: isDark ? (theme.colors.card || '#1E1E22') : '#FFFFFF',
             borderWidth: 1,
             borderColor: isDark ? '#2C2C30' : '#EAEAEA',
@@ -295,23 +386,21 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
           },
         ]}
       >
-        {/* Upper Card Area: Product Image */}
+        {/* Upper Card Area: Consistent Square Product Image Stage */}
         <View
           style={[
             styles.imageContainer,
             {
-              width: finalCardWidth,
-              height: finalCardWidth,
-              backgroundColor: isDark ? '#17171A' : '#FAFAFA',
+              backgroundColor: isDark ? '#18181B' : '#FFFFFF',
             },
           ]}
         >
-          {imageError ? (
+          {imageError || !displayUri ? (
             <View style={styles.imagePlaceholder}>
               <Ionicons
-                name="image-outline"
-                size={36}
-                color={theme.colors.textSecondary}
+                name="cube-outline"
+                size={34}
+                color={isDark ? '#52525B' : '#9CA3AF'}
               />
             </View>
           ) : (
@@ -330,7 +419,7 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
             />
           )}
 
-          {/* Wishlist action: Top-right (respects RTL), clean without heavy circle */}
+          {/* Wishlist action: Top-trailing, clean without heavy circle */}
           <Pressable
             style={({ pressed }) => [
               styles.favoriteButton,
@@ -356,7 +445,7 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
             </Animated.View>
           </Pressable>
 
-          {/* Restrained single badge at top-left (respects RTL) */}
+          {/* Restrained single badge at top-leading (respects RTL) */}
           {badgeConfig && (
             <View
               style={[
@@ -375,98 +464,93 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
           )}
         </View>
 
-        {/* Text + Compact Price/Add Strip */}
-        <View style={[styles.textContainer, { height: TEXT_CONTAINER_HEIGHT }]}>
-          {/* 1. Brand in small muted text */}
-          {brandLine ? (
+        {/* Text Container + Balanced Two-Row Footer */}
+        <View style={styles.textContainer}>
+          {/* Top section: Brand, Title, Variant tags */}
+          <View>
+            {/* 1. Brand in small muted text */}
+            {brandLine ? (
+              <AppText
+                fontSize={11}
+                style={[styles.brand, { color: isDark ? '#A1A1AA' : '#8E8E93', textAlign }]}
+                numberOfLines={1}
+              >
+                {brandLine}
+              </AppText>
+            ) : (
+              <View style={styles.brandPlaceholder} />
+            )}
+
+            {/* 2. Product name in readable medium weight (up to 2 lines) */}
             <AppText
-              fontSize={11}
-              style={[styles.brand, { color: isDark ? '#A1A1AA' : '#8E8E93', textAlign }]}
-              numberOfLines={1}
+              fontSize={13}
+              style={[styles.title, { color: theme.colors.text, textAlign }]}
+              numberOfLines={2}
+              ellipsizeMode="tail"
             >
-              {brandLine}
+              {getDisplayTitle()}
             </AppText>
-          ) : (
-            <View style={styles.brandPlaceholder} />
-          )}
 
-          {/* 2. Product name in readable medium weight (up to 2 lines) */}
-          <AppText
-            fontSize={13}
-            style={[styles.title, { color: theme.colors.text, textAlign }]}
-            numberOfLines={2}
-            ellipsizeMode="tail"
-          >
-            {getDisplayTitle()}
-          </AppText>
+            {/* 3. Optional swatches / storage meta */}
+            {hasVariantMeta ? (
+              <View
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                style={[styles.variantRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}
+              >
+                {swatchable.length > 0 ? (
+                  <View style={[styles.swatchRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+                    {swatchable.slice(0, MAX_SWATCHES).map((c) => (
+                      <View
+                        key={c.variationId}
+                        style={[
+                          styles.swatch,
+                          {
+                            backgroundColor: c.colorHex,
+                            borderColor: isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.15)",
+                          },
+                        ]}
+                      />
+                    ))}
+                    {extraColors > 0 && (
+                      <AppText fontSize={10} style={[styles.variantText, { color: theme.colors.textSecondary }]}>
+                        +{extraColors}
+                      </AppText>
+                    )}
+                  </View>
+                ) : colorOptions.length > 0 ? (
+                  <AppText
+                    fontSize={10}
+                    numberOfLines={1}
+                    style={[styles.variantText, { color: theme.colors.textSecondary }]}
+                  >
+                    {t("product.colorCount", {
+                      count: colorOptions.length,
+                      defaultValue: `${colorOptions.length} colors`,
+                    })}
+                  </AppText>
+                ) : null}
 
-          {/* 3. Optional swatches / storage meta */}
-          {hasVariantMeta ? (
-            <View
-              accessibilityElementsHidden
-              importantForAccessibility="no-hide-descendants"
-              style={[styles.variantRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}
-            >
-              {swatchable.length > 0 ? (
-                <View style={[styles.swatchRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-                  {swatchable.slice(0, MAX_SWATCHES).map((c) => (
-                    <View
-                      key={c.variationId}
-                      style={[
-                        styles.swatch,
-                        {
-                          backgroundColor: c.colorHex,
-                          borderColor: isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.15)",
-                        },
-                      ]}
-                    />
-                  ))}
-                  {extraColors > 0 && (
-                    <AppText fontSize={10} style={[styles.variantText, { color: theme.colors.textSecondary }]}>
-                      +{extraColors}
-                    </AppText>
-                  )}
-                </View>
-              ) : colorOptions.length > 0 ? (
-                <AppText
-                  fontSize={10}
-                  numberOfLines={1}
-                  style={[styles.variantText, { color: theme.colors.textSecondary }]}
-                >
-                  {t("product.colorCount", {
-                    count: colorOptions.length,
-                    defaultValue: `${colorOptions.length} colors`,
-                  })}
-                </AppText>
-              ) : null}
+                {!!storageRange && (
+                  <AppText
+                    fontSize={10}
+                    numberOfLines={1}
+                    style={[styles.storageText, { color: theme.colors.textSecondary }]}
+                  >
+                    {storageRange}
+                  </AppText>
+                )}
+              </View>
+            ) : (
+              <View style={styles.variantPlaceholder} />
+            )}
+          </View>
 
-              {!!storageRange && (
-                <AppText
-                  fontSize={10}
-                  numberOfLines={1}
-                  style={[styles.storageText, { color: theme.colors.textSecondary }]}
-                >
-                  {storageRange}
-                </AppText>
-              )}
-            </View>
-          ) : (
-            <View style={styles.variantPlaceholder} />
-          )}
-
-          {/* 4. Compact Bottom Strip: Formatted price on the left, circular red "+" button on the right */}
-          <View
-            style={[
-              styles.bottomStrip,
-              {
-                backgroundColor: isDark ? '#26262A' : '#F4F4F6',
-                flexDirection: isRTL ? "row-reverse" : "row",
-              },
-            ]}
-          >
-            {/* Price Details - Flexible Area */}
-            <View style={styles.priceContainer}>
-              {/* VIP Badge: Above the price instead of squeezed between amount and add button */}
+          {/* Bottom Section: Balanced Two Rows */}
+          <View style={styles.footerSection}>
+            {/* ROW 1: Price block (Full available width) */}
+            <View style={styles.priceBlock}>
+              {/* VIP Badge */}
               {vipActive && (
                 <View
                   style={[
@@ -483,8 +567,8 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
                 </View>
               )}
 
-              {/* Price Row: Primary price with clear bold font */}
-              <View style={[styles.priceRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+              {/* Primary Price */}
+              <View style={[styles.priceHeaderRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
                 <AppNumber
                   value={getPriceDisplay()}
                   numberOfLines={1}
@@ -496,10 +580,10 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
                 />
               </View>
 
-              {/* Compare-at discount or status below current price */}
+              {/* Compare-at discount or status underneath */}
               {!purchasable ? (
                 <AppText
-                  fontSize={9.5}
+                  fontSize={10}
                   numberOfLines={1}
                   style={[styles.unavailableText, { color: isDark ? '#A1A1AA' : '#6B7280', textAlign }]}
                 >
@@ -516,27 +600,76 @@ const MasonryProductCard: React.FC<MasonryProductCardProps> = ({
               ) : null}
             </View>
 
-            {/* Circular Red "+" Add-to-Cart Button - Dedicated Fixed Width Area */}
-            <View ref={addToCartRef} collapsable={false} style={styles.buttonContainer}>
+            {/* ROW 2: Always-visible Stepper [ - ] 0 [ + ] spanning available inner width */}
+            <View
+              style={[
+                styles.stepperContainer,
+                {
+                  backgroundColor: isDark ? '#26262A' : '#F4F4F6',
+                  flexDirection: isRTL ? 'row-reverse' : 'row',
+                },
+              ]}
+            >
+              {/* Minus Button: Leading side, disabled at 0 */}
               <Pressable
-                disabled={!purchasable}
-                onPress={handleCtaPress}
-                hitSlop={8}
+                disabled={currentQuantity <= 0 || !purchasable || isPending}
+                onPress={handleDecrement}
+                hitSlop={{ top: 6, bottom: 6, left: 8, right: 8 }}
                 accessibilityRole="button"
-                accessibilityLabel={`${t("product.addToCart", { defaultValue: "Add to cart" })}: ${getDisplayTitle()}`}
-                accessibilityState={{ disabled: !purchasable }}
+                accessibilityLabel={t("cart.decrease", { defaultValue: "Decrease quantity" })}
+                accessibilityState={{ disabled: currentQuantity <= 0 || !purchasable }}
                 style={({ pressed }) => [
-                  styles.plusButton,
+                  styles.stepperBtn,
                   {
-                    backgroundColor: purchasable ? SALE_RED : (isDark ? '#3A3A3E' : '#D1D5DB'),
-                    opacity: pressed && purchasable ? 0.82 : 1,
+                    opacity: currentQuantity <= 0 || !purchasable ? 0.35 : pressed ? 0.6 : 1,
                   },
                 ]}
               >
                 <Ionicons
-                  name={purchasable ? "add" : "close"}
-                  size={18}
-                  color={purchasable ? "#FFFFFF" : (isDark ? '#71717A' : '#9CA3AF')}
+                  name="remove"
+                  size={16}
+                  color={currentQuantity <= 0 ? (isDark ? '#52525B' : '#9CA3AF') : (isDark ? '#E4E4E7' : '#27272A')}
+                />
+              </Pressable>
+
+              {/* Quantity Counter: Centered */}
+              <View style={styles.stepperCountWrap}>
+                {isPending ? (
+                  <ActivityIndicator size="small" color={SALE_RED} style={{ transform: [{ scale: 0.7 }] }} />
+                ) : (
+                  <AppNumber
+                    value={String(currentQuantity)}
+                    style={[
+                      styles.stepperCountText,
+                      {
+                        color: currentQuantity > 0 ? (isDark ? '#FFFFFF' : '#111827') : (isDark ? '#71717A' : '#9CA3AF'),
+                      },
+                    ]}
+                  />
+                )}
+              </View>
+
+              {/* Plus Button: Trailing side, Khamark crimson */}
+              <Pressable
+                disabled={!purchasable || isPending}
+                onPress={handleIncrement}
+                hitSlop={{ top: 6, bottom: 6, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel={t("cart.increase", { defaultValue: "Increase quantity" })}
+                accessibilityState={{ disabled: !purchasable }}
+                style={({ pressed }) => [
+                  styles.stepperBtn,
+                  styles.plusStepperBtn,
+                  {
+                    backgroundColor: purchasable ? SALE_RED : (isDark ? '#3F3F46' : '#E5E7EB'),
+                    opacity: !purchasable ? 0.5 : pressed ? 0.8 : 1,
+                  },
+                ]}
+              >
+                <Ionicons
+                  name="add"
+                  size={16}
+                  color={purchasable ? '#FFFFFF' : (isDark ? '#71717A' : '#9CA3AF')}
                 />
               </Pressable>
             </View>
@@ -577,9 +710,10 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   imageContainer: {
-    alignSelf: "center",
+    width: "100%",
+    aspectRatio: 1,
     position: "relative",
-    padding: 12,
+    padding: 6,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -601,7 +735,7 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: "rgba(255, 255, 255, 0.82)",
+    backgroundColor: "rgba(255, 255, 255, 0.85)",
     zIndex: 10,
   },
   restrainedBadge: {
@@ -626,7 +760,8 @@ const styles = StyleSheet.create({
   textContainer: {
     paddingHorizontal: 10,
     paddingTop: 8,
-    paddingBottom: 8,
+    paddingBottom: 10,
+    minHeight: TEXT_CONTAINER_HEIGHT,
     justifyContent: "space-between",
   },
   brand: {
@@ -678,34 +813,19 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     minWidth: 0,
   },
-  bottomStrip: {
-    borderRadius: 16,
-    minHeight: 44,
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingStart: 10,
-    paddingEnd: 5,
-    paddingVertical: 5,
-    marginTop: 4,
+  footerSection: {
+    marginTop: 6,
   },
-  priceContainer: {
-    flex: 1,
-    marginEnd: 8,
+  priceBlock: {
+    minHeight: 32,
     justifyContent: "center",
   },
-  buttonContainer: {
-    flexShrink: 0,
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  priceRow: {
+  priceHeaderRow: {
     alignItems: "center",
   },
   priceText: {
     fontWeight: "700",
-    fontSize: 14,
+    fontSize: 14.5,
   },
   compareAtText: {
     textDecorationLine: "line-through",
@@ -713,7 +833,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   unavailableText: {
-    fontSize: 9.5,
+    fontSize: 10,
     fontWeight: "600",
     marginTop: 1,
   },
@@ -730,12 +850,34 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
     includeFontPadding: false,
   },
-  plusButton: {
+  stepperContainer: {
+    height: 36,
+    borderRadius: 10,
+    paddingHorizontal: 3,
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 6,
+  },
+  stepperBtn: {
     width: 32,
-    height: 32,
-    borderRadius: 16,
+    height: 30,
+    borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
+  },
+  plusStepperBtn: {
+    // solid red plus
+  },
+  stepperCountWrap: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepperCountText: {
+    fontSize: 13,
+    fontWeight: "700",
+    includeFontPadding: false,
+    textAlign: "center",
   },
 });
 

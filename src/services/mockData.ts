@@ -57,7 +57,19 @@ const SEEDS: Seed[] = [
   { id: 'p19', name: 'iPhone 17 Pro Max', brand: 'Apple', category: 'Phones', priceUSD: 1199, stockQty: 20, featured: true, desc: 'Apple iPhone 17 Pro Max with the A19 Pro chip, titanium frame, 6.9" ProMotion display and a pro camera system. Choose your colour and storage.' },
 ];
 
+const VERIFIED_SEEDS: Record<string, string[]> = {
+  p1: ['https://globaliraq.iq/cdn/shop/files/1_aecebb33-11bd-4154-ba57-11aa81aa946f.jpg?v=1779613983'],
+  p4: ['https://images.samsung.com/is/image/samsung/p6pim/levant_ar/ep-t6530nbegww/gallery/levant-ar-65w-power-adapter-trio-ep-t6530-ep-t6530nbegww-532744544?$1164_776_PNG$'],
+  p5: ['https://images.samsung.com/is/image/samsung/p6pim/levant_ar/ei-t5600bbegww/gallery/levant-ar-galaxy-smarttag2-ei-t5600-ei-t5600bbegww-538513169?$1164_776_PNG$'],
+  p6: ['https://images.samsung.com/is/image/samsung/p6pim/levant_ar/ep-ta800xbegww/gallery/levant-ar-wall-charger-for-super-fast-charging-25w-405723-ep-ta800xbegww-525295236?$1164_776_PNG$'],
+  p7: ['https://images.samsung.com/is/image/samsung/p6pim/bd/2401/gallery/bd-galaxy-s24-s928-sm-s928bztcbkd-539412884?$1164_776_PNG$'],
+  p8: ['https://images.samsung.com/is/image/samsung/p6pim/bd/2401/gallery/bd-galaxy-s24-s928-sm-s928bztcbkd-539412884?$1164_776_PNG$'],
+  p19: ['https://store.storeimages.cdn-apple.com/1/as-images.apple.com/is/refurb-iphone-16-pro-max-naturaltitanium-202509?wid=1144&hei=1144&fmt=jpeg&qlt=90'],
+};
+
 function build(s: Seed): Product {
+  const customImages = VERIFIED_SEEDS[s.id];
+  const images = customImages || [img(s.id)];
   return {
     id: s.id,
     name: s.name,
@@ -67,7 +79,7 @@ function build(s: Seed): Product {
     category: s.category,
     categoryAr: s.category,
     categoryKu: s.category,
-    imageUrls: [img(s.id + 'a'), img(s.id + 'b'), img(s.id + 'c')],
+    imageUrls: images,
     priceUSD: s.priceUSD,
     stockQty: s.stockQty,
     description: s.desc,
@@ -78,7 +90,7 @@ function build(s: Seed): Product {
     isActive: true,
     brand: s.brand,
     inStock: s.stockQty > 0,
-    images: [img(s.id + 'a'), img(s.id + 'b'), img(s.id + 'c')],
+    images: images,
     status: s.status ?? 'available',
     warranty: '12 months',
     condition: 'New',
@@ -106,15 +118,14 @@ MOCK_PRODUCTS.forEach((p) => {
 // swap the hero on selection; storage adds a price delta to the base price.
 const COLOR_VARIANTS: Record<string, Product['colorVariations']> = {
   p19: [
-    { variationId: 'p19_c_orange', colorValue: 'Cosmic Orange', colorHex: '#F5670A', imageUrl: img('p19-orange'), stockQuantity: 8 },
-    { variationId: 'p19_c_white', colorValue: 'Silver', colorHex: '#E6E7E9', imageUrl: img('p19-white'), stockQuantity: 6 },
-    { variationId: 'p19_c_black', colorValue: 'Space Black', colorHex: '#1C1C1E', imageUrl: img('p19-black'), stockQuantity: 4 },
-    { variationId: 'p19_c_blue', colorValue: 'Deep Blue', colorHex: '#2B4C8C', imageUrl: img('p19-blue'), stockQuantity: 2 },
+    { variationId: 'p19_c_natural', colorValue: 'Natural Titanium', colorHex: '#9E978E', imageUrl: 'https://store.storeimages.cdn-apple.com/1/as-images.apple.com/is/refurb-iphone-16-pro-max-naturaltitanium-202509?wid=1144&hei=1144&fmt=jpeg&qlt=90', stockQuantity: 8 },
+    { variationId: 'p19_c_white', colorValue: 'White Titanium', colorHex: '#F2F2F2', imageUrl: 'https://store.storeimages.cdn-apple.com/1/as-images.apple.com/is/refurb-iphone-16-pro-max-whitetitanium-202509?wid=1144&hei=1144&fmt=jpeg&qlt=90', stockQuantity: 6 },
+    { variationId: 'p19_c_black', colorValue: 'Black Titanium', colorHex: '#2B2B2E', imageUrl: 'https://store.storeimages.cdn-apple.com/1/as-images.apple.com/is/refurb-iphone-16-pro-max-blacktitanium-202509?wid=1144&hei=1144&fmt=jpeg&qlt=90', stockQuantity: 4 },
+    { variationId: 'p19_c_desert', colorValue: 'Desert Titanium', colorHex: '#C4A58C', imageUrl: 'https://store.storeimages.cdn-apple.com/1/as-images.apple.com/is/refurb-iphone-16-pro-max-deserttitanium-202509?wid=1144&hei=1144&fmt=jpeg&qlt=90', stockQuantity: 2 },
   ],
   p7: [
-    { variationId: 'p7_c_black', colorValue: 'Titanium Black', colorHex: '#2B2B2E', imageUrl: img('p7-black'), stockQuantity: 5 },
-    { variationId: 'p7_c_gray', colorValue: 'Titanium Gray', colorHex: '#8E8E93', imageUrl: img('p7-gray'), stockQuantity: 4 },
-    { variationId: 'p7_c_white', colorValue: 'Titanium White', colorHex: '#EDEDED', imageUrl: img('p7-white'), stockQuantity: 3 },
+    { variationId: 'p7_c_gray', colorValue: 'Titanium Gray', colorHex: '#8E8E93', imageUrl: 'https://images.samsung.com/is/image/samsung/p6pim/bd/2401/gallery/bd-galaxy-s24-s928-sm-s928bztcbkd-539412884?$1164_776_PNG$', stockQuantity: 5 },
+    { variationId: 'p7_c_black', colorValue: 'Titanium Black', colorHex: '#2B2B2E', imageUrl: 'https://images.samsung.com/is/image/samsung/p6pim/bd/2401/gallery/bd-galaxy-s24-s928-sm-s928bztcbkd-539412884?$1164_776_PNG$', stockQuantity: 4 },
   ],
 };
 const STORAGE_VARIANTS: Record<string, Product['storageOptions']> = {

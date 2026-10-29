@@ -169,7 +169,7 @@ export default function App() {
 
   // Step 2: Backstop only — the splash self-finishes via its own animation callback.
   // This guarantees we never hang behind it if that callback never fires. The logo
-  // splash runs well under a second, so a 3s guard is plenty.
+  // splash runs ~800ms on ready startup; 4s guard is plenty for safety.
   useEffect(() => {
     if (isReady && SPLASH_ENABLED) {
       const t = setTimeout(() => {
@@ -178,7 +178,7 @@ export default function App() {
         // fully-running app. hideAsync() is idempotent and safe to call more than once.
         SplashScreenExpo.hideAsync().catch(() => {});
         setShowCustomSplash(false);
-      }, 3000);
+      }, 4000);
       return () => clearTimeout(t);
     }
   }, [isReady]);
@@ -216,8 +216,8 @@ export default function App() {
 
   if (!isReady && !showCustomSplash) {
     // Failsafe: the splash animation can finish before resources are ready. Match
-    // the splash background so this reads as a continuation, not a black flash.
-    return <View style={{ flex: 1, backgroundColor: SHOW_LOGO_SPLASH ? '#FFFFFF' : '#000000' }} />;
+    // the splash background (#A61920) so this reads as a continuation, not a flash.
+    return <View style={{ flex: 1, backgroundColor: '#A61920' }} />;
   }
 
 
@@ -242,7 +242,7 @@ export default function App() {
                 <CartProvider>
                   <FavoritesProvider>
                     <NotificationProvider>
-                      <StatusBar style="auto" />
+                      <StatusBar style={showCustomSplash ? 'light' : 'auto'} />
                       {isReady && (
                         <>
                           <ConfigurationUnavailableNotice />
@@ -259,7 +259,11 @@ export default function App() {
                         </View>
                       )}
                       {showCustomSplash && SHOW_LOGO_SPLASH && (
-                        <AnimatedLogoSplash onFinish={handleSplashFinish} onStart={handleSplashStart} />
+                        <AnimatedLogoSplash
+                          isReady={isReady}
+                          onFinish={handleSplashFinish}
+                          onStart={handleSplashStart}
+                        />
                       )}
                     </NotificationProvider>
                   </FavoritesProvider>

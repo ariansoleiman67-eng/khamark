@@ -332,11 +332,10 @@ const HomeScreen: React.FC = () => {
     navigation.navigate('ProductDetails', { productId });
   }, [navigation]);
 
-  const handleAddToCartPress = useCallback((productId: string, product: Product) => {
+  const handleAddToCartPress = useCallback(async (productId: string, product: Product) => {
     if (!product) return;
     // Variant products (color / size / storage) need the customer to choose an
-    // option — send them straight to the detail page instead of a sheet that just
-    // bounces there anyway.
+    // option — send them straight to the detail page.
     const hasVariants =
       (product.colorVariations && product.colorVariations.length > 0) ||
       (product.variations && product.variations.length > 0) ||
@@ -345,9 +344,12 @@ const HomeScreen: React.FC = () => {
       navigation.navigate('ProductDetails', { productId });
       return;
     }
-    setCartSheetProduct(product);
-    setCartSheetVisible(true);
-  }, [navigation]);
+    try {
+      await addToCart(productId, 1, product);
+    } catch (e) {
+      console.warn('Error adding to cart from home card:', e);
+    }
+  }, [navigation, addToCart]);
 
   // Confirm handler for the Add to Cart bottom sheet
   const handleCartSheetConfirm = useCallback(async (orderData: {

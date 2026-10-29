@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -41,6 +42,9 @@ import { iosTapFix } from '../ui/iosTapFix';
  * measured per shopper, so a VIP's own price counts: hasCompareAtDiscount
  * compares against the displayed price, not the list price.
  */
+const GRID_PADDING = 16;
+const GRID_GAP = 12;
+
 const OffersScreen: React.FC = () => {
   const { theme } = useTheme();
   const { t, i18n } = useTranslation();
@@ -49,7 +53,9 @@ const OffersScreen: React.FC = () => {
   const { isFavorite, toggleFavorite } = useFavorites();
   const { tenantId } = useTenant();
   const { user } = useAuth();
+  const { width: windowWidth } = useWindowDimensions();
 
+  const cardWidth = Math.floor((windowWidth - (GRID_PADDING * 2) - GRID_GAP) / 2);
   const isRTL = I18nManager.isRTL || i18n.language === 'ar' || i18n.language === 'ku';
   const isVip = user?.role === 'vip';
 
@@ -108,11 +114,20 @@ const OffersScreen: React.FC = () => {
     [addToCart],
   );
 
+  const handleBack = useCallback(() => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate('Main');
+    }
+  }, [navigation]);
+
   const renderItem = useCallback(
     ({ item }: { item: Product }) => (
-      <View style={styles.cardWrap}>
+      <View style={{ width: cardWidth, marginBottom: 12 }}>
         <MasonryProductCard
           product={item}
+          cardWidth={cardWidth}
           onPress={handleProductPress}
           onAddToCart={handleAddToCart}
           isFavorite={isFavorite(item.id)}
@@ -120,13 +135,13 @@ const OffersScreen: React.FC = () => {
         />
       </View>
     ),
-    [handleProductPress, handleAddToCart, isFavorite, toggleFavorite],
+    [cardWidth, handleProductPress, handleAddToCart, isFavorite, toggleFavorite],
   );
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
       <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: theme.colors.surface }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={10} style={styles.iconBtn}>
+        <TouchableOpacity onPress={handleBack} hitSlop={10} style={styles.iconBtn}>
           <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={24} color={theme.colors.text} />
         </TouchableOpacity>
         <AppText fontSize={20} numberOfLines={1} style={[styles.title, { color: theme.colors.text }]}>
@@ -217,9 +232,8 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   count: { fontWeight: '800' },
-  listContent: { paddingHorizontal: 8, paddingBottom: 120 },
+  listContent: { paddingHorizontal: 16, paddingBottom: 120, paddingTop: 6 },
   column: { justifyContent: 'space-between' },
-  cardWrap: { width: '50%', paddingHorizontal: 4, marginBottom: 12 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80, paddingHorizontal: 32 },
   emptyText: { marginTop: 12, textAlign: 'center' },
   retryBtn: { marginTop: 16, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12 },
