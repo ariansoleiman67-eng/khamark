@@ -1,4 +1,4 @@
-# Asankary - Online Retail Store App
+# Khamark — Mobile Accessories & Consumer Electronics
 
 A comprehensive React Native Expo application for online retail (consumer electronics & accessories) in Iraq, featuring multilingual support (English, Arabic, Kurdish) with RTL layout, secure payment processing, and real-time order tracking.
 
